@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import sys
 import time
 
 # States:
@@ -151,8 +151,8 @@ mapper(SnapshotImage, snapshot_image_table,
 
 
 class NodeDatabase(object):
-    def __init__(self, path=os.path.expanduser("~/nodes.db")):
-        engine = create_engine('sqlite:///%s' % path, echo=False)
+    def __init__(self, dburi):
+        engine = create_engine(dburi, echo=False)
         metadata.create_all(engine)
         Session = sessionmaker(bind=engine, autoflush=True, autocommit=False)
         self.session = Session()
@@ -268,5 +268,5 @@ class NodeDatabase(object):
         return nodes[0]
 
 if __name__ == '__main__':
-    db = NodeDatabase()
+    db = NodeDatabase(sys.argv[0])
     db.print_state()

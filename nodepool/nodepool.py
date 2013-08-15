@@ -48,8 +48,8 @@ class NodeCompleteThread(threading.Thread):
     def __init__(self, nodepool, nodename):
         threading.Thread.__init__(self)
         self.nodename = nodename
-        self.db = nodedb.NodeDatabase()
         self.nodepool = nodepool
+        self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
 
     def run(self):
         try:
@@ -61,8 +61,9 @@ class NodeCompleteThread(threading.Thread):
     def handleEvent(self):
         node = self.db.getNodeByNodename(self.nodename)
         if not node:
-            raise Exception("Unable to find node with nodename: %s" %
-                            self.nodename)
+            self.log.debug("Unable to find node with nodename: %s" %
+                           self.nodename)
+            return
         self.nodepool.deleteNode(node)
 
 
@@ -77,7 +78,7 @@ class NodeUpdateListener(threading.Thread):
         self.socket.setsockopt(zmq.SUBSCRIBE, event_filter)
         self.socket.connect(addr)
         self._stopped = False
-        self.db = nodedb.NodeDatabase()
+        self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
 
     def run(self):
         while not self._stopped:
@@ -91,20 +92,26 @@ class NodeUpdateListener(threading.Thread):
     def handleEvent(self, topic, data):
         self.log.debug("Received: %s %s" % (topic, data))
         args = json.loads(data)
+        build = args['build']
+        if 'node_name' not in build:
+            return
         nodename = args['build']['node_name']
         if topic == 'onStarted':
             self.handleStartPhase(nodename)
+        elif topic == 'onCompleted':
+            pass
         elif topic == 'onFinalized':
             self.handleCompletePhase(nodename)
         else:
             raise Exception("Received job for unhandled phase: %s" %
-                            args['phase'])
+                            topic)
 
     def handleStartPhase(self, nodename):
         node = self.db.getNodeByNodename(nodename)
         if not node:
-            raise Exception("Unable to find node with nodename: %s" %
-                            nodename)
+            self.log.debug("Unable to find node with nodename: %s" %
+                           nodename)
+            return
         node.state = nodedb.USED
         self.nodepool.updateStats(node.provider_name)
 
@@ -127,7 +134,7 @@ class NodeLauncher(threading.Thread):
     def run(self):
         self.log.debug("Launching node id: %s" % self.node_id)
         try:
-            self.db = nodedb.NodeDatabase()
+            self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
             self.node = self.db.getNode(self.node_id)
             self.client = utils.get_client(self.provider)
         except Exception:
@@ -250,18 +257,19 @@ class NodeLauncher(threading.Thread):
 class ImageUpdater(threading.Thread):
     log = logging.getLogger("nodepool.ImageUpdater")
 
-    def __init__(self, provider, image, snap_image_id, scriptdir):
+    def __init__(self, nodepool, provider, image, snap_image_id):
         threading.Thread.__init__(self)
         self.provider = provider
         self.image = image
         self.snap_image_id = snap_image_id
-        self.scriptdir = scriptdir
+        self.nodepool = nodepool
+        self.scriptdir = self.nodepool.config.scriptdir
 
     def run(self):
         self.log.debug("Updating image %s in %s " % (self.image.name,
                                                      self.provider.name))
         try:
-            self.db = nodedb.NodeDatabase()
+            self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
             self.snap_image = self.db.getSnapshotImage(self.snap_image_id)
             self.client = utils.get_client(self.provider)
         except Exception:
@@ -414,9 +422,9 @@ class NodePool(threading.Thread):
     def __init__(self, configfile):
         threading.Thread.__init__(self)
         self.configfile = configfile
-        self.db = nodedb.NodeDatabase()
         self.zmq_context = None
         self.zmq_listeners = {}
+        self.db = None
         self.apsched = apscheduler.scheduler.Scheduler()
         self.apsched.start()
 
@@ -465,6 +473,7 @@ class NodePool(threading.Thread):
         newconfig.providers = {}
         newconfig.targets = {}
         newconfig.scriptdir = config.get('script-dir')
+        newconfig.dburi = config.get('dburi')
 
         for provider in config['providers']:
             p = Provider()
@@ -514,6 +523,7 @@ class NodePool(threading.Thread):
                     i.providers[p.name] = p
                     p.min_ready = provider['min-ready']
         self.config = newconfig
+        self.db = nodedb.NodeDatabase(self.config.dburi)
         self.startUpdateListeners(config['zmq-publishers'])
 
     def startUpdateListeners(self, publishers):
@@ -570,7 +580,13 @@ class NodePool(threading.Thread):
                                           (num_to_launch, image.name,
                                            target.name, provider.name))
                         for i in range(num_to_launch):
-                            self.launchNode(provider, image, target)
+                            snap_image = self.db.getCurrentSnapshotImage(
+                                provider.name, image.name)
+                            if not snap_image:
+                                self.log.debug("No current image for %s on %s"
+                                               % (provider.name, image.name))
+                            else:
+                                self.launchNode(provider, image, target)
             time.sleep(WATERMARK_SLEEP)
 
     def checkForMissingImages(self):
@@ -602,8 +618,7 @@ class NodePool(threading.Thread):
                 snap_image = self.db.createSnapshotImage(
                     provider_name=provider.name,
                     image_name=image.name)
-                t = ImageUpdater(provider, image, snap_image.id,
-                                 self.config.scriptdir)
+                t = ImageUpdater(self, provider, image, snap_image.id)
                 t.start()
                 # Enough time to give them different timestamps (versions)
                 # Just to keep things clearer.
@@ -661,7 +676,7 @@ class NodePool(threading.Thread):
         # old images.
 
         self.log.debug("Starting periodic cleanup")
-        db = nodedb.NodeDatabase()
+        db = nodedb.NodeDatabase(self.config.dburi)
         for node in db.getNodes():
             if node.state in [nodedb.READY, nodedb.HOLD]:
                 continue
@@ -717,7 +732,7 @@ class NodePool(threading.Thread):
         if not statsd:
             return
         # This may be called outside of the main thread.
-        db = nodedb.NodeDatabase()
+        db = nodedb.NodeDatabase(self.config.dburi)
         provider = self.config.providers[provider_name]
 
         states = {}
