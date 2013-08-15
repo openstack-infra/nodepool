@@ -27,7 +27,9 @@ import os
 import sys
 import signal
 
-import nodepool.nodepool
+# No nodepool imports here because they pull in paramiko which must not be
+# imported until after the daemonization.
+# https://github.com/paramiko/paramiko/issues/59
 
 
 class NodePoolDaemon(object):
@@ -66,6 +68,7 @@ class NodePoolDaemon(object):
         os._exit(0)
 
     def main(self):
+        import nodepool.nodepool
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.config)
 
@@ -100,5 +103,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, '.')
     sys.exit(main())
