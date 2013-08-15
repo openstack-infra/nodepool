@@ -250,11 +250,12 @@ class NodeLauncher(threading.Thread):
 class ImageUpdater(threading.Thread):
     log = logging.getLogger("nodepool.ImageUpdater")
 
-    def __init__(self, provider, image, snap_image_id):
+    def __init__(self, provider, image, snap_image_id, scriptdir):
         threading.Thread.__init__(self)
         self.provider = provider
         self.image = image
         self.snap_image_id = snap_image_id
+        self.scriptdir = scriptdir
 
     def run(self):
         self.log.debug("Updating image %s in %s " % (self.image.name,
@@ -365,8 +366,8 @@ class ImageUpdater(threading.Thread):
             raise Exception("Unable to log in via SSH")
 
         host.ssh("make scripts dir", "mkdir -p scripts")
-        for fname in os.listdir('scripts'):
-            host.scp(os.path.join('scripts', fname), 'scripts/%s' % fname)
+        for fname in os.listdir(self.scriptdir):
+            host.scp(os.path.join(self.scriptdir, fname), 'scripts/%s' % fname)
         host.ssh("make scripts executable", "chmod a+x scripts/*")
         if self.image.setup:
             env_vars = ''
@@ -463,6 +464,8 @@ class NodePool(threading.Thread):
         newconfig = Config()
         newconfig.providers = {}
         newconfig.targets = {}
+        newconfig.scriptdir = config.get('script-dir')
+
         for provider in config['providers']:
             p = Provider()
             p.name = provider['name']
@@ -599,7 +602,8 @@ class NodePool(threading.Thread):
                 snap_image = self.db.createSnapshotImage(
                     provider_name=provider.name,
                     image_name=image.name)
-                t = ImageUpdater(provider, image, snap_image.id)
+                t = ImageUpdater(provider, image, snap_image.id,
+                                 self.config.scriptdir)
                 t.start()
                 # Enough time to give them different timestamps (versions)
                 # Just to keep things clearer.
