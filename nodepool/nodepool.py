@@ -112,6 +112,7 @@ class NodeUpdateListener(threading.Thread):
             self.log.debug("Unable to find node with nodename: %s" %
                            nodename)
             return
+        self.log.info("Setting node id: %s to USED" % node.id)
         node.state = nodedb.USED
         self.nodepool.updateStats(node.provider_name)
 
@@ -627,7 +628,7 @@ class NodePool(threading.Thread):
     def launchNode(self, provider, image, target):
         provider = self.config.providers[provider.name]
         image = provider.images[image.name]
-        node = self.db.createNode(provider.name, image.name)
+        node = self.db.createNode(provider.name, image.name, target.name)
         t = NodeLauncher(self, provider, image, target, node.id)
         t.start()
 

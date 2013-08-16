@@ -115,10 +115,12 @@ class SnapshotImage(object):
 
 
 class Node(object):
-    def __init__(self, provider_name, image_name, hostname=None,
-                 external_id=None, ip=None, state=BUILDING):
+    def __init__(self, provider_name, image_name, target_name,
+                 hostname=None, external_id=None, ip=None,
+                 state=BUILDING):
         self.provider_name = provider_name
         self.image_name = image_name
+        self.target_name = target_name
         self.external_id = external_id
         self.ip = ip
         self.hostname = hostname

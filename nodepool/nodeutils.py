@@ -156,7 +156,7 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
             client = SSHClient(ip, username, **connect_kwargs)
             break
         except socket.error, e:
-            if e[0] != 111:
+            if e[0] not in [111, 113]:
                 log.exception('Exception while testing ssh access:')
 
     out = client.ssh("test ssh access", "echo access okay")
