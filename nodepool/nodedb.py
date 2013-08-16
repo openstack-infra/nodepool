@@ -69,7 +69,7 @@ node_table = Table(
     Column('id', Integer, primary_key=True),
     Column('provider_name', String(255), index=True, nullable=False),
     Column('image_name', String(255), index=True, nullable=False),
-    Column('target_name', String(255)),
+    Column('target_name', String(255), index=True, nullable=False),
     # Machine name
     Column('hostname', String(255), index=True),
     # Eg, jenkins node name
