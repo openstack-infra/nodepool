@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import errno
 import time
 import socket
 import logging
@@ -39,13 +40,14 @@ def iterate_timeout(max_seconds, purpose):
 def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
     if ip == 'fake':
         return fakeprovider.FakeSSHClient()
-    # HPcloud may return errno 111 for about 30 seconds after adding the IP
+    # HPcloud may return ECONNREFUSED or EHOSTUNREACH
+    # for about 30 seconds after adding the IP
     for count in iterate_timeout(timeout, "ssh access"):
         try:
             client = SSHClient(ip, username, **connect_kwargs)
             break
         except socket.error, e:
-            if e[0] not in [111, 113]:
+            if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH]:
                 log.exception('Exception while testing ssh access:')
 
     out = client.ssh("test ssh access", "echo access okay")
