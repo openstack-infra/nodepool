@@ -1,0 +1,13 @@
+Developer setup:
+
+mysql -u root
+
+mysql> create database nodepool;
+mysql> GRANT ALL ON nodepool.* TO 'nodepool'@'localhost';
+mysql> flush privileges;
+
+nodepool -d -c tools/fake.yaml
+
+After each run (the fake nova provider is only in-memory):
+
+mysql> delete from snapshot_image; delete from node;

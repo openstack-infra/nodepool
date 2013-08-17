@@ -21,9 +21,11 @@ import time
 import paramiko
 import socket
 import logging
+import myjenkins
 from sshclient import SSHClient
 
 import nodedb
+import fakeprovider
 
 log = logging.getLogger("nodepool.utils")
 
@@ -48,8 +50,17 @@ def get_client(provider):
         kwargs['service_name'] = provider.service_name
     if provider.region_name:
         kwargs['region_name'] = provider.region_name
+    if provider.auth_url == 'fake':
+        return fakeprovider.FAKE_CLIENT
     client = novaclient.client.Client(*args, **kwargs)
     return client
+
+
+def get_jenkins(url, user, apikey):
+    if apikey == 'fake':
+        return fakeprovider.FakeJenkins()
+    return myjenkins.Jenkins(url, user, apikey)
+
 
 extension_cache = {}
 
@@ -150,6 +161,8 @@ def wait_for_resource(wait_resource, timeout=3600):
 
 
 def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
+    if ip == 'fake':
+        return fakeprovider.FakeSSHClient()
     # HPcloud may return errno 111 for about 30 seconds after adding the IP
     for count in iterate_timeout(timeout, "ssh access"):
         try:

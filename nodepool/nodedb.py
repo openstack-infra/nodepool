@@ -42,7 +42,7 @@ STATE_NAMES = {
 
 from sqlalchemy import Table, Column, Integer, String, \
     MetaData, create_engine
-from sqlalchemy.orm import mapper
+from sqlalchemy.orm import scoped_session, mapper
 from sqlalchemy.orm.session import Session, sessionmaker
 
 metadata = MetaData()
@@ -154,10 +154,27 @@ mapper(SnapshotImage, snapshot_image_table,
 
 class NodeDatabase(object):
     def __init__(self, dburi):
-        engine = create_engine(dburi, echo=False)
-        metadata.create_all(engine)
-        Session = sessionmaker(bind=engine, autoflush=True, autocommit=False)
-        self.session = Session()
+        self.engine = create_engine(dburi, echo=False)
+        metadata.create_all(self.engine)
+        self.session_factory = sessionmaker(bind=self.engine)
+        self.session = scoped_session(self.session_factory)
+
+    def getSession(self):
+        return NodeDatabaseSession(self.session)
+
+
+class NodeDatabaseSession(object):
+    def __init__(self, session):
+        self.session = session
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, value, tb):
+        if etype:
+            self.session().rollback()
+        else:
+            self.session().commit()
 
     def print_state(self):
         for provider_name in self.getProviders():
@@ -182,40 +199,41 @@ class NodeDatabase(object):
                         node.state_time, node.ip)
 
     def abort(self):
-        self.session.rollback()
+        self.session().rollback()
 
     def commit(self):
-        self.session.commit()
+        self.session().commit()
 
     def delete(self, obj):
-        self.session.delete(obj)
+        self.session().delete(obj)
 
     def getProviders(self):
         return [
             x.provider_name for x in
-            self.session.query(SnapshotImage).distinct(
+            self.session().query(SnapshotImage).distinct(
                 snapshot_image_table.c.provider_name).all()]
 
     def getImages(self, provider_name):
         return [
             x.image_name for x in
-            self.session.query(SnapshotImage).filter(
+            self.session().query(SnapshotImage).filter(
                 snapshot_image_table.c.provider_name == provider_name
                 ).distinct(snapshot_image_table.c.image_name).all()]
 
     def getSnapshotImages(self):
-        return self.session.query(SnapshotImage).order_by(
+        return self.session().query(SnapshotImage).order_by(
             snapshot_image_table.c.provider_name,
             snapshot_image_table.c.image_name).all()
 
-    def getSnapshotImage(self, id):
-        images = self.session.query(SnapshotImage).filter_by(id=id).all()
+    def getSnapshotImage(self, image_id):
+        images = self.session().query(SnapshotImage).filter_by(
+            id=image_id).all()
         if not images:
             return None
         return images[0]
 
     def getCurrentSnapshotImage(self, provider_name, image_name):
-        images = self.session.query(SnapshotImage).filter(
+        images = self.session().query(SnapshotImage).filter(
             snapshot_image_table.c.provider_name == provider_name,
             snapshot_image_table.c.image_name == image_name,
             snapshot_image_table.c.state == READY).order_by(
@@ -226,13 +244,13 @@ class NodeDatabase(object):
 
     def createSnapshotImage(self, *args, **kwargs):
         new = SnapshotImage(*args, **kwargs)
-        self.session.add(new)
-        self.session.commit()
+        self.session().add(new)
+        self.commit()
         return new
 
     def getNodes(self, provider_name=None, image_name=None, target_name=None,
                  state=None):
-        exp = self.session.query(Node).order_by(
+        exp = self.session().query(Node).order_by(
             node_table.c.provider_name,
             node_table.c.image_name)
         if provider_name:
@@ -247,24 +265,24 @@ class NodeDatabase(object):
 
     def createNode(self, *args, **kwargs):
         new = Node(*args, **kwargs)
-        self.session.add(new)
-        self.session.commit()
+        self.session().add(new)
+        self.commit()
         return new
 
     def getNode(self, id):
-        nodes = self.session.query(Node).filter_by(id=id).all()
+        nodes = self.session().query(Node).filter_by(id=id).all()
         if not nodes:
             return None
         return nodes[0]
 
     def getNodeByHostname(self, hostname):
-        nodes = self.session.query(Node).filter_by(hostname=hostname).all()
+        nodes = self.session().query(Node).filter_by(hostname=hostname).all()
         if not nodes:
             return None
         return nodes[0]
 
     def getNodeByNodename(self, nodename):
-        nodes = self.session.query(Node).filter_by(nodename=nodename).all()
+        nodes = self.session().query(Node).filter_by(nodename=nodename).all()
         if not nodes:
             return None
         return nodes[0]

@@ -1,0 +1,34 @@
+script-dir: .
+dburi: 'mysql://nodepool@localhost/nodepool'
+
+cron:
+  cleanup: '*/1 * * * *'
+  update-image: '14 2 * * *'
+
+zmq-publishers:
+  - tcp://localhost:8888
+
+providers:
+  - name: fake-provider
+    username: 'fake'
+    password: 'fake'
+    auth-url: 'fake'
+    project-id: 'fake'
+    max-servers: 96
+    images:
+      - name: nodepool-fake
+        base-image: 'Fake Precise'
+        min-ram: 8192
+        setup: prepare_node_devstack.sh
+
+targets:
+  - name: fake-jenkins
+    jenkins:
+      url: https://jenkins.example.org/
+      user: fake
+      apikey: fake
+    images:
+      - name: nodepool-fake
+        providers:
+          - name: fake-provider
+            min-ready: 6

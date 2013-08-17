@@ -49,22 +49,22 @@ class NodeCompleteThread(threading.Thread):
         threading.Thread.__init__(self)
         self.nodename = nodename
         self.nodepool = nodepool
-        self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
 
     def run(self):
         try:
-            self.handleEvent()
+            with self.nodepool.db.getSession() as session:
+                self.handleEvent(session)
         except Exception:
             self.log.exception("Exception handling event for %s:" %
                                self.nodename)
 
-    def handleEvent(self):
-        node = self.db.getNodeByNodename(self.nodename)
+    def handleEvent(self, session):
+        node = session.getNodeByNodename(self.nodename)
         if not node:
             self.log.debug("Unable to find node with nodename: %s" %
                            self.nodename)
             return
-        self.nodepool.deleteNode(node)
+        self.nodepool.deleteNode(session, node)
 
 
 class NodeUpdateListener(threading.Thread):
@@ -78,7 +78,6 @@ class NodeUpdateListener(threading.Thread):
         self.socket.setsockopt(zmq.SUBSCRIBE, event_filter)
         self.socket.connect(addr)
         self._stopped = False
-        self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
 
     def run(self):
         while not self._stopped:
@@ -107,14 +106,15 @@ class NodeUpdateListener(threading.Thread):
                             topic)
 
     def handleStartPhase(self, nodename):
-        node = self.db.getNodeByNodename(nodename)
-        if not node:
-            self.log.debug("Unable to find node with nodename: %s" %
-                           nodename)
-            return
-        self.log.info("Setting node id: %s to USED" % node.id)
-        node.state = nodedb.USED
-        self.nodepool.updateStats(node.provider_name)
+        with self.nodepool.db.getSession() as session:
+            node = session.getNodeByNodename(nodename)
+            if not node:
+                self.log.debug("Unable to find node with nodename: %s" %
+                               nodename)
+                return
+            self.log.info("Setting node id: %s to USED" % node.id)
+            node.state = nodedb.USED
+            self.nodepool.updateStats(session, node.provider_name)
 
     def handleCompletePhase(self, nodename):
         t = NodeCompleteThread(self.nodepool, nodename)
@@ -133,29 +133,35 @@ class NodeLauncher(threading.Thread):
         self.nodepool = nodepool
 
     def run(self):
-        self.log.debug("Launching node id: %s" % self.node_id)
         try:
-            self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
-            self.node = self.db.getNode(self.node_id)
-            self.client = utils.get_client(self.provider)
+            self._run()
         except Exception:
-            self.log.exception("Exception preparing to launch node id: %s:" %
-                               self.node_id)
-            return
+            self.log.exception("Exception in run method:")
 
-        try:
-            self.launchNode()
-        except Exception:
-            self.log.exception("Exception launching node id: %s:" %
-                               self.node_id)
+    def _run(self):
+        with self.nodepool.db.getSession() as session:
+            self.log.debug("Launching node id: %s" % self.node_id)
             try:
-                utils.delete_node(self.client, self.node)
+                self.node = session.getNode(self.node_id)
+                self.client = utils.get_client(self.provider)
             except Exception:
-                self.log.exception("Exception deleting node id: %s:" %
-                                   self.node_id)
+                self.log.exception("Exception preparing to launch node id: %s:"
+                                   % self.node_id)
                 return
 
-    def launchNode(self):
+            try:
+                self.launchNode(session)
+            except Exception:
+                self.log.exception("Exception launching node id: %s:" %
+                                   self.node_id)
+                try:
+                    utils.delete_node(self.client, self.node)
+                except Exception:
+                    self.log.exception("Exception deleting node id: %s:" %
+                                       self.node_id)
+                    return
+
+    def launchNode(self, session):
         start_time = time.time()
 
         hostname = '%s-%s-%s.slave.openstack.org' % (
@@ -165,7 +171,7 @@ class NodeLauncher(threading.Thread):
         self.node.target_name = self.target.name
 
         flavor = utils.get_flavor(self.client, self.image.min_ram)
-        snap_image = self.db.getCurrentSnapshotImage(
+        snap_image = session.getCurrentSnapshotImage(
             self.provider.name, self.image.name)
         if not snap_image:
             raise Exception("Unable to find current snapshot image %s in %s" %
@@ -179,7 +185,7 @@ class NodeLauncher(threading.Thread):
         server, key = utils.create_server(self.client, hostname,
                                           remote_snap_image, flavor)
         self.node.external_id = server.id
-        self.db.commit()
+        session.commit()
 
         self.log.debug("Waiting for server %s for node id: %s" %
                        (server.id, self.node.id))
@@ -213,7 +219,7 @@ class NodeLauncher(threading.Thread):
         # Jenkins might immediately use the node before we've updated
         # the state:
         self.node.state = nodedb.READY
-        self.nodepool.updateStats(self.provider.name)
+        self.nodepool.updateStats(session, self.provider.name)
         self.log.info("Node id: %s is ready" % self.node.id)
 
         if self.target.jenkins_url:
@@ -222,7 +228,7 @@ class NodeLauncher(threading.Thread):
             self.log.info("Node id: %s added to jenkins" % self.node.id)
 
     def createJenkinsNode(self):
-        jenkins = myjenkins.Jenkins(self.target.jenkins_url,
+        jenkins = utils.get_jenkins(self.target.jenkins_url,
                                     self.target.jenkins_user,
                                     self.target.jenkins_apikey)
         node_desc = 'Dynamic single use %s node' % self.image.name
@@ -267,31 +273,39 @@ class ImageUpdater(threading.Thread):
         self.scriptdir = self.nodepool.config.scriptdir
 
     def run(self):
-        self.log.debug("Updating image %s in %s " % (self.image.name,
-                                                     self.provider.name))
         try:
-            self.db = nodedb.NodeDatabase(self.nodepool.config.dburi)
-            self.snap_image = self.db.getSnapshotImage(self.snap_image_id)
-            self.client = utils.get_client(self.provider)
+            self._run()
         except Exception:
-            self.log.exception("Exception preparing to update image %s in %s:"
-                               % (self.image.name, self.provider.name))
-            return
+            self.log.exception("Exception in run method:")
 
-        try:
-            self.updateImage()
-        except Exception:
-            self.log.exception("Exception updating image %s in %s:" %
-                               (self.image.name, self.provider.name))
+    def _run(self):
+        with self.nodepool.db.getSession() as session:
+            self.log.debug("Updating image %s in %s " % (self.image.name,
+                                                         self.provider.name))
             try:
-                if self.snap_image:
-                    utils.delete_image(self.client, self.snap_image)
+                self.snap_image = session.getSnapshotImage(
+                    self.snap_image_id)
+                self.client = utils.get_client(self.provider)
             except Exception:
-                self.log.exception("Exception deleting image id: %s:" %
-                                   self.snap_image.id)
+                self.log.exception("Exception preparing to update image %s "
+                                   "in %s:" % (self.image.name,
+                                               self.provider.name))
                 return
 
-    def updateImage(self):
+            try:
+                self.updateImage(session)
+            except Exception:
+                self.log.exception("Exception updating image %s in %s:" %
+                                   (self.image.name, self.provider.name))
+                try:
+                    if self.snap_image:
+                        utils.delete_image(self.client, self.snap_image)
+                except Exception:
+                    self.log.exception("Exception deleting image id: %s:" %
+                                       self.snap_image.id)
+                    return
+
+    def updateImage(self, session):
         start_time = time.time()
         timestamp = int(start_time)
 
@@ -308,7 +322,7 @@ class ImageUpdater(threading.Thread):
         self.snap_image.hostname = hostname
         self.snap_image.version = timestamp
         self.snap_image.server_external_id = server.id
-        self.db.commit()
+        session.commit()
 
         self.log.debug("Image id: %s waiting for server %s" %
                        (self.snap_image.id, server.id))
@@ -322,7 +336,7 @@ class ImageUpdater(threading.Thread):
 
         image = utils.create_image(self.client, server, hostname)
         self.snap_image.external_id = image.id
-        self.db.commit()
+        session.commit()
         self.log.debug("Image id: %s building image %s" %
                        (self.snap_image.id, image.id))
         # It can take a _very_ long time for Rackspace 1.0 to save an image
@@ -339,6 +353,7 @@ class ImageUpdater(threading.Thread):
             statsd.incr(key)
 
         self.snap_image.state = nodedb.READY
+        session.commit()
         self.log.info("Image %s in %s is ready" % (hostname,
                                                    self.provider.name))
 
@@ -426,6 +441,7 @@ class NodePool(threading.Thread):
         self.zmq_context = None
         self.zmq_listeners = {}
         self.db = None
+        self.dburi = None
         self.apsched = apscheduler.scheduler.Scheduler()
         self.apsched.start()
 
@@ -452,7 +468,7 @@ class NodePool(threading.Thread):
                 self.apsched.unschedule_job(self.update_job)
             parts = update_cron.split()
             minute, hour, dom, month, dow = parts[:5]
-            self.apsched.add_cron_job(self.updateImages,
+            self.apsched.add_cron_job(self._doUpdateImages,
                                       day=dom,
                                       day_of_week=dow,
                                       hour=hour,
@@ -463,7 +479,7 @@ class NodePool(threading.Thread):
                 self.apsched.unschedule_job(self.cleanup_job)
             parts = cleanup_cron.split()
             minute, hour, dom, month, dow = parts[:5]
-            self.apsched.add_cron_job(self.periodicCleanup,
+            self.apsched.add_cron_job(self._doPeriodicCleanup,
                                       day=dom,
                                       day_of_week=dow,
                                       hour=hour,
@@ -524,7 +540,9 @@ class NodePool(threading.Thread):
                     i.providers[p.name] = p
                     p.min_ready = provider['min-ready']
         self.config = newconfig
-        self.db = nodedb.NodeDatabase(self.config.dburi)
+        if self.config.dburi != self.dburi:
+            self.dburi = self.config.dburi
+            self.db = nodedb.NodeDatabase(self.config.dburi)
         self.startUpdateListeners(config['zmq-publishers'])
 
     def startUpdateListeners(self, publishers):
@@ -545,15 +563,15 @@ class NodePool(threading.Thread):
             self.zmq_listeners[addr] = listener
             listener.start()
 
-    def getNumNeededNodes(self, target, provider, image):
+    def getNumNeededNodes(self, session, target, provider, image):
         # Count machines that are ready and machines that are building,
         # so that if the provider is very slow, we aren't queueing up tons
         # of machines to be built.
-        n_ready = len(self.db.getNodes(provider.name, image.name, target.name,
+        n_ready = len(session.getNodes(provider.name, image.name, target.name,
                                        nodedb.READY))
-        n_building = len(self.db.getNodes(provider.name, image.name,
+        n_building = len(session.getNodes(provider.name, image.name,
                                           target.name, nodedb.BUILDING))
-        n_provider = len(self.db.getNodes(provider.name))
+        n_provider = len(session.getNodes(provider.name))
         num_to_launch = provider.min_ready - (n_ready + n_building)
 
         # Don't launch more than our provider max
@@ -567,30 +585,37 @@ class NodePool(threading.Thread):
 
     def run(self):
         while not self._stopped:
-            self.loadConfig()
-            self.checkForMissingImages()
-            for target in self.config.targets.values():
-                self.log.debug("Examining target: %s" % target.name)
-                for image in target.images.values():
-                    for provider in image.providers.values():
-                        num_to_launch = self.getNumNeededNodes(
-                            target, provider, image)
-                        if num_to_launch:
-                            self.log.info("Need to launch %s %s nodes for "
-                                          "%s on %s" %
-                                          (num_to_launch, image.name,
-                                           target.name, provider.name))
-                        for i in range(num_to_launch):
-                            snap_image = self.db.getCurrentSnapshotImage(
-                                provider.name, image.name)
-                            if not snap_image:
-                                self.log.debug("No current image for %s on %s"
-                                               % (provider.name, image.name))
-                            else:
-                                self.launchNode(provider, image, target)
+            try:
+                self.loadConfig()
+                with self.db.getSession() as session:
+                    self._run(session)
+            except Exception:
+                self.log.exception("Exception in main loop:")
             time.sleep(WATERMARK_SLEEP)
 
-    def checkForMissingImages(self):
+    def _run(self, session):
+        self.checkForMissingImages(session)
+        for target in self.config.targets.values():
+            self.log.debug("Examining target: %s" % target.name)
+            for image in target.images.values():
+                for provider in image.providers.values():
+                    num_to_launch = self.getNumNeededNodes(
+                        session, target, provider, image)
+                    if num_to_launch:
+                        self.log.info("Need to launch %s %s nodes for "
+                                      "%s on %s" %
+                                      (num_to_launch, image.name,
+                                       target.name, provider.name))
+                    for i in range(num_to_launch):
+                        snap_image = session.getCurrentSnapshotImage(
+                            provider.name, image.name)
+                        if not snap_image:
+                            self.log.debug("No current image for %s on %s"
+                                           % (provider.name, image.name))
+                        else:
+                            self.launchNode(session, provider, image, target)
+
+    def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
         missing = False
@@ -598,7 +623,7 @@ class NodePool(threading.Thread):
             for image in target.images.values():
                 for provider in image.providers.values():
                     found = False
-                    for snap_image in self.db.getSnapshotImages():
+                    for snap_image in session.getSnapshotImages():
                         if (snap_image.provider_name == provider.name and
                             snap_image.image_name == image.name and
                             snap_image.state in [nodedb.READY,
@@ -609,14 +634,21 @@ class NodePool(threading.Thread):
                                          (image.name, provider.name))
                         missing = True
         if missing:
-            self.updateImages()
+            self.updateImages(session)
 
-    def updateImages(self):
+    def _doUpdateImages(self):
+        try:
+            with self.db.getSession() as session:
+                self.updateImages(session)
+        except Exception:
+            self.log.exception("Exception in periodic image update:")
+
+    def updateImages(self, session):
         # This function should be run periodically to create new snapshot
         # images.
         for provider in self.config.providers.values():
             for image in provider.images.values():
-                snap_image = self.db.createSnapshotImage(
+                snap_image = session.createSnapshotImage(
                     provider_name=provider.name,
                     image_name=image.name)
                 t = ImageUpdater(self, provider, image, snap_image.id)
@@ -625,33 +657,33 @@ class NodePool(threading.Thread):
                 # Just to keep things clearer.
                 time.sleep(2)
 
-    def launchNode(self, provider, image, target):
+    def launchNode(self, session, provider, image, target):
         provider = self.config.providers[provider.name]
         image = provider.images[image.name]
-        node = self.db.createNode(provider.name, image.name, target.name)
+        node = session.createNode(provider.name, image.name, target.name)
         t = NodeLauncher(self, provider, image, target, node.id)
         t.start()
 
-    def deleteNode(self, node):
+    def deleteNode(self, session, node):
         # Delete a node
         start_time = time.time()
         node.state = nodedb.DELETE
-        self.updateStats(node.provider_name)
+        self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
         client = utils.get_client(provider)
 
         if target.jenkins_url:
-            jenkins = myjenkins.Jenkins(target.jenkins_url,
+            jenkins = utils.get_jenkins(target.jenkins_url,
                                         target.jenkins_user,
                                         target.jenkins_apikey)
             jenkins_name = node.nodename
             if jenkins.node_exists(jenkins_name):
                 jenkins.delete_node(jenkins_name)
-            self.log.info("Deleted jenkins node ID: %s" % node.id)
+            self.log.info("Deleted jenkins node id: %s" % node.id)
 
         utils.delete_node(client, node)
-        self.log.info("Deleted node ID: %s" % node.id)
+        self.log.info("Deleted node id: %s" % node.id)
 
         if statsd:
             dt = int((time.time() - start_time) * 1000)
@@ -660,7 +692,7 @@ class NodePool(threading.Thread):
                                                 node.target_name)
             statsd.timing(key, dt)
             statsd.incr(key)
-        self.updateStats(node.provider_name)
+        self.updateStats(session, node.provider_name)
 
     def deleteImage(self, snap_image):
         # Delete a node
@@ -669,16 +701,22 @@ class NodePool(threading.Thread):
         client = utils.get_client(provider)
 
         utils.delete_image(client, snap_image)
-        self.log.info("Deleted image ID: %s" % snap_image.id)
+        self.log.info("Deleted image id: %s" % snap_image.id)
 
-    def periodicCleanup(self):
+    def _doPeriodicCleanup(self):
+        try:
+            with self.db.getSession() as session:
+                self.periodicCleanup(session)
+        except Exception:
+            self.log.exception("Exception in periodic cleanup:")
+
+    def periodicCleanup(self, session):
         # This function should be run periodically to clean up any hosts
         # that may have slipped through the cracks, as well as to remove
         # old images.
 
         self.log.debug("Starting periodic cleanup")
-        db = nodedb.NodeDatabase(self.config.dburi)
-        for node in db.getNodes():
+        for node in session.getNodes():
             if node.state in [nodedb.READY, nodedb.HOLD]:
                 continue
             delete = False
@@ -694,12 +732,12 @@ class NodePool(threading.Thread):
                 delete = True
             if delete:
                 try:
-                    self.deleteNode(node)
+                    self.deleteNode(session, node)
                 except Exception:
-                    self.log.exception("Exception deleting node ID: "
+                    self.log.exception("Exception deleting node id: "
                                        "%s" % node.id)
 
-        for image in db.getSnapshotImages():
+        for image in session.getSnapshotImages():
             # Normally, reap images that have sat in their current state
             # for 24 hours, unless the image is the current snapshot
             delete = False
@@ -713,8 +751,8 @@ class NodePool(threading.Thread):
                 self.log.info("Deleting image id: %s which has no current "
                               "base image" % image.id)
             else:
-                current = db.getCurrentSnapshotImage(image.provider_name,
-                                                     image.image_name)
+                current = session.getCurrentSnapshotImage(image.provider_name,
+                                                          image.image_name)
                 if (current and image != current and
                     (time.time() - current.state_time) > KEEP_OLD_IMAGE):
                     self.log.info("Deleting image id: %s because the current "
@@ -729,11 +767,10 @@ class NodePool(threading.Thread):
                                        image.id)
         self.log.debug("Finished periodic cleanup")
 
-    def updateStats(self, provider_name):
+    def updateStats(self, session, provider_name):
         if not statsd:
             return
         # This may be called outside of the main thread.
-        db = nodedb.NodeDatabase(self.config.dburi)
         provider = self.config.providers[provider_name]
 
         states = {}
@@ -750,7 +787,7 @@ class NodePool(threading.Thread):
                         key = '%s.%s' % (base_key, state)
                         states[key] = 0
 
-        for node in db.getNodes():
+        for node in session.getNodes():
             if node.state not in nodedb.STATE_NAMES:
                 continue
             key = 'nodepool.target.%s.%s.%s.%s' % (
