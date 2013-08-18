@@ -143,7 +143,7 @@ class NodeLauncher(threading.Thread):
             self.log.debug("Launching node id: %s" % self.node_id)
             try:
                 self.node = session.getNode(self.node_id)
-                self.client = utils.get_client(self.provider)
+                self.client = self.nodepool.getClient(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to launch node id: %s:"
                                    % self.node_id)
@@ -285,7 +285,7 @@ class ImageUpdater(threading.Thread):
             try:
                 self.snap_image = session.getSnapshotImage(
                     self.snap_image_id)
-                self.client = utils.get_client(self.provider)
+                self.client = self.nodepool.getClient(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to update image %s "
                                    "in %s:" % (self.image.name,
@@ -450,6 +450,7 @@ class NodePool(threading.Thread):
         self.cleanup_cron = ''
         self.cleanup_job = None
         self._stopped = False
+        self.config = None
         self.loadConfig()
 
     def stop(self):
@@ -491,6 +492,7 @@ class NodePool(threading.Thread):
         newconfig.targets = {}
         newconfig.scriptdir = config.get('script-dir')
         newconfig.dburi = config.get('dburi')
+        newconfig.clients = {}
 
         for provider in config['providers']:
             p = Provider()
@@ -504,6 +506,23 @@ class NodePool(threading.Thread):
             p.service_name = provider.get('service-name')
             p.region_name = provider.get('region-name')
             p.max_servers = provider['max-servers']
+            oldclient = None
+            if self.config:
+                oldclient = self.config.clients.get(p.name)
+            if oldclient:
+                if (p.username != oldclient.client.user or
+                    p.password != oldclient.client.password or
+                    p.project_id != oldclient.client.projectid or
+                    p.service_type != oldclient.client.service_type or
+                    p.service_name != oldclient.client.service_name or
+                    p.region_name != oldclient.client.region_name):
+                    oldclient = None
+            if oldclient:
+                newconfig.clients[p.name] = oldclient
+            else:
+                self.log.debug("Creating new client object for %s" %
+                               p.name)
+                newconfig.clients[p.name] = utils.get_client(p)
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()
@@ -544,6 +563,9 @@ class NodePool(threading.Thread):
             self.dburi = self.config.dburi
             self.db = nodedb.NodeDatabase(self.config.dburi)
         self.startUpdateListeners(config['zmq-publishers'])
+
+    def getClient(self, provider):
+        return self.config.clients[provider.name]
 
     def startUpdateListeners(self, publishers):
         running = set(self.zmq_listeners.keys())
@@ -671,7 +693,7 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
-        client = utils.get_client(provider)
+        client = self.getClient(provider)
 
         if target.jenkins_url:
             jenkins = utils.get_jenkins(target.jenkins_url,
@@ -698,7 +720,7 @@ class NodePool(threading.Thread):
         # Delete a node
         snap_image.state = nodedb.DELETE
         provider = self.config.providers[snap_image.provider_name]
-        client = utils.get_client(provider)
+        client = self.getClient(provider)
 
         utils.delete_image(client, snap_image)
         self.log.info("Deleted image id: %s" % snap_image.id)
