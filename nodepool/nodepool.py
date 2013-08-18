@@ -40,6 +40,8 @@ CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
 NODE_CLEANUP = 8 * HOURS     # When to start deleting a node that is not
                              # READY or HOLD
 KEEP_OLD_IMAGE = 24 * HOURS  # How long to keep an old (good) image
+DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
+                             # its job.
 
 
 class NodeCompleteThread(threading.Thread):
@@ -51,6 +53,7 @@ class NodeCompleteThread(threading.Thread):
         self.nodepool = nodepool
 
     def run(self):
+        time.sleep(DELETE_DELAY)
         try:
             with self.nodepool.db.getSession() as session:
                 self.handleEvent(session)
