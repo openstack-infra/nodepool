@@ -360,7 +360,7 @@ class ProviderManager(TaskManager):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
-        for count in iterate_timeout(3600, "waiting for server %s deletion" %
+        for count in iterate_timeout(600, "waiting for server %s deletion" %
                                      server_id):
             try:
                 self.getServer(server_id)
