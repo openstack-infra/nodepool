@@ -549,7 +549,7 @@ class NodePool(threading.Thread):
                 t.jenkins_url = jenkins['url']
                 t.jenkins_user = jenkins['user']
                 t.jenkins_apikey = jenkins['apikey']
-                t.jenkins_credentials_id = jenkins.get('credentials_id')
+                t.jenkins_credentials_id = jenkins.get('credentials-id')
             else:
                 t.jenkins_url = None
                 t.jenkins_user = None
