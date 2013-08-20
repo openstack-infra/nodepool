@@ -19,7 +19,6 @@
 import time
 import socket
 import logging
-import myjenkins
 from sshclient import SSHClient
 
 import fakeprovider
@@ -35,15 +34,6 @@ def iterate_timeout(max_seconds, purpose):
         yield count
         time.sleep(2)
     raise Exception("Timeout waiting for %s" % purpose)
-
-
-def get_jenkins(url, user, apikey):
-    if apikey == 'fake':
-        return fakeprovider.FakeJenkins()
-    return myjenkins.Jenkins(url, user, apikey)
-
-
-extension_cache = {}
 
 
 def ssh_connect(ip, username, connect_kwargs={}, timeout=60):

@@ -16,9 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import threading
-import Queue
 import logging
 import paramiko
 import novaclient
@@ -26,6 +23,7 @@ import novaclient.client
 import time
 
 import fakeprovider
+from task_manager import Task, TaskManager
 
 
 def iterate_timeout(max_seconds, purpose):
@@ -40,36 +38,6 @@ def iterate_timeout(max_seconds, purpose):
 
 class NotFound(Exception):
     pass
-
-
-class Task(object):
-    def __init__(self, **kw):
-        self._wait_event = threading.Event()
-        self._exception = None
-        self._traceback = None
-        self._result = None
-        self.args = kw
-
-    def done(self, result):
-        self._result = result
-        self._wait_event.set()
-
-    def exception(self, e, tb):
-        self._exception = e
-        self._traceback = tb
-        self._wait_event.set()
-
-    def wait(self):
-        self._wait_event.wait()
-        if self._exception:
-            raise self._exception, None, self._traceback
-        return self._result
-
-    def run(self, client):
-        try:
-            self.done(self.main(client))
-        except Exception as e:
-            self.exception(e, sys.exc_info()[2])
 
 
 class CreateServerTask(Task):
@@ -201,20 +169,17 @@ class DeleteImageTask(Task):
         client.images.delete(**self.args)
 
 
-class ProviderManager(threading.Thread):
+class ProviderManager(TaskManager):
     log = logging.getLogger("nodepool.ProviderManager")
 
     def __init__(self, provider):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.queue = Queue.Queue()
-        self._running = True
+        super(ProviderManager, self).__init__(None, provider.name,
+                                              provider.rate)
         self.provider = provider
         self._client = self._getClient()
         self._flavors = self._getFlavors()
         self._images = {}
         self._extensions = self._getExtensions()
-        self._rate = float(provider.rate)
 
     def _getClient(self):
         args = ['1.1', self.provider.username, self.provider.password,
@@ -246,27 +211,6 @@ class ProviderManager(threading.Thread):
         if extension in self._extensions:
             return True
         return False
-
-    def stop(self):
-        self._running = False
-        self.queue.put(None)
-
-    def run(self):
-        last_ts = 0
-        while self._running:
-            task = self.queue.get()
-            if not task:
-                continue
-            while True:
-                delta = time.time() - last_ts
-                if delta >= self._rate:
-                    break
-                time.sleep(self._rate - delta)
-            self.log.debug("Provider %s running task %s" % (self.provider.name,
-                                                            task))
-            task.run(self._client)
-            last_ts = time.time()
-            self.queue.task_done()
 
     def submitTask(self, task):
         self.queue.put(task)

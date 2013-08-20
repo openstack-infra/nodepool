@@ -23,13 +23,13 @@ import threading
 import yaml
 import apscheduler.scheduler
 import os
-import myjenkins
 from statsd import statsd
 import zmq
 
 import nodedb
 import nodeutils as utils
 import provider_manager
+import jenkins_manager
 
 MINS = 60
 HOURS = 60 * MINS
@@ -147,7 +147,7 @@ class NodeLauncher(threading.Thread):
             self.log.debug("Launching node id: %s" % self.node_id)
             try:
                 self.node = session.getNode(self.node_id)
-                self.manager = self.nodepool.getManager(self.provider)
+                self.manager = self.nodepool.getProviderManager(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to launch node id: %s:"
                                    % self.node_id)
@@ -228,37 +228,21 @@ class NodeLauncher(threading.Thread):
             self.log.info("Node id: %s added to jenkins" % self.node.id)
 
     def createJenkinsNode(self):
-        jenkins = utils.get_jenkins(self.target.jenkins_url,
-                                    self.target.jenkins_user,
-                                    self.target.jenkins_apikey)
-        node_desc = 'Dynamic single use %s node' % self.image.name
-        labels = self.image.name
-        priv_key = '/var/lib/jenkins/.ssh/id_rsa'
+        jenkins = self.nodepool.getJenkinsManager(self.target)
+
+        args = dict(name=self.node.nodename,
+                    host=self.node.ip,
+                    description='Dynamic single use %s node' % self.image.name,
+                    labels=self.image.name,
+                    executors=1,
+                    root='/home/jenkins')
         if self.target.jenkins_credentials_id:
-            launcher_params = {'port': 22,
-                               'credentialsId':
-                                   self.target.jenkins_credentials_id,  # noqa
-                               'host': self.node.ip}
+            args['credentials_id'] = self.target.jenkins_credentials_id
         else:
-            launcher_params = {'port': 22,
-                               'username': 'jenkins',
-                               'privatekey': priv_key,
-                               'host': self.node.ip}
-        try:
-            jenkins.create_node(
-                self.node.nodename,
-                numExecutors=1,
-                nodeDescription=node_desc,
-                remoteFS='/home/jenkins',
-                labels=labels,
-                exclusive=True,
-                launcher='hudson.plugins.sshslaves.SSHLauncher',
-                launcher_params=launcher_params)
-        except myjenkins.JenkinsException as e:
-            if 'already exists' in str(e):
-                pass
-            else:
-                raise
+            args['username'] = 'jenkins'
+            args['private_key'] = '/var/lib/jenkins/.ssh/id_rsa'
+
+        jenkins.createNode(**args)
 
 
 class ImageUpdater(threading.Thread):
@@ -285,7 +269,7 @@ class ImageUpdater(threading.Thread):
             try:
                 self.snap_image = session.getSnapshotImage(
                     self.snap_image_id)
-                self.manager = self.nodepool.getManager(self.provider)
+                self.manager = self.nodepool.getProviderManager(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to update image %s "
                                    "in %s:" % (self.image.name,
@@ -495,7 +479,8 @@ class NodePool(threading.Thread):
         newconfig.targets = {}
         newconfig.scriptdir = config.get('script-dir')
         newconfig.dburi = config.get('dburi')
-        newconfig.managers = {}
+        newconfig.provider_managers = {}
+        newconfig.jenkins_managers = {}
         stop_managers = []
 
         for provider in config['providers']:
@@ -513,7 +498,7 @@ class NodePool(threading.Thread):
             p.rate = provider.get('rate', 1.0)
             oldmanager = None
             if self.config:
-                oldmanager = self.config.managers.get(p.name)
+                oldmanager = self.config.provider_managers.get(p.name)
             if oldmanager:
                 if (p.username != oldmanager.provider.username or
                     p.password != oldmanager.provider.password or
@@ -525,13 +510,13 @@ class NodePool(threading.Thread):
                     stop_managers.append(oldmanager)
                     oldmanager = None
             if oldmanager:
-                newconfig.managers[p.name] = oldmanager
+                newconfig.provider_managers[p.name] = oldmanager
             else:
                 self.log.debug("Creating new ProviderManager object for %s" %
                                p.name)
-                newconfig.managers[p.name] = \
+                newconfig.provider_managers[p.name] = \
                     provider_manager.ProviderManager(p)
-                newconfig.managers[p.name].start()
+                newconfig.provider_managers[p.name].start()
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()
@@ -556,6 +541,24 @@ class NodePool(threading.Thread):
                 t.jenkins_user = None
                 t.jenkins_apikey = None
                 t.jenkins_credentials_id = None
+            t.rate = target.get('rate', 1.0)
+            oldmanager = None
+            if self.config:
+                oldmanager = self.config.jenkins_managers.get(t.name)
+            if oldmanager:
+                if (t.jenkins_url != oldmanager.target.jenkins_url or
+                    t.jenkins_user != oldmanager.target.jenkins_user or
+                    t.jenkins_apikey != oldmanager.target.jenkins_apikey):
+                    stop_managers.append(oldmanager)
+                    oldmanager = None
+            if oldmanager:
+                newconfig.jenkins_managers[t.name] = oldmanager
+            else:
+                self.log.debug("Creating new JenkinsManager object for %s" %
+                               t.name)
+                newconfig.jenkins_managers[t.name] = \
+                    jenkins_manager.JenkinsManager(t)
+                newconfig.jenkins_managers[t.name].start()
             t.images = {}
             for image in target['images']:
                 i = TargetImage()
@@ -575,8 +578,11 @@ class NodePool(threading.Thread):
             self.db = nodedb.NodeDatabase(self.config.dburi)
         self.startUpdateListeners(config['zmq-publishers'])
 
-    def getManager(self, provider):
-        return self.config.managers[provider.name]
+    def getProviderManager(self, provider):
+        return self.config.provider_managers[provider.name]
+
+    def getJenkinsManager(self, target):
+        return self.config.jenkins_managers[target.name]
 
     def startUpdateListeners(self, publishers):
         running = set(self.zmq_listeners.keys())
@@ -704,23 +710,21 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
-        manager = self.getManager(provider)
+        manager = self.getProviderManager(provider)
 
         if target.jenkins_url:
-            jenkins = utils.get_jenkins(target.jenkins_url,
-                                        target.jenkins_user,
-                                        target.jenkins_apikey)
+            jenkins = self.getJenkinsManager(target)
             jenkins_name = node.nodename
-            if jenkins.node_exists(jenkins_name):
-                jenkins.delete_node(jenkins_name)
+            if jenkins.nodeExists(jenkins_name):
+                jenkins.deleteNode(jenkins_name)
             self.log.info("Deleted jenkins node id: %s" % node.id)
 
         if node.external_id:
             try:
                 server = manager.getServer(node.external_id)
                 self.log.debug('Deleting server %s for node id: %s' %
-                               node.external_id,
-                               node.id)
+                               (node.external_id,
+                                node.id))
                 manager.cleanupServer(server['id'])
             except provider_manager.NotFound:
                 pass
@@ -741,14 +745,14 @@ class NodePool(threading.Thread):
         # Delete an image (and its associated server)
         snap_image.state = nodedb.DELETE
         provider = self.config.providers[snap_image.provider_name]
-        manager = self.getManager(provider)
+        manager = self.getProviderManager(provider)
 
         if snap_image.server_external_id:
             try:
                 server = manager.getServer(snap_image.server_external_id)
                 self.log.debug('Deleting server %s for image id: %s' %
-                               snap_image.server_external_id,
-                               snap_image.id)
+                               (snap_image.server_external_id,
+                                snap_image.id))
                 manager.cleanupServer(server['id'])
             except provider_manager.NotFound:
                 self.log.warning('Image server id %s not found' %
