@@ -436,6 +436,8 @@ class NodePool(threading.Thread):
         self.update_job = None
         self.cleanup_cron = ''
         self.cleanup_job = None
+        self.check_cron = ''
+        self.check_job = None
         self._stopped = False
         self.config = None
         self.loadConfig()
@@ -451,6 +453,7 @@ class NodePool(threading.Thread):
 
         update_cron = config.get('cron', {}).get('image-update', '14 2 * * *')
         cleanup_cron = config.get('cron', {}).get('cleanup', '27 */6 * * *')
+        check_cron = config.get('cron', {}).get('check', '*/15 * * * *')
         if (update_cron != self.update_cron):
             if self.update_job:
                 self.apsched.unschedule_job(self.update_job)
@@ -473,6 +476,17 @@ class NodePool(threading.Thread):
                                       hour=hour,
                                       minute=minute)
             self.cleanup_cron = cleanup_cron
+        if (check_cron != self.check_cron):
+            if self.check_job:
+                self.apsched.unschedule_job(self.check_job)
+            parts = check_cron.split()
+            minute, hour, dom, month, dow = parts[:5]
+            self.apsched.add_cron_job(self._doPeriodicCheck,
+                                      day=dom,
+                                      day_of_week=dow,
+                                      hour=hour,
+                                      minute=minute)
+            self.check_cron = check_cron
 
         newconfig = Config()
         newconfig.providers = {}
@@ -833,6 +847,30 @@ class NodePool(threading.Thread):
                     self.log.exception("Exception deleting image id: %s:" %
                                        image.id)
         self.log.debug("Finished periodic cleanup")
+
+    def _doPeriodicCheck(self):
+        try:
+            with self.db.getSession() as session:
+                self.periodicCheck(session)
+        except Exception:
+            self.log.exception("Exception in periodic chack:")
+
+    def periodicCheck(self, session):
+        # This function should be run periodically to make sure we can
+        # still access hosts via ssh.
+
+        self.log.debug("Starting periodic check")
+        for node in session.getNodes():
+            if node.state != nodedb.READY:
+                continue
+            try:
+                if utils.ssh_connect(node.ip, 'jenkins'):
+                    continue
+            except Exception:
+                self.log.exception("SSH Check failed for node id: %s" %
+                                   node.id)
+                self.deleteNode(session, node)
+        self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
         if not statsd:
