@@ -29,6 +29,7 @@ import zmq
 
 import nodedb
 import nodeutils as utils
+import provider_manager
 
 MINS = 60
 HOURS = 60 * MINS
@@ -146,7 +147,7 @@ class NodeLauncher(threading.Thread):
             self.log.debug("Launching node id: %s" % self.node_id)
             try:
                 self.node = session.getNode(self.node_id)
-                self.client = self.nodepool.getClient(self.provider)
+                self.manager = self.nodepool.getManager(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to launch node id: %s:"
                                    % self.node_id)
@@ -158,7 +159,7 @@ class NodeLauncher(threading.Thread):
                 self.log.exception("Exception launching node id: %s:" %
                                    self.node_id)
                 try:
-                    utils.delete_node(self.client, self.node)
+                    self.nodepool.deleteNode(session, self.node)
                 except Exception:
                     self.log.exception("Exception deleting node id: %s:" %
                                        self.node_id)
@@ -173,37 +174,33 @@ class NodeLauncher(threading.Thread):
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
 
-        flavor = utils.get_flavor(self.client, self.image.min_ram)
         snap_image = session.getCurrentSnapshotImage(
             self.provider.name, self.image.name)
         if not snap_image:
             raise Exception("Unable to find current snapshot image %s in %s" %
                             (self.image.name, self.provider.name))
-        remote_snap_image = self.client.images.get(snap_image.external_id)
 
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for node id: %s" % (hostname, self.provider.name,
                                            self.image.name, self.node_id))
-        server = None
-        server, key = utils.create_server(self.client, hostname,
-                                          remote_snap_image, flavor)
-        self.node.external_id = server.id
+        server_id = self.manager.createServer(hostname,
+                                              self.image.min_ram,
+                                              snap_image.external_id)
+        self.node.external_id = server_id
         session.commit()
 
         self.log.debug("Waiting for server %s for node id: %s" %
-                       (server.id, self.node.id))
-
-        server = utils.wait_for_resource(server)
-        if server.status != 'ACTIVE':
+                       (server_id, self.node.id))
+        server = self.manager.waitForServer(server_id)
+        if server['status'] != 'ACTIVE':
             raise Exception("Server %s for node id: %s status: %s" %
-                            (server.id, self.node.id, server.status))
+                            (server_id, self.node.id, server['status']))
 
-        ip = utils.get_public_ip(server)
-        if not ip and 'os-floating-ips' in utils.get_extensions(self.client):
-            utils.add_public_ip(server)
-            ip = utils.get_public_ip(server)
+        ip = server.get('public_v4')
+        if not ip and self.manager.hasExtension('os-floating-ips'):
+            ip = self.manager.addPublicIP(server['server_id'])
         if not ip:
-            raise Exception("Unable to find public ip of server")
+            raise Exception("Unable to find public IP of server")
 
         self.node.ip = ip
         self.log.debug("Node id: %s is running, testing ssh" % self.node.id)
@@ -288,7 +285,7 @@ class ImageUpdater(threading.Thread):
             try:
                 self.snap_image = session.getSnapshotImage(
                     self.snap_image_id)
-                self.client = self.nodepool.getClient(self.provider)
+                self.manager = self.nodepool.getManager(self.provider)
             except Exception:
                 self.log.exception("Exception preparing to update image %s "
                                    "in %s:" % (self.image.name,
@@ -302,7 +299,7 @@ class ImageUpdater(threading.Thread):
                                    (self.image.name, self.provider.name))
                 try:
                     if self.snap_image:
-                        utils.delete_image(self.client, self.snap_image)
+                        self.nodepool.deleteImage(self.snap_image)
                 except Exception:
                     self.log.exception("Exception deleting image id: %s:" %
                                        self.snap_image.id)
@@ -312,41 +309,50 @@ class ImageUpdater(threading.Thread):
         start_time = time.time()
         timestamp = int(start_time)
 
-        flavor = utils.get_flavor(self.client, self.image.min_ram)
-        base_image = self.client.images.find(name=self.image.base_image)
         hostname = ('%s-%s.template.openstack.org' %
                     (self.image.name, str(timestamp)))
         self.log.info("Creating image id: %s for %s in %s" %
                       (self.snap_image.id, self.image.name,
                        self.provider.name))
-        server, key = utils.create_server(
-            self.client, hostname, base_image, flavor, add_key=True)
+        if self.manager.hasExtension('os-keypairs'):
+            key_name = hostname.split('.')[0]
+            key = self.manager.addKeypair(key_name)
+        else:
+            key_name = None
+            key = None
 
+        server_id = self.manager.createServer(hostname,
+                                              self.image.min_ram,
+                                              image_name=self.image.base_image,
+                                              key_name=key_name)
         self.snap_image.hostname = hostname
         self.snap_image.version = timestamp
-        self.snap_image.server_external_id = server.id
+        self.snap_image.server_external_id = server_id
         session.commit()
 
         self.log.debug("Image id: %s waiting for server %s" %
-                       (self.snap_image.id, server.id))
-        server = utils.wait_for_resource(server)
-        if not server:
-            raise Exception("Timeout waiting for server %s" %
-                            server.id)
+                       (self.snap_image.id, server_id))
+        server = self.manager.waitForServer(server_id)
+        if server['status'] != 'ACTIVE':
+            raise Exception("Server %s for image id: %s status: %s" %
+                            (server_id, self.snap_image.id, server['status']))
 
-        admin_pass = None  # server.adminPass
-        self.bootstrapServer(server, admin_pass, key)
+        ip = server.get('public_v4')
+        if not ip and self.manager.hasExtension('os-floating-ips'):
+            ip = self.manager.addPublicIP(server['server_id'])
+        if not ip:
+            raise Exception("Unable to find public IP of server")
+        server['public_v4'] = ip
 
-        image = utils.create_image(self.client, server, hostname)
-        self.snap_image.external_id = image.id
+        self.bootstrapServer(server, key)
+
+        image_id = self.manager.createImage(server_id, hostname)
+        self.snap_image.external_id = image_id
         session.commit()
         self.log.debug("Image id: %s building image %s" %
-                       (self.snap_image.id, image.id))
+                       (self.snap_image.id, image_id))
         # It can take a _very_ long time for Rackspace 1.0 to save an image
-        image = utils.wait_for_resource(image, IMAGE_TIMEOUT)
-        if not image:
-            raise Exception("Timeout waiting for image %s" %
-                            self.snap_image.id)
+        self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
 
         if statsd:
             dt = int((time.time() - start_time) * 1000)
@@ -363,28 +369,22 @@ class ImageUpdater(threading.Thread):
         try:
             # We made the snapshot, try deleting the server, but it's okay
             # if we fail.  The reap script will find it and try again.
-            utils.delete_server(self.client, server)
+            self.manager.cleanupServer(server_id)
         except:
             self.log.exception("Exception encountered deleting server"
                                " %s for image id: %s" %
-                               (server.id, self.snap_image.id))
+                               (server_id, self.snap_image.id))
 
-    def bootstrapServer(self, server, admin_pass, key):
-        ip = utils.get_public_ip(server)
-        if not ip and 'os-floating-ips' in utils.get_extensions(self.client):
-            utils.add_public_ip(server)
-            ip = utils.get_public_ip(server)
-        if not ip:
-            raise Exception("Unable to find public ip of server")
-
+    def bootstrapServer(self, server, key):
         ssh_kwargs = {}
         if key:
             ssh_kwargs['pkey'] = key
         else:
-            ssh_kwargs['password'] = admin_pass
+            ssh_kwargs['password'] = server['admin_pass']
 
         for username in ['root', 'ubuntu']:
-            host = utils.ssh_connect(ip, username, ssh_kwargs,
+            host = utils.ssh_connect(server['public_v4'], username,
+                                     ssh_kwargs,
                                      timeout=CONNECT_TIMEOUT)
             if host:
                 break
@@ -495,7 +495,8 @@ class NodePool(threading.Thread):
         newconfig.targets = {}
         newconfig.scriptdir = config.get('script-dir')
         newconfig.dburi = config.get('dburi')
-        newconfig.clients = {}
+        newconfig.managers = {}
+        stop_managers = []
 
         for provider in config['providers']:
             p = Provider()
@@ -509,23 +510,28 @@ class NodePool(threading.Thread):
             p.service_name = provider.get('service-name')
             p.region_name = provider.get('region-name')
             p.max_servers = provider['max-servers']
-            oldclient = None
+            p.rate = provider.get('rate', 1.0)
+            oldmanager = None
             if self.config:
-                oldclient = self.config.clients.get(p.name)
-            if oldclient:
-                if (p.username != oldclient.client.user or
-                    p.password != oldclient.client.password or
-                    p.project_id != oldclient.client.projectid or
-                    p.service_type != oldclient.client.service_type or
-                    p.service_name != oldclient.client.service_name or
-                    p.region_name != oldclient.client.region_name):
-                    oldclient = None
-            if oldclient:
-                newconfig.clients[p.name] = oldclient
+                oldmanager = self.config.managers.get(p.name)
+            if oldmanager:
+                if (p.username != oldmanager.provider.username or
+                    p.password != oldmanager.provider.password or
+                    p.project_id != oldmanager.provider.project_id or
+                    p.auth_url != oldmanager.provider.auth_url or
+                    p.service_type != oldmanager.provider.service_type or
+                    p.service_name != oldmanager.provider.service_name or
+                    p.region_name != oldmanager.provider.region_name):
+                    stop_managers.append(oldmanager)
+                    oldmanager = None
+            if oldmanager:
+                newconfig.managers[p.name] = oldmanager
             else:
-                self.log.debug("Creating new client object for %s" %
+                self.log.debug("Creating new ProviderManager object for %s" %
                                p.name)
-                newconfig.clients[p.name] = utils.get_client(p)
+                newconfig.managers[p.name] = \
+                    provider_manager.ProviderManager(p)
+                newconfig.managers[p.name].start()
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()
@@ -562,13 +568,15 @@ class NodePool(threading.Thread):
                     i.providers[p.name] = p
                     p.min_ready = provider['min-ready']
         self.config = newconfig
+        for oldmanager in stop_managers:
+            oldmanager.stop()
         if self.config.dburi != self.dburi:
             self.dburi = self.config.dburi
             self.db = nodedb.NodeDatabase(self.config.dburi)
         self.startUpdateListeners(config['zmq-publishers'])
 
-    def getClient(self, provider):
-        return self.config.clients[provider.name]
+    def getManager(self, provider):
+        return self.config.managers[provider.name]
 
     def startUpdateListeners(self, publishers):
         running = set(self.zmq_listeners.keys())
@@ -696,7 +704,7 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
-        client = self.getClient(provider)
+        manager = self.getManager(provider)
 
         if target.jenkins_url:
             jenkins = utils.get_jenkins(target.jenkins_url,
@@ -707,7 +715,17 @@ class NodePool(threading.Thread):
                 jenkins.delete_node(jenkins_name)
             self.log.info("Deleted jenkins node id: %s" % node.id)
 
-        utils.delete_node(client, node)
+        if node.external_id:
+            try:
+                server = manager.getServer(node.external_id)
+                self.log.debug('Deleting server %s for node id: %s' %
+                               node.external_id,
+                               node.id)
+                manager.cleanupServer(server['id'])
+            except provider_manager.NotFound:
+                pass
+
+        node.delete()
         self.log.info("Deleted node id: %s" % node.id)
 
         if statsd:
@@ -720,12 +738,32 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
 
     def deleteImage(self, snap_image):
-        # Delete a node
+        # Delete an image (and its associated server)
         snap_image.state = nodedb.DELETE
         provider = self.config.providers[snap_image.provider_name]
-        client = self.getClient(provider)
+        manager = self.getManager(provider)
 
-        utils.delete_image(client, snap_image)
+        if snap_image.server_external_id:
+            try:
+                server = manager.getServer(snap_image.server_external_id)
+                self.log.debug('Deleting server %s for image id: %s' %
+                               snap_image.server_external_id,
+                               snap_image.id)
+                manager.cleanupServer(server['id'])
+            except provider_manager.NotFound:
+                self.log.warning('Image server id %s not found' %
+                                 snap_image.server_external_id)
+
+        if snap_image.external_id:
+            try:
+                remote_image = manager.getImage(snap_image.external_id)
+                self.log.debug('Deleting image %s' % remote_image.id)
+                manager.deleteImage(remote_image['id'])
+            except provider_manager.NotFound:
+                self.log.warning('Image id %s not found' %
+                                 snap_image.external_id)
+
+        snap_image.delete()
         self.log.info("Deleted image id: %s" % snap_image.id)
 
     def _doPeriodicCleanup(self):

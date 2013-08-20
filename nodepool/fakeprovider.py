@@ -41,7 +41,9 @@ class FakeList(object):
             if x.name == name:
                 return x
 
-    def get(self, id):
+    def get(self, image=None):
+        if image:
+            id = image
         for x in self._list:
             if x.id == id:
                 return x
@@ -52,12 +54,16 @@ class FakeList(object):
         obj.status = status
 
     def delete(self, obj):
-        self._list.remove(obj)
+        if hasattr(obj, 'id'):
+            self._list.remove(obj)
+        else:
+            self._list.remove(self.get(obj))
 
     def create(self, **kw):
         s = Dummy(id=uuid.uuid4().hex,
                   name=kw['name'],
                   status='BUILD',
+                  adminPass='fake',
                   addresses=dict(public=[dict(version=4, addr='fake')]),
                   manager=self)
         self._list.append(s)
@@ -65,8 +71,8 @@ class FakeList(object):
         t.start()
         return s
 
-    def create_image(self, server, name):
-        x = self.api.images.create(name=name)
+    def create_image(self, server, image_name):
+        x = self.api.images.create(name=image_name)
         return x.id
 
 
