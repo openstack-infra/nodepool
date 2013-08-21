@@ -379,13 +379,17 @@ class ImageUpdater(threading.Thread):
         host.ssh("make scripts dir", "mkdir -p scripts")
         for fname in os.listdir(self.scriptdir):
             host.scp(os.path.join(self.scriptdir, fname), 'scripts/%s' % fname)
-        host.ssh("make scripts executable", "chmod a+x scripts/*")
+        host.ssh("move scripts to opt",
+                 "sudo mv scripts /opt/nodepool-scripts")
+        host.ssh("set scripts permissions",
+                 "sudo chmod -R a+rx /opt/nodepool-scripts")
         if self.image.setup:
             env_vars = ''
             for k, v in os.environ.items():
                 if k.startswith('NODEPOOL_'):
                     env_vars += ' %s="%s"' % (k, v)
-            r = host.ssh("run setup script", "cd scripts && %s ./%s" %
+            r = host.ssh("run setup script",
+                         "cd /opt/nodepool-scripts && %s ./%s" %
                          (env_vars, self.image.setup))
             if not r:
                 raise Exception("Unable to run setup scripts")
