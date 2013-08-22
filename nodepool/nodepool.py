@@ -204,7 +204,9 @@ class NodeLauncher(threading.Thread):
 
         self.node.ip = ip
         self.log.debug("Node id: %s is running, testing ssh" % self.node.id)
-        if not utils.ssh_connect(ip, 'jenkins'):
+        connect_kwargs = dict(key_filename=self.image.private_key)
+        if not utils.ssh_connect(ip, self.image.username,
+                                 connect_kwargs=connect_kwargs):
             raise Exception("Unable to connect via ssh")
 
         if statsd:
@@ -239,8 +241,8 @@ class NodeLauncher(threading.Thread):
         if self.target.jenkins_credentials_id:
             args['credentials_id'] = self.target.jenkins_credentials_id
         else:
-            args['username'] = 'jenkins'
-            args['private_key'] = '/var/lib/jenkins/.ssh/id_rsa'
+            args['username'] = self.image.username
+            args['private_key'] = self.image.private_key
 
         jenkins.createNode(**args)
 
@@ -544,6 +546,9 @@ class NodePool(threading.Thread):
                 i.min_ram = image['min-ram']
                 i.setup = image.get('setup')
                 i.reset = image.get('reset')
+                i.username = image.get('username', 'jenkins')
+                i.private_key = image.get('private-key',
+                                          '/var/lib/jenkins/.ssh/id_rsa')
         for target in config['targets']:
             t = Target()
             t.name = target['name']
@@ -868,7 +873,11 @@ class NodePool(threading.Thread):
             if node.state != nodedb.READY:
                 continue
             try:
-                if utils.ssh_connect(node.ip, 'jenkins'):
+                provider = self.config.providers[node.provider_name]
+                image = provider.images[node.image_name]
+                connect_kwargs = dict(key_filename=self.image.private_key)
+                if utils.ssh_connect(node.ip, image.username,
+                                     connect_kwargs=connect_kwargs):
                     continue
             except Exception:
                 self.log.exception("SSH Check failed for node id: %s" %

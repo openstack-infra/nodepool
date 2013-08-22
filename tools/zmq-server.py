@@ -28,7 +28,7 @@ import zmq
 import json
 context = zmq.Context()
 socket = context.socket(zmq.PUB)
-socket.bind("tcp://*:8888")
+socket.bind("tcp://*:8881")
 
 print('ready')
 while True:
