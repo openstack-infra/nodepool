@@ -902,6 +902,8 @@ class NodePool(threading.Thread):
             key = 'nodepool.target.%s.%s.%s.%s' % (
                 node.target_name, node.image_name,
                 node.provider_name, nodedb.STATE_NAMES[node.state])
+            if key not in states:
+                states[key] = 0
             states[key] += 1
 
         for key, count in states.items():
