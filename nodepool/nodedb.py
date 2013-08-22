@@ -31,6 +31,9 @@ USED = 3
 DELETE = 4
 # Keep this machine indefinitely.
 HOLD = 5
+# Acceptance testing (pre-ready)
+TEST = 6
+
 
 STATE_NAMES = {
     BUILDING: 'building',
@@ -38,6 +41,7 @@ STATE_NAMES = {
     USED: 'used',
     DELETE: 'delete',
     HOLD: 'hold',
+    TEST: 'test',
     }
 
 from sqlalchemy import Table, Column, Integer, String, \

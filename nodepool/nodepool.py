@@ -40,6 +40,7 @@ CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
                              # is ACTIVE
 NODE_CLEANUP = 8 * HOURS     # When to start deleting a node that is not
                              # READY or HOLD
+TEST_CLEANUP = 5 * MINS      # When to start deleting a node that is in TEST
 KEEP_OLD_IMAGE = 24 * HOURS  # How long to keep an old (good) image
 DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
                              # its job.
@@ -48,13 +49,14 @@ DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
 class NodeCompleteThread(threading.Thread):
     log = logging.getLogger("nodepool.NodeCompleteThread")
 
-    def __init__(self, nodepool, nodename):
+    def __init__(self, nodepool, nodename, jobname, result):
         threading.Thread.__init__(self)
         self.nodename = nodename
         self.nodepool = nodepool
+        self.jobname = jobname
+        self.result = result
 
     def run(self):
-        time.sleep(DELETE_DELAY)
         try:
             with self.nodepool.db.getSession() as session:
                 self.handleEvent(session)
@@ -68,6 +70,26 @@ class NodeCompleteThread(threading.Thread):
             self.log.debug("Unable to find node with nodename: %s" %
                            self.nodename)
             return
+
+        target = self.nodepool.config.targets[node.target_name]
+        if self.jobname == target.jenkins_test_job:
+            self.log.debug("Test job for node id: %s complete, result: %s" %
+                           (node.id, self.result))
+            if self.result == 'SUCCESS':
+                jenkins = self.nodepool.getJenkinsManager(target)
+                old = jenkins.relabelNode(node.nodename, [node.image_name])
+                if not old:
+                    old = '[unlabeled]'
+                self.log.info("Relabeled jenkins node id: %s from %s to %s" %
+                              (node.id, old, node.image_name))
+                node.state = nodedb.READY
+                self.log.info("Node id: %s is ready" % node.id)
+                self.nodepool.updateStats(session, node.provider_name)
+                return
+            self.log.info("Node id: %s failed acceptance test, deleting" %
+                          node.id)
+
+        time.sleep(DELETE_DELAY)
         self.nodepool.deleteNode(session, node)
 
 
@@ -98,30 +120,38 @@ class NodeUpdateListener(threading.Thread):
         build = args['build']
         if 'node_name' not in build:
             return
+        jobname = args['name']
         nodename = args['build']['node_name']
         if topic == 'onStarted':
-            self.handleStartPhase(nodename)
+            self.handleStartPhase(nodename, jobname)
         elif topic == 'onCompleted':
             pass
         elif topic == 'onFinalized':
-            self.handleCompletePhase(nodename)
+            result = args['build'].get('status')
+            self.handleCompletePhase(nodename, jobname, result)
         else:
             raise Exception("Received job for unhandled phase: %s" %
                             topic)
 
-    def handleStartPhase(self, nodename):
+    def handleStartPhase(self, nodename, jobname):
         with self.nodepool.db.getSession() as session:
             node = session.getNodeByNodename(nodename)
             if not node:
                 self.log.debug("Unable to find node with nodename: %s" %
                                nodename)
                 return
+
+            target = self.nodepool.config.targets[node.target_name]
+            if jobname == target.jenkins_test_job:
+                self.log.debug("Test job for node id: %s started" % node.id)
+                return
+
             self.log.info("Setting node id: %s to USED" % node.id)
             node.state = nodedb.USED
             self.nodepool.updateStats(session, node.provider_name)
 
-    def handleCompletePhase(self, nodename):
-        t = NodeCompleteThread(self.nodepool, nodename)
+    def handleCompletePhase(self, nodename, jobname, result):
+        t = NodeCompleteThread(self.nodepool, nodename, jobname, result)
         t.start()
 
 
@@ -220,9 +250,13 @@ class NodeLauncher(threading.Thread):
         # Do this before adding to jenkins to avoid a race where
         # Jenkins might immediately use the node before we've updated
         # the state:
-        self.node.state = nodedb.READY
+        if self.target.jenkins_test_job:
+            self.node.state = nodedb.TEST
+            self.log.info("Node id: %s is in testing" % self.node.id)
+        else:
+            self.node.state = nodedb.READY
+            self.log.info("Node id: %s is ready" % self.node.id)
         self.nodepool.updateStats(session, self.provider.name)
-        self.log.info("Node id: %s is ready" % self.node.id)
 
         if self.target.jenkins_url:
             self.log.debug("Adding node id: %s to jenkins" % self.node.id)
@@ -235,9 +269,10 @@ class NodeLauncher(threading.Thread):
         args = dict(name=self.node.nodename,
                     host=self.node.ip,
                     description='Dynamic single use %s node' % self.image.name,
-                    labels=self.image.name,
                     executors=1,
                     root='/home/jenkins')
+        if not self.target.jenkins_test_job:
+            args['labels'] = self.image.name
         if self.target.jenkins_credentials_id:
             args['credentials_id'] = self.target.jenkins_credentials_id
         else:
@@ -245,6 +280,10 @@ class NodeLauncher(threading.Thread):
             args['private_key'] = self.image.private_key
 
         jenkins.createNode(**args)
+
+        if self.target.jenkins_test_job:
+            params = dict(NODE=self.node.nodename)
+            jenkins.startBuild(self.target.jenkins_test_job, params)
 
 
 class ImageUpdater(threading.Thread):
@@ -559,11 +598,13 @@ class NodePool(threading.Thread):
                 t.jenkins_user = jenkins['user']
                 t.jenkins_apikey = jenkins['apikey']
                 t.jenkins_credentials_id = jenkins.get('credentials-id')
+                t.jenkins_test_job = jenkins.get('test-job')
             else:
                 t.jenkins_url = None
                 t.jenkins_user = None
                 t.jenkins_apikey = None
                 t.jenkins_credentials_id = None
+                t.jenkins_test_job = None
             t.rate = target.get('rate', 1.0)
             oldmanager = None
             if self.config:
@@ -633,8 +674,10 @@ class NodePool(threading.Thread):
                                        nodedb.READY))
         n_building = len(session.getNodes(provider.name, image.name,
                                           target.name, nodedb.BUILDING))
+        n_test = len(session.getNodes(provider.name, image.name,
+                                      target.name, nodedb.TEST))
         n_provider = len(session.getNodes(provider.name))
-        num_to_launch = provider.min_ready - (n_ready + n_building)
+        num_to_launch = provider.min_ready - (n_ready + n_building + n_test)
 
         # Don't launch more than our provider max
         max_servers = self.config.providers[provider.name].max_servers
@@ -813,6 +856,13 @@ class NodePool(threading.Thread):
             if (node.state == nodedb.DELETE):
                 self.log.warning("Deleting node id: %s which is in delete "
                                  "state" % node.id)
+                delete = True
+            elif (node.state == nodedb.TEST and
+                  time.time() - node.state_time > TEST_CLEANUP):
+                self.log.warning("Deleting node id: %s which has been in %s "
+                                 "state for %s hours" %
+                                 (node.id, node.state,
+                                  node.state_time / (60 * 60)))
                 delete = True
             elif time.time() - node.state_time > NODE_CLEANUP:
                 self.log.warning("Deleting node id: %s which has been in %s "

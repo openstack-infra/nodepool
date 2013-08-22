@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import logging
+import re
 
 import myjenkins
 import fakeprovider
@@ -34,16 +35,18 @@ class CreateNodeTask(Task):
                                'username': self.args['username'],
                                'privatekey': self.args['private_key'],
                                'host': self.args['host']}
+        args = dict(
+            name=self.args['name'],
+            numExecutors=self.args['executors'],
+            nodeDescription=self.args['description'],
+            remoteFS=self.args['root'],
+            exclusive=True,
+            launcher='hudson.plugins.sshslaves.SSHLauncher',
+            launcher_params=launcher_params)
+        if self.args['labels']:
+            args['labels'] = self.args['labels']
         try:
-            jenkins.create_node(
-                name=self.args['name'],
-                numExecutors=self.args['executors'],
-                nodeDescription=self.args['description'],
-                remoteFS=self.args['root'],
-                labels=self.args['labels'],
-                exclusive=True,
-                launcher='hudson.plugins.sshslaves.SSHLauncher',
-                launcher_params=launcher_params)
+            jenkins.create_node(**args)
         except myjenkins.JenkinsException as e:
             if 'already exists' in str(e):
                 pass
@@ -61,6 +64,22 @@ class DeleteNodeTask(Task):
         return jenkins.delete_node(self.args['name'])
 
 
+class GetNodeConfigTask(Task):
+    def main(self, jenkins):
+        return jenkins.get_node_config(self.args['name'])
+
+
+class SetNodeConfigTask(Task):
+    def main(self, jenkins):
+        jenkins.reconfig_node(self.args['name'], self.args['config'])
+
+
+class StartBuildTask(Task):
+    def main(self, jenkins):
+        jenkins.build_job(self.args['name'],
+                          parameters=self.args['params'])
+
+
 class JenkinsManager(TaskManager):
     log = logging.getLogger("nodepool.JenkinsManager")
 
@@ -76,7 +95,7 @@ class JenkinsManager(TaskManager):
                                  self.target.jenkins_user,
                                  self.target.jenkins_apikey)
 
-    def createNode(self, name, host, description, labels, executors, root,
+    def createNode(self, name, host, description, executors, root, labels=[],
                    credentials_id=None, username=None, private_key=None):
         args = dict(name=name, host=host, description=description,
                     labels=labels, executors=executors, root=root)
@@ -92,3 +111,19 @@ class JenkinsManager(TaskManager):
 
     def deleteNode(self, name):
         return self.submitTask(DeleteNodeTask(name=name))
+
+    LABEL_RE = re.compile(r'<label>(.*)</label>')
+
+    def relabelNode(self, name, labels):
+        config = self.submitTask(GetNodeConfigTask(name=name))
+        old = None
+        m = self.LABEL_RE.search(config)
+        if m:
+            old = m.group(1)
+        config = self.LABEL_RE.sub('<label>%s</label>' % ' '.join(labels),
+                                   config)
+        self.submitTask(SetNodeConfigTask(name=name, config=config))
+        return old
+
+    def startBuild(self, name, params):
+        self.submitTask(StartBuildTask(name=name, params=params))
