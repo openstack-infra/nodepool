@@ -925,7 +925,7 @@ class NodePool(threading.Thread):
             try:
                 provider = self.config.providers[node.provider_name]
                 image = provider.images[node.image_name]
-                connect_kwargs = dict(key_filename=self.image.private_key)
+                connect_kwargs = dict(key_filename=image.private_key)
                 if utils.ssh_connect(node.ip, image.username,
                                      connect_kwargs=connect_kwargs):
                     continue
