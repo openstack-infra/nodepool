@@ -827,7 +827,7 @@ class NodePool(threading.Thread):
         if snap_image.external_id:
             try:
                 remote_image = manager.getImage(snap_image.external_id)
-                self.log.debug('Deleting image %s' % remote_image.id)
+                self.log.debug('Deleting image %s' % remote_image['id'])
                 manager.deleteImage(remote_image['id'])
             except provider_manager.NotFound:
                 self.log.warning('Image id %s not found' %
