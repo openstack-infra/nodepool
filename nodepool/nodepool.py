@@ -853,22 +853,23 @@ class NodePool(threading.Thread):
             if node.state in [nodedb.READY, nodedb.HOLD]:
                 continue
             delete = False
+            now = time.time()
             if (node.state == nodedb.DELETE):
                 self.log.warning("Deleting node id: %s which is in delete "
                                  "state" % node.id)
                 delete = True
             elif (node.state == nodedb.TEST and
-                  time.time() - node.state_time > TEST_CLEANUP):
+                  (now - node.state_time) > TEST_CLEANUP):
                 self.log.warning("Deleting node id: %s which has been in %s "
                                  "state for %s hours" %
                                  (node.id, node.state,
-                                  node.state_time / (60 * 60)))
+                                  (now - node.state_time) / (60 * 60)))
                 delete = True
-            elif time.time() - node.state_time > NODE_CLEANUP:
+            elif (now - node.state_time) > NODE_CLEANUP:
                 self.log.warning("Deleting node id: %s which has been in %s "
                                  "state for %s hours" %
                                  (node.id, node.state,
-                                  node.state_time / (60 * 60)))
+                                  (now - node.state_time) / (60 * 60)))
                 delete = True
             if delete:
                 try:
@@ -881,6 +882,7 @@ class NodePool(threading.Thread):
             # Normally, reap images that have sat in their current state
             # for 24 hours, unless the image is the current snapshot
             delete = False
+            now = time.time()
             if image.provider_name not in self.config.providers:
                 delete = True
                 self.log.info("Deleting image id: %s which has no current "
@@ -894,10 +896,11 @@ class NodePool(threading.Thread):
                 current = session.getCurrentSnapshotImage(image.provider_name,
                                                           image.image_name)
                 if (current and image != current and
-                    (time.time() - current.state_time) > KEEP_OLD_IMAGE):
-                    self.log.info("Deleting image id: %s because the current "
-                                  "image is %s hours old" %
-                                  (image.id, current.state_time / (60 * 60)))
+                    (now - image.state_time) > KEEP_OLD_IMAGE):
+                    self.log.info("Deleting non-current image id: %s because "
+                                  "the image is %s hours old" %
+                                  (image.id,
+                                   (now - image.state_time) / (60 * 60)))
                     delete = True
             if delete:
                 try:

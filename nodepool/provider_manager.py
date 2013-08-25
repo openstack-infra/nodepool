@@ -152,6 +152,9 @@ class GetImageTask(Task):
             image = client.images.get(**self.args)
         except novaclient.exceptions.NotFound:
             raise NotFound()
+        # HP returns 404, rackspace can return a 'DELETED' image.
+        if image.status == 'DELETED':
+            raise NotFound()
         d = dict(id=image.id, status=image.status)
         if hasattr(image, 'progress'):
             d['progress'] = image.progress
