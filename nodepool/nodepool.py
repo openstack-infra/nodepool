@@ -401,7 +401,10 @@ class ImageUpdater(threading.Thread):
                                (server_id, self.snap_image.id))
 
     def bootstrapServer(self, server, key):
-        ssh_kwargs = {}
+        log = logging.getLogger("nodepool.image.build.%s.%s" %
+                                (self.provider.name, self.image.name))
+
+        ssh_kwargs = dict(log=log)
         if key:
             ssh_kwargs['pkey'] = key
         else:
@@ -429,11 +432,9 @@ class ImageUpdater(threading.Thread):
             for k, v in os.environ.items():
                 if k.startswith('NODEPOOL_'):
                     env_vars += ' %s="%s"' % (k, v)
-            r = host.ssh("run setup script",
-                         "cd /opt/nodepool-scripts && %s ./%s" %
-                         (env_vars, self.image.setup))
-            if not r:
-                raise Exception("Unable to run setup scripts")
+            host.ssh("run setup script",
+                     "cd /opt/nodepool-scripts && %s ./%s" %
+                     (env_vars, self.image.setup))
 
 
 class ConfigValue(object):
