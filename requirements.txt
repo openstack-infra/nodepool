@@ -13,3 +13,4 @@ sqlalchemy>=0.8.2,<0.9.0
 pyzmq>=13.1.0,<14.0.0
 python-novaclient
 MySQL-python
+PrettyTable>=0.6,<0.8
