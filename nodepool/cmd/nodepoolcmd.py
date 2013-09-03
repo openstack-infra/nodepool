@@ -45,6 +45,12 @@ class NodePoolCmd(object):
                                                help='list images')
         cmd_image_list.set_defaults(func=self.image_list)
 
+        cmd_image_update = subparsers.add_parser('image-update',
+                                                 help='update image')
+        cmd_image_update.add_argument('provider', help='provider name')
+        cmd_image_update.add_argument('image', help='image name')
+        cmd_image_update.set_defaults(func=self.image_update)
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -77,6 +83,20 @@ class NodePoolCmd(object):
                            nodedb.STATE_NAMES[image.state],
                            '%.02f' % ((now - image.state_time) / 3600)])
             print t
+
+    def image_update(self):
+        self.pool.reconfigureManagers(self.pool.config)
+        provider = self.pool.config.providers[self.args.provider]
+        image = provider.images[self.args.image]
+
+        with self.pool.getDB().getSession() as session:
+            snap_image = session.createSnapshotImage(
+                provider_name=provider.name,
+                image_name=image.name)
+            t = nodepool.ImageUpdater(self.pool, provider, image,
+                                      snap_image.id)
+            t.start()
+            t.join()
 
     def main(self):
         self.parse_arguments()
