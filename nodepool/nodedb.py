@@ -239,6 +239,14 @@ class NodeDatabaseSession(object):
             return None
         return images[0]
 
+    def getSnapshotImageByExternalID(self, provider_name, external_id):
+        images = self.session().query(SnapshotImage).filter_by(
+            provider_name=provider_name,
+            external_id=external_id).all()
+        if not images:
+            return None
+        return images[0]
+
     def getCurrentSnapshotImage(self, provider_name, image_name):
         images = self.session().query(SnapshotImage).filter(
             snapshot_image_table.c.provider_name == provider_name,

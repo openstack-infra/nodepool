@@ -71,6 +71,14 @@ def make_server_dict(server):
     return d
 
 
+def make_image_dict(image):
+    d = dict(id=image.id, name=image.name, status=image.status,
+             metadata=image.metadata)
+    if hasattr(image, 'progress'):
+        d['progress'] = image.progress
+    return d
+
+
 class NotFound(Exception):
     pass
 
@@ -167,10 +175,13 @@ class GetImageTask(Task):
         # HP returns 404, rackspace can return a 'DELETED' image.
         if image.status == 'DELETED':
             raise NotFound()
-        d = dict(id=image.id, status=image.status)
-        if hasattr(image, 'progress'):
-            d['progress'] = image.progress
-        return d
+        return make_image_dict(image)
+
+
+class ListImagesTask(Task):
+    def main(self, client):
+        images = client.images.list()
+        return [make_image_dict(image) for image in images]
 
 
 class FindImageTask(Task):
@@ -340,6 +351,9 @@ class ProviderManager(TaskManager):
 
     def getImage(self, image_id):
         return self.submitTask(GetImageTask(image=image_id))
+
+    def listImages(self):
+        return self.submitTask(ListImagesTask())
 
     def listFloatingIPs(self):
         return self.submitTask(ListFloatingIPsTask())
