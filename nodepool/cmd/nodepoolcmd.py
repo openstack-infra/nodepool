@@ -77,6 +77,12 @@ class NodePoolCmd(object):
         cmd_delete.set_defaults(func=self.delete)
         cmd_delete.add_argument('id', help='node id')
 
+        cmd_image_delete = subparsers.add_parser(
+            'image-delete',
+            help='delete an image')
+        cmd_image_delete.set_defaults(func=self.image_delete)
+        cmd_image_delete.add_argument('id', help='image id')
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -179,6 +185,12 @@ class NodePoolCmd(object):
         with self.pool.getDB().getSession() as session:
             node = session.getNode(self.args.id)
             self.pool.deleteNode(session, node)
+
+    def image_delete(self):
+        self.pool.reconfigureManagers(self.pool.config)
+        with self.pool.getDB().getSession() as session:
+            snap_image = session.getSnapshotImage(self.args.id)
+            self.pool.deleteImage(snap_image)
 
     def main(self):
         self.parse_arguments()
