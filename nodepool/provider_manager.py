@@ -36,6 +36,41 @@ def iterate_timeout(max_seconds, purpose):
     raise Exception("Timeout waiting for %s" % purpose)
 
 
+def get_public_ip(server, version=4):
+    for addr in server.addresses.get('public', []):
+        if type(addr) == type(u''):  # Rackspace/openstack 1.0
+            return addr
+        if addr['version'] == version:  # Rackspace/openstack 1.1
+            return addr['addr']
+    for addr in server.addresses.get('private', []):
+        # HPcloud
+        if (addr['version'] == version and version == 4):
+            quad = map(int, addr['addr'].split('.'))
+            if quad[0] == 10:
+                continue
+            if quad[0] == 192 and quad[1] == 168:
+                continue
+            if quad[0] == 172 and (16 <= quad[1] <= 31):
+                continue
+            return addr['addr']
+    return None
+
+
+def make_server_dict(server):
+    d = dict(id=server.id,
+             name=server.name,
+             status=server.status,
+             addresses=server.addresses)
+    if hasattr(server, 'adminPass'):
+        d['admin_pass'] = server.adminPass
+    if hasattr(server, 'key_name'):
+        d['key_name'] = server.key_name
+    if hasattr(server, 'progress'):
+        d['progress'] = server.progress
+    d['public_v4'] = get_public_ip(server)
+    return d
+
+
 class NotFound(Exception):
     pass
 
@@ -47,46 +82,23 @@ class CreateServerTask(Task):
 
 
 class GetServerTask(Task):
-    def getPublicIP(self, server, version=4):
-        for addr in server.addresses.get('public', []):
-            if type(addr) == type(u''):  # Rackspace/openstack 1.0
-                return addr
-            if addr['version'] == version:  # Rackspace/openstack 1.1
-                return addr['addr']
-        for addr in server.addresses.get('private', []):
-            # HPcloud
-            if (addr['version'] == version and version == 4):
-                quad = map(int, addr['addr'].split('.'))
-                if quad[0] == 10:
-                    continue
-                if quad[0] == 192 and quad[1] == 168:
-                    continue
-                if quad[0] == 172 and (16 <= quad[1] <= 31):
-                    continue
-                return addr['addr']
-        return None
-
     def main(self, client):
         try:
             server = client.servers.get(self.args['server_id'])
         except novaclient.exceptions.NotFound:
             raise NotFound()
-        d = dict(id=server.id,
-                 status=server.status,
-                 addresses=server.addresses)
-        if hasattr(server, 'adminPass'):
-            d['admin_pass'] = server.adminPass
-        if hasattr(server, 'key_name'):
-            d['key_name'] = server.key_name
-        if hasattr(server, 'progress'):
-            d['progress'] = server.progress
-        d['public_v4'] = self.getPublicIP(server)
-        return d
+        return make_server_dict(server)
 
 
 class DeleteServerTask(Task):
     def main(self, client):
         client.servers.delete(self.args['server_id'])
+
+
+class ListServersTask(Task):
+    def main(self, client):
+        servers = client.servers.list()
+        return [make_server_dict(server) for server in servers]
 
 
 class AddKeypairTask(Task):
@@ -338,6 +350,9 @@ class ProviderManager(TaskManager):
 
     def deleteFloatingIP(self, ip_id):
         return self.submitTask(DeleteFloatingIPTask(floating_ip=ip_id))
+
+    def listServers(self):
+        return self.submitTask(ListServersTask())
 
     def deleteServer(self, server_id):
         return self.submitTask(DeleteServerTask(server_id=server_id))

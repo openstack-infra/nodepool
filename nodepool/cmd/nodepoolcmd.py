@@ -50,6 +50,12 @@ class NodePoolCmd(object):
         cmd_image_update.add_argument('provider', help='provider name')
         cmd_image_update.add_argument('image', help='image name')
         cmd_image_update.set_defaults(func=self.image_update)
+        cmd_alien_list = subparsers.add_parser(
+            'alien-list',
+            help='list nodes not accounted for by nodepool')
+        cmd_alien_list.set_defaults(func=self.alien_list)
+        cmd_alien_list.add_argument('provider', help='provider name',
+                                    nargs='?')
 
         self.args = parser.parse_args()
 
@@ -97,6 +103,25 @@ class NodePoolCmd(object):
                                       snap_image.id)
             t.start()
             t.join()
+
+    def alien_list(self):
+        self.pool.reconfigureManagers(self.pool.config)
+
+        t = PrettyTable(["Provider", "Hostname", "Server ID", "IP"])
+        t.align = 'l'
+        with self.pool.getDB().getSession() as session:
+            for provider in self.pool.config.providers.values():
+                if (self.args.provider and
+                    provider.name != self.args.provider):
+                    continue
+                manager = self.pool.getProviderManager(provider)
+
+                for server in manager.listServers():
+                    if not session.getNodeByExternalID(
+                        provider.name, server['id']):
+                        t.add_row([provider.name, server['name'], server['id'],
+                                   server['public_v4']])
+        print t
 
     def main(self):
         self.parse_arguments()

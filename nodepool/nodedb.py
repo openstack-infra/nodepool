@@ -294,6 +294,15 @@ class NodeDatabaseSession(object):
             return None
         return nodes[0]
 
+    def getNodeByExternalID(self, provider_name, external_id):
+        nodes = self.session().query(Node).filter_by(
+            provider_name=provider_name,
+            external_id=external_id).all()
+        if not nodes:
+            return None
+        return nodes[0]
+
+
 if __name__ == '__main__':
     db = NodeDatabase(sys.argv[0])
     db.print_state()
