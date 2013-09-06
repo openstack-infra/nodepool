@@ -50,12 +50,14 @@ class NodePoolCmd(object):
         cmd_image_update.add_argument('provider', help='provider name')
         cmd_image_update.add_argument('image', help='image name')
         cmd_image_update.set_defaults(func=self.image_update)
+
         cmd_alien_list = subparsers.add_parser(
             'alien-list',
             help='list nodes not accounted for by nodepool')
         cmd_alien_list.set_defaults(func=self.alien_list)
         cmd_alien_list.add_argument('provider', help='provider name',
                                     nargs='?')
+
         cmd_alien_image_list = subparsers.add_parser(
             'alien-image-list',
             help='list images not accounted for by nodepool')
@@ -63,19 +65,28 @@ class NodePoolCmd(object):
         cmd_alien_image_list.add_argument('provider', help='provider name',
                                           nargs='?')
 
+        cmd_hold = subparsers.add_parser(
+            'hold',
+            help='place a node in the HOLD state')
+        cmd_hold.set_defaults(func=self.hold)
+        cmd_hold.add_argument('id', help='node id')
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
         logging.basicConfig(level=logging.INFO)
 
-    def list(self):
-        t = PrettyTable(["Provider", "Image", "Target", "Hostname", "NodeName",
-                         "Server ID", "IP", "State", "Age (hours)"])
+    def list(self, node_id=None):
+        t = PrettyTable(["ID", "Provider", "Image", "Target", "Hostname",
+                         "NodeName", "Server ID", "IP", "State",
+                         "Age (hours)"])
         t.align = 'l'
         now = time.time()
         with self.pool.getDB().getSession() as session:
             for node in session.getNodes():
-                t.add_row([node.provider_name, node.image_name,
+                if node_id and node.id != node_id:
+                    continue
+                t.add_row([node.id, node.provider_name, node.image_name,
                            node.target_name, node.hostname, node.nodename,
                            node.external_id, node.ip,
                            nodedb.STATE_NAMES[node.state],
@@ -83,13 +94,13 @@ class NodePoolCmd(object):
             print t
 
     def image_list(self):
-        t = PrettyTable(["Provider", "Image", "Hostname", "Version",
+        t = PrettyTable(["ID", "Provider", "Image", "Hostname", "Version",
                          "Image ID", "Server ID", "State", "Age (hours)"])
         t.align = 'l'
         now = time.time()
         with self.pool.getDB().getSession() as session:
             for image in session.getSnapshotImages():
-                t.add_row([image.provider_name, image.image_name,
+                t.add_row([image.id, image.provider_name, image.image_name,
                            image.hostname, image.version,
                            image.external_id, image.server_external_id,
                            nodedb.STATE_NAMES[image.state],
@@ -148,6 +159,14 @@ class NodePoolCmd(object):
                             t.add_row([provider.name, image['name'],
                                        image['id']])
         print t
+
+    def hold(self):
+        node_id = None
+        with self.pool.getDB().getSession() as session:
+            node = session.getNode(self.args.id)
+            node.state = nodedb.HOLD
+            node_id = node.id
+        self.list(node_id=node_id)
 
     def main(self):
         self.parse_arguments()
