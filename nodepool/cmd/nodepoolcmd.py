@@ -71,6 +71,12 @@ class NodePoolCmd(object):
         cmd_hold.set_defaults(func=self.hold)
         cmd_hold.add_argument('id', help='node id')
 
+        cmd_delete = subparsers.add_parser(
+            'delete',
+            help='delete a node')
+        cmd_delete.set_defaults(func=self.delete)
+        cmd_delete.add_argument('id', help='node id')
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -167,6 +173,12 @@ class NodePoolCmd(object):
             node.state = nodedb.HOLD
             node_id = node.id
         self.list(node_id=node_id)
+
+    def delete(self):
+        self.pool.reconfigureManagers(self.pool.config)
+        with self.pool.getDB().getSession() as session:
+            node = session.getNode(self.args.id)
+            self.pool.deleteNode(session, node)
 
     def main(self):
         self.parse_arguments()
