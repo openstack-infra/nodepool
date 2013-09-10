@@ -65,6 +65,7 @@ class FakeList(object):
                   status='BUILD',
                   adminPass='fake',
                   addresses=dict(public=[dict(version=4, addr='fake')]),
+                  metadata={},
                   manager=self)
         self._list.append(s)
         t = threading.Thread(target=self._finish, args=(s, 0.5, 'ACTIVE'))
