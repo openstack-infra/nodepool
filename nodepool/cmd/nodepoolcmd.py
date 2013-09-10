@@ -31,6 +31,7 @@ class NodePoolCmd(object):
     def parse_arguments(self):
         parser = argparse.ArgumentParser(description='Node pool.')
         parser.add_argument('-c', dest='config',
+                            default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')

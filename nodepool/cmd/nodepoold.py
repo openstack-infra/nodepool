@@ -39,6 +39,7 @@ class NodePoolDaemon(object):
     def parse_arguments(self):
         parser = argparse.ArgumentParser(description='Node pool.')
         parser.add_argument('-c', dest='config',
+                            default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
         parser.add_argument('-d', dest='nodaemon', action='store_true',
                             help='do not run as a daemon')
