@@ -71,6 +71,11 @@ class NodeCompleteThread(threading.Thread):
                            self.nodename)
             return
 
+        if node.state == nodedb.HOLD:
+            self.log.info("Node id: %s is complete but in HOLD state" %
+                          node.id)
+            return
+
         target = self.nodepool.config.targets[node.target_name]
         if self.jobname == target.jenkins_test_job:
             self.log.debug("Test job for node id: %s complete, result: %s" %
