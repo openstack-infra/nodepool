@@ -163,12 +163,13 @@ class NodeUpdateListener(threading.Thread):
 class NodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
-    def __init__(self, nodepool, provider, image, target, node_id):
+    def __init__(self, nodepool, provider, image, target, node_id, timeout):
         threading.Thread.__init__(self)
         self.provider = provider
         self.image = image
         self.target = target
         self.node_id = node_id
+        self.timeout = timeout
         self.nodepool = nodepool
 
     def run(self):
@@ -241,7 +242,8 @@ class NodeLauncher(threading.Thread):
         self.log.debug("Node id: %s is running, testing ssh" % self.node.id)
         connect_kwargs = dict(key_filename=self.image.private_key)
         if not utils.ssh_connect(ip, self.image.username,
-                                 connect_kwargs=connect_kwargs):
+                                 connect_kwargs=connect_kwargs,
+                                 timeout=self.timeout):
             raise Exception("Unable to connect via ssh")
 
         if statsd:
@@ -542,6 +544,7 @@ class NodePool(threading.Thread):
             p.region_name = provider.get('region-name')
             p.max_servers = provider['max-servers']
             p.rate = provider.get('rate', 1.0)
+            p.boot_timeout = provider.get('boot-timeout', 60)
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()
@@ -604,7 +607,9 @@ class NodePool(threading.Thread):
                     p.auth_url != oldmanager.provider.auth_url or
                     p.service_type != oldmanager.provider.service_type or
                     p.service_name != oldmanager.provider.service_name or
-                    p.region_name != oldmanager.provider.region_name):
+                    p.max_servers != oldmanager.provider.max_servers or
+                    p.rate != oldmanager.provider.rate or
+                    p.boot_timeout != oldmanager.provider.boot_timeout):
                     stop_managers.append(oldmanager)
                     oldmanager = None
             if oldmanager:
@@ -802,8 +807,9 @@ class NodePool(threading.Thread):
     def launchNode(self, session, provider, image, target):
         provider = self.config.providers[provider.name]
         image = provider.images[image.name]
+        timeout = provider.boot_timeout
         node = session.createNode(provider.name, image.name, target.name)
-        t = NodeLauncher(self, provider, image, target, node.id)
+        t = NodeLauncher(self, provider, image, target, node.id, timeout)
         t.start()
 
     def deleteNode(self, session, node):
