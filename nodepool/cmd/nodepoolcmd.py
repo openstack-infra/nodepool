@@ -48,11 +48,20 @@ class NodePoolCmd(object):
                                                help='list images')
         cmd_image_list.set_defaults(func=self.image_list)
 
+        cmd_dib_image_list = subparsers.add_parser('dib-image-list',
+                                                   help='list dib images')
+        cmd_dib_image_list.set_defaults(func=self.dib_image_list)
+
         cmd_image_update = subparsers.add_parser('image-update',
                                                  help='update image')
         cmd_image_update.add_argument('provider', help='provider name')
         cmd_image_update.add_argument('image', help='image name')
         cmd_image_update.set_defaults(func=self.image_update)
+
+        cmd_image_build = subparsers.add_parser('image-build',
+                                                help='build image')
+        cmd_image_build.add_argument('image', help='image name')
+        cmd_image_build.set_defaults(func=self.image_build)
 
         cmd_alien_list = subparsers.add_parser(
             'alien-list',
@@ -89,6 +98,20 @@ class NodePoolCmd(object):
         cmd_image_delete.set_defaults(func=self.image_delete)
         cmd_image_delete.add_argument('id', help='image id')
 
+        cmd_dib_image_delete = subparsers.add_parser(
+            'dib-image-delete',
+            help='delete a dib image')
+        cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
+        cmd_dib_image_delete.add_argument('id', help='dib image id')
+
+        cmd_image_upload = subparsers.add_parser(
+            'image-upload',
+            help='upload an image')
+        cmd_image_upload.set_defaults(func=self.image_upload)
+        cmd_image_upload.add_argument('provider', help='provider name',
+                                      nargs='?', default='all')
+        cmd_image_upload.add_argument('image', help='image name')
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -114,6 +137,19 @@ class NodePoolCmd(object):
                            '%.02f' % ((now - node.state_time) / 3600)])
             print t
 
+    def dib_image_list(self):
+        t = PrettyTable(["ID", "Image", "Filename", "Version",
+                         "State", "Age (hours)"])
+        t.align = 'l'
+        now = time.time()
+        with self.pool.getDB().getSession() as session:
+            for image in session.getDibImages():
+                t.add_row([image.id, image.image_name,
+                           image.filename, image.version,
+                           nodedb.STATE_NAMES[image.state],
+                           '%.02f' % ((now - image.state_time) / 3600)])
+            print t
+
     def image_list(self):
         t = PrettyTable(["ID", "Provider", "Image", "Hostname", "Version",
                          "Image ID", "Server ID", "State", "Age (hours)"])
@@ -129,12 +165,54 @@ class NodePoolCmd(object):
             print t
 
     def image_update(self):
+        with self.pool.getDB().getSession() as session:
+            self.pool.reconfigureManagers(self.pool.config)
+            if self.args.image in self.pool.config.diskimages:
+                # first build image, then upload it
+                self.image_build()
+                self.image_upload()
+            else:
+                if self.args.provider == 'all':
+                    # iterate for all providers listed in label
+                    for provider in self.pool.config.providers.values():
+                        for image in provider.images.values():
+                            if self.args.image == image.name:
+                                self.pool.updateImage(session, provider.name,
+                                                      self.args.image)
+                                break
+                else:
+                    provider = self.pool.config.providers[self.args.provider]
+                    self.pool.updateImage(session, provider.self.args.image)
+
+    def image_build(self):
+        if self.args.image not in self.pool.config.diskimages:
+            # only can build disk images, not snapshots
+            raise Exception("Trying to build a non disk-image-builder "
+                            "image: %s" % self.args.image)
+
+        self.pool.reconfigureImageBuilder()
+        self.pool.buildImage(self.pool.config.diskimages[self.args.image])
+        self.pool.waitForBuiltImages()
+
+    def image_upload(self):
         self.pool.reconfigureManagers(self.pool.config)
-        provider = self.pool.config.providers[self.args.provider]
-        image = provider.images[self.args.image]
+        if not self.args.image in self.pool.config.diskimages:
+            # only can build disk images, not snapshots
+            raise Exception("Trying to upload a non disk-image-builder "
+                            "image: %s" % self.args.image)
 
         with self.pool.getDB().getSession() as session:
-            self.pool.updateImage(session, provider.name, image.name)
+            if self.args.provider == 'all':
+                # iterate for all providers listed in label
+                for provider in self.pool.config.providers.values():
+                    for image in provider.images.values():
+                        if self.args.image == image.name:
+                            self.pool.uploadImage(session, provider.name,
+                                                  self.args.image)
+                            break
+            else:
+                self.pool.uploadImage(session, self.args.provider,
+                                      self.args.image)
 
     def alien_list(self):
         self.pool.reconfigureManagers(self.pool.config)
@@ -192,6 +270,12 @@ class NodePoolCmd(object):
             else:
                 node.state = nodedb.DELETE
                 self.list(node_id=node.id)
+
+    def dib_image_delete(self):
+        self.pool.reconfigureManagers(self.pool.config)
+        with self.pool.getDB().getSession() as session:
+            dib_image = session.getDibImage(self.args.id)
+            self.pool.deleteDibImage(dib_image)
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config)

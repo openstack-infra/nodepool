@@ -23,8 +23,11 @@ import json
 import logging
 import os.path
 import paramiko
+import Queue
 import random
 import re
+import shlex
+import subprocess
 import threading
 import time
 import yaml
@@ -406,6 +409,7 @@ class NodeLauncher(threading.Thread):
         self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
                        (self.node.id, ip))
         connect_kwargs = dict(key_filename=self.image.private_key)
+
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
                                  timeout=self.timeout):
@@ -653,8 +657,8 @@ class SubNodeLauncher(threading.Thread):
             raise LaunchNetworkException("Unable to find public IP of server")
 
         self.subnode.ip = ip
-        self.log.debug("Subnode id: %s for node id: %s is running, ip: %s, "
-                       "testing ssh" %
+        self.log.debug("Subnode id: %s for node id: %s is running, "
+                       "ip: %s, testing ssh" %
                        (self.subnode_id, self.node_id, ip))
         connect_kwargs = dict(key_filename=self.image.private_key)
         if not utils.ssh_connect(ip, self.image.username,
@@ -684,6 +688,8 @@ class ImageUpdater(threading.Thread):
         self.snap_image_id = snap_image_id
         self.nodepool = nodepool
         self.scriptdir = self.nodepool.config.scriptdir
+        self.elementsdir = self.nodepool.config.elementsdir
+        self.imagesdir = self.nodepool.config.imagesdir
 
     def run(self):
         try:
@@ -717,6 +723,146 @@ class ImageUpdater(threading.Thread):
                     self.log.exception("Exception deleting image id: %s:" %
                                        self.snap_image.id)
                     return
+
+
+class DiskImageBuilder(threading.Thread):
+    log = logging.getLogger("nodepool.DiskImageBuilderThread")
+
+    def __init__(self, nodepool):
+        threading.Thread.__init__(self, name='DiskImageBuilder queue')
+        self.nodepool = nodepool
+        self.elementsdir = self.nodepool.config.elementsdir
+        self.imagesdir = self.nodepool.config.imagesdir
+        self.queue = nodepool._image_builder_queue
+
+    def run(self):
+        while True:
+            # grabs image id from queue
+            self.disk_image = self.queue.get()
+            self.buildImage(self.disk_image)
+            self.queue.task_done()
+
+    def _buildImage(self, image, filename):
+        if filename.startswith('./fake-dib-image'):
+            return True
+
+        try:
+            env = os.environ.copy()
+            for k, v in os.environ.items():
+                if k.startswith('NODEPOOL_'):
+                    env[k] = v
+
+            env['ELEMENTS_PATH'] = self.elementsdir
+            img_elements = ''
+            extra_options = ''
+            env['DIB_RELEASE'] = image.release
+            img_elements = image.elements
+
+            if image.qemu_img_options:
+                extra_options = ('--qemu-img-options %s' %
+                                 image.qemu_img_options)
+
+            cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
+                   (extra_options, filename, img_elements))
+            self.log.info('Running %s' % cmd)
+
+            p = subprocess.Popen(
+                shlex.split(cmd),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env)
+            (stdout, stderr) = p.communicate()
+            if self.log:
+                self.log.info(stdout)
+            if stderr:
+                for line in stderr:
+                    if self.log:
+                        self.log.error(line.rstrip())
+            ret = p.returncode
+            if ret:
+                raise Exception("Unable to create %s" % filename)
+        except Exception:
+            self.log.exception("Exception in run method:")
+
+    def buildImage(self, image_id):
+        with self.nodepool.getDB().getSession() as session:
+            self.dib_image = session.getDibImage(image_id)
+            self.log.info("Creating image: %s with filename %s" %
+                          (self.dib_image.image_name, self.dib_image.filename))
+
+            start_time = time.time()
+            timestamp = int(start_time)
+            self.dib_image.version = timestamp
+            session.commit()
+
+            # retrieve image details
+            image_details = \
+                self.nodepool.config.diskimages[self.dib_image.image_name]
+            self._buildImage(image_details, self.dib_image.filename)
+
+            if statsd:
+                dt = int((time.time() - start_time) * 1000)
+                key = 'nodepool.dib_image_build.%s' % self.dib_image.image_name
+                statsd.timing(key, dt)
+                statsd.incr(key)
+
+            self.dib_image.state = nodedb.READY
+            session.commit()
+            self.log.info("Image %s is built" % self.dib_image.image_name)
+
+
+class DiskImageUpdater(ImageUpdater):
+
+    log = logging.getLogger("nodepool.DiskImageUpdater")
+
+    def __init__(self, nodepool, provider, image, snap_image_id,
+                 filename):
+        super(DiskImageUpdater, self).__init__(nodepool, provider, image,
+                                               snap_image_id)
+        self.filename = filename
+        self.image_name = image.name
+
+    def updateImage(self, session):
+        start_time = time.time()
+        timestamp = int(start_time)
+
+        dummy_image = type('obj', (object,), {'name': self.image_name})
+        image_name = self.provider.template_hostname.format(
+            provider=self.provider, image=dummy_image,
+            timestamp=str(timestamp))
+
+        # TODO(mordred) abusing the hostname field
+        self.snap_image.hostname = image_name
+        self.snap_image.version = timestamp
+        session.commit()
+
+        # strip extension from filename
+        stripped_filename = self.filename.replace(".qcow2", "")
+        image_id = self.manager.uploadImage(image_name, stripped_filename,
+                                            'qcow2', 'bare')
+        self.snap_image.external_id = image_id
+        session.commit()
+        self.log.debug("Image id: %s building image %s" %
+                       (self.snap_image.id, image_id))
+        # It can take a _very_ long time for Rackspace 1.0 to save an image
+        self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
+
+        if statsd:
+            dt = int((time.time() - start_time) * 1000)
+            key = 'nodepool.image_update.%s.%s' % (self.image_name,
+                                                   self.provider.name)
+            statsd.timing(key, dt)
+            statsd.incr(key)
+
+        self.snap_image.state = nodedb.READY
+        session.commit()
+        self.log.info("Image %s in %s is ready" % (self.snap_image.hostname,
+                                                   self.provider.name))
+
+
+class SnapshotImageUpdater(ImageUpdater):
+
+    log = logging.getLogger("nodepool.SnapshotImageUpdater")
 
     def updateImage(self, session):
         start_time = time.time()
@@ -914,6 +1060,10 @@ class GearmanServer(ConfigValue):
     pass
 
 
+class DiskImage(ConfigValue):
+    pass
+
+
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
@@ -928,6 +1078,8 @@ class NodePool(threading.Thread):
         self.apsched = None
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
+        self._image_builder_queue = Queue.Queue()
+        self._image_builder_thread = None
 
     def stop(self):
         self._stopped = True
@@ -940,6 +1092,10 @@ class NodePool(threading.Thread):
         if self.apsched:
             self.apsched.shutdown()
 
+    def waitForBuiltImages(self):
+        # wait on the queue until everything has been processed
+        self._image_builder_queue.join()
+
     def loadConfig(self):
         self.log.debug("Loading configuration")
         config = yaml.load(open(self.configfile))
@@ -951,11 +1107,14 @@ class NodePool(threading.Thread):
         newconfig.targets = {}
         newconfig.labels = {}
         newconfig.scriptdir = config.get('script-dir')
+        newconfig.elementsdir = config.get('elements-dir')
+        newconfig.imagesdir = config.get('images-dir')
         newconfig.dburi = config.get('dburi')
         newconfig.provider_managers = {}
         newconfig.jenkins_managers = {}
         newconfig.zmq_publishers = {}
         newconfig.gearman_servers = {}
+        newconfig.diskimages = {}
         newconfig.crons = {}
 
         for name, default in [
@@ -982,6 +1141,18 @@ class NodePool(threading.Thread):
             g.name = g.host + '_' + str(g.port)
             newconfig.gearman_servers[g.name] = g
 
+        if 'diskimages' in config:
+            for diskimage in config['diskimages']:
+                d = DiskImage()
+                d.name = diskimage['name']
+                newconfig.diskimages[d.name] = d
+                if 'elements' in diskimage:
+                    d.elements = u' '.join(diskimage['elements'])
+                else:
+                    d.elements = ''
+                d.release = diskimage.get('release', '')
+                d.qemu_img_options = diskimage.get('qemu-img-options', '')
+
         for label in config['labels']:
             l = Label()
             l.name = label['name']
@@ -995,6 +1166,9 @@ class NodePool(threading.Thread):
                 p = LabelProvider()
                 p.name = provider['name']
                 l.providers[p.name] = p
+
+            # if image is in diskimages, mark it to build once
+            l.is_diskimage = (l.image in newconfig.diskimages)
 
         for provider in config['providers']:
             p = Provider()
@@ -1025,11 +1199,12 @@ class NodePool(threading.Thread):
                 i = ProviderImage()
                 i.name = image['name']
                 p.images[i.name] = i
-                i.base_image = image['base-image']
+                i.base_image = image.get('base-image', None)
                 i.min_ram = image['min-ram']
                 i.name_filter = image.get('name-filter', None)
-                i.setup = image.get('setup')
+                i.setup = image.get('setup', None)
                 i.reset = image.get('reset')
+                i.diskimage = image.get('diskimage', None)
                 i.username = image.get('username', 'jenkins')
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
@@ -1227,6 +1402,13 @@ class NodePool(threading.Thread):
                 self.gearman_client.addServer(g.host, g.port)
             self.gearman_client.waitForServer()
 
+    def reconfigureImageBuilder(self):
+        # start disk image builder thread
+        if not self._image_builder_thread:
+            self._image_builder_thread = DiskImageBuilder(self)
+            self._image_builder_thread.daemon = True
+            self._image_builder_thread.start()
+
     def setConfig(self, config):
         self.config = config
 
@@ -1354,12 +1536,14 @@ class NodePool(threading.Thread):
     def getNeededSubNodes(self, session):
         nodes_to_launch = []
         for node in session.getNodes():
-            expected_subnodes = self.config.labels[node.label_name].subnodes
-            active_subnodes = len([n for n in node.subnodes
-                                   if n.state != nodedb.DELETE])
-            deficit = max(expected_subnodes - active_subnodes, 0)
-            if deficit:
-                nodes_to_launch.append((node, deficit))
+            if node.label_name in self.config.labels:
+                expected_subnodes = \
+                    self.config.labels[node.label_name].subnodes
+                active_subnodes = len([n for n in node.subnodes
+                                       if n.state != nodedb.DELETE])
+                deficit = max(expected_subnodes - active_subnodes, 0)
+                if deficit:
+                    nodes_to_launch.append((node, deficit))
         return nodes_to_launch
 
     def updateConfig(self):
@@ -1370,9 +1554,11 @@ class NodePool(threading.Thread):
         self.reconfigureUpdateListeners(config)
         self.reconfigureGearmanClient(config)
         self.setConfig(config)
+        self.reconfigureImageBuilder()
 
     def startup(self):
         self.updateConfig()
+
         # Currently nodepool can not resume building a node after a
         # restart.  To clean up, mark all building nodes for deletion
         # when the daemon starts.
@@ -1435,18 +1621,67 @@ class NodePool(threading.Thread):
             if label.min_ready < 0:
                 # Label is configured to be disabled, skip creating the image.
                 continue
-            for provider_name in label.providers:
+
+            # check if image is there, if not, build it
+            if label.is_diskimage:
                 found = False
-                for snap_image in session.getSnapshotImages():
-                    if (snap_image.provider_name == provider_name and
-                        snap_image.image_name == label.image and
-                        snap_image.state in [nodedb.READY,
-                                             nodedb.BUILDING]):
+                for dib_image in session.getDibImages():
+                    if (dib_image.image_name == label.image and
+                            dib_image.state in [nodedb.READY,
+                                                nodedb.BUILDING]):
+                        # if image is in ready state, check if image
+                        # file exists in directory, otherwise we need
+                        # to rebuild and delete this buggy image
+                        if (dib_image.state == nodedb.READY and
+                                not os.path.exists(dib_image.filename) and
+                                not dib_image.filename.startswith(
+                                    './fake-dib-image')):
+                            self.log.warning("Image filename %s does not "
+                                             "exist. Removing image" %
+                                             dib_image.filename)
+                            self.deleteDibImage(dib_image)
+                            continue
+
                         found = True
+                        break
                 if not found:
-                    self.log.warning("Missing image %s on %s" %
-                                     (label.image, provider_name))
-                    self.updateImage(session, provider_name, label.image)
+                    # only build the image, we'll recheck again
+                    self.log.warning("Missing disk image %s" % label.image)
+                    self.buildImage(self.config.diskimages[label.image])
+                else:
+                    # check for providers, to upload it
+                    for provider_name in label.providers:
+                        found = False
+                        for snap_image in session.getSnapshotImages():
+                            if (snap_image.provider_name == provider_name and
+                                snap_image.image_name == label.image and
+                                snap_image.state in [nodedb.READY,
+                                                     nodedb.BUILDING]):
+                                found = True
+                                break
+                        if not found:
+                            self.log.warning("Missing image %s on %s" %
+                                             (label.image, provider_name))
+                            # when we have a READY image, upload it
+                            available_images = \
+                                session.getOrderedReadyDibImages(label.image)
+                            if available_images:
+                                self.uploadImage(session, provider_name,
+                                                 label.image)
+            else:
+                # snapshots
+                for provider_name in label.providers:
+                    found = False
+                    for snap_image in session.getSnapshotImages():
+                        if (snap_image.provider_name == provider_name and
+                            snap_image.image_name == label.image and
+                            snap_image.state in [nodedb.READY,
+                                                 nodedb.BUILDING]):
+                            found = True
+                    if not found:
+                        self.log.warning("Missing image %s on %s" %
+                                         (label.image, provider_name))
+                        self.updateImage(session, provider_name, label.image)
 
     def _doUpdateImages(self):
         try:
@@ -1458,9 +1693,30 @@ class NodePool(threading.Thread):
     def updateImages(self, session):
         # This function should be run periodically to create new snapshot
         # images.
-        for provider in self.config.providers.values():
-            for image in provider.images.values():
-                self.updateImage(session, provider.name, image.name)
+        needs_build = False
+        for label in self.config.labels.values():
+            if label.min_ready < 0:
+                # Label is configured to be disabled, skip creating the image.
+                continue
+
+            # check if image is there, if not, build it
+            if label.image.is_diskimage:
+                self.buildImage(self.pool.config.diskimages[label.image])
+                needs_build = True
+        if needs_build:
+            # wait for all builds to finish, to have updated images to upload
+            self.waitForBuiltImages()
+
+        for label in self.config.labels.values():
+            if label.min_ready < 0:
+                # Label is configured to be disabled, skip creating the image.
+                continue
+
+            for provider in label.providers:
+                if label.image.is_diskimage:
+                    self.uploadImage(session, provider.name, label.image)
+                else:
+                    self.updateImage(session, provider.name, label.image)
 
     def updateImage(self, session, provider_name, image_name):
         try:
@@ -1470,17 +1726,89 @@ class NodePool(threading.Thread):
                 "Could not update image %s on %s", image_name, provider_name)
 
     def _updateImage(self, session, provider_name, image_name):
+        # check type of image depending on label
+        is_diskimage = (image_name in self.config.diskimages)
+        if is_diskimage:
+            raise Exception(
+                "Cannot update disk image images. "
+                "Please build and upload images")
+
         provider = self.config.providers[provider_name]
         image = provider.images[image_name]
+        if not image.setup:
+            raise Exception(
+                "Invalid image config. Must specify either "
+                "a setup script, or a diskimage to use.")
         snap_image = session.createSnapshotImage(
             provider_name=provider.name,
-            image_name=image.name)
-        t = ImageUpdater(self, provider, image, snap_image.id)
+            image_name=image_name)
+
+        t = SnapshotImageUpdater(self, provider, image, snap_image.id)
         t.start()
         # Enough time to give them different timestamps (versions)
         # Just to keep things clearer.
         time.sleep(2)
         return t
+
+    def buildImage(self, image):
+        # check type of image depending on label
+        is_diskimage = (image.name in self.config.diskimages)
+        if not is_diskimage:
+            raise Exception(
+                "Cannot build non disk image images. "
+                "Please create snapshots for them")
+
+        # check if we already have this item in the queue
+        with self.getDB().getSession() as session:
+            queued_images = session.getBuildingDibImagesByName(image.name)
+            if queued_images:
+                self.log.exception('Image %s is already being built' %
+                                   image.name)
+            else:
+                try:
+                    start_time = time.time()
+                    timestamp = int(start_time)
+
+                    filename = os.path.join(self.config.imagesdir,
+                                            '%s-%s' %
+                                            (image.name, str(timestamp)))
+
+                    self.log.debug("Queued image building task for %s" %
+                                   image.name)
+                    dib_image = session.createDibImage(image_name=image.name,
+                                                       filename=filename +
+                                                       ".qcow2")
+
+                    # add this build to queue
+                    self._image_builder_queue.put(dib_image.id)
+                except Exception:
+                    self.log.exception(
+                        "Could not build image %s", image.name)
+
+    def uploadImage(self, session, provider, image_name):
+        images = session.getOrderedReadyDibImages(image_name)
+        if not images:
+            # raise error, no image ready for uploading
+            raise Exception(
+                "No image available for that upload. Please build one first.")
+
+        try:
+            filename = images[0].filename
+            provider_entity = self.config.providers[provider]
+            provider_image = provider_entity.images[images[0].image_name]
+            snap_image = session.createSnapshotImage(
+                provider_name=provider, image_name=image_name)
+            t = DiskImageUpdater(self, provider_entity, provider_image,
+                                 snap_image.id, filename)
+            t.start()
+
+            # Enough time to give them different timestamps (versions)
+            # Just to keep things clearer.
+            time.sleep(2)
+            return t
+        except Exception:
+            self.log.exception(
+                "Could not upload image %s on %s", image_name, provider)
 
     def launchNode(self, session, provider, label, target):
         try:
@@ -1560,8 +1888,11 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
-        label = self.config.labels[node.label_name]
-        image = provider.images[label.image]
+        label = self.config.labels.get(node.label_name, None)
+        if label:
+            image_name = provider.images[label.image].name
+        else:
+            image_name = None
         manager = self.getProviderManager(provider)
 
         if target.jenkins_url:
@@ -1601,7 +1932,7 @@ class NodePool(threading.Thread):
 
         if statsd:
             dt = int((time.time() - node.state_time) * 1000)
-            key = 'nodepool.delete.%s.%s.%s' % (image.name,
+            key = 'nodepool.delete.%s.%s.%s' % (image_name,
                                                 node.provider_name,
                                                 node.target_name)
             statsd.timing(key, dt)
@@ -1638,6 +1969,15 @@ class NodePool(threading.Thread):
         snap_image.delete()
         self.log.info("Deleted image id: %s" % snap_image.id)
 
+    def deleteDibImage(self, dib_image):
+        # Delete a dib image and it's associated file
+        if os.path.exists(dib_image.filename):
+            os.remove(dib_image.filename)
+
+        dib_image.state = nodedb.DELETE
+        dib_image.delete()
+        self.log.info("Deleted dib image id: %s" % dib_image.id)
+
     def _doPeriodicCleanup(self):
         try:
             self.periodicCleanup()
@@ -1657,11 +1997,14 @@ class NodePool(threading.Thread):
 
         node_ids = []
         image_ids = []
+        dib_image_ids = []
         with self.getDB().getSession() as session:
             for node in session.getNodes():
                 node_ids.append(node.id)
             for image in session.getSnapshotImages():
                 image_ids.append(image.id)
+            for dib_image in session.getDibImages():
+                dib_image_ids.append(dib_image.id)
 
         for node_id in node_ids:
             try:
@@ -1681,6 +2024,15 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception cleaning up image id %s:" %
                                    image_id)
+
+        for dib_image_id in dib_image_ids:
+            try:
+                with self.getDB().getSession() as session:
+                    dib_image = session.getDibImage(dib_image_id)
+                    self.cleanupOneDibImage(session, dib_image)
+            except Exception:
+                self.log.exception("Exception cleaning up image id %s:" %
+                                   dib_image_id)
         self.log.debug("Finished periodic cleanup")
 
     def cleanupOneNode(self, session, node):
@@ -1727,7 +2079,7 @@ class NodePool(threading.Thread):
             if len(images) > 1:
                 previous = images[1]
             if (image != current and image != previous and
-                (now - image.state_time) > IMAGE_CLEANUP):
+                    (now - image.state_time) > IMAGE_CLEANUP):
                 self.log.info("Deleting image id: %s which is "
                               "%s hours old" %
                               (image.id,
@@ -1736,6 +2088,35 @@ class NodePool(threading.Thread):
         if delete:
             try:
                 self.deleteImage(image)
+            except Exception:
+                self.log.exception("Exception deleting image id: %s:" %
+                                   image.id)
+
+    def cleanupOneDibImage(self, session, image):
+        delete = False
+        now = time.time()
+        if (image.image_name not in self.config.diskimages):
+            delete = True
+            self.log.info("Deleting image id: %s which has no current "
+                          "base image" % image.id)
+        else:
+            images = session.getOrderedReadyDibImages(
+                image.image_name)
+            current = previous = None
+            if len(images) > 0:
+                current = images[0]
+            if len(images) > 1:
+                previous = images[1]
+            if (image != current and image != previous and
+                    (now - image.state_time) > IMAGE_CLEANUP):
+                self.log.info("Deleting image id: %s which is "
+                              "%s hours old" %
+                              (image.id,
+                               (now - image.state_time) / (60 * 60)))
+                delete = True
+        if delete:
+            try:
+                self.deleteDibImage(image)
             except Exception:
                 self.log.exception("Exception deleting image id: %s:" %
                                    image.id)
@@ -1755,18 +2136,22 @@ class NodePool(threading.Thread):
         for node in session.getNodes():
             if node.state != nodedb.READY:
                 continue
-            try:
-                provider = self.config.providers[node.provider_name]
+            provider = self.config.providers[node.provider_name]
+            if node.label_name in self.config.labels:
                 label = self.config.labels[node.label_name]
                 image = provider.images[label.image]
                 connect_kwargs = dict(key_filename=image.private_key)
-                if utils.ssh_connect(node.ip, image.username,
-                                     connect_kwargs=connect_kwargs):
-                    continue
-            except Exception:
-                self.log.exception("SSH Check failed for node id: %s" %
-                                   node.id)
-                self.deleteNode(node.id)
+                try:
+                    if utils.ssh_connect(node.ip, image.username,
+                                         connect_kwargs=connect_kwargs):
+                        continue
+                except Exception:
+                    self.log.exception("SSH Check failed for node id: %s" %
+                                       node.id)
+            else:
+                self.log.exception("Node with non-existing label %s" %
+                                   node.label_name)
+            self.deleteNode(node.id)
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):

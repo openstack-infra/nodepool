@@ -32,6 +32,29 @@ Example::
 
   script-dir: /path/to/script/dir
 
+elements-dir
+------------
+
+If an image is configured to use disk-image-builder and glance to locally
+create and upload images, then a collection of disk-image-builder elements
+must be present. The ``elements-dir`` parameter indicates a directory
+that holds one or more elements.
+
+Example::
+
+  elements-dir: /path/to/elements/dir
+
+images-dir
+----------
+
+When we generate images using disk-image-builder they need to be
+written to somewhere. The ``images-dir`` parameter is the place to
+write them.
+
+Example::
+
+  images-dir: /path/to/images/dir
+
 dburi
 -----
 Indicates the URI for the database connection.  See the `SQLAlchemy
