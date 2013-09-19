@@ -8,6 +8,9 @@ cron:
 zmq-publishers:
   - tcp://localhost:8888
 
+gearman-servers:
+  - host: localhost
+
 providers:
   - name: fake-provider
     username: 'fake'
@@ -29,6 +32,6 @@ targets:
       apikey: fake
     images:
       - name: nodepool-fake
+        min-ready: 6
         providers:
           - name: fake-provider
-            min-ready: 6
