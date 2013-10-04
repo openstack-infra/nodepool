@@ -128,7 +128,7 @@ class DeleteKeypairTask(Task):
 
 class CreateFloatingIPTask(Task):
     def main(self, client):
-        ip = client.floating_ips.create()
+        ip = client.floating_ips.create(**self.args)
         return dict(id=ip.id, ip=ip.ip)
 
 
@@ -325,15 +325,15 @@ class ProviderManager(TaskManager):
     def waitForImage(self, image_id, timeout=3600):
         return self._waitForResource('image', image_id, timeout)
 
-    def createFloatingIP(self):
-        return self.submitTask(CreateFloatingIPTask())
+    def createFloatingIP(self, pool=None):
+        return self.submitTask(CreateFloatingIPTask(pool=pool))
 
     def addFloatingIP(self, server_id, address):
         self.submitTask(AddFloatingIPTask(server=server_id,
                                           address=address))
 
-    def addPublicIP(self, server_id):
-        ip = self.createFloatingIP()
+    def addPublicIP(self, server_id, pool=None):
+        ip = self.createFloatingIP(pool)
         self.addFloatingIP(server_id, ip['ip'])
         for count in iterate_timeout(600, "ip to be added"):
             try:
