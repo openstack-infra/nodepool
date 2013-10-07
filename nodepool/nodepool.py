@@ -163,6 +163,10 @@ class NodeUpdateListener(threading.Thread):
 
 
 class GearmanClient(gear.Client):
+    def __init__(self):
+        super(GearmanClient, self).__init__()
+        self.__log = logging.getLogger("nodepool.GearmanClient")
+
     def getNeededWorkers(self):
         needed_workers = {}
         job_worker_map = {}
@@ -172,32 +176,41 @@ class GearmanClient(gear.Client):
                 req = gear.StatusAdminRequest()
                 connection.sendAdminRequest(req)
             except Exception:
-                self.log.exception("Exception while listing functions")
+                self.__log.exception("Exception while listing functions")
                 continue
             for line in req.response.split('\n'):
                 parts = [x.strip() for x in line.split()]
                 if not parts or parts[0] == '.':
                     continue
-                deficit = int(parts[1]) - int(parts[3])
-                if ':' in parts[0]:
-                    job, worker = parts[0].split(':')
+                if not parts[0].startswith('build:'):
+                    continue
+                function = parts[0][len('build:'):]
+                # total jobs in queue - running
+                queued = int(parts[1]) - int(parts[2])
+                if queued > 0:
+                    self.__log.debug("Function: %s queued: %s" % (function,
+                                                                  queued))
+                if ':' in function:
+                    fparts = function.split(':')
+                    job = fparts[-2]
+                    worker = fparts[-1]
                     workers = job_worker_map.get(job, [])
                     workers.append(worker)
                     job_worker_map[job] = workers
-                    if deficit:
+                    if queued > 0:
                         needed_workers[worker] = (
-                            needed_workers.get(worker, 0) + deficit)
-                elif deficit:
-                    job = parts[0]
+                            needed_workers.get(worker, 0) + queued)
+                elif queued > 0:
+                    job = function
                     unspecified_jobs[job] = (unspecified_jobs.get(job, 0) +
-                                             deficit)
-        for job, deficit in unspecified_jobs.items():
+                                             queued)
+        for job, queued in unspecified_jobs.items():
             workers = job_worker_map.get(job)
             if not workers:
                 continue
             worker = workers[0]
             needed_workers[worker] = (needed_workers.get(worker, 0) +
-                                      deficit)
+                                      queued)
         return needed_workers
 
 
