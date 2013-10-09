@@ -1162,14 +1162,15 @@ class NodePool(threading.Thread):
 
         for target in self.config.targets.values():
             for image in target.images.values():
+                image_key = 'nodepool.target.%s.%s' % (
+                    target.name, image.name)
+                key = '%s.min_ready' % image_key
+                statsd.gauge(key, image.min_ready)
                 for provider in image.providers.values():
-                    base_key = 'nodepool.target.%s.%s.%s' % (
-                        target.name, image.name,
-                        provider.name)
-                    key = '%s.min_ready' % base_key
-                    statsd.gauge(key, provider.min_ready)
+                    provider_key = '%s.%s' % (
+                        image_key, provider.name)
                     for state in nodedb.STATE_NAMES.values():
-                        key = '%s.%s' % (base_key, state)
+                        key = '%s.%s' % (provider_key, state)
                         states[key] = 0
 
         for node in session.getNodes():
