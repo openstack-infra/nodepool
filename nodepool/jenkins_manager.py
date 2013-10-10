@@ -80,6 +80,11 @@ class StartBuildTask(Task):
                           parameters=self.args['params'])
 
 
+class GetInfoTask(Task):
+    def main(self, jenkins):
+        return jenkins.get_info()
+
+
 class JenkinsManager(TaskManager):
     log = logging.getLogger("nodepool.JenkinsManager")
 
@@ -90,7 +95,7 @@ class JenkinsManager(TaskManager):
 
     def _getClient(self):
         if self.target.jenkins_apikey == 'fake':
-            return fakeprovider.FakeJenkins()
+            return fakeprovider.FakeJenkins(self.target.jenkins_user)
         return myjenkins.Jenkins(self.target.jenkins_url,
                                  self.target.jenkins_user,
                                  self.target.jenkins_apikey)
@@ -127,3 +132,6 @@ class JenkinsManager(TaskManager):
 
     def startBuild(self, name, params):
         self.submitTask(StartBuildTask(name=name, params=params))
+
+    def getInfo(self):
+        return self.submitTask(GetInfoTask())

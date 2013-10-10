@@ -293,7 +293,8 @@ class NodeLauncher(threading.Thread):
             raise Exception("Unable to find public IP of server")
 
         self.node.ip = ip
-        self.log.debug("Node id: %s is running, testing ssh" % self.node.id)
+        self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
+                       (ip, self.node.id))
         connect_kwargs = dict(key_filename=self.image.private_key)
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
@@ -630,6 +631,7 @@ class NodePool(threading.Thread):
             t.name = target['name']
             newconfig.targets[t.name] = t
             jenkins = target.get('jenkins')
+            t.online = True
             if jenkins:
                 t.jenkins_url = jenkins['url']
                 t.jenkins_user = jenkins['user']
@@ -710,6 +712,18 @@ class NodePool(threading.Thread):
                 config.jenkins_managers[t.name].start()
         for oldmanager in stop_managers:
             oldmanager.stop()
+
+        for t in config.targets.values():
+            try:
+                info = config.jenkins_managers[t.name].getInfo()
+                if info['quietingDown']:
+                    self.log.info("Target %s is offline" % t.name)
+                    t.online = False
+                else:
+                    t.online = True
+            except Exception:
+                self.log.exception("Unable to check status of %s" % t.name)
+                t.online = False
 
     def reconfigureCrons(self, config):
         cron_map = {
@@ -809,22 +823,29 @@ class NodePool(threading.Thread):
         # Make sure that the current demand includes at least the
         # configured min_ready values
         total_image_min_ready = {}
+        online_targets = set()
         for target in self.config.targets.values():
+            if not target.online:
+                continue
+            online_targets.add(target.name)
             for image in target.images.values():
                 min_ready = total_image_min_ready.get(image.name, 0)
                 min_ready += image.min_ready
                 total_image_min_ready[image.name] = min_ready
 
+        def count_nodes(image_name, state):
+            nodes = session.getNodes(image_name=image_name,
+                                     state=state)
+            return len([n for n in nodes
+                        if n.target_name in online_targets])
+
         # Actual need is demand - (ready + building)
         for image_name in total_image_min_ready:
             start_demand = image_demand.get(image_name, 0)
             min_demand = max(start_demand, total_image_min_ready[image_name])
-            n_ready = len(session.getNodes(image_name=image_name,
-                                           state=nodedb.READY))
-            n_building = len(session.getNodes(image_name=image_name,
-                                              state=nodedb.BUILDING))
-            n_test = len(session.getNodes(image_name=image_name,
-                                          state=nodedb.TEST))
+            n_ready = count_nodes(image_name, nodedb.READY)
+            n_building = count_nodes(image_name, nodedb.BUILDING)
+            n_test = count_nodes(image_name, nodedb.TEST)
             ready = n_ready + n_building + n_test
             demand = max(min_demand - ready, 0)
             image_demand[image_name] = demand
@@ -851,6 +872,8 @@ class NodePool(threading.Thread):
         allocation_requests = {}
         # Set up the request values in the allocation system
         for target in self.config.targets.values():
+            if not target.online:
+                continue
             at = allocation.AllocationTarget(target.name)
             for image in target.images.values():
                 ar = allocation_requests.get(image.name)
@@ -915,6 +938,8 @@ class NodePool(threading.Thread):
         self.checkForMissingImages(session)
         nodes_to_launch = self.getNeededNodes(session)
         for target in self.config.targets.values():
+            if not target.online:
+                continue
             self.log.debug("Examining target: %s" % target.name)
             for image in target.images.values():
                 for provider in image.providers.values():

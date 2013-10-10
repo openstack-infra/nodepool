@@ -18,6 +18,7 @@ import uuid
 import time
 import threading
 import novaclient
+from jenkins import JenkinsException
 
 
 class Dummy(object):
@@ -108,8 +109,14 @@ class FakeSSHClient(object):
 
 
 class FakeJenkins(object):
-    def __init__(self):
+    def __init__(self, user):
         self._nodes = {}
+        self.quiet = False
+        self.down = False
+        if user == 'quiet':
+            self.quiet = True
+        if user == 'down':
+            self.down = True
 
     def node_exists(self, name):
         return name in self._nodes
@@ -120,5 +127,29 @@ class FakeJenkins(object):
     def delete_node(self, name):
         del self._nodes[name]
 
+    def get_info(self):
+        if self.down:
+            raise JenkinsException("Jenkins is down")
+        d = {u'assignedLabels': [{}],
+             u'description': None,
+             u'jobs': [{u'color': u'red',
+                        u'name': u'test-job',
+                        u'url': u'https://jenkins.example.com/job/test-job/'}],
+             u'mode': u'NORMAL',
+             u'nodeDescription': u'the master Jenkins node',
+             u'nodeName': u'',
+             u'numExecutors': 1,
+             u'overallLoad': {},
+             u'primaryView': {u'name': u'Overview',
+                              u'url': u'https://jenkins.example.com/'},
+             u'quietingDown': self.quiet,
+             u'slaveAgentPort': 8090,
+             u'unlabeledLoad': {},
+             u'useCrumbs': False,
+             u'useSecurity': True,
+             u'views': [
+                 {u'name': u'test-view',
+                  u'url': u'https://jenkins.example.com/view/test-view/'}]}
+        return d
 
 FAKE_CLIENT = FakeClient()

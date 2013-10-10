@@ -31,9 +31,9 @@ import gear
 
 class MyGearmanServer(gear.Server):
     def handleStatus(self, request):
-        request.connection.conn.send(("fake_job\t%s\t0\t0\n" %
+        request.connection.conn.send(("build:fake_job\t%s\t0\t0\n" %
                                       self._count).encode('utf8'))
-        request.connection.conn.send(("fake_job:nodepool-fake\t%s\t0\t0\n" %
+        request.connection.conn.send(("build:fake_job:devstack-precise\t%s\t0\t0\n" %
                                       0).encode('utf8'))
         request.connection.conn.send(b'.\n')
 
