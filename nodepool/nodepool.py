@@ -961,7 +961,6 @@ class NodePool(threading.Thread):
     def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
-        missing = False
         for target in self.config.targets.values():
             for image in target.images.values():
                 for provider in image.providers.values():
@@ -975,9 +974,7 @@ class NodePool(threading.Thread):
                     if not found:
                         self.log.warning("Missing image %s on %s" %
                                          (image.name, provider.name))
-                        missing = True
-        if missing:
-            self.updateImages(session)
+                        self.updateImage(session, provider, image)
 
     def _doUpdateImages(self):
         try:
@@ -991,14 +988,20 @@ class NodePool(threading.Thread):
         # images.
         for provider in self.config.providers.values():
             for image in provider.images.values():
-                snap_image = session.createSnapshotImage(
-                    provider_name=provider.name,
-                    image_name=image.name)
-                t = ImageUpdater(self, provider, image, snap_image.id)
-                t.start()
-                # Enough time to give them different timestamps (versions)
-                # Just to keep things clearer.
-                time.sleep(2)
+                self.updateImage(session, provider, image)
+
+    def updateImage(self, session, provider, image):
+        provider = self.config.providers[provider.name]
+        image = provider.images[image.name]
+        snap_image = session.createSnapshotImage(
+            provider_name=provider.name,
+            image_name=image.name)
+        t = ImageUpdater(self, provider, image, snap_image.id)
+        t.start()
+        # Enough time to give them different timestamps (versions)
+        # Just to keep things clearer.
+        time.sleep(2)
+        return t
 
     def launchNode(self, session, provider, image, target):
         provider = self.config.providers[provider.name]

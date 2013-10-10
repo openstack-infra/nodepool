@@ -126,12 +126,7 @@ class NodePoolCmd(object):
         image = provider.images[self.args.image]
 
         with self.pool.getDB().getSession() as session:
-            snap_image = session.createSnapshotImage(
-                provider_name=provider.name,
-                image_name=image.name)
-            t = nodepool.ImageUpdater(self.pool, provider, image,
-                                      snap_image.id)
-            t.start()
+            t = self.pool.updateImage(session, provider, image)
             t.join()
 
     def alien_list(self):
