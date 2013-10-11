@@ -867,8 +867,8 @@ class NodePool(threading.Thread):
 
         # "Target-Image-Provider" -- the triplet of info that identifies
         # the source and location of each node.  The mapping is
-        # AllocationSubRequestTarget -> TargetImageProvider, because
-        # the allocation system produces ASRTs as the final product.
+        # AllocationGrantTarget -> TargetImageProvider, because
+        # the allocation system produces AGTs as the final product.
         tips = {}
         # image_name -> AllocationRequest
         allocation_requests = {}
@@ -892,9 +892,9 @@ class NodePool(threading.Thread):
                     # This request may be supplied by this provider
                     # (and nodes from this provider supplying this
                     # request should be distributed to this target).
-                    sr, asrt = ar.addProvider(
+                    sr, agt = ar.addProvider(
                         allocation_providers[provider.name], at)
-                    tips[asrt] = provider
+                    tips[agt] = provider
 
         self.log.debug("  Allocation requests:")
         for ar in allocation_requests.values():
@@ -905,16 +905,16 @@ class NodePool(threading.Thread):
         nodes_to_launch = {}
 
         # Let the allocation system do it's thing, and then examine
-        # the ASRT objects that it produces.
+        # the AGT objects that it produces.
         self.log.debug("  Grants:")
         for ap in allocation_providers.values():
             ap.makeGrants()
             for g in ap.grants:
                 self.log.debug('    %s' % g)
-                for asrt in g.targets:
-                    self.log.debug('      %s' % asrt)
-                    tip = tips[asrt]
-                    nodes_to_launch[tip] = asrt.amount
+                for agt in g.targets:
+                    self.log.debug('      %s' % agt)
+                    tip = tips[agt]
+                    nodes_to_launch[tip] = agt.amount
 
         self.log.debug("Finished node launch calculation")
         return nodes_to_launch

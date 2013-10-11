@@ -117,12 +117,12 @@ class AllocationRequest(object):
         s = self.sub_requests.get(provider)
         if not s:
             s = AllocationSubRequest(self, provider)
-        asrt = s.addTarget(self.request_targets[target])
+        agt = s.addTarget(self.request_targets[target])
         self.sub_requests[provider] = s
         if s not in provider.sub_requests:
             provider.sub_requests.append(s)
         self.makeRequests()
-        return s, asrt
+        return s, agt
 
     def makeRequests(self):
         # (Re-)distribute this request across all of its providers.
@@ -151,9 +151,9 @@ class AllocationSubRequest(object):
             self.provider.name)
 
     def addTarget(self, request_target):
-        asrt = AllocationSubRequestTarget(self, request_target)
-        self.targets.append(asrt)
-        return asrt
+        agt = AllocationGrantTarget(self, request_target)
+        self.targets.append(agt)
+        return agt
 
     def setAmount(self, amount):
         self.amount = amount
@@ -170,8 +170,12 @@ class AllocationSubRequest(object):
         self.provider.sub_requests.remove(self)
         del self.request.sub_requests[self.provider]
         if amount > 0:
+            grant = AllocationGrant(self.request, self.provider,
+                                    amount, self.targets)
             # This is now a grant instead of a request.
-            self.provider.grants.append(self)
+            self.provider.grants.append(grant)
+        else:
+            grant = None
         self.amount = amount
         # Adjust provider and request values accordingly.
         self.request.amount -= amount
@@ -179,18 +183,34 @@ class AllocationSubRequest(object):
         # Adjust the requested values for related sub-requests.
         self.request.makeRequests()
         # Allocate these granted nodes to targets.
-        self.makeAllocations()
+        if grant:
+            grant.makeAllocations()
+
+
+class AllocationGrant(object):
+    """A grant of a certain number of nodes of an image from a
+    specific provider."""
+
+    def __init__(self, request, provider, amount, targets):
+        self.request = request
+        self.provider = provider
+        self.amount = amount
+        self.targets = targets
+
+    def __repr__(self):
+        return '<AllocationGrant of %s of %s from %s>' % (
+            self.amount, self.request.name, self.provider.name)
 
     def makeAllocations(self):
         # Allocate this grant to the linked targets using min_ready as
         # a weight.  Calculate the total min_ready.
         total_min_ready = 0.0
-        for asrt in self.targets:
-            total_min_ready += asrt.request_target.min_ready
+        for agt in self.targets:
+            total_min_ready += agt.request_target.min_ready
         amount = self.amount
-        for asrt in self.targets:
+        for agt in self.targets:
             if total_min_ready:
-                ratio = float(asrt.request_target.min_ready) / total_min_ready
+                ratio = float(agt.request_target.min_ready) / total_min_ready
             else:
                 ratio = 0.0
             allocation = int(round(amount * ratio))
@@ -198,9 +218,9 @@ class AllocationSubRequest(object):
             # grant by this amount.
             amount -= allocation
             # Similarly we have reduced the total weight.
-            total_min_ready -= asrt.request_target.min_ready
+            total_min_ready -= agt.request_target.min_ready
             # Set the amount of this allocation.
-            asrt.allocate(allocation)
+            agt.allocate(allocation)
 
 
 class AllocationTarget(object):
@@ -220,15 +240,15 @@ class AllocationRequestTarget(object):
         self.min_ready = min_ready
 
 
-class AllocationSubRequestTarget(object):
-    """A target for a specific sub-request to which nodes may be assigned."""
+class AllocationGrantTarget(object):
+    """A target for a specific grant to which nodes may be assigned."""
     def __init__(self, sub_request, request_target):
         self.sub_request = sub_request
         self.request_target = request_target
         self.amount = 0
 
     def __repr__(self):
-        return '<AllocationSubRequestTarget for %s of %s to %s>' % (
+        return '<AllocationGrantTarget for %s of %s to %s>' % (
             self.amount, self.sub_request.request.name,
             self.request_target.target.name)
 
