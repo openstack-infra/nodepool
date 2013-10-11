@@ -57,7 +57,7 @@ class TaskManager(threading.Thread):
     log = logging.getLogger("nodepool.ProviderManager")
 
     def __init__(self, client, name, rate):
-        super(TaskManager, self).__init__()
+        super(TaskManager, self).__init__(name=name)
         self.daemon = True
         self.queue = Queue.Queue()
         self._running = True

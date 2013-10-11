@@ -69,7 +69,9 @@ class FakeList(object):
                   metadata={},
                   manager=self)
         self._list.append(s)
-        t = threading.Thread(target=self._finish, args=(s, 0.5, 'ACTIVE'))
+        t = threading.Thread(target=self._finish,
+                             name='FakeProvider create',
+                             args=(s, 0.5, 'ACTIVE'))
         t.start()
         return s
 

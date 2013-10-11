@@ -52,7 +52,8 @@ class NodeCompleteThread(threading.Thread):
     log = logging.getLogger("nodepool.NodeCompleteThread")
 
     def __init__(self, nodepool, nodename, jobname, result):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='NodeCompleteThread for %s' %
+                                  nodename)
         self.nodename = nodename
         self.nodepool = nodepool
         self.jobname = jobname
@@ -104,7 +105,7 @@ class NodeUpdateListener(threading.Thread):
     log = logging.getLogger("nodepool.NodeUpdateListener")
 
     def __init__(self, nodepool, addr):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='NodeUpdateListener')
         self.nodepool = nodepool
         self.socket = self.nodepool.zmq_context.socket(zmq.SUB)
         event_filter = b""
@@ -218,7 +219,7 @@ class NodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
     def __init__(self, nodepool, provider, image, target, node_id, timeout):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='NodeLauncher for %s' % node_id)
         self.provider = provider
         self.image = image
         self.target = target
@@ -352,7 +353,8 @@ class ImageUpdater(threading.Thread):
     log = logging.getLogger("nodepool.ImageUpdater")
 
     def __init__(self, nodepool, provider, image, snap_image_id):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='ImageUpdater for %s' %
+                                  snap_image_id)
         self.provider = provider
         self.image = image
         self.snap_image_id = snap_image_id
@@ -543,7 +545,7 @@ class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
     def __init__(self, configfile):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name='NodePool')
         self.configfile = configfile
         self._stopped = False
         self.config = None
