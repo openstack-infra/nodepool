@@ -363,7 +363,7 @@ class ProviderManager(TaskManager):
                                                     address=address))
 
     def deleteFloatingIP(self, ip_id):
-        return self.submitTask(DeleteFloatingIPTask(floating_ip=ip_id))
+        return self.submitTask(DeleteFloatingIPTask(ip_id=ip_id))
 
     def listServers(self):
         return self.submitTask(ListServersTask())
