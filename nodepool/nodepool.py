@@ -956,7 +956,7 @@ class NodePool(threading.Thread):
                             provider.name, image.name)
                         if not snap_image:
                             self.log.debug("No current image for %s on %s"
-                                           % (provider.name, image.name))
+                                           % (image.name, provider.name))
                         else:
                             self.launchNode(session, provider, image, target)
 
