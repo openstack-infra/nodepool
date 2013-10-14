@@ -428,7 +428,7 @@ class ImageUpdater(threading.Thread):
 
         ip = server.get('public_v4')
         if not ip and self.manager.hasExtension('os-floating-ips'):
-            ip = self.manager.addPublicIP(server['server_id'])
+            ip = self.manager.addPublicIP(server_id)
         if not ip:
             raise Exception("Unable to find public IP of server")
         server['public_v4'] = ip
