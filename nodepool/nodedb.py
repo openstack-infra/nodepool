@@ -158,8 +158,11 @@ mapper(SnapshotImage, snapshot_image_table,
 
 class NodeDatabase(object):
     def __init__(self, dburi):
-        self.engine = create_engine(dburi, echo=False, max_overflow=-1,
-                                    pool_recycle=3600)
+        engine_kwargs = dict(echo=False, pool_recycle=3600)
+        if 'sqlite:' not in dburi:
+            engine_kwargs['max_overflow'] = -1
+
+        self.engine = create_engine(dburi, **engine_kwargs)
         metadata.create_all(self.engine)
         self.session_factory = sessionmaker(bind=self.engine)
         self.session = scoped_session(self.session_factory)
