@@ -108,8 +108,8 @@ class AllocationRequest(object):
     def __repr__(self):
         return '<AllocationRequest for %s of %s>' % (self.amount, self.name)
 
-    def addTarget(self, target, min_ready):
-        art = AllocationRequestTarget(self, target, min_ready)
+    def addTarget(self, target, min_ready, current):
+        art = AllocationRequestTarget(self, target, min_ready, current)
         self.request_targets[target] = art
 
     def addProvider(self, provider, target):
@@ -203,22 +203,48 @@ class AllocationGrant(object):
 
     def makeAllocations(self):
         # Allocate this grant to the linked targets using min_ready as
-        # a weight.  Calculate the total min_ready.
+        # a weight for the total number of nodes of this image that
+        # should be assigned to the target.  Calculate the total
+        # min_ready as well as the total number of nodes for this image.
         total_min_ready = 0.0
+        total_current = 0
         for agt in self.targets:
             total_min_ready += agt.request_target.min_ready
+            total_current += agt.request_target.current
         amount = self.amount
+        # Add the nodes in this allocation to the total number of
+        # nodes for this image so that we're setting our target
+        # allocations based on a portion of the total future nodes.
+        total_current += amount
         for agt in self.targets:
+            # Calculate the weight from the config file (as indicated
+            # by min_ready)
             if total_min_ready:
                 ratio = float(agt.request_target.min_ready) / total_min_ready
             else:
                 ratio = 0.0
-            allocation = int(round(amount * ratio))
+            # Take the min_ready weight and apply it to the total
+            # number of nodes to this image to figure out how many of
+            # the total nodes should ideally be on this target.
+            desired_count = int(round(ratio * total_current))
+            # The number of nodes off from our calculated target.
+            delta = desired_count - agt.request_target.current
+            # Use the delta as the allocation for this target, but
+            # make sure it's bounded by 0 and the number of nodes we
+            # have available to allocate.
+            allocation = min(delta, amount)
+            allocation = max(allocation, 0)
+
             # The next time through the loop, we have reduced our
             # grant by this amount.
             amount -= allocation
             # Similarly we have reduced the total weight.
             total_min_ready -= agt.request_target.min_ready
+            # Don't consider this target's count in the total number
+            # of nodes in the next iteration, nor the nodes we have
+            # just allocated.
+            total_current -= agt.request_target.current
+            total_current -= allocation
             # Set the amount of this allocation.
             agt.allocate(allocation)
 
@@ -234,10 +260,11 @@ class AllocationTarget(object):
 
 class AllocationRequestTarget(object):
     """A request associated with a target to which nodes may be assigned."""
-    def __init__(self, request, target, min_ready):
+    def __init__(self, request, target, min_ready, current):
         self.target = target
         self.request = request
         self.min_ready = min_ready
+        self.current = current
 
 
 class AllocationGrantTarget(object):
@@ -258,3 +285,6 @@ class AllocationGrantTarget(object):
         # specific provider that should be assigned to a specific
         # target.
         self.amount = amount
+        # Update the number of nodes of this image that are assigned
+        # to this target to assist in other allocation calculations
+        self.request_target.current += amount

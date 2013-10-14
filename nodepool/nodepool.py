@@ -886,8 +886,11 @@ class NodePool(threading.Thread):
                     # loop.
                     ar = allocation.AllocationRequest(image.name,
                                                       image_demand[image.name])
+
+                nodes = session.getNodes(image_name=image_name,
+                                         target_name=target.name)
                 allocation_requests[image.name] = ar
-                ar.addTarget(at, image.min_ready)
+                ar.addTarget(at, image.min_ready, len(nodes))
                 for provider in image.providers.values():
                     # This request may be supplied by this provider
                     # (and nodes from this provider supplying this
