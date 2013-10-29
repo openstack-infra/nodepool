@@ -289,7 +289,8 @@ class NodeLauncher(threading.Thread):
 
         ip = server.get('public_v4')
         if not ip and self.manager.hasExtension('os-floating-ips'):
-            ip = self.manager.addPublicIP(server_id)
+            ip = self.manager.addPublicIP(server_id,
+                                          pool=self.provider.pool)
         if not ip:
             raise Exception("Unable to find public IP of server")
 
@@ -428,7 +429,8 @@ class ImageUpdater(threading.Thread):
 
         ip = server.get('public_v4')
         if not ip and self.manager.hasExtension('os-floating-ips'):
-            ip = self.manager.addPublicIP(server_id)
+            ip = self.manager.addPublicIP(server_id,
+                                          pool=self.provider.pool)
         if not ip:
             raise Exception("Unable to find public IP of server")
         server['public_v4'] = ip
@@ -613,6 +615,7 @@ class NodePool(threading.Thread):
             p.service_name = provider.get('service-name')
             p.region_name = provider.get('region-name')
             p.max_servers = provider['max-servers']
+            p.pool = provider.get('pool')
             p.rate = provider.get('rate', 1.0)
             p.boot_timeout = provider.get('boot-timeout', 60)
             p.images = {}
@@ -681,6 +684,7 @@ class NodePool(threading.Thread):
                     p.service_type != oldmanager.provider.service_type or
                     p.service_name != oldmanager.provider.service_name or
                     p.max_servers != oldmanager.provider.max_servers or
+                    p.pool != oldmanager.provider.pool or
                     p.rate != oldmanager.provider.rate or
                     p.boot_timeout != oldmanager.provider.boot_timeout):
                     stop_managers.append(oldmanager)
