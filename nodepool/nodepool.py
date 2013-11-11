@@ -274,9 +274,9 @@ class NodeLauncher(threading.Thread):
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for node id: %s" % (hostname, self.provider.name,
                                            self.image.name, self.node_id))
-        server_id = self.manager.createServer(hostname,
-                                              self.image.min_ram,
-                                              snap_image.external_id)
+        server_id = self.manager.createServer(
+            hostname, self.image.min_ram,
+            snap_image.external_id, name_filter=self.image.name_filter)
         self.node.external_id = server_id
         session.commit()
 
@@ -410,10 +410,9 @@ class ImageUpdater(threading.Thread):
             key_name = None
             key = None
 
-        server_id = self.manager.createServer(hostname,
-                                              self.image.min_ram,
-                                              image_name=self.image.base_image,
-                                              key_name=key_name)
+        server_id = self.manager.createServer(
+            hostname, self.image.min_ram, image_name=self.image.base_image,
+            key_name=key_name, name_filter=self.image.name_filter)
         self.snap_image.hostname = hostname
         self.snap_image.version = timestamp
         self.snap_image.server_external_id = server_id
@@ -622,6 +621,7 @@ class NodePool(threading.Thread):
                 p.images[i.name] = i
                 i.base_image = image['base-image']
                 i.min_ram = image['min-ram']
+                i.name_filter = image.get('name-filter', None)
                 i.setup = image.get('setup')
                 i.reset = image.get('reset')
                 i.username = image.get('username', 'jenkins')
