@@ -1097,7 +1097,8 @@ class NodePool(threading.Thread):
 
         self.log.debug("Starting periodic cleanup")
         for node in session.getNodes():
-            if node.state in [nodedb.READY, nodedb.HOLD]:
+            if (node.state in [nodedb.READY, nodedb.HOLD] or
+                node.state_time < 900):
                 continue
             delete = False
             now = time.time()
