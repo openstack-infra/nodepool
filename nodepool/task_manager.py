@@ -54,7 +54,7 @@ class Task(object):
 
 
 class TaskManager(threading.Thread):
-    log = logging.getLogger("nodepool.ProviderManager")
+    log = logging.getLogger("nodepool.TaskManager")
 
     def __init__(self, client, name, rate):
         super(TaskManager, self).__init__(name=name)
