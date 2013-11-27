@@ -400,8 +400,8 @@ class ImageUpdater(threading.Thread):
 
         hostname = ('%s-%s.template.openstack.org' %
                     (self.image.name, str(timestamp)))
-        self.log.info("Creating image id: %s for %s in %s" %
-                      (self.snap_image.id, self.image.name,
+        self.log.info("Creating image id: %s with hostname %s for %s in %s" %
+                      (self.snap_image.id, hostname, self.image.name,
                        self.provider.name))
         if self.manager.hasExtension('os-keypairs'):
             key_name = hostname.split('.')[0]
