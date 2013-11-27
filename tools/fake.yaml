@@ -22,6 +22,7 @@ providers:
       - name: nodepool-fake
         base-image: 'Fake Precise'
         min-ram: 8192
+        name-filter: 'Fake'
         setup: prepare_node_devstack.sh
 
 targets:

@@ -222,7 +222,8 @@ class ProviderManager(TaskManager):
         return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
-        l = [dict(id=f.id, ram=f.ram) for f in self._client.flavors.list()]
+        l = [dict(id=f.id, ram=f.ram, name=f.name)
+             for f in self._client.flavors.list()]
         l.sort(lambda a, b: cmp(a['ram'], b['ram']))
         return l
 
@@ -242,9 +243,10 @@ class ProviderManager(TaskManager):
         self.queue.put(task)
         return task.wait()
 
-    def findFlavor(self, min_ram):
+    def findFlavor(self, min_ram, name_filter=None):
         for f in self._flavors:
-            if f['ram'] >= min_ram:
+            if (f['ram'] >= min_ram
+                    and (not name_filter or name_filter in f['name'])):
                 return f
         raise Exception("Unable to find flavor with min ram: %s" % min_ram)
 
@@ -273,10 +275,10 @@ class ProviderManager(TaskManager):
         return self.submitTask(DeleteKeypairTask(name=name))
 
     def createServer(self, name, min_ram, image_id=None,
-                     image_name=None, key_name=None):
+                     image_name=None, key_name=None, name_filter=None):
         if image_name:
             image_id = self.findImage(image_name)['id']
-        flavor = self.findFlavor(min_ram)
+        flavor = self.findFlavor(min_ram, name_filter)
         create_args = dict(name=name, image=image_id, flavor=flavor['id'])
         if key_name:
             create_args['key_name'] = key_name

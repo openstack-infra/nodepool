@@ -88,7 +88,10 @@ class FakeHTTPClient(object):
 
 class FakeClient(object):
     def __init__(self):
-        self.flavors = FakeList([Dummy(id='f1', ram=8192)])
+        self.flavors = FakeList([
+            Dummy(id='f1', ram=8192, name='Fake Flavor'),
+            Dummy(id='f2', ram=8192, name='Unreal Flavor'),
+        ])
         self.images = FakeList([Dummy(id='i1', name='Fake Precise')])
         self.client = FakeHTTPClient()
         self.servers = FakeList([])
