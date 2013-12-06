@@ -1085,78 +1085,103 @@ class NodePool(threading.Thread):
 
     def _doPeriodicCleanup(self):
         try:
-            with self.getDB().getSession() as session:
-                self.periodicCleanup(session)
+            self.periodicCleanup()
         except Exception:
             self.log.exception("Exception in periodic cleanup:")
 
-    def periodicCleanup(self, session):
+    def periodicCleanup(self):
         # This function should be run periodically to clean up any hosts
         # that may have slipped through the cracks, as well as to remove
         # old images.
 
         self.log.debug("Starting periodic cleanup")
-        for node in session.getNodes():
-            if (node.state in [nodedb.READY, nodedb.HOLD] or
-                node.state_time < 900):
-                continue
-            delete = False
-            now = time.time()
-            if (node.state == nodedb.DELETE):
-                self.log.warning("Deleting node id: %s which is in delete "
-                                 "state" % node.id)
-                delete = True
-            elif (node.state == nodedb.TEST and
-                  (now - node.state_time) > TEST_CLEANUP):
-                self.log.warning("Deleting node id: %s which has been in %s "
-                                 "state for %s hours" %
-                                 (node.id, node.state,
-                                  (now - node.state_time) / (60 * 60)))
-                delete = True
-            elif (now - node.state_time) > NODE_CLEANUP:
-                self.log.warning("Deleting node id: %s which has been in %s "
-                                 "state for %s hours" %
-                                 (node.id, node.state,
-                                  (now - node.state_time) / (60 * 60)))
-                delete = True
-            if delete:
-                try:
-                    self.deleteNode(session, node)
-                except Exception:
-                    self.log.exception("Exception deleting node id: "
-                                       "%s" % node.id)
+        node_ids = []
+        image_ids = []
+        with self.getDB().getSession() as session:
+            for node in session.getNodes():
+                node_ids.append(node.id)
+            for image in session.getSnapshotImages():
+                image_ids.append(image.id)
 
-        for image in session.getSnapshotImages():
-            # Normally, reap images that have sat in their current state
-            # for 24 hours, unless the image is the current snapshot
-            delete = False
-            now = time.time()
-            if image.provider_name not in self.config.providers:
-                delete = True
-                self.log.info("Deleting image id: %s which has no current "
-                              "provider" % image.id)
-            elif (image.image_name not in
-                  self.config.providers[image.provider_name].images):
-                delete = True
-                self.log.info("Deleting image id: %s which has no current "
-                              "base image" % image.id)
-            else:
-                current = session.getCurrentSnapshotImage(image.provider_name,
-                                                          image.image_name)
-                if (current and image != current and
-                    (now - image.state_time) > KEEP_OLD_IMAGE):
-                    self.log.info("Deleting non-current image id: %s because "
-                                  "the image is %s hours old" %
-                                  (image.id,
-                                   (now - image.state_time) / (60 * 60)))
-                    delete = True
-            if delete:
-                try:
-                    self.deleteImage(image)
-                except Exception:
-                    self.log.exception("Exception deleting image id: %s:" %
-                                       image.id)
+        for node_id in node_ids:
+            try:
+                with self.getDB().getSession() as session:
+                    node = session.getNode(node_id)
+                    self.cleanupOneNode(session, node)
+            except Exception:
+                self.log.exception("Exception cleaning up node id %s:" %
+                                   node_id)
+
+        for image_id in image_ids:
+            try:
+                with self.getDB().getSession() as session:
+                    image = session.getSnapshotImage(image_id)
+                    self.cleanupOneImage(session, image)
+            except Exception:
+                self.log.exception("Exception cleaning up image id %s:" %
+                                   image_id)
         self.log.debug("Finished periodic cleanup")
+
+    def cleanupOneNode(self, session, node):
+        if (node.state in [nodedb.READY, nodedb.HOLD] or
+            node.state_time < 900):
+            return
+        delete = False
+        now = time.time()
+        if (node.state == nodedb.DELETE):
+            self.log.warning("Deleting node id: %s which is in delete "
+                             "state" % node.id)
+            delete = True
+        elif (node.state == nodedb.TEST and
+              (now - node.state_time) > TEST_CLEANUP):
+            self.log.warning("Deleting node id: %s which has been in %s "
+                             "state for %s hours" %
+                             (node.id, node.state,
+                              (now - node.state_time) / (60 * 60)))
+            delete = True
+        elif (now - node.state_time) > NODE_CLEANUP:
+            self.log.warning("Deleting node id: %s which has been in %s "
+                             "state for %s hours" %
+                             (node.id, node.state,
+                              (now - node.state_time) / (60 * 60)))
+            delete = True
+        if delete:
+            try:
+                self.deleteNode(session, node)
+            except Exception:
+                self.log.exception("Exception deleting node id: "
+                                   "%s" % node.id)
+
+    def cleanupOneImage(self, session, image):
+        # Normally, reap images that have sat in their current state
+        # for 24 hours, unless the image is the current snapshot
+        delete = False
+        now = time.time()
+        if image.provider_name not in self.config.providers:
+            delete = True
+            self.log.info("Deleting image id: %s which has no current "
+                          "provider" % image.id)
+        elif (image.image_name not in
+              self.config.providers[image.provider_name].images):
+            delete = True
+            self.log.info("Deleting image id: %s which has no current "
+                          "base image" % image.id)
+        else:
+            current = session.getCurrentSnapshotImage(image.provider_name,
+                                                      image.image_name)
+            if (current and image != current and
+                (now - image.state_time) > KEEP_OLD_IMAGE):
+                self.log.info("Deleting non-current image id: %s because "
+                              "the image is %s hours old" %
+                              (image.id,
+                               (now - image.state_time) / (60 * 60)))
+                delete = True
+        if delete:
+            try:
+                self.deleteImage(image)
+            except Exception:
+                self.log.exception("Exception deleting image id: %s:" %
+                                   image.id)
 
     def _doPeriodicCheck(self):
         try:
