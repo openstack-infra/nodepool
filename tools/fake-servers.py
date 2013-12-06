@@ -24,10 +24,13 @@
 #   zmq-server.py start HOSTNAME
 #   zmq-server.py complete HOSTNAME
 
-import zmq
+import gear
 import json
 import logging
-import gear
+import select
+import socket
+import threading
+import zmq
 
 class MyGearmanServer(gear.Server):
     def handleStatus(self, request):
@@ -37,14 +40,38 @@ class MyGearmanServer(gear.Server):
                                       0).encode('utf8'))
         request.connection.conn.send(b'.\n')
 
+class FakeStatsd(object):
+    def __init__(self):
+        self.thread = threading.Thread(target=self.run)
+        self.thread.daemon = True
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(('', 8125))
+        self.stats = []
+        self.thread.start()
+
+    def run(self):
+        while True:
+            poll = select.poll()
+            poll.register(self.sock, select.POLLIN)
+            ret = poll.poll()
+            for (fd, event) in ret:
+                if fd == self.sock.fileno():
+                    data = self.sock.recvfrom(1024)
+                    if not data:
+                        return
+                    print data[0]
+                    self.stats.append(data[0])
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
     context = zmq.Context()
-    socket = context.socket(zmq.PUB)
-    socket.bind("tcp://*:8881")
+    zsocket = context.socket(zmq.PUB)
+    zsocket.bind("tcp://*:8881")
 
     geard = MyGearmanServer()
     geard._count = 0
+
+    statsd = FakeStatsd()
 
     print('ready')
     while True:
@@ -55,11 +82,11 @@ def main():
         elif command == 'start':
             topic = 'onStarted'
             data = {"name":"test","url":"job/test/","build":{"full_url":"http://localhost:8080/job/test/1/","number":1,"phase":"STARTED","url":"job/test/1/","node_name":arg}}
-            socket.send("%s %s" % (topic, json.dumps(data)))
+            zsocket.send("%s %s" % (topic, json.dumps(data)))
         elif command == 'complete':
             topic = 'onFinalized'
-            data = {"name":"test","url":"job/test/","build":{"full_url":"http://localhost:8080/job/test/1/","number":1,"phase":"FINISHED","status":"SUCCESS","url":"job/test/1/","node_name":arg}}
-            socket.send("%s %s" % (topic, json.dumps(data)))
+            data = {"name":"test","url":"job/test/","build":{"full_url":"http://localhost:8080/job/test/1/","number":1,"phase":"FINISHED","status":"SUCCESS","url":"job/test/1/","node_name":arg, "parameters":{"BASE_LOG_PATH":"05/60105/3/gate","LOG_PATH":"05/60105/3/gate/gate-tempest-dsvm-postgres-full/bf0f215","OFFLINE_NODE_WHEN_COMPLETE":"1","ZUUL_BRANCH":"master","ZUUL_CHANGE":"60105","ZUUL_CHANGE_IDS":"60105,3","ZUUL_CHANGES":"openstack/cinder:master:refs/changes/05/60105/3","ZUUL_COMMIT":"ccd02fce4148d5ac2b3e1e68532b55eb5c1c356d","ZUUL_PATCHSET":"3","ZUUL_PIPELINE":"gate","ZUUL_PROJECT":"openstack/cinder","ZUUL_REF":"refs/zuul/master/Z6726d84e57a04ec79585b895ace08f7e","ZUUL_URL":"http://zuul.openstack.org/p","ZUUL_UUID":"bf0f21577026492a985ca98a9ea14cc1"}}}
+            zsocket.send("%s %s" % (topic, json.dumps(data)))
 
 if __name__ == '__main__':
     main()

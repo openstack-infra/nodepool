@@ -6,7 +6,7 @@ cron:
   update-image: '14 2 * * *'
 
 zmq-publishers:
-  - tcp://localhost:8888
+  - tcp://localhost:8881
 
 gearman-servers:
   - host: localhost

@@ -51,13 +51,14 @@ DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
 class NodeCompleteThread(threading.Thread):
     log = logging.getLogger("nodepool.NodeCompleteThread")
 
-    def __init__(self, nodepool, nodename, jobname, result):
+    def __init__(self, nodepool, nodename, jobname, result, branch):
         threading.Thread.__init__(self, name='NodeCompleteThread for %s' %
                                   nodename)
         self.nodename = nodename
         self.nodepool = nodepool
         self.jobname = jobname
         self.result = result
+        self.branch = branch
 
     def run(self):
         try:
@@ -96,6 +97,31 @@ class NodeCompleteThread(threading.Thread):
                 return
             self.log.info("Node id: %s failed acceptance test, deleting" %
                           node.id)
+
+        if statsd and self.result == 'SUCCESS':
+            start = node.state_time
+            end = time.time()
+            dt = end - start
+
+            # nodepool.job.tempest
+            key = 'nodepool.job.%s' % self.jobname
+            statsd.timing(key + '.runtime', dt)
+            statsd.incr(key + '.builds')
+
+            # nodepool.job.tempest.master
+            key += '.%s' % self.branch
+            statsd.timing(key + '.runtime', dt)
+            statsd.incr(key + '.builds')
+
+            # nodepool.job.tempest.master.devstack-precise
+            key += '.%s' % node.image_name
+            statsd.timing(key + '.runtime', dt)
+            statsd.incr(key + '.builds')
+
+            # nodepool.job.tempest.master.devstack-precise.rax-ord
+            key += '.%s' % node.provider_name
+            statsd.timing(key + '.runtime', dt)
+            statsd.incr(key + '.builds')
 
         time.sleep(DELETE_DELAY)
         self.nodepool.deleteNode(session, node)
@@ -136,7 +162,12 @@ class NodeUpdateListener(threading.Thread):
             pass
         elif topic == 'onFinalized':
             result = args['build'].get('status')
-            self.handleCompletePhase(nodename, jobname, result)
+            params = args['build'].get('parameters')
+            if params:
+                branch = params.get('ZUUL_BRANCH', 'unknown_branch')
+            else:
+                branch = 'unknown_branch'
+            self.handleCompletePhase(nodename, jobname, result, branch)
         else:
             raise Exception("Received job for unhandled phase: %s" %
                             topic)
@@ -158,8 +189,9 @@ class NodeUpdateListener(threading.Thread):
             node.state = nodedb.USED
             self.nodepool.updateStats(session, node.provider_name)
 
-    def handleCompletePhase(self, nodename, jobname, result):
-        t = NodeCompleteThread(self.nodepool, nodename, jobname, result)
+    def handleCompletePhase(self, nodename, jobname, result, branch):
+        t = NodeCompleteThread(self.nodepool, nodename, jobname, result,
+                               branch)
         t.start()
 
 
