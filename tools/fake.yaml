@@ -18,6 +18,7 @@ providers:
     auth-url: 'fake'
     project-id: 'fake'
     max-servers: 96
+    pool: 'fake'
     images:
       - name: nodepool-fake
         base-image: 'Fake Precise'
