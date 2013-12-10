@@ -1,6 +1,6 @@
 flake8==2.0
 coverage
-sphinx
+sphinx>=1.1.2,<1.2
 docutils==0.9.1
 discover
 fixtures>=0.3.12
