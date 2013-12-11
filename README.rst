@@ -9,49 +9,63 @@ Developer setup
 
 Install dependencies:
 
-sudo apt-get install git mysql-server libmysqlclient-dev g++ python-dev libzmq-dev
-mkdir src
-cd ~/src
-git clone git://git.openstack.org/openstack-infra/config
-git clone git://git.openstack.org/openstack-infra/nodepool
-cd nodepool
-sudo pip install -U -r requirements.txt
-sudo pip install -e .
+.. code-block:: bash
+
+    sudo apt-get install git mysql-server libmysqlclient-dev g++ python-dev libzmq-dev
+    mkdir src
+    cd ~/src
+    git clone git://git.openstack.org/openstack-infra/config
+    git clone git://git.openstack.org/openstack-infra/nodepool
+    cd nodepool
+    sudo pip install -U -r requirements.txt
+    sudo pip install -e .
 
 If you're testing a specific patch that is already in gerrit, you will also
 want to install git-review and apply that patch while in the nodepool
 directory, ie:
 
-git review -x XXXXX
+.. code-block:: bash
+
+    git review -x XXXXX
 
 If the cloud being used has no default_floating_pool defined in nova.conf,
 you will need to define a pool name using nodepool.layout to use floating ips.
 
 Set up database:
 
-mysql -u root
+.. code-block:: bash
 
-mysql> create database nodepool;
-mysql> GRANT ALL ON nodepool.* TO 'nodepool'@'localhost';
-mysql> flush privileges;
+    mysql -u root
+
+    mysql> create database nodepool;
+    mysql> GRANT ALL ON nodepool.* TO 'nodepool'@'localhost';
+    mysql> flush privileges;
 
 Export variable for your ssh key so you can log into the created instances:
 
-export NODEPOOL_SSH_KEY=`cat ~/.ssh/id_rsa.pub`
+.. code-block:: bash
+
+    export NODEPOOL_SSH_KEY=`cat ~/.ssh/id_rsa.pub`
 
 Start nodepool with a demo config file (copy or edit fake.yaml
 to contain your data):
 
-export STATSD_HOST=127.0.0.1
-export STATSD_PORT=8125
-nodepoold -d -c tools/fake.yaml
+.. code-block:: bash
+
+    export STATSD_HOST=127.0.0.1
+    export STATSD_PORT=8125
+    nodepoold -d -c tools/fake.yaml
 
 All logging ends up in stdout.
 
 Use the following tool to check on progress:
 
-nodepool image-list
+.. code-block:: bash
+
+    nodepool image-list
 
 After each run (the fake nova provider is only in-memory):
 
-mysql> delete from snapshot_image; delete from node;
+.. code-block:: bash
+
+    mysql> delete from snapshot_image; delete from node;
