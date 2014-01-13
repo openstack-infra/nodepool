@@ -649,6 +649,9 @@ class NodePool(threading.Thread):
             p.pool = provider.get('pool')
             p.rate = provider.get('rate', 1.0)
             p.boot_timeout = provider.get('boot-timeout', 60)
+            p.use_neutron = bool(provider.get('networks', ()))
+            if p.use_neutron:
+                p.nics = provider.get('networks')
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()

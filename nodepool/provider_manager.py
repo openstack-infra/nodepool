@@ -282,6 +282,8 @@ class ProviderManager(TaskManager):
         create_args = dict(name=name, image=image_id, flavor=flavor['id'])
         if key_name:
             create_args['key_name'] = key_name
+        if self.provider.use_neutron:
+            create_args['nics'] = self.provider.nics
 
         return self.submitTask(CreateServerTask(**create_args))
 
