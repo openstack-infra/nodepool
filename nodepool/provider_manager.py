@@ -222,10 +222,17 @@ class ProviderManager(TaskManager):
         return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
-        l = [dict(id=f.id, ram=f.ram, name=f.name)
-             for f in self._client.flavors.list()]
-        l.sort(lambda a, b: cmp(a['ram'], b['ram']))
-        return l
+        try:
+            l = [dict(id=f.id, ram=f.ram, name=f.name)
+                 for f in self._client.flavors.list()]
+            l.sort(lambda a, b: cmp(a['ram'], b['ram']))
+            return l
+        except Exception:
+            # requests.ConnectionError exceptions bubble up through
+            # novaclient, making them hard to match on
+            self.log.exception('Unable to get flavors for %s'
+                               % self.provider.name)
+            return []
 
     def _getExtensions(self):
         try:
