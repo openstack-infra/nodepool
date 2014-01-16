@@ -386,7 +386,8 @@ class ProviderManager(TaskManager):
                     self.removeFloatingIP(server_id, ip['ip'])
                     self.deleteFloatingIP(ip['id'])
 
-        if self.hasExtension('os-keypairs'):
+        if (self.hasExtension('os-keypairs') and
+            server['key_name'] != self.provider.keypair):
             for kp in self.listKeypairs():
                 if kp['name'] == server['key_name']:
                     self.log.debug('Deleting keypair for server %s' %

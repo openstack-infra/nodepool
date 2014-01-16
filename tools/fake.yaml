@@ -13,6 +13,7 @@ gearman-servers:
 
 providers:
   - name: fake-provider
+    keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
     auth-url: 'fake'

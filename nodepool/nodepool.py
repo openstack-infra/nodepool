@@ -436,12 +436,18 @@ class ImageUpdater(threading.Thread):
         self.log.info("Creating image id: %s with hostname %s for %s in %s" %
                       (self.snap_image.id, hostname, self.image.name,
                        self.provider.name))
-        if self.manager.hasExtension('os-keypairs'):
+        if self.provider.keypair:
+            key_name = self.provider.keypair
+            key = None
+            use_password = False
+        elif self.manager.hasExtension('os-keypairs'):
             key_name = hostname.split('.')[0]
             key = self.manager.addKeypair(key_name)
+            use_password = False
         else:
             key_name = None
             key = None
+            use_password = True
 
         server_id = self.manager.createServer(
             hostname, self.image.min_ram, image_name=self.image.base_image,
@@ -466,7 +472,7 @@ class ImageUpdater(threading.Thread):
             raise Exception("Unable to find public IP of server")
         server['public_v4'] = ip
 
-        self.bootstrapServer(server, key)
+        self.bootstrapServer(server, key, use_password=use_password)
 
         image_id = self.manager.createImage(server_id, hostname)
         self.snap_image.external_id = image_id
@@ -497,12 +503,12 @@ class ImageUpdater(threading.Thread):
                                " %s for image id: %s" %
                                (server_id, self.snap_image.id))
 
-    def bootstrapServer(self, server, key):
+    def bootstrapServer(self, server, key, use_password=False):
         log = logging.getLogger("nodepool.image.build.%s.%s" %
                                 (self.provider.name, self.image.name))
 
         ssh_kwargs = dict(log=log)
-        if key:
+        if not use_password:
             ssh_kwargs['pkey'] = key
         else:
             ssh_kwargs['password'] = server['admin_pass']
@@ -646,6 +652,7 @@ class NodePool(threading.Thread):
             p.service_name = provider.get('service-name')
             p.region_name = provider.get('region-name')
             p.max_servers = provider['max-servers']
+            p.keypair = provider.get('keypair', None)
             p.pool = provider.get('pool')
             p.rate = provider.get('rate', 1.0)
             p.boot_timeout = provider.get('boot-timeout', 60)
