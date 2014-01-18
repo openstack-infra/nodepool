@@ -1012,8 +1012,11 @@ class NodePool(threading.Thread):
     def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
+        self.log.debug("Checking missing images.")
         for target in self.config.targets.values():
+            self.log.debug("Checking target: %s", target.name)
             for image in target.images.values():
+                self.log.debug("Checking image: %s", image.name)
                 for provider in image.providers.values():
                     found = False
                     for snap_image in session.getSnapshotImages():
@@ -1022,6 +1025,9 @@ class NodePool(threading.Thread):
                             snap_image.state in [nodedb.READY,
                                                  nodedb.BUILDING]):
                             found = True
+                            self.log.debug('Found image %s in state %r',
+                                           snap_image.image_name,
+                                           snap_image.state)
                     if not found:
                         self.log.warning("Missing image %s on %s" %
                                          (image.name, provider.name))
