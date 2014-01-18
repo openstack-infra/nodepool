@@ -21,7 +21,7 @@ import apscheduler.scheduler
 import gear
 import json
 import logging
-import os
+import os.path
 import threading
 import time
 import yaml
@@ -525,7 +525,10 @@ class ImageUpdater(threading.Thread):
 
         host.ssh("make scripts dir", "mkdir -p scripts")
         for fname in os.listdir(self.scriptdir):
-            host.scp(os.path.join(self.scriptdir, fname), 'scripts/%s' % fname)
+            path = os.path.join(self.scriptdir, fname)
+            if not os.path.isfile(path):
+                continue
+            host.scp(path, 'scripts/%s' % fname)
         host.ssh("move scripts to opt",
                  "sudo mv scripts /opt/nodepool-scripts")
         host.ssh("set scripts permissions",
