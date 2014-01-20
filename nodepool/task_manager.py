@@ -79,7 +79,10 @@ class TaskManager(threading.Thread):
                 delta = time.time() - last_ts
                 if delta >= self.rate:
                     break
-                time.sleep(self.rate - delta)
+                sleep_len = self.rate - delta
+                self.log.debug(
+                    "Manager sleeping %ss to avoid over-rate", sleep_len)
+                time.sleep(sleep_len)
             self.log.debug("Manager %s running task %s" % (self.name, task))
             task.run(self._client)
             last_ts = time.time()
