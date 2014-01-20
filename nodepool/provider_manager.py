@@ -375,8 +375,27 @@ class ProviderManager(TaskManager):
     def deleteServer(self, server_id):
         return self.submitTask(DeleteServerTask(server_id=server_id))
 
-    def cleanupServer(self, server_id):
-        server = self.getServer(server_id)
+    def cleanupServer(self, server_id, block_on_delete=True):
+        """Cleanup the cloud resources for server_id.
+
+        If server_id does not exist when cleanupServer is called, True is
+        immediately returned. Otherwise the resources for the server are
+        deleted and then the deletion is monitored (but see block_on_delete
+        below).
+
+        :param block_on_delete: If True (the default), then cleanupServer
+            will not return until the server has been deleted by the cloud
+            provider. If False, the server's existence is probed once and the
+            return value of cleanupServer indicates whether or not the server
+            still exists.
+        :raises Exception: If block_on_delete is True and the server has not
+            been deleted after 600 seconds, an Exception is raised.
+        :return: True if the server no longer exists, False otherwise.
+        """
+        try:
+            server = self.getServer(server_id)
+        except NotFound:
+            return True
 
         if self.hasExtension('os-floating-ips'):
             for ip in self.listFloatingIPs():
@@ -397,9 +416,12 @@ class ProviderManager(TaskManager):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
-        for count in iterate_timeout(600, "waiting for server %s deletion" %
-                                     server_id):
-            try:
-                self.getServer(server_id)
-            except NotFound:
-                return
+        if block_on_delete:
+            for count in iterate_timeout(600,
+                                         "waiting for server %s deletion" %
+                                         server_id):
+                try:
+                    self.getServer(server_id)
+                except NotFound:
+                    return True
+        return False
