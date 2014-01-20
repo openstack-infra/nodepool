@@ -124,7 +124,8 @@ class NodeCompleteThread(threading.Thread):
             statsd.incr(key + '.builds')
 
         time.sleep(DELETE_DELAY)
-        self.nodepool.deleteNode(session, node)
+        # Mark the node for deletion by the provider.
+        node.state = nodedb.DELETE
 
 
 class NodeUpdateListener(threading.Thread):
@@ -282,10 +283,10 @@ class NodeLauncher(threading.Thread):
                 self.log.exception("Exception launching node id: %s:" %
                                    self.node_id)
                 try:
-                    self.nodepool.deleteNode(session, self.node)
+                    self.node.state = nodedb.DELETE
                 except Exception:
-                    self.log.exception("Exception deleting node id: %s:" %
-                                       self.node_id)
+                    self.log.exception("Exception marking node id: %s "
+                                       "for deletion" % self.node_id)
                     return
 
     def launchNode(self, session):
@@ -1181,7 +1182,8 @@ class NodePool(threading.Thread):
     def cleanupOneNode(self, session, node):
         now = time.time()
         time_in_state = now - node.state_time
-        if (node.state in [nodedb.READY, nodedb.HOLD] or
+        if node.state != nodedb.DELETE and (
+            node.state in [nodedb.READY, nodedb.HOLD] or
             time_in_state < 900):
             return
         delete = False
@@ -1265,7 +1267,7 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("SSH Check failed for node id: %s" %
                                    node.id)
-                self.deleteNode(session, node)
+                node.state = nodedb.DELETE
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
