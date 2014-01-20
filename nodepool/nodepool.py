@@ -1178,27 +1178,28 @@ class NodePool(threading.Thread):
         self.log.debug("Finished periodic cleanup")
 
     def cleanupOneNode(self, session, node):
+        now = time.time()
+        time_in_state = now - node.state_time
         if (node.state in [nodedb.READY, nodedb.HOLD] or
-            node.state_time < 900):
+            time_in_state < 900):
             return
         delete = False
-        now = time.time()
         if (node.state == nodedb.DELETE):
             self.log.warning("Deleting node id: %s which is in delete "
                              "state" % node.id)
             delete = True
         elif (node.state == nodedb.TEST and
-              (now - node.state_time) > TEST_CLEANUP):
+              time_in_state > TEST_CLEANUP):
             self.log.warning("Deleting node id: %s which has been in %s "
                              "state for %s hours" %
                              (node.id, node.state,
                               (now - node.state_time) / (60 * 60)))
             delete = True
-        elif (now - node.state_time) > NODE_CLEANUP:
+        elif time_in_state > NODE_CLEANUP:
             self.log.warning("Deleting node id: %s which has been in %s "
                              "state for %s hours" %
                              (node.id, node.state,
-                              (now - node.state_time) / (60 * 60)))
+                              time_in_state / (60 * 60)))
             delete = True
         if delete:
             try:
