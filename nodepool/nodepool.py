@@ -1099,6 +1099,9 @@ class NodePool(threading.Thread):
             except provider_manager.NotFound:
                 pass
 
+        self.deleteCleanedNode(session, node)
+
+    def deleteCleanedNode(self, session, node):
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
 
