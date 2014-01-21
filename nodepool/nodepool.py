@@ -1095,10 +1095,30 @@ class NodePool(threading.Thread):
                 self.log.debug('Deleting server %s for node id: %s' %
                                (node.external_id,
                                 node.id))
-                manager.cleanupServer(server['id'])
+                deleted = manager.cleanupServer(
+                    server['id'], block_on_delete=False)
+                if not deleted:
+                    # The cloud provider hasn't deleted the server yet, we need
+                    # to keep our DB record until they do. Periodic cleanup
+                    # will retry the deletion.
+                    return
             except provider_manager.NotFound:
                 pass
 
+        self.deleteCleanedNode(session, node)
+
+    def deleteNodeIfCleaned(self, session, node):
+        if node is None:
+            return
+        if node.external_id:
+            try:
+                provider = self.config.providers[node.provider_name]
+                manager = self.getProviderManager(provider)
+                manager.getServer(node.external_id)
+                # Still exists, don't delete.
+                return
+            except provider_manager.NotFound:
+                pass
         self.deleteCleanedNode(session, node)
 
     def deleteCleanedNode(self, session, node):
@@ -1126,7 +1146,13 @@ class NodePool(threading.Thread):
                 self.log.debug('Deleting server %s for image id: %s' %
                                (snap_image.server_external_id,
                                 snap_image.id))
-                manager.cleanupServer(server['id'])
+                deleted = manager.cleanupServer(
+                    server['id'], block_on_delete=False)
+                if not deleted:
+                    # The cloud provider hasn't deleted the server yet, we need
+                    # to keep our DB record until they do. Periodic cleanup
+                    # will retry the deletion.
+                    return
             except provider_manager.NotFound:
                 self.log.warning('Image server id %s not found' %
                                  snap_image.server_external_id)
@@ -1180,6 +1206,22 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception cleaning up image id %s:" %
                                    image_id)
+
+        # Detect which nodes the provider APIs have actually cleaned
+        # up since deletion was requested. Some may have been deleted
+        # inline, so requery the list.
+        with self.getDB().getSession() as session:
+            for node in session.getNodes():
+                node_ids.append(node.id)
+        for node_id in node_ids:
+            try:
+                with self.getDB().getSession() as session:
+                    node = session.getNode(node_id)
+                    self.deleteNodeIfCleaned(session, node)
+            except Exception:
+                self.log.exception(
+                    "Exception probing delete-requested node id %s:", node_id)
+
         self.log.debug("Finished periodic cleanup")
 
     def cleanupOneNode(self, session, node):
