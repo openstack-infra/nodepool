@@ -657,7 +657,7 @@ class NodePool(threading.Thread):
             p.max_servers = provider['max-servers']
             p.keypair = provider.get('keypair', None)
             p.pool = provider.get('pool')
-            p.rate = provider.get('rate', 1.0)
+            p.rate = provider.get('rate', 0.5)
             p.boot_timeout = provider.get('boot-timeout', 60)
             p.use_neutron = bool(provider.get('networks', ()))
             if p.use_neutron:
