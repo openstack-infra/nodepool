@@ -1074,7 +1074,9 @@ class NodePool(threading.Thread):
     def deleteNode(self, session, node):
         # Delete a node
         start_time = time.time()
-        node.state = nodedb.DELETE
+        if node.state != nodedb.DELETE:
+            # Don't write to the session if not needed.
+            node.state = nodedb.DELETE
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
