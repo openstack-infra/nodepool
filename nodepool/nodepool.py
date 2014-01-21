@@ -1073,7 +1073,6 @@ class NodePool(threading.Thread):
 
     def deleteNode(self, session, node):
         # Delete a node
-        start_time = time.time()
         if node.state != nodedb.DELETE:
             # Don't write to the session if not needed.
             node.state = nodedb.DELETE
@@ -1103,7 +1102,7 @@ class NodePool(threading.Thread):
         self.log.info("Deleted node id: %s" % node.id)
 
         if statsd:
-            dt = int((time.time() - start_time) * 1000)
+            dt = int((time.time() - node.state_time) * 1000)
             key = 'nodepool.delete.%s.%s.%s' % (node.image_name,
                                                 node.provider_name,
                                                 node.target_name)
