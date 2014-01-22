@@ -2,6 +2,7 @@ script-dir: .
 dburi: 'mysql://nodepool@localhost/nodepool'
 
 cron:
+  check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
   update-image: '14 2 * * *'
 
