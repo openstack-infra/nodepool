@@ -620,17 +620,6 @@ class NodePool(threading.Thread):
         newconfig.gearman_servers = {}
         newconfig.crons = {}
 
-        for name, default in [
-            ('image-update', '14 2 * * *'),
-            ('cleanup', '27 */6 * * *'),
-            ('check', '*/15 * * * *'),
-            ]:
-            c = Cron()
-            c.name = name
-            newconfig.crons[c.name] = c
-            c.job = None
-            c.timespec = config.get('cron', {}).get(name, default)
-
         for addr in config['zmq-publishers']:
             z = ZMQPublisher()
             z.name = addr
@@ -676,6 +665,17 @@ class NodePool(threading.Thread):
                 i.username = image.get('username', 'jenkins')
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
+
+        for name, default in [
+            ('image-update', '14 2 * * *'),
+            ('cleanup', '27 */6 * * *'),
+            ('check', '*/15 * * * *'),
+            ]:
+            c = Cron()
+            c.name = name
+            newconfig.crons[c.name] = c
+            c.job = None
+            c.timespec = config.get('cron', {}).get(name, default)
 
         for target in config['targets']:
             t = Target()
