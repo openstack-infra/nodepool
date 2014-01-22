@@ -666,16 +666,19 @@ class NodePool(threading.Thread):
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
 
+        def _define_cron(name, default):
+            c = Cron()
+            c.name = name
+            c.job = None
+            c.timespec = config.get('cron', {}).get(name, default)
+            newconfig.crons[c.name] = c
+
         for name, default in [
             ('image-update', '14 2 * * *'),
             ('cleanup', '27 */6 * * *'),
             ('check', '*/15 * * * *'),
             ]:
-            c = Cron()
-            c.name = name
-            newconfig.crons[c.name] = c
-            c.job = None
-            c.timespec = config.get('cron', {}).get(name, default)
+            _define_cron(name, default)
 
         for target in config['targets']:
             t = Target()
