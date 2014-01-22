@@ -1169,25 +1169,28 @@ class NodePool(threading.Thread):
         snap_image.delete()
         self.log.info("Deleted image id: %s" % snap_image.id)
 
-    def _doPeriodicCleanup(self):
+    def _doPeriodicCleanup(self, provider_name=None):
         try:
-            self.periodicCleanup()
+            self.periodicCleanup(provider_name)
         except Exception:
             self.log.exception("Exception in periodic cleanup:")
 
-    def periodicCleanup(self):
+    def periodicCleanup(self, provider_name):
         # This function should be run periodically to clean up any hosts
         # that may have slipped through the cracks, as well as to remove
         # old images.
 
-        self.log.debug("Starting periodic cleanup")
+        self.log.debug(
+            "Starting periodic cleanup for provider %s", provider_name)
         node_ids = []
         image_ids = []
         with self.getDB().getSession() as session:
             for node in session.getNodes():
-                node_ids.append(node.id)
+                if not provider_name or node.provider_name == provider_name:
+                    node_ids.append(node.id)
             for image in session.getSnapshotImages():
-                image_ids.append(image.id)
+                if not provider_name or image.provider_name == provider_name:
+                    image_ids.append(image.id)
 
         for node_id in node_ids:
             try:
@@ -1212,7 +1215,8 @@ class NodePool(threading.Thread):
         # inline, so requery the list.
         with self.getDB().getSession() as session:
             for node in session.getNodes():
-                node_ids.append(node.id)
+                if not provider_name or node.provider_name == provider_name:
+                    node_ids.append(node.id)
         for node_id in node_ids:
             try:
                 with self.getDB().getSession() as session:
@@ -1222,7 +1226,8 @@ class NodePool(threading.Thread):
                 self.log.exception(
                     "Exception probing delete-requested node id %s:", node_id)
 
-        self.log.debug("Finished periodic cleanup")
+        self.log.debug(
+            "Finished periodic cleanup for provider %s", provider_name)
 
     def cleanupOneNode(self, session, node):
         now = time.time()
