@@ -666,7 +666,7 @@ class NodePool(threading.Thread):
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
 
-        def _define_cron(name, map_name, default):
+        def _define_cron(name, map_name, default, args=None):
             c = Cron()
             # name is the running name of the cron entry - e.g.
             # cleanup-raxspace-dfw
@@ -674,6 +674,7 @@ class NodePool(threading.Thread):
             # map-name is the name of cron entry in the config file
             # - e.g. cleanup
             c.map_name = map_name
+            c.args = args
             c.job = None
             c.timespec = config.get('cron', {}).get(map_name, default)
             newconfig.crons[c.name] = c
@@ -683,7 +684,12 @@ class NodePool(threading.Thread):
             ('cleanup', '27 */6 * * *'),
             ('check', '*/15 * * * *'),
             ]:
-            _define_cron(name, name, default)
+            if name == 'cleanup':
+                for provider_name in newconfig.providers.keys():
+                    name = 'cleanup-%s' % provider_name
+                    _define_cron(name, 'cleanup', default, (provider_name,))
+            else:
+                _define_cron(name, name, default)
 
         for target in config['targets']:
             t = Target()
@@ -808,7 +814,8 @@ class NodePool(threading.Thread):
                     day=dom,
                     day_of_week=dow,
                     hour=hour,
-                    minute=minute)
+                    minute=minute,
+                    args=c.args)
             else:
                 c.job = self.config.crons[c.name].job
 
