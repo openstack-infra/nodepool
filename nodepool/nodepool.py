@@ -328,7 +328,7 @@ class NodeLauncher(threading.Thread):
 
         self.node.ip = ip
         self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
-                       (ip, self.node.id))
+                       (self.node.id, ip))
         connect_kwargs = dict(key_filename=self.image.private_key)
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
