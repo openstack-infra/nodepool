@@ -31,10 +31,11 @@ class SSHClient(object):
         self.client = client
         self.log = log
 
-    def ssh(self, action, command, output=False):
+    def ssh(self, action, command, get_pty=True, output=False):
         if self.log:
             self.log.info(command)
-        stdin, stdout, stderr = self.client.exec_command(command)
+        stdin, stdout, stderr = self.client.exec_command(
+            command, get_pty=get_pty)
         out = ''
         for line in stdout:
             if output:
