@@ -1187,22 +1187,21 @@ class NodePool(threading.Thread):
             time_in_state < 900):
             return
         delete = False
+        hours_in_state = time_in_state / HOURS
         if (node.state == nodedb.DELETE):
             self.log.warning("Deleting node id: %s which is in delete "
-                             "state" % node.id)
+                             "state for %s hours", node.id, hours_in_state)
             delete = True
         elif (node.state == nodedb.TEST and
               time_in_state > TEST_CLEANUP):
             self.log.warning("Deleting node id: %s which has been in %s "
                              "state for %s hours" %
-                             (node.id, node.state,
-                              (now - node.state_time) / (60 * 60)))
+                             (node.id, node.state, hours_in_state))
             delete = True
         elif time_in_state > NODE_CLEANUP:
             self.log.warning("Deleting node id: %s which has been in %s "
                              "state for %s hours" %
-                             (node.id, node.state,
-                              time_in_state / (60 * 60)))
+                             (node.id, node.state, hours_in_state))
             delete = True
         if delete:
             try:
