@@ -1261,9 +1261,10 @@ class NodePool(threading.Thread):
         elif time_in_state > NODE_CLEANUP:
             delete = True
         if delete:
-            self.log.warning("Deleting node id: %s which has been in %s "
-                             "state for %s hours" %
-                             (node.id, node.state, hours_in_state))
+            self.log.warning("Deleting node id: %s provider: %s which has been"
+                             " in %s state for %s hours" %
+                             (node.id, node.provider_name, node.state,
+                              hours_in_state))
             try:
                 self.deleteNode(session, node)
             except Exception:
