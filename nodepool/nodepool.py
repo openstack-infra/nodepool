@@ -124,8 +124,7 @@ class NodeCompleteThread(threading.Thread):
             statsd.incr(key + '.builds')
 
         time.sleep(DELETE_DELAY)
-        # Mark the node for deletion by the provider.
-        node.state = nodedb.DELETE
+        self.nodepool.deleteNode(session, node)
 
 
 class NodeUpdateListener(threading.Thread):
@@ -283,10 +282,10 @@ class NodeLauncher(threading.Thread):
                 self.log.exception("Exception launching node id: %s:" %
                                    self.node_id)
                 try:
-                    self.node.state = nodedb.DELETE
+                    self.nodepool.deleteNode(session, self.node)
                 except Exception:
-                    self.log.exception("Exception marking node id: %s "
-                                       "for deletion" % self.node_id)
+                    self.log.exception("Exception deleting node id: %s:" %
+                                       self.node_id)
                     return
 
     def launchNode(self, session):
@@ -620,6 +619,17 @@ class NodePool(threading.Thread):
         newconfig.gearman_servers = {}
         newconfig.crons = {}
 
+        for name, default in [
+            ('image-update', '14 2 * * *'),
+            ('cleanup', '27 */6 * * *'),
+            ('check', '*/15 * * * *'),
+            ]:
+            c = Cron()
+            c.name = name
+            newconfig.crons[c.name] = c
+            c.job = None
+            c.timespec = config.get('cron', {}).get(name, default)
+
         for addr in config['zmq-publishers']:
             z = ZMQPublisher()
             z.name = addr
@@ -665,31 +675,6 @@ class NodePool(threading.Thread):
                 i.username = image.get('username', 'jenkins')
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
-
-        def _define_cron(name, map_name, default, args=None):
-            c = Cron()
-            # name is the running name of the cron entry - e.g.
-            # cleanup-raxspace-dfw
-            c.name = name
-            # map-name is the name of cron entry in the config file
-            # - e.g. cleanup
-            c.map_name = map_name
-            c.args = args
-            c.job = None
-            c.timespec = config.get('cron', {}).get(map_name, default)
-            newconfig.crons[c.name] = c
-
-        for name, default in [
-            ('image-update', '14 2 * * *'),
-            ('cleanup', '27 */6 * * *'),
-            ('check', '*/15 * * * *'),
-            ]:
-            if name == 'cleanup':
-                for provider_name in newconfig.providers.keys():
-                    name = 'cleanup-%s' % provider_name
-                    _define_cron(name, 'cleanup', default, (provider_name,))
-            else:
-                _define_cron(name, name, default)
 
         for target in config['targets']:
             t = Target()
@@ -810,12 +795,11 @@ class NodePool(threading.Thread):
                 parts = c.timespec.split()
                 minute, hour, dom, month, dow = parts[:5]
                 c.job = self.apsched.add_cron_job(
-                    cron_map[c.map_name],
+                    cron_map[c.name],
                     day=dom,
                     day_of_week=dow,
                     hour=hour,
-                    minute=minute,
-                    args=c.args)
+                    minute=minute)
             else:
                 c.job = self.config.crons[c.name].job
 
@@ -1110,33 +1094,10 @@ class NodePool(threading.Thread):
                 self.log.debug('Deleting server %s for node id: %s' %
                                (node.external_id,
                                 node.id))
-                deleted = manager.cleanupServer(
-                    server['id'], block_on_delete=False)
-                if not deleted:
-                    # The cloud provider hasn't deleted the server yet, we need
-                    # to keep our DB record until they do. Periodic cleanup
-                    # will retry the deletion.
-                    return
+                manager.cleanupServer(server['id'])
             except provider_manager.NotFound:
                 pass
 
-        self.deleteCleanedNode(session, node)
-
-    def deleteNodeIfCleaned(self, session, node):
-        if node is None:
-            return
-        if node.external_id:
-            try:
-                provider = self.config.providers[node.provider_name]
-                manager = self.getProviderManager(provider)
-                manager.getServer(node.external_id)
-                # Still exists, don't delete.
-                return
-            except provider_manager.NotFound:
-                pass
-        self.deleteCleanedNode(session, node)
-
-    def deleteCleanedNode(self, session, node):
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
 
@@ -1161,13 +1122,7 @@ class NodePool(threading.Thread):
                 self.log.debug('Deleting server %s for image id: %s' %
                                (snap_image.server_external_id,
                                 snap_image.id))
-                deleted = manager.cleanupServer(
-                    server['id'], block_on_delete=False)
-                if not deleted:
-                    # The cloud provider hasn't deleted the server yet, we need
-                    # to keep our DB record until they do. Periodic cleanup
-                    # will retry the deletion.
-                    return
+                manager.cleanupServer(server['id'])
             except provider_manager.NotFound:
                 self.log.warning('Image server id %s not found' %
                                  snap_image.server_external_id)
@@ -1184,28 +1139,25 @@ class NodePool(threading.Thread):
         snap_image.delete()
         self.log.info("Deleted image id: %s" % snap_image.id)
 
-    def _doPeriodicCleanup(self, provider_name=None):
+    def _doPeriodicCleanup(self):
         try:
-            self.periodicCleanup(provider_name)
+            self.periodicCleanup()
         except Exception:
             self.log.exception("Exception in periodic cleanup:")
 
-    def periodicCleanup(self, provider_name):
+    def periodicCleanup(self):
         # This function should be run periodically to clean up any hosts
         # that may have slipped through the cracks, as well as to remove
         # old images.
 
-        self.log.debug(
-            "Starting periodic cleanup for provider %s", provider_name)
+        self.log.debug("Starting periodic cleanup")
         node_ids = []
         image_ids = []
         with self.getDB().getSession() as session:
             for node in session.getNodes():
-                if not provider_name or node.provider_name == provider_name:
-                    node_ids.append(node.id)
+                node_ids.append(node.id)
             for image in session.getSnapshotImages():
-                if not provider_name or image.provider_name == provider_name:
-                    image_ids.append(image.id)
+                image_ids.append(image.id)
 
         for node_id in node_ids:
             try:
@@ -1224,48 +1176,33 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception cleaning up image id %s:" %
                                    image_id)
-
-        # Detect which nodes the provider APIs have actually cleaned
-        # up since deletion was requested. Some may have been deleted
-        # inline, so requery the list.
-        with self.getDB().getSession() as session:
-            for node in session.getNodes():
-                if not provider_name or node.provider_name == provider_name:
-                    node_ids.append(node.id)
-        for node_id in node_ids:
-            try:
-                with self.getDB().getSession() as session:
-                    node = session.getNode(node_id)
-                    self.deleteNodeIfCleaned(session, node)
-            except Exception:
-                self.log.exception(
-                    "Exception probing delete-requested node id %s:", node_id)
-
-        self.log.debug(
-            "Finished periodic cleanup for provider %s", provider_name)
+        self.log.debug("Finished periodic cleanup")
 
     def cleanupOneNode(self, session, node):
         now = time.time()
         time_in_state = now - node.state_time
-        if node.state != nodedb.DELETE and (
-            node.state in [nodedb.READY, nodedb.HOLD] or
+        if (node.state in [nodedb.READY, nodedb.HOLD] or
             time_in_state < 900):
             return
         delete = False
-        hours_in_state = time_in_state / HOURS
         if (node.state == nodedb.DELETE):
+            self.log.warning("Deleting node id: %s which is in delete "
+                             "state" % node.id)
             delete = True
         elif (node.state == nodedb.TEST and
               time_in_state > TEST_CLEANUP):
+            self.log.warning("Deleting node id: %s which has been in %s "
+                             "state for %s hours" %
+                             (node.id, node.state,
+                              (now - node.state_time) / (60 * 60)))
             delete = True
         elif time_in_state > NODE_CLEANUP:
+            self.log.warning("Deleting node id: %s which has been in %s "
+                             "state for %s hours" %
+                             (node.id, node.state,
+                              time_in_state / (60 * 60)))
             delete = True
         if delete:
-            self.log.warning("Deleting node id: %s provider: %s which has been"
-                             " in %s state for %s hours" %
-                             (node.id, node.provider_name,
-                              nodedb.STATE_NAMES[node.state],
-                              hours_in_state))
             try:
                 self.deleteNode(session, node)
             except Exception:
@@ -1328,7 +1265,7 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("SSH Check failed for node id: %s" %
                                    node.id)
-                node.state = nodedb.DELETE
+                self.deleteNode(session, node)
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
