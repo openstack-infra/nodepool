@@ -1263,7 +1263,8 @@ class NodePool(threading.Thread):
         if delete:
             self.log.warning("Deleting node id: %s provider: %s which has been"
                              " in %s state for %s hours" %
-                             (node.id, node.provider_name, node.state,
+                             (node.id, node.provider_name,
+                              nodedb.STATE_NAMES[node.state],
                               hours_in_state))
             try:
                 self.deleteNode(session, node)
