@@ -203,9 +203,29 @@ class ProviderManager(TaskManager):
                                               provider.rate)
         self.provider = provider
         self._client = self._getClient()
-        self._flavors = self._getFlavors()
         self._images = {}
-        self._extensions = self._getExtensions()
+        self._cloud_metadata_read = False
+        self.__flavors = {}
+        self.__extensions = {}
+
+    @property
+    def _flavors(self):
+        if not self._cloud_metadata_read:
+            self._getCloudMetadata()
+        return self.__flavors
+
+    @property
+    def _extensions(self):
+        if not self._cloud_metadata_read:
+            self._getCloudMetadata()
+        return self.__extensions
+
+    def _getCloudMetadata(self):
+        # NB: This is synchronous because it must complete before any requests
+        # can be made of this cloud.
+        self.__flavors = self._getFlavors()
+        self.__extensions = self._getExtensions()
+        self._cloud_metadata_read = True
 
     def _getClient(self):
         args = ['1.1', self.provider.username, self.provider.password,
@@ -222,26 +242,22 @@ class ProviderManager(TaskManager):
         return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
-        try:
-            l = [dict(id=f.id, ram=f.ram, name=f.name)
-                 for f in self._client.flavors.list()]
-            l.sort(lambda a, b: cmp(a['ram'], b['ram']))
-            return l
-        except Exception:
-            # requests.ConnectionError exceptions bubble up through
-            # novaclient, making them hard to match on
-            self.log.exception('Unable to get flavors for %s'
-                               % self.provider.name)
-            return []
+        l = [dict(id=f.id, ram=f.ram, name=f.name)
+             for f in self._client.flavors.list()]
+        l.sort(lambda a, b: cmp(a['ram'], b['ram']))
+        return l
 
     def _getExtensions(self):
         try:
             resp, body = self._client.client.get('/extensions')
             return [x['alias'] for x in body['extensions']]
         except novaclient.exceptions.NotFound:
+            # No extensions present.
             return []
 
     def hasExtension(self, extension):
+        # Note: this will throw an error if the provider is offline
+        # but all the callers are in threads so the mainloop won't be affected.
         if extension in self._extensions:
             return True
         return False
@@ -251,6 +267,9 @@ class ProviderManager(TaskManager):
         return task.wait()
 
     def findFlavor(self, min_ram, name_filter=None):
+        # Note: this will throw an error if the provider is offline
+        # but all the callers are in threads (they call in via CreateServer) so
+        # the mainloop won't be affected.
         for f in self._flavors:
             if (f['ram'] >= min_ram
                     and (not name_filter or name_filter in f['name'])):

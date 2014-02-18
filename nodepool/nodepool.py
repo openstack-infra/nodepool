@@ -1051,6 +1051,13 @@ class NodePool(threading.Thread):
                 self.updateImage(session, provider, image)
 
     def updateImage(self, session, provider, image):
+        try:
+            self._updateImage(session, provider, image)
+        except Exception:
+            self.log.exception(
+                "Could not update image %s on %s", image.name, provider.name)
+
+    def _updateImage(self, session, provider, image):
         provider = self.config.providers[provider.name]
         image = provider.images[image.name]
         snap_image = session.createSnapshotImage(
@@ -1064,6 +1071,13 @@ class NodePool(threading.Thread):
         return t
 
     def launchNode(self, session, provider, image, target):
+        try:
+            self._launchNode(session, provider, image, target)
+        except Exception:
+            self.log.exception(
+                "Could not launch node %s on %s", image.name, provider.name)
+
+    def _launchNode(self, session, provider, image, target):
         provider = self.config.providers[provider.name]
         image = provider.images[image.name]
         timeout = provider.boot_timeout
