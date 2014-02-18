@@ -524,12 +524,22 @@ class ImageUpdater(threading.Thread):
         else:
             ssh_kwargs['password'] = server['admin_pass']
 
-        for username in ['root', 'ubuntu']:
-            host = utils.ssh_connect(server['public_v4'], username,
-                                     ssh_kwargs,
-                                     timeout=CONNECT_TIMEOUT)
-            if host:
-                break
+        host = utils.ssh_connect(server['public_v4'], 'root', ssh_kwargs,
+                                 timeout=CONNECT_TIMEOUT)
+
+        if not host:
+            # We have connected to the node but couldn't do anything as root
+            # try distro specific users, since we know ssh is up (a timeout
+            # didn't occur), we can connect with a very sort timeout.
+            for username in ['ubuntu', 'fedora']:
+                try:
+                    host = utils.ssh_connect(server['public_v4'], username,
+                                             ssh_kwargs,
+                                             timeout=10)
+                    if host:
+                        break
+                except:
+                    continue
 
         if not host:
             raise Exception("Unable to log in via SSH")
