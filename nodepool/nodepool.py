@@ -947,7 +947,7 @@ class NodePool(threading.Thread):
                     ar = allocation.AllocationRequest(image.name,
                                                       image_demand[image.name])
 
-                nodes = session.getNodes(image_name=image_name,
+                nodes = session.getNodes(image_name=image.name,
                                          target_name=target.name)
                 allocation_requests[image.name] = ar
                 ar.addTarget(at, image.min_ready, len(nodes))
