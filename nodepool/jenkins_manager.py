@@ -134,4 +134,4 @@ class JenkinsManager(TaskManager):
         self.submitTask(StartBuildTask(name=name, params=params))
 
     def getInfo(self):
-        return self.submitTask(GetInfoTask())
+        return self._client.get_info()

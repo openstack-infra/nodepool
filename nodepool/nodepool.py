@@ -36,7 +36,7 @@ import provider_manager
 MINS = 60
 HOURS = 60 * MINS
 
-WATERMARK_SLEEP = 5          # Interval between checking if new servers needed
+WATERMARK_SLEEP = 10         # Interval between checking if new servers needed
 IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
 CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
                              # is ACTIVE
