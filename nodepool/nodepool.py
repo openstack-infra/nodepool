@@ -22,6 +22,7 @@ import gear
 import json
 import logging
 import os.path
+import re
 import threading
 import time
 import yaml
@@ -449,9 +450,19 @@ class ImageUpdater(threading.Thread):
             key = None
             use_password = True
 
+        uuid_pattern = 'hex{8}-(hex{4}-){3}hex{12}'.replace('hex',
+                                                            '[0-9a-fA-F]')
+        if re.match(uuid_pattern, self.image.base_image):
+            image_name = None
+            image_id = self.image.base_image
+        else:
+            image_name = self.image.base_image
+            image_id = None
         server_id = self.manager.createServer(
-            hostname, self.image.min_ram, image_name=self.image.base_image,
-            key_name=key_name, name_filter=self.image.name_filter)
+            hostname, self.image.min_ram, image_name=image_name,
+            key_name=key_name, name_filter=self.image.name_filter,
+            image_id=image_id)
+
         self.snap_image.hostname = hostname
         self.snap_image.version = timestamp
         self.snap_image.server_external_id = server_id
