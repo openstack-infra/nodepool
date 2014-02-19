@@ -26,13 +26,18 @@ import fakeprovider
 from task_manager import Task, TaskManager
 
 
+SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
+ITERATE_INTERVAL = 2  # How long to sleep while waiting for something
+                      # in a loop
+
+
 def iterate_timeout(max_seconds, purpose):
     start = time.time()
     count = 0
     while (time.time() < start + max_seconds):
         count += 1
         yield count
-        time.sleep(2)
+        time.sleep(ITERATE_INTERVAL)
     raise Exception("Timeout waiting for %s" % purpose)
 
 
@@ -207,6 +212,8 @@ class ProviderManager(TaskManager):
         self._cloud_metadata_read = False
         self.__flavors = {}
         self.__extensions = {}
+        self._servers = []
+        self._servers_time = 0
 
     @property
     def _flavors(self):
@@ -319,33 +326,37 @@ class ProviderManager(TaskManager):
     def getFloatingIP(self, ip_id):
         return self.submitTask(GetFloatingIPTask(ip_id=ip_id))
 
+    def getServerFromList(self, server_id):
+        for s in self.listServers():
+            if s['id'] == server_id:
+                return s
+        raise NotFound()
+
     def _waitForResource(self, resource_type, resource_id, timeout):
-        last_progress = None
         last_status = None
         for count in iterate_timeout(timeout,
                                      "waiting for %s %s" % (resource_type,
                                                             resource_id)):
             try:
                 if resource_type == 'server':
-                    resource = self.getServer(resource_id)
+                    resource = self.getServerFromList(resource_id)
                 elif resource_type == 'image':
                     resource = self.getImage(resource_id)
-            except:
+            except NotFound:
+                self.log.debug('Resource %s %s not found while waiting' %
+                               (resource_type, resource_id))
+                continue
+            except Exception:
                 self.log.exception('Unable to list %ss while waiting for '
                                    '%s will retry' % (resource_type,
                                                       resource_id))
                 continue
 
-            # In Rackspace v1.0, there is no progress attribute while queued
-            progress = resource.get('progress')
             status = resource.get('status')
-            if (last_progress != progress or
-                last_status != status):
-                self.log.debug('Status of %s %s: %s %s' %
-                               (resource_type, resource_id,
-                                status, progress))
+            if (last_status != status):
+                self.log.debug('Status of %s %s: %s' %
+                               (resource_type, resource_id, status))
             last_status = status
-            last_progress = progress
             if status == 'ACTIVE':
                 return resource
 
@@ -396,13 +407,23 @@ class ProviderManager(TaskManager):
         return self.submitTask(DeleteFloatingIPTask(ip_id=ip_id))
 
     def listServers(self):
-        return self.submitTask(ListServersTask())
+        if time.time() - self._servers_time >= SERVER_LIST_AGE:
+            self._servers = self.submitTask(ListServersTask())
+            self._servers_time = time.time()
+        return self._servers
 
     def deleteServer(self, server_id):
         return self.submitTask(DeleteServerTask(server_id=server_id))
 
     def cleanupServer(self, server_id):
-        server = self.getServer(server_id)
+        try:
+            server = self.getServerFromList(server_id)
+        except NotFound:
+            # In case this server is really new, make sure we have at
+            # least one server list update since it was created.  If
+            # it still doesn't exist, then propogate the exception.
+            time.sleep(SERVER_LIST_AGE + 1)
+            server = self.getServerFromList(server_id)
 
         if self.hasExtension('os-floating-ips'):
             for ip in self.listFloatingIPs():
@@ -426,6 +447,6 @@ class ProviderManager(TaskManager):
         for count in iterate_timeout(600, "waiting for server %s deletion" %
                                      server_id):
             try:
-                self.getServer(server_id)
+                self.getServerFromList(server_id)
             except NotFound:
                 return

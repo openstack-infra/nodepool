@@ -1115,11 +1115,9 @@ class NodePool(threading.Thread):
 
         if node.external_id:
             try:
-                server = manager.getServer(node.external_id)
                 self.log.debug('Deleting server %s for node id: %s' %
-                               (node.external_id,
-                                node.id))
-                manager.cleanupServer(server['id'])
+                               (node.external_id, node.id))
+                manager.cleanupServer(node.external_id)
             except provider_manager.NotFound:
                 pass
 
