@@ -350,8 +350,6 @@ class ProviderManager(TaskManager):
                 elif resource_type == 'image':
                     resource = self.getImage(resource_id)
             except NotFound:
-                self.log.debug('Resource %s %s not found while waiting' %
-                               (resource_type, resource_id))
                 continue
             except Exception:
                 self.log.exception('Unable to list %ss while waiting for '
