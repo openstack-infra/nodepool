@@ -1002,17 +1002,34 @@ class NodePool(threading.Thread):
         self.log.debug("Finished node launch calculation")
         return nodes_to_launch
 
+    def updateConfig(self):
+        config = self.loadConfig()
+        self.reconfigureDatabase(config)
+        self.reconfigureManagers(config)
+        self.reconfigureCrons(config)
+        self.reconfigureUpdateListeners(config)
+        self.reconfigureGearmanClient(config)
+        self.setConfig(config)
+
+    def startup(self):
+        self.updateConfig()
+        # Currently nodepool can not resume building a node after a
+        # restart.  To clean up, mark all building nodes for deletion
+        # when the daemon starts.
+        with self.getDB().getSession() as session:
+            for node in session.getNodes(state=nodedb.BUILDING):
+                self.log.info("Setting building node id: %s to delete "
+                              "on startup" % node.id)
+                node.state = nodedb.DELETE
+
     def run(self):
+        try:
+            self.startup()
+        except Exception:
+            self.log.exception("Exception in startup:")
         while not self._stopped:
             try:
-                config = self.loadConfig()
-                self.reconfigureDatabase(config)
-                self.reconfigureManagers(config)
-                self.reconfigureCrons(config)
-                self.reconfigureUpdateListeners(config)
-                self.reconfigureGearmanClient(config)
-                self.setConfig(config)
-
+                self.updateConfig()
                 with self.getDB().getSession() as session:
                     self._run(session)
             except Exception:
