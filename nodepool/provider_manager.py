@@ -183,6 +183,23 @@ class GetImageTask(Task):
         return make_image_dict(image)
 
 
+class ListExtensionsTask(Task):
+    def main(self, client):
+        try:
+            resp, body = client.client.get('/extensions')
+            return [x['alias'] for x in body['extensions']]
+        except novaclient.exceptions.NotFound:
+            # No extensions present.
+            return []
+
+
+class ListFlavorsTask(Task):
+    def main(self, client):
+        flavors = client.flavors.list()
+        return [dict(id=flavor.id, ram=flavor.ram, name=flavor.name)
+                for flavor in flavors]
+
+
 class ListImagesTask(Task):
     def main(self, client):
         images = client.images.list()
@@ -228,10 +245,8 @@ class ProviderManager(TaskManager):
         return self.__extensions
 
     def _getCloudMetadata(self):
-        # NB: This is synchronous because it must complete before any requests
-        # can be made of this cloud.
         self.__flavors = self._getFlavors()
-        self.__extensions = self._getExtensions()
+        self.__extensions = self.listExtensions()
         self._cloud_metadata_read = True
 
     def _getClient(self):
@@ -249,18 +264,9 @@ class ProviderManager(TaskManager):
         return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
-        l = [dict(id=f.id, ram=f.ram, name=f.name)
-             for f in self._client.flavors.list()]
-        l.sort(lambda a, b: cmp(a['ram'], b['ram']))
-        return l
-
-    def _getExtensions(self):
-        try:
-            resp, body = self._client.client.get('/extensions')
-            return [x['alias'] for x in body['extensions']]
-        except novaclient.exceptions.NotFound:
-            # No extensions present.
-            return []
+        flavors = self.listFlavors()
+        flavors.sort(lambda a, b: cmp(a['ram'], b['ram']))
+        return flavors
 
     def hasExtension(self, extension):
         # Note: this will throw an error if the provider is offline
@@ -393,8 +399,14 @@ class ProviderManager(TaskManager):
     def getImage(self, image_id):
         return self.submitTask(GetImageTask(image=image_id))
 
+    def listExtensions(self):
+        return self.submitTask(ListExtensionsTask())
+
     def listImages(self):
         return self.submitTask(ListImagesTask())
+
+    def listFlavors(self):
+        return self.submitTask(ListFlavorsTask())
 
     def listFloatingIPs(self):
         return self.submitTask(ListFloatingIPsTask())
