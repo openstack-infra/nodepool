@@ -1137,8 +1137,6 @@ class NodePool(threading.Thread):
         try:
             self._delete_threads_lock.acquire()
             if node_id in self._delete_threads:
-                self.log.info("Deletion of node %s already in progress"
-                              % node_id)
                 return
             t = NodeDeleter(self, node_id)
             self._delete_threads[node_id] = t
@@ -1149,6 +1147,10 @@ class NodePool(threading.Thread):
             self._delete_threads_lock.release()
 
     def _deleteNode(self, session, node):
+        self.log.debug("Deleting node id: %s which has been in %s "
+                       "state for %s hours" %
+                       (node.id, nodedb.STATE_NAMES[node.state],
+                        (time.time() - node.state_time) / (60 * 60)))
         # Delete a node
         if node.state != nodedb.DELETE:
             # Don't write to the session if not needed.
@@ -1243,7 +1245,8 @@ class NodePool(threading.Thread):
             try:
                 with self.getDB().getSession() as session:
                     node = session.getNode(node_id)
-                    self.cleanupOneNode(session, node)
+                    if node:
+                        self.cleanupOneNode(session, node)
             except Exception:
                 self.log.exception("Exception cleaning up node id %s:" %
                                    node_id)
@@ -1272,10 +1275,6 @@ class NodePool(threading.Thread):
         elif time_in_state > NODE_CLEANUP:
             delete = True
         if delete:
-            self.log.warning("Deleting node id: %s which has been in %s "
-                             "state for %s hours" %
-                             (node.id, node.state,
-                              (now - node.state_time) / (60 * 60)))
             try:
                 self.deleteNode(node.id)
             except Exception:
@@ -1338,7 +1337,7 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("SSH Check failed for node id: %s" %
                                    node.id)
-                self.deleteNode(node)
+                self.deleteNode(node.id)
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
