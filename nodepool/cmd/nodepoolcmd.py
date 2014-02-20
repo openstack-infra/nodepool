@@ -74,9 +74,12 @@ class NodePoolCmd(object):
 
         cmd_delete = subparsers.add_parser(
             'delete',
-            help='delete a node')
+            help='place a node in the DELETE state')
         cmd_delete.set_defaults(func=self.delete)
         cmd_delete.add_argument('id', help='node id')
+        cmd_delete.add_argument('--now',
+                                action='store_true',
+                                help='delete the node in the foreground')
 
         cmd_image_delete = subparsers.add_parser(
             'image-delete',
@@ -180,7 +183,11 @@ class NodePoolCmd(object):
         self.pool.reconfigureManagers(self.pool.config)
         with self.pool.getDB().getSession() as session:
             node = session.getNode(self.args.id)
-            self.pool.deleteNode(session, node)
+            if self.args.now:
+                self.pool._deleteNode(session, node)
+            else:
+                node.state = nodedb.DELETE
+                self.list(node_id=node.id)
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config)

@@ -125,7 +125,7 @@ class NodeCompleteThread(threading.Thread):
             statsd.incr(key + '.builds')
 
         time.sleep(DELETE_DELAY)
-        self.nodepool.deleteNode(session, node)
+        self.nodepool.deleteNode(node.id)
 
 
 class NodeUpdateListener(threading.Thread):
@@ -248,6 +248,24 @@ class GearmanClient(gear.Client):
         return needed_workers
 
 
+class NodeDeleter(threading.Thread):
+    log = logging.getLogger("nodepool.NodeDeleter")
+
+    def __init__(self, nodepool, node_id):
+        threading.Thread.__init__(self, name='NodeDeleter for %s' % node_id)
+        self.node_id = node_id
+        self.nodepool = nodepool
+
+    def run(self):
+        try:
+            with self.nodepool.getDB().getSession() as session:
+                node = session.getNode(self.node_id)
+                self.nodepool._deleteNode(session, node)
+        except Exception:
+            self.log.exception("Exception deleting node %s:" %
+                               self.node_id)
+
+
 class NodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
@@ -283,7 +301,7 @@ class NodeLauncher(threading.Thread):
                 self.log.exception("Exception launching node id: %s:" %
                                    self.node_id)
                 try:
-                    self.nodepool.deleteNode(session, self.node)
+                    self.nodepool.deleteNode(self.node_id)
                 except Exception:
                     self.log.exception("Exception deleting node id: %s:" %
                                        self.node_id)
@@ -605,6 +623,8 @@ class NodePool(threading.Thread):
         self.zmq_context = None
         self.gearman_client = None
         self.apsched = None
+        self._delete_threads = {}
+        self._delete_threads_lock = threading.Lock()
 
     def stop(self):
         self._stopped = True
@@ -632,7 +652,7 @@ class NodePool(threading.Thread):
 
         for name, default in [
             ('image-update', '14 2 * * *'),
-            ('cleanup', '27 */6 * * *'),
+            ('cleanup', '* * * * *'),
             ('check', '*/15 * * * *'),
             ]:
             c = Cron()
@@ -1096,7 +1116,22 @@ class NodePool(threading.Thread):
         t = NodeLauncher(self, provider, image, target, node.id, timeout)
         t.start()
 
-    def deleteNode(self, session, node):
+    def deleteNode(self, node_id):
+        try:
+            self._delete_threads_lock.acquire()
+            if node_id in self._delete_threads:
+                self.log.info("Deletion of node %s already in progress"
+                              % node_id)
+                return
+            t = NodeDeleter(self, node_id)
+            self._delete_threads[node_id] = t
+            t.start()
+        except Exception:
+            self.log.exception("Could not delete node %s", node_id)
+        finally:
+            self._delete_threads_lock.release()
+
+    def _deleteNode(self, session, node):
         # Delete a node
         if node.state != nodedb.DELETE:
             # Don't write to the session if not needed.
@@ -1174,6 +1209,11 @@ class NodePool(threading.Thread):
         # old images.
 
         self.log.debug("Starting periodic cleanup")
+
+        for k, t in self._delete_threads.items()[:]:
+            if not t.isAlive():
+                del self._delete_threads[k]
+
         node_ids = []
         image_ids = []
         with self.getDB().getSession() as session:
@@ -1204,30 +1244,23 @@ class NodePool(threading.Thread):
     def cleanupOneNode(self, session, node):
         now = time.time()
         time_in_state = now - node.state_time
-        if (node.state in [nodedb.READY, nodedb.HOLD] or
-            time_in_state < 900):
+        if (node.state in [nodedb.READY, nodedb.HOLD]):
             return
         delete = False
         if (node.state == nodedb.DELETE):
-            self.log.warning("Deleting node id: %s which is in delete "
-                             "state" % node.id)
             delete = True
         elif (node.state == nodedb.TEST and
               time_in_state > TEST_CLEANUP):
+            delete = True
+        elif time_in_state > NODE_CLEANUP:
+            delete = True
+        if delete:
             self.log.warning("Deleting node id: %s which has been in %s "
                              "state for %s hours" %
                              (node.id, node.state,
                               (now - node.state_time) / (60 * 60)))
-            delete = True
-        elif time_in_state > NODE_CLEANUP:
-            self.log.warning("Deleting node id: %s which has been in %s "
-                             "state for %s hours" %
-                             (node.id, node.state,
-                              time_in_state / (60 * 60)))
-            delete = True
-        if delete:
             try:
-                self.deleteNode(session, node)
+                self.deleteNode(node.id)
             except Exception:
                 self.log.exception("Exception deleting node id: "
                                    "%s" % node.id)
@@ -1288,7 +1321,7 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("SSH Check failed for node id: %s" %
                                    node.id)
-                self.deleteNode(session, node)
+                self.deleteNode(node)
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
