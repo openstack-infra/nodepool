@@ -62,7 +62,7 @@ def get_public_ip(server, version=4):
 
 
 def make_server_dict(server):
-    d = dict(id=server.id,
+    d = dict(id=str(server.id),
              name=server.name,
              status=server.status,
              addresses=server.addresses)
@@ -77,7 +77,7 @@ def make_server_dict(server):
 
 
 def make_image_dict(image):
-    d = dict(id=image.id, name=image.name, status=image.status,
+    d = dict(id=str(image.id), name=image.name, status=image.status,
              metadata=image.metadata)
     if hasattr(image, 'progress'):
         d['progress'] = image.progress
@@ -122,7 +122,7 @@ class AddKeypairTask(Task):
 class ListKeypairsTask(Task):
     def main(self, client):
         keys = client.keypairs.list()
-        return [dict(id=key.id, name=key.name) for
+        return [dict(id=str(key.id), name=key.name) for
                 key in keys]
 
 
@@ -134,7 +134,7 @@ class DeleteKeypairTask(Task):
 class CreateFloatingIPTask(Task):
     def main(self, client):
         ip = client.floating_ips.create(**self.args)
-        return dict(id=ip.id, ip=ip.ip)
+        return dict(id=str(ip.id), ip=ip.ip)
 
 
 class AddFloatingIPTask(Task):
@@ -145,13 +145,14 @@ class AddFloatingIPTask(Task):
 class GetFloatingIPTask(Task):
     def main(self, client):
         ip = client.floating_ips.get(self.args['ip_id'])
-        return dict(id=ip.id, ip=ip.ip, instance_id=ip.instance_id)
+        return dict(id=str(ip.id), ip=ip.ip, instance_id=str(ip.instance_id))
 
 
 class ListFloatingIPsTask(Task):
     def main(self, client):
         ips = client.floating_ips.list()
-        return [dict(id=ip.id, ip=ip.ip, instance_id=ip.instance_id) for
+        return [dict(id=str(ip.id), ip=ip.ip,
+                     instance_id=str(ip.instance_id)) for
                 ip in ips]
 
 
@@ -196,7 +197,7 @@ class ListExtensionsTask(Task):
 class ListFlavorsTask(Task):
     def main(self, client):
         flavors = client.flavors.list()
-        return [dict(id=flavor.id, ram=flavor.ram, name=flavor.name)
+        return [dict(id=str(flavor.id), ram=flavor.ram, name=flavor.name)
                 for flavor in flavors]
 
 
@@ -209,7 +210,7 @@ class ListImagesTask(Task):
 class FindImageTask(Task):
     def main(self, client):
         image = client.images.find(**self.args)
-        return dict(id=image.id)
+        return dict(id=str(image.id))
 
 
 class DeleteImageTask(Task):
