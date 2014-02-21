@@ -91,7 +91,7 @@ class NotFound(Exception):
 class CreateServerTask(Task):
     def main(self, client):
         server = client.servers.create(**self.args)
-        return server.id
+        return str(server.id)
 
 
 class GetServerTask(Task):
@@ -169,7 +169,7 @@ class DeleteFloatingIPTask(Task):
 class CreateImageTask(Task):
     def main(self, client):
         # This returns an id
-        return client.servers.create_image(**self.args)
+        return str(client.servers.create_image(**self.args))
 
 
 class GetImageTask(Task):
