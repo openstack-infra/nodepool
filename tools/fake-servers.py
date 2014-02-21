@@ -68,7 +68,8 @@ def main():
     zsocket = context.socket(zmq.PUB)
     zsocket.bind("tcp://*:8881")
 
-    geard = MyGearmanServer()
+    geard = MyGearmanServer(statsd_host='localhost', statsd_port=8125,
+                            statsd_prefix='zuul.geard')
     geard._count = 0
 
     statsd = FakeStatsd()

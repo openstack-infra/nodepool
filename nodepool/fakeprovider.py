@@ -54,11 +54,15 @@ class FakeList(object):
         time.sleep(delay)
         obj.status = status
 
-    def delete(self, obj):
-        if hasattr(obj, 'id'):
-            self._list.remove(obj)
+    def delete(self, *args, **kw):
+        if 'image' in kw:
+            self._list.remove(self.get(kw['image']))
         else:
-            self._list.remove(self.get(obj))
+            obj = args[0]
+            if hasattr(obj, 'id'):
+                self._list.remove(obj)
+            else:
+                self._list.remove(self.get(obj))
 
     def create(self, **kw):
         s = Dummy(id=uuid.uuid4().hex,

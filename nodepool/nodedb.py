@@ -250,12 +250,16 @@ class NodeDatabaseSession(object):
             return None
         return images[0]
 
-    def getCurrentSnapshotImage(self, provider_name, image_name):
+    def getOrderedReadySnapshotImages(self, provider_name, image_name):
         images = self.session().query(SnapshotImage).filter(
             snapshot_image_table.c.provider_name == provider_name,
             snapshot_image_table.c.image_name == image_name,
             snapshot_image_table.c.state == READY).order_by(
             snapshot_image_table.c.version.desc()).all()
+        return images
+
+    def getCurrentSnapshotImage(self, provider_name, image_name):
+        images = self.getOrderedReadySnapshotImages(provider_name, image_name)
         if not images:
             return None
         return images[0]

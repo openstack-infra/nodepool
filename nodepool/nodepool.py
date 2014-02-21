@@ -44,7 +44,8 @@ CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
 NODE_CLEANUP = 8 * HOURS     # When to start deleting a node that is not
                              # READY or HOLD
 TEST_CLEANUP = 5 * MINS      # When to start deleting a node that is in TEST
-KEEP_OLD_IMAGE = 24 * HOURS  # How long to keep an old (good) image
+IMAGE_CLEANUP = 8 * HOURS    # When to start deleting an image that is not
+                             # READY or is not the current or previous image
 DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
                              # its job.
 
@@ -1283,7 +1284,8 @@ class NodePool(threading.Thread):
 
     def cleanupOneImage(self, session, image):
         # Normally, reap images that have sat in their current state
-        # for 24 hours, unless the image is the current snapshot
+        # for 8 hours, unless the image is the current or previous
+        # snapshot.
         delete = False
         now = time.time()
         if image.provider_name not in self.config.providers:
@@ -1296,12 +1298,17 @@ class NodePool(threading.Thread):
             self.log.info("Deleting image id: %s which has no current "
                           "base image" % image.id)
         else:
-            current = session.getCurrentSnapshotImage(image.provider_name,
-                                                      image.image_name)
-            if (current and image != current and
-                (now - image.state_time) > KEEP_OLD_IMAGE):
-                self.log.info("Deleting non-current image id: %s because "
-                              "the image is %s hours old" %
+            images = session.getOrderedReadySnapshotImages(
+                image.provider_name, image.image_name)
+            current = previous = None
+            if len(images) > 0:
+                current = images[0]
+            if len(images) > 1:
+                previous = images[1]
+            if (image != current and image != previous and
+                (now - image.state_time) > IMAGE_CLEANUP):
+                self.log.info("Deleting image id: %s which is "
+                              "%s hours old" %
                               (image.id,
                                (now - image.state_time) / (60 * 60)))
                 delete = True
