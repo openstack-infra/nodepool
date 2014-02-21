@@ -186,8 +186,10 @@ class NodeUpdateListener(threading.Thread):
                 self.log.debug("Test job for node id: %s started" % node.id)
                 return
 
-            self.log.info("Setting node id: %s to USED" % node.id)
-            node.state = nodedb.USED
+            # Preserve the HOLD state even if a job starts on the node.
+            if node.state != nodedb.HOLD:
+                self.log.info("Setting node id: %s to USED" % node.id)
+                node.state = nodedb.USED
             self.nodepool.updateStats(session, node.provider_name)
 
     def handleCompletePhase(self, nodename, jobname, result, branch):
