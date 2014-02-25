@@ -15,3 +15,4 @@ pyzmq>=13.1.0,<14.0.0
 python-novaclient
 MySQL-python
 PrettyTable>=0.6,<0.8
+six>=1.4.1

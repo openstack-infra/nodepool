@@ -15,8 +15,10 @@
 
 import jenkins
 import json
-import urllib
-import urllib2
+
+import six.moves.urllib.parse as urlparse
+import six.moves.urllib.request as urlrequest
+
 from jenkins import JenkinsException, NODE_TYPE, CREATE_NODE
 
 TOGGLE_OFFLINE = '/computer/%(name)s/toggleOffline?offlineMessage=%(msg)s'
@@ -37,7 +39,7 @@ class Jenkins(jenkins.Jenkins):
         if info['offline']:
             return
         self.jenkins_open(
-            urllib2.Request(self.server + TOGGLE_OFFLINE % locals()))
+            urlrequest.Request(self.server + TOGGLE_OFFLINE % locals()))
 
     def enable_node(self, name):
         '''
@@ -51,7 +53,7 @@ class Jenkins(jenkins.Jenkins):
             return
         msg = ''
         self.jenkins_open(
-            urllib2.Request(self.server + TOGGLE_OFFLINE % locals()))
+            urlrequest.Request(self.server + TOGGLE_OFFLINE % locals()))
 
     def get_node_config(self, name):
         '''
@@ -60,7 +62,7 @@ class Jenkins(jenkins.Jenkins):
         :param name: Jenkins node name, ``str``
         '''
         get_config_url = self.server + CONFIG_NODE % locals()
-        return self.jenkins_open(urllib2.Request(get_config_url))
+        return self.jenkins_open(urlrequest.Request(get_config_url))
 
     def reconfig_node(self, name, config_xml):
         '''
@@ -71,7 +73,8 @@ class Jenkins(jenkins.Jenkins):
         '''
         headers = {'Content-Type': 'text/xml'}
         reconfig_url = self.server + CONFIG_NODE % locals()
-        self.jenkins_open(urllib2.Request(reconfig_url, config_xml, headers))
+        self.jenkins_open(
+            urlrequest.Request(reconfig_url, config_xml, headers))
 
     def create_node(self, name, numExecutors=2, nodeDescription=None,
                     remoteFS='/var/lib/jenkins', labels=None, exclusive=False,
@@ -126,8 +129,8 @@ class Jenkins(jenkins.Jenkins):
             'json': json.dumps(inner_params)
         }
 
-        self.jenkins_open(urllib2.Request(
-            self.server + CREATE_NODE % urllib.urlencode(params)))
+        self.jenkins_open(urlrequest.Request(
+            self.server + CREATE_NODE % urlparse.urlencode(params)))
 
         if not self.node_exists(name):
             raise JenkinsException('create[%s] failed' % (name))
