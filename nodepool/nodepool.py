@@ -479,10 +479,21 @@ class ImageUpdater(threading.Thread):
         else:
             image_name = self.image.base_image
             image_id = None
-        server_id = self.manager.createServer(
-            hostname, self.image.min_ram, image_name=image_name,
-            key_name=key_name, name_filter=self.image.name_filter,
-            image_id=image_id)
+        try:
+            server_id = self.manager.createServer(
+                hostname, self.image.min_ram, image_name=image_name,
+                key_name=key_name, name_filter=self.image.name_filter,
+                image_id=image_id)
+        except Exception:
+            if (self.manager.hasExtension('os-keypairs') and
+                not self.provider.keypair):
+                for kp in self.manager.listKeypairs():
+                    if kp['name'] == key_name:
+                        self.log.debug(
+                            'Deleting keypair for failed image build %s' %
+                            self.snap_image.id)
+                        self.manager.deleteKeypair(kp['name'])
+            raise
 
         self.snap_image.hostname = hostname
         self.snap_image.version = timestamp
