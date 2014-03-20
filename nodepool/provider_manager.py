@@ -369,6 +369,14 @@ class ProviderManager(TaskManager):
     def waitForServer(self, server_id, timeout=3600):
         return self._waitForResource('server', server_id, timeout)
 
+    def waitForServerDeletion(self, server_id, timeout=600):
+        for count in iterate_timeout(600, "server %s deletion in %s" %
+                                     (server_id, self.provider.name)):
+            try:
+                self.getServerFromList(server_id)
+            except NotFound:
+                return
+
     def waitForImage(self, image_id, timeout=3600):
         return self._waitForResource('image', image_id, timeout)
 
@@ -456,10 +464,3 @@ class ProviderManager(TaskManager):
 
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
-
-        for count in iterate_timeout(600, "server %s deletion in %s" %
-                                     (server_id, self.provider.name)):
-            try:
-                self.getServerFromList(server_id)
-            except NotFound:
-                return

@@ -541,6 +541,7 @@ class ImageUpdater(threading.Thread):
             # We made the snapshot, try deleting the server, but it's okay
             # if we fail.  The reap script will find it and try again.
             self.manager.cleanupServer(server_id)
+            self.manager.waitForServerDeletion(server_id)
         except:
             self.log.exception("Exception encountered deleting server"
                                " %s for image id: %s" %
@@ -1191,13 +1192,30 @@ class NodePool(threading.Thread):
                 jenkins.deleteNode(jenkins_name)
             self.log.info("Deleted jenkins node id: %s" % node.id)
 
+        for subnode in node.subnodes:
+            if subnode.external_id:
+                try:
+                    self.log.debug('Deleting server %s for subnode id: '
+                                   '%s of node id: %s' %
+                                   (subnode.external_id, subnode.id, node.id))
+                    manager.cleanupServer(subnode.external_id)
+                except provider_manager.NotFound:
+                    pass
+
         if node.external_id:
             try:
                 self.log.debug('Deleting server %s for node id: %s' %
                                (node.external_id, node.id))
                 manager.cleanupServer(node.external_id)
+                manager.waitForServerDeletion(node.external_id)
             except provider_manager.NotFound:
                 pass
+            node.external_id = None
+
+        for subnode in node.subnodes:
+            if subnode.external_id:
+                manager.waitForServerDeletion(subnode.external_id)
+                subnode.delete()
 
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
@@ -1224,6 +1242,7 @@ class NodePool(threading.Thread):
                                (snap_image.server_external_id,
                                 snap_image.id))
                 manager.cleanupServer(server['id'])
+                manager.waitForServerDeletion(server['id'])
             except provider_manager.NotFound:
                 self.log.warning('Image server id %s not found' %
                                  snap_image.server_external_id)

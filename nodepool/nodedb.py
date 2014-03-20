@@ -46,7 +46,7 @@ STATE_NAMES = {
 
 from sqlalchemy import Table, Column, Integer, String, \
     MetaData, create_engine
-from sqlalchemy.orm import scoped_session, mapper
+from sqlalchemy.orm import scoped_session, mapper, relationship, foreign
 from sqlalchemy.orm.session import Session, sessionmaker
 
 metadata = MetaData()
@@ -78,6 +78,21 @@ node_table = Table(
     Column('hostname', String(255), index=True),
     # Eg, jenkins node name
     Column('nodename', String(255), index=True),
+    # Provider assigned id for this machine
+    Column('external_id', String(255)),
+    # Primary IP address
+    Column('ip', String(255)),
+    # One of the above values
+    Column('state', Integer),
+    # Time of last state change
+    Column('state_time', Integer),
+    )
+subnode_table = Table(
+    'subnode', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('node_id', Integer, index=True, nullable=False),
+    # Machine name
+    Column('hostname', String(255), index=True),
     # Provider assigned id for this machine
     Column('external_id', String(255)),
     # Primary IP address
@@ -148,8 +163,50 @@ class Node(object):
             session.commit()
 
 
+class SubNode(object):
+    def __init__(self, node,
+                 hostname=None, external_id=None, ip=None,
+                 state=BUILDING):
+        self.node_id = node.id
+        self.provider_name = node.provider_name
+        self.image_name = node.image_name
+        self.target_name = node.target_name
+        self.external_id = external_id
+        self.ip = ip
+        self.hostname = hostname
+        self.state = state
+
+    def delete(self):
+        session = Session.object_session(self)
+        session.delete(self)
+        session.commit()
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, state):
+        self._state = state
+        self.state_time = int(time.time())
+        session = Session.object_session(self)
+        if session:
+            session.commit()
+
+
+mapper(SubNode, subnode_table,
+       properties=dict(_state=subnode_table.c.state))
+
+
 mapper(Node, node_table,
-       properties=dict(_state=node_table.c.state))
+       properties=dict(
+           _state=node_table.c.state,
+           subnodes=relationship(
+               SubNode,
+               cascade='all, delete-orphan',
+               uselist=True,
+               primaryjoin=foreign(subnode_table.c.node_id) == node_table.c.id,
+               backref='node')))
 
 
 mapper(SnapshotImage, snapshot_image_table,
