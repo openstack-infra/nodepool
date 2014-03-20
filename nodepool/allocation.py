@@ -112,11 +112,11 @@ class AllocationRequest(object):
         art = AllocationRequestTarget(self, target, min_ready, current)
         self.request_targets[target] = art
 
-    def addProvider(self, provider, target):
+    def addProvider(self, provider, target, subnodes):
         # Handle being called multiple times with different targets.
         s = self.sub_requests.get(provider)
         if not s:
-            s = AllocationSubRequest(self, provider)
+            s = AllocationSubRequest(self, provider, subnodes)
         agt = s.addTarget(self.request_targets[target])
         self.sub_requests[provider] = s
         if s not in provider.sub_requests:
@@ -139,10 +139,11 @@ class AllocationRequest(object):
 
 class AllocationSubRequest(object):
     """A request for a number of images from a specific provider."""
-    def __init__(self, request, provider):
+    def __init__(self, request, provider, subnodes):
         self.request = request
         self.provider = provider
         self.amount = 0.0
+        self.subnodes = subnodes
         self.targets = []
 
     def __repr__(self):
@@ -179,7 +180,8 @@ class AllocationSubRequest(object):
         self.amount = amount
         # Adjust provider and request values accordingly.
         self.request.amount -= amount
-        self.provider.available -= amount
+        subnode_factor = 1 + self.subnodes
+        self.provider.available -= (amount * subnode_factor)
         # Adjust the requested values for related sub-requests.
         self.request.makeRequests()
         # Allocate these granted nodes to targets.

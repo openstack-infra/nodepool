@@ -29,6 +29,12 @@ providers:
         min-ram: 8192
         name-filter: 'Fake'
         setup: prepare_node_devstack.sh
+      - name: multi-fake
+        subnodes: 2
+        base-image: 'Fake Precise'
+        min-ram: 8192
+        name-filter: 'Fake'
+        setup: prepare_node_devstack.sh
 
 targets:
   - name: fake-jenkins
@@ -38,6 +44,10 @@ targets:
       apikey: fake
     images:
       - name: nodepool-fake
-        min-ready: 6
+        min-ready: 2
+        providers:
+          - name: fake-provider
+      - name: multi-fake
+        min-ready: 2
         providers:
           - name: fake-provider

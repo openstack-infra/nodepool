@@ -365,6 +365,17 @@ class NodeLauncher(threading.Thread):
             statsd.timing(key, dt)
             statsd.incr(key)
 
+        if self.image.subnodes:
+            self.log.info("Node id: %s is waiting on subnodes" % self.node.id)
+
+            while ((time.time() - start_time) < (NODE_CLEANUP - 60)):
+                session.commit()
+                ready_subnodes = [n for n in self.node.subnodes
+                                  if n.state == nodedb.READY]
+                if len(ready_subnodes) == self.image.subnodes:
+                    break
+                time.sleep(5)
+
         # Do this before adding to jenkins to avoid a race where
         # Jenkins might immediately use the node before we've updated
         # the state:
@@ -402,6 +413,118 @@ class NodeLauncher(threading.Thread):
         if self.target.jenkins_test_job:
             params = dict(NODE=self.node.nodename)
             jenkins.startBuild(self.target.jenkins_test_job, params)
+
+
+class SubNodeLauncher(threading.Thread):
+    log = logging.getLogger("nodepool.SubNodeLauncher")
+
+    def __init__(self, nodepool, provider, image, subnode_id,
+                 node_id, timeout):
+        threading.Thread.__init__(self, name='SubNodeLauncher for %s'
+                                  % subnode_id)
+        self.provider = provider
+        self.image = image
+        self.subnode_id = subnode_id
+        self.node_id = node_id
+        self.timeout = timeout
+        self.nodepool = nodepool
+
+    def run(self):
+        try:
+            self._run()
+        except Exception:
+            self.log.exception("Exception in run method:")
+
+    def _run(self):
+        with self.nodepool.getDB().getSession() as session:
+            self.log.debug("Launching subnode id: %s for node id: %s" %
+                           (self.subnode_id, self.node_id))
+            try:
+                self.subnode = session.getSubNode(self.subnode_id)
+                self.manager = self.nodepool.getProviderManager(self.provider)
+            except Exception:
+                self.log.exception("Exception preparing to launch subnode "
+                                   "id: %s for node id: %s:"
+                                   % (self.subnode_id, self.node_id))
+                return
+
+            try:
+                self.launchSubNode(session)
+            except Exception:
+                self.log.exception("Exception launching subnode id: %s for "
+                                   "node id: %s:" %
+                                   (self.subnode_id, self.node_id))
+                try:
+                    self.nodepool.deleteSubNode(self.subnode, self.manager)
+                except Exception:
+                    self.log.exception("Exception deleting subnode id: %s: "
+                                       "for node id: %s:" %
+                                       (self.subnode_id, self.node_id))
+                    return
+
+    def launchSubNode(self, session):
+        start_time = time.time()
+
+        hostname = '%s-%s-%s-%s.slave.openstack.org' % (
+            self.image.name, self.provider.name, self.node_id, self.subnode_id)
+        self.subnode.hostname = hostname
+        self.subnode.nodename = hostname.split('.')[0]
+
+        snap_image = session.getCurrentSnapshotImage(
+            self.provider.name, self.image.name)
+        if not snap_image:
+            raise Exception("Unable to find current snapshot image %s in %s" %
+                            (self.image.name, self.provider.name))
+
+        self.log.info("Creating server with hostname %s in %s from image %s "
+                      "for subnode id: %s for node id: %s"
+                      % (hostname, self.provider.name,
+                         self.image.name, self.subnode_id, self.node_id))
+        server_id = self.manager.createServer(
+            hostname, self.image.min_ram,
+            snap_image.external_id, name_filter=self.image.name_filter)
+        self.subnode.external_id = server_id
+        session.commit()
+
+        self.log.debug("Waiting for server %s for subnode id: %s for "
+                       "node id: %s" %
+                       (server_id, self.subnode_id, self.node_id))
+        server = self.manager.waitForServer(server_id)
+        if server['status'] != 'ACTIVE':
+            raise Exception("Server %s for subnode id: %s for node id: %s "
+                            "status: %s" %
+                            (server_id, self.subnode_id, self.node_id,
+                             server['status']))
+
+        ip = server.get('public_v4')
+        if not ip and self.manager.hasExtension('os-floating-ips'):
+            ip = self.manager.addPublicIP(server_id,
+                                          pool=self.provider.pool)
+        if not ip:
+            raise Exception("Unable to find public IP of server")
+
+        self.subnode.ip = ip
+        self.log.debug("Subnode id: %s for node id: %s is running, ip: %s, "
+                       "testing ssh" %
+                       (self.subnode_id, self.node_id, ip))
+        connect_kwargs = dict(key_filename=self.image.private_key)
+        if not utils.ssh_connect(ip, self.image.username,
+                                 connect_kwargs=connect_kwargs,
+                                 timeout=self.timeout):
+            raise Exception("Unable to connect via ssh")
+
+        if statsd:
+            dt = int((time.time() - start_time) * 1000)
+            key = 'nodepool.launch.%s.%s.%s' % (self.image.name,
+                                                self.provider.name,
+                                                self.target.name)
+            statsd.timing(key, dt)
+            statsd.incr(key)
+
+        self.subnode.state = nodedb.READY
+        self.log.info("Subnode id: %s for node id: %s is ready"
+                      % (self.subnode_id, self.node_id))
+        self.nodepool.updateStats(session, self.provider.name)
 
 
 class ImageUpdater(threading.Thread):
@@ -729,6 +852,7 @@ class NodePool(threading.Thread):
                 i.setup = image.get('setup')
                 i.reset = image.get('reset')
                 i.username = image.get('username', 'jenkins')
+                i.subnodes = image.get('subnodes', 0)
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
 
@@ -946,6 +1070,12 @@ class NodePool(threading.Thread):
             return len([n for n in nodes
                         if n.target_name in online_targets])
 
+        def count_nodes_and_subnodes(provider_name):
+            count = 0
+            for n in session.getNodes(provider_name):
+                count += 1 + len(n.subnodes)
+            return count
+
         # Actual need is demand - (ready + building)
         for image_name in total_image_min_ready:
             start_demand = image_demand.get(image_name, 0)
@@ -965,7 +1095,7 @@ class NodePool(threading.Thread):
         allocation_providers = {}
         for provider in self.config.providers.values():
             provider_max = provider.max_servers
-            n_provider = len(session.getNodes(provider.name))
+            n_provider = count_nodes_and_subnodes(provider.name)
             available = provider_max - n_provider
             ap = allocation.AllocationProvider(provider.name, available)
             allocation_providers[provider.name] = ap
@@ -1000,8 +1130,11 @@ class NodePool(threading.Thread):
                     # This request may be supplied by this provider
                     # (and nodes from this provider supplying this
                     # request should be distributed to this target).
+                    subnodes = self.config.providers[provider.name].\
+                        images[image.name].subnodes
                     sr, agt = ar.addProvider(
-                        allocation_providers[provider.name], at)
+                        allocation_providers[provider.name],
+                        at, subnodes)
                     tips[agt] = provider
 
         self.log.debug("  Allocation requests:")
@@ -1025,6 +1158,18 @@ class NodePool(threading.Thread):
                     nodes_to_launch[tip] = agt.amount
 
         self.log.debug("Finished node launch calculation")
+        return nodes_to_launch
+
+    def getNeededSubNodes(self, session):
+        nodes_to_launch = []
+        for node in session.getNodes():
+            target_subnodes = self.config.providers[node.provider_name].\
+                images[node.image_name].subnodes
+            active_subnodes = len([n for n in node.subnodes
+                                   if n.state != nodedb.DELETE])
+            deficit = max(target_subnodes - active_subnodes, 0)
+            if deficit:
+                nodes_to_launch.append((node, deficit))
         return nodes_to_launch
 
     def updateConfig(self):
@@ -1063,6 +1208,17 @@ class NodePool(threading.Thread):
 
     def _run(self, session):
         self.checkForMissingImages(session)
+
+        # Make up the subnode deficit first to make sure that an
+        # already allocated node has priority in filling its subnodes
+        # ahead of new nodes.
+        subnodes_to_launch = self.getNeededSubNodes(session)
+        for (node, num_to_launch) in subnodes_to_launch:
+            self.log.info("Need to launch %s subnodes for node id: %s" %
+                          (num_to_launch, node.id))
+            for i in range(num_to_launch):
+                self.launchSubNode(session, node)
+
         nodes_to_launch = self.getNeededNodes(session)
         for target in self.config.targets.values():
             if not target.online:
@@ -1157,6 +1313,37 @@ class NodePool(threading.Thread):
         node = session.createNode(provider.name, image.name, target.name)
         t = NodeLauncher(self, provider, image, target, node.id, timeout)
         t.start()
+
+    def launchSubNode(self, session, node):
+        try:
+            self._launchSubNode(session, node)
+        except Exception:
+            self.log.exception(
+                "Could not launch subnode for node id: %s", node.id)
+
+    def _launchSubNode(self, session, node):
+        provider = self.config.providers[node.provider_name]
+        image = provider.images[node.image_name]
+        timeout = provider.boot_timeout
+        subnode = session.createSubNode(node)
+        t = SubNodeLauncher(self, provider, image, subnode.id,
+                            node.id, timeout)
+        t.start()
+
+    def deleteSubNode(self, subnode, manager):
+        # Don't try too hard here, the actual node deletion will make
+        # sure this is cleaned up.
+        if subnode.external_id:
+            try:
+                self.log.debug('Deleting server %s for subnode id: '
+                               '%s of node id: %s' %
+                               (subnode.external_id, subnode.id,
+                                subnode.node.id))
+                manager.cleanupServer(subnode.external_id)
+                manager.waitForServerDeletion(subnode.external_id)
+            except provider_manager.NotFound:
+                pass
+        subnode.delete()
 
     def deleteNode(self, node_id):
         try:

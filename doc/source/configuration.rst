@@ -114,6 +114,7 @@ same name.  Example::
           reset: reset_node.sh
           username: jenkins
           private-key: /var/lib/jenkins/.ssh/id_rsa
+          subnodes: 2
     - name: provider2
       username: 'username'
       password: 'password'
@@ -139,6 +140,15 @@ For providers, the `name`, `username`, `password`, `auth-url`,
 and `private-key` values default to the values indicated.  Nodepool
 expects that user to exist after running the script indicated by
 `setup`.
+
+The `subnode` key is used to configure multi-node support.  If a
+`subnode` key is supplied to an image, it indicates that the specified
+number of additional nodes of the same image type should be created
+and associated with each node for that image.  Only one node from each
+such group will be added to the target, the subnodes are expected to
+communicate directly with each other.  In the example above, for each
+Quantal node added to the target system, two additional nodes will be
+created and associated with it.
 
 targets
 -------

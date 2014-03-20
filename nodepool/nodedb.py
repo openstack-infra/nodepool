@@ -348,8 +348,20 @@ class NodeDatabaseSession(object):
         self.commit()
         return new
 
+    def createSubNode(self, *args, **kwargs):
+        new = SubNode(*args, **kwargs)
+        self.session().add(new)
+        self.commit()
+        return new
+
     def getNode(self, id):
         nodes = self.session().query(Node).filter_by(id=id).all()
+        if not nodes:
+            return None
+        return nodes[0]
+
+    def getSubNode(self, id):
+        nodes = self.session().query(SubNode).filter_by(id=id).all()
         if not nodes:
             return None
         return nodes[0]
