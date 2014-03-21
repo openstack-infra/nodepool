@@ -102,6 +102,7 @@ providers or images are used to create them).  Example::
       image: precise
       subnodes: 2
       min-ready: 2
+      ready-script: setup_multinode.sh
       providers:
         - name: provider1
 
@@ -117,6 +118,28 @@ such group will be added to the target, the subnodes are expected to
 communicate directly with each other.  In the example above, for each
 Precise node added to the target system, two additional nodes will be
 created and associated with it.
+
+The script specified by `ready-script` (which is expected to be in
+`/opt/nodepool-scripts` along with the setup script) can be used to
+perform any last minute changes to a node after it has been launched
+but before it is put in the READY state to receive jobs.  In
+particular, it can read the files in /etc/nodepool to perform
+multi-node related setup.
+
+Those files include:
+
+**/etc/nodepool/role**
+  Either the string ``primary`` or ``sub`` indicating whether this
+  node is the primary (the node added to the target and which will run
+  the job), or a sub-node.
+**/etc/nodepool/primary_node**
+  The IP address of the primary node.
+**/etc/nodepool/sub_nodes**
+  The IP addresses of the sub nodes, one on each line.
+**/etc/nodepool/id_rsa**
+  An OpenSSH private key generated specifically for this node group.
+**/etc/nodepool/id_rsa.pub**
+  The corresponding public key.
 
 providers
 ---------

@@ -14,10 +14,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import uuid
-import time
-import threading
+import StringIO
 import novaclient
+import threading
+import time
+import uuid
+
 from jenkins import JenkinsException
 
 
@@ -109,12 +111,37 @@ class FakeClient(object):
         self.client.region_name = None
 
 
+class FakeFile(StringIO.StringIO):
+    def __init__(self, path):
+        StringIO.StringIO.__init__(self)
+        self.__path = path
+
+    def close(self):
+        print "Wrote to %s:" % self.__path
+        print self.getvalue()
+        StringIO.StringIO.close(self)
+
+
+class FakeSFTPClient(object):
+    def open(self, path, mode):
+        return FakeFile(path)
+
+    def close(self):
+        pass
+
+
 class FakeSSHClient(object):
+    def __init__(self):
+        self.client = self
+
     def ssh(self, description, cmd):
         return True
 
     def scp(self, src, dest):
         return True
+
+    def open_sftp(self):
+        return FakeSFTPClient()
 
 
 class FakeJenkins(object):

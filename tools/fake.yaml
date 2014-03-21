@@ -20,6 +20,7 @@ labels:
       - name: fake-provider
   - name: multi-fake
     image: nodepool-fake
+    ready-script: multinode_setup.sh
     subnodes: 2
     min-ready: 2
     providers:

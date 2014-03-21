@@ -22,6 +22,7 @@ import gear
 import json
 import logging
 import os.path
+import paramiko
 import re
 import threading
 import time
@@ -377,6 +378,15 @@ class NodeLauncher(threading.Thread):
                     break
                 time.sleep(5)
 
+        nodelist = []
+        for subnode in self.node.subnodes:
+            nodelist.append(('sub', subnode))
+        nodelist.append(('primary', self.node))
+
+        self.writeNodepoolInfo(nodelist)
+        if self.label.ready_script:
+            self.runReadyScript(nodelist)
+
         # Do this before adding to jenkins to avoid a race where
         # Jenkins might immediately use the node before we've updated
         # the state:
@@ -414,6 +424,55 @@ class NodeLauncher(threading.Thread):
         if self.target.jenkins_test_job:
             params = dict(NODE=self.node.nodename)
             jenkins.startBuild(self.target.jenkins_test_job, params)
+
+    def writeNodepoolInfo(self, nodelist):
+        key = paramiko.RSAKey.generate(2048)
+        public_key = key.get_name() + ' ' + key.get_base64()
+
+        for role, n in nodelist:
+            connect_kwargs = dict(key_filename=self.image.private_key)
+            host = utils.ssh_connect(n.ip, self.image.username,
+                                     connect_kwargs=connect_kwargs,
+                                     timeout=self.timeout)
+            if not host:
+                raise Exception("Unable to log in via SSH")
+            ftp = host.client.open_sftp()
+
+            f = ftp.open('/etc/nodepool/role', 'w')
+            f.write(role + '\n')
+            f.close()
+            f = ftp.open('/etc/nodepool/primary_node', 'w')
+            f.write(self.node.ip + '\n')
+            f.close()
+            f = ftp.open('/etc/nodepool/sub_nodes', 'w')
+            for subnode in self.node.subnodes:
+                f.write(subnode.ip + '\n')
+            f.close()
+            f = ftp.open('/etc/nodepool/id_rsa', 'w')
+            key.write_private_key(f)
+            f.close()
+            f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
+            f.write(public_key)
+            f.close()
+
+            ftp.close()
+
+    def runReadyScript(self, nodelist):
+        for role, n in nodelist:
+            connect_kwargs = dict(key_filename=self.image.private_key)
+            host = utils.ssh_connect(n.ip, self.image.username,
+                                     connect_kwargs=connect_kwargs,
+                                     timeout=self.timeout)
+            if not host:
+                raise Exception("Unable to log in via SSH")
+
+            env_vars = ''
+            for k, v in os.environ.items():
+                if k.startswith('NODEPOOL_'):
+                    env_vars += ' %s="%s"' % (k, v)
+            host.ssh("run ready script",
+                     "cd /opt/nodepool-scripts && %s ./%s" %
+                     (env_vars, self.label.ready_script))
 
 
 class SubNodeLauncher(threading.Thread):
@@ -703,6 +762,11 @@ class ImageUpdater(threading.Thread):
             raise Exception("Unable to log in via SSH")
 
         host.ssh("make scripts dir", "mkdir -p scripts")
+        # /etc/nodepool is world writable because by the time we write
+        # the contents after the node is launched, we may not have
+        # sudo access any more.
+        host.ssh("make config dir", "sudo mkdir /etc/nodepool")
+        host.ssh("chmod config dir", "sudo chmod 0777 /etc/nodepool")
         for fname in os.listdir(self.scriptdir):
             path = os.path.join(self.scriptdir, fname)
             if not os.path.isfile(path):
@@ -832,6 +896,7 @@ class NodePool(threading.Thread):
             l.image = label['image']
             l.min_ready = label['min-ready']
             l.subnodes = label.get('subnodes', 0)
+            l.ready_script = label.get('ready-script')
             l.providers = {}
             for provider in label['providers']:
                 p = LabelProvider()
