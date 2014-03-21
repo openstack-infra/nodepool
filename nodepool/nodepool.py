@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2011-2013 OpenStack Foundation
+# Copyright (C) 2011-2014 OpenStack Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -272,10 +272,11 @@ class NodeDeleter(threading.Thread):
 class NodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
-    def __init__(self, nodepool, provider, image, target, node_id, timeout):
+    def __init__(self, nodepool, provider, label, target, node_id, timeout):
         threading.Thread.__init__(self, name='NodeLauncher for %s' % node_id)
         self.provider = provider
-        self.image = image
+        self.label = label
+        self.image = provider.images[label.image]
         self.target = target
         self.node_id = node_id
         self.timeout = timeout
@@ -314,7 +315,7 @@ class NodeLauncher(threading.Thread):
         start_time = time.time()
 
         hostname = '%s-%s-%s.slave.openstack.org' % (
-            self.image.name, self.provider.name, self.node.id)
+            self.label.name, self.provider.name, self.node.id)
         self.node.hostname = hostname
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
@@ -365,14 +366,14 @@ class NodeLauncher(threading.Thread):
             statsd.timing(key, dt)
             statsd.incr(key)
 
-        if self.image.subnodes:
+        if self.label.subnodes:
             self.log.info("Node id: %s is waiting on subnodes" % self.node.id)
 
             while ((time.time() - start_time) < (NODE_CLEANUP - 60)):
                 session.commit()
                 ready_subnodes = [n for n in self.node.subnodes
                                   if n.state == nodedb.READY]
-                if len(ready_subnodes) == self.image.subnodes:
+                if len(ready_subnodes) == self.label.subnodes:
                     break
                 time.sleep(5)
 
@@ -397,11 +398,11 @@ class NodeLauncher(threading.Thread):
 
         args = dict(name=self.node.nodename,
                     host=self.node.ip,
-                    description='Dynamic single use %s node' % self.image.name,
+                    description='Dynamic single use %s node' % self.label.name,
                     executors=1,
                     root='/home/jenkins')
         if not self.target.jenkins_test_job:
-            args['labels'] = self.image.name
+            args['labels'] = self.label.name
         if self.target.jenkins_credentials_id:
             args['credentials_id'] = self.target.jenkins_credentials_id
         else:
@@ -418,12 +419,13 @@ class NodeLauncher(threading.Thread):
 class SubNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.SubNodeLauncher")
 
-    def __init__(self, nodepool, provider, image, subnode_id,
+    def __init__(self, nodepool, provider, label, subnode_id,
                  node_id, timeout):
         threading.Thread.__init__(self, name='SubNodeLauncher for %s'
                                   % subnode_id)
         self.provider = provider
-        self.image = image
+        self.label = label
+        self.image = provider.images[label.image]
         self.subnode_id = subnode_id
         self.node_id = node_id
         self.timeout = timeout
@@ -466,7 +468,7 @@ class SubNodeLauncher(threading.Thread):
         start_time = time.time()
 
         hostname = '%s-%s-%s-%s.slave.openstack.org' % (
-            self.image.name, self.provider.name, self.node_id, self.subnode_id)
+            self.label.name, self.provider.name, self.node_id, self.subnode_id)
         self.subnode.hostname = hostname
         self.subnode.nodename = hostname.split('.')[0]
 
@@ -740,11 +742,11 @@ class Target(ConfigValue):
     pass
 
 
-class TargetImage(ConfigValue):
+class Label(ConfigValue):
     pass
 
 
-class TargetImageProvider(ConfigValue):
+class LabelProvider(ConfigValue):
     pass
 
 
@@ -790,6 +792,7 @@ class NodePool(threading.Thread):
         newconfig.dburi = None
         newconfig.providers = {}
         newconfig.targets = {}
+        newconfig.labels = {}
         newconfig.scriptdir = config.get('script-dir')
         newconfig.dburi = config.get('dburi')
         newconfig.provider_managers = {}
@@ -822,6 +825,19 @@ class NodePool(threading.Thread):
             g.name = g.host + '_' + str(g.port)
             newconfig.gearman_servers[g.name] = g
 
+        for label in config['labels']:
+            l = Label()
+            l.name = label['name']
+            newconfig.labels[l.name] = l
+            l.image = label['image']
+            l.min_ready = label['min-ready']
+            l.subnodes = label.get('subnodes', 0)
+            l.providers = {}
+            for provider in label['providers']:
+                p = LabelProvider()
+                p.name = provider['name']
+                l.providers[p.name] = p
+
         for provider in config['providers']:
             p = Provider()
             p.name = provider['name']
@@ -852,7 +868,6 @@ class NodePool(threading.Thread):
                 i.setup = image.get('setup')
                 i.reset = image.get('reset')
                 i.username = image.get('username', 'jenkins')
-                i.subnodes = image.get('subnodes', 0)
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
 
@@ -875,17 +890,6 @@ class NodePool(threading.Thread):
                 t.jenkins_credentials_id = None
                 t.jenkins_test_job = None
             t.rate = target.get('rate', 1.0)
-            t.images = {}
-            for image in target['images']:
-                i = TargetImage()
-                i.name = image['name']
-                t.images[i.name] = i
-                i.providers = {}
-                i.min_ready = image['min-ready']
-                for provider in image['providers']:
-                    p = TargetImageProvider()
-                    p.name = provider['name']
-                    i.providers[p.name] = p
 
         return newconfig
 
@@ -1044,28 +1048,21 @@ class NodePool(threading.Thread):
         self.log.debug("Beginning node launch calculation")
         # Get the current demand for nodes.
         if self.gearman_client:
-            image_demand = self.gearman_client.getNeededWorkers()
+            label_demand = self.gearman_client.getNeededWorkers()
         else:
-            image_demand = {}
+            label_demand = {}
 
-        for name, demand in image_demand.items():
+        for name, demand in label_demand.items():
             self.log.debug("  Demand from gearman: %s: %s" % (name, demand))
 
-        # Make sure that the current demand includes at least the
-        # configured min_ready values
-        total_image_min_ready = {}
         online_targets = set()
         for target in self.config.targets.values():
             if not target.online:
                 continue
             online_targets.add(target.name)
-            for image in target.images.values():
-                min_ready = total_image_min_ready.get(image.name, 0)
-                min_ready += image.min_ready
-                total_image_min_ready[image.name] = min_ready
 
-        def count_nodes(image_name, state):
-            nodes = session.getNodes(image_name=image_name,
+        def count_nodes(label_name, state):
+            nodes = session.getNodes(label_name=label_name,
                                      state=state)
             return len([n for n in nodes
                         if n.target_name in online_targets])
@@ -1077,17 +1074,17 @@ class NodePool(threading.Thread):
             return count
 
         # Actual need is demand - (ready + building)
-        for image_name in total_image_min_ready:
-            start_demand = image_demand.get(image_name, 0)
-            min_demand = start_demand + total_image_min_ready[image_name]
-            n_ready = count_nodes(image_name, nodedb.READY)
-            n_building = count_nodes(image_name, nodedb.BUILDING)
-            n_test = count_nodes(image_name, nodedb.TEST)
+        for label in self.config.labels.values():
+            start_demand = label_demand.get(label.name, 0)
+            min_demand = start_demand + label.min_ready
+            n_ready = count_nodes(label.name, nodedb.READY)
+            n_building = count_nodes(label.name, nodedb.BUILDING)
+            n_test = count_nodes(label.name, nodedb.TEST)
             ready = n_ready + n_building + n_test
             demand = max(min_demand - ready, 0)
-            image_demand[image_name] = demand
+            label_demand[label.name] = demand
             self.log.debug("  Deficit: %s: %s (start: %s min: %s ready: %s)" %
-                           (image_name, demand, start_demand, min_demand,
+                           (label.name, demand, start_demand, min_demand,
                             ready))
 
         # Start setting up the allocation system.  Add a provider for
@@ -1100,42 +1097,41 @@ class NodePool(threading.Thread):
             ap = allocation.AllocationProvider(provider.name, available)
             allocation_providers[provider.name] = ap
 
-        # "Target-Image-Provider" -- the triplet of info that identifies
+        # "Target-Label-Provider" -- the triplet of info that identifies
         # the source and location of each node.  The mapping is
-        # AllocationGrantTarget -> TargetImageProvider, because
+        # AllocationGrantTarget -> TargetLabelProvider, because
         # the allocation system produces AGTs as the final product.
-        tips = {}
-        # image_name -> AllocationRequest
+        tlps = {}
+        # label_name -> AllocationRequest
         allocation_requests = {}
         # Set up the request values in the allocation system
         for target in self.config.targets.values():
             if not target.online:
                 continue
             at = allocation.AllocationTarget(target.name)
-            for image in target.images.values():
-                ar = allocation_requests.get(image.name)
+            for label in self.config.labels.values():
+                ar = allocation_requests.get(label.name)
                 if not ar:
                     # A request for a certain number of nodes of this
-                    # image type.  We may have already started a
-                    # request from a previous target-image in this
+                    # label type.  We may have already started a
+                    # request from a previous target-label in this
                     # loop.
-                    ar = allocation.AllocationRequest(image.name,
-                                                      image_demand[image.name])
+                    ar = allocation.AllocationRequest(label.name,
+                                                      label_demand[label.name])
 
-                nodes = session.getNodes(image_name=image.name,
+                nodes = session.getNodes(label_name=label.name,
                                          target_name=target.name)
-                allocation_requests[image.name] = ar
-                ar.addTarget(at, image.min_ready, len(nodes))
-                for provider in image.providers.values():
+                allocation_requests[label.name] = ar
+                ar.addTarget(at, len(nodes))
+                for provider in label.providers.values():
                     # This request may be supplied by this provider
                     # (and nodes from this provider supplying this
                     # request should be distributed to this target).
-                    subnodes = self.config.providers[provider.name].\
-                        images[image.name].subnodes
                     sr, agt = ar.addProvider(
                         allocation_providers[provider.name],
-                        at, subnodes)
-                    tips[agt] = provider
+                        at, label.subnodes)
+                    tlps[agt] = (target, label,
+                                 self.config.providers[provider.name])
 
         self.log.debug("  Allocation requests:")
         for ar in allocation_requests.values():
@@ -1143,7 +1139,7 @@ class NodePool(threading.Thread):
             for sr in ar.sub_requests.values():
                 self.log.debug('      %s' % sr)
 
-        nodes_to_launch = {}
+        nodes_to_launch = []
 
         # Let the allocation system do it's thing, and then examine
         # the AGT objects that it produces.
@@ -1154,8 +1150,8 @@ class NodePool(threading.Thread):
                 self.log.debug('    %s' % g)
                 for agt in g.targets:
                     self.log.debug('      %s' % agt)
-                    tip = tips[agt]
-                    nodes_to_launch[tip] = agt.amount
+                    tlp = tlps[agt]
+                    nodes_to_launch.append((tlp, agt.amount))
 
         self.log.debug("Finished node launch calculation")
         return nodes_to_launch
@@ -1163,11 +1159,10 @@ class NodePool(threading.Thread):
     def getNeededSubNodes(self, session):
         nodes_to_launch = []
         for node in session.getNodes():
-            target_subnodes = self.config.providers[node.provider_name].\
-                images[node.image_name].subnodes
+            expected_subnodes = self.config.labels[node.label_name].subnodes
             active_subnodes = len([n for n in node.subnodes
                                    if n.state != nodedb.DELETE])
-            deficit = max(target_subnodes - active_subnodes, 0)
+            deficit = max(expected_subnodes - active_subnodes, 0)
             if deficit:
                 nodes_to_launch.append((node, deficit))
         return nodes_to_launch
@@ -1220,50 +1215,42 @@ class NodePool(threading.Thread):
                 self.launchSubNode(session, node)
 
         nodes_to_launch = self.getNeededNodes(session)
-        for target in self.config.targets.values():
-            if not target.online:
+
+        for (tlp, num_to_launch) in nodes_to_launch:
+            (target, label, provider) = tlp
+            if (not target.online) or (not num_to_launch):
                 continue
-            self.log.debug("Examining target: %s" % target.name)
-            for image in target.images.values():
-                for provider in image.providers.values():
-                    num_to_launch = nodes_to_launch.get(provider, 0)
-                    if num_to_launch:
-                        self.log.info("Need to launch %s %s nodes for "
-                                      "%s on %s" %
-                                      (num_to_launch, image.name,
-                                       target.name, provider.name))
-                    for i in range(num_to_launch):
-                        snap_image = session.getCurrentSnapshotImage(
-                            provider.name, image.name)
-                        if not snap_image:
-                            self.log.debug("No current image for %s on %s"
-                                           % (image.name, provider.name))
-                        else:
-                            self.launchNode(session, provider, image, target)
+            self.log.info("Need to launch %s %s nodes for %s on %s" %
+                          (num_to_launch, label.name,
+                           target.name, provider.name))
+            for i in range(num_to_launch):
+                snap_image = session.getCurrentSnapshotImage(
+                    provider.name, label.image)
+                if not snap_image:
+                    self.log.debug("No current image for %s on %s"
+                                   % (label.image, provider.name))
+                else:
+                    self.launchNode(session, provider, label, target)
 
     def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
         self.log.debug("Checking missing images.")
-        for target in self.config.targets.values():
-            self.log.debug("Checking target: %s", target.name)
-            for image in target.images.values():
-                self.log.debug("Checking image: %s", image.name)
-                for provider in image.providers.values():
-                    found = False
-                    for snap_image in session.getSnapshotImages():
-                        if (snap_image.provider_name == provider.name and
-                            snap_image.image_name == image.name and
-                            snap_image.state in [nodedb.READY,
-                                                 nodedb.BUILDING]):
-                            found = True
-                            self.log.debug('Found image %s in state %r',
-                                           snap_image.image_name,
-                                           snap_image.state)
-                    if not found:
-                        self.log.warning("Missing image %s on %s" %
-                                         (image.name, provider.name))
-                        self.updateImage(session, provider, image)
+        for label in self.config.labels.values():
+            if not label.min_ready:
+                continue
+            for provider_name in label.providers:
+                found = False
+                for snap_image in session.getSnapshotImages():
+                    if (snap_image.provider_name == provider_name and
+                        snap_image.image_name == label.image and
+                        snap_image.state in [nodedb.READY,
+                                             nodedb.BUILDING]):
+                        found = True
+                if not found:
+                    self.log.warning("Missing image %s on %s" %
+                                     (label.image, provider_name))
+                    self.updateImage(session, provider_name, label.image)
 
     def _doUpdateImages(self):
         try:
@@ -1277,18 +1264,18 @@ class NodePool(threading.Thread):
         # images.
         for provider in self.config.providers.values():
             for image in provider.images.values():
-                self.updateImage(session, provider, image)
+                self.updateImage(session, provider.name, image.name)
 
-    def updateImage(self, session, provider, image):
+    def updateImage(self, session, provider_name, image_name):
         try:
-            self._updateImage(session, provider, image)
+            self._updateImage(session, provider_name, image_name)
         except Exception:
             self.log.exception(
-                "Could not update image %s on %s", image.name, provider.name)
+                "Could not update image %s on %s", image_name, provider_name)
 
-    def _updateImage(self, session, provider, image):
-        provider = self.config.providers[provider.name]
-        image = provider.images[image.name]
+    def _updateImage(self, session, provider_name, image_name):
+        provider = self.config.providers[provider_name]
+        image = provider.images[image_name]
         snap_image = session.createSnapshotImage(
             provider_name=provider.name,
             image_name=image.name)
@@ -1299,19 +1286,18 @@ class NodePool(threading.Thread):
         time.sleep(2)
         return t
 
-    def launchNode(self, session, provider, image, target):
+    def launchNode(self, session, provider, label, target):
         try:
-            self._launchNode(session, provider, image, target)
+            self._launchNode(session, provider, label, target)
         except Exception:
             self.log.exception(
-                "Could not launch node %s on %s", image.name, provider.name)
+                "Could not launch node %s on %s", label.name, provider.name)
 
-    def _launchNode(self, session, provider, image, target):
+    def _launchNode(self, session, provider, label, target):
         provider = self.config.providers[provider.name]
-        image = provider.images[image.name]
         timeout = provider.boot_timeout
-        node = session.createNode(provider.name, image.name, target.name)
-        t = NodeLauncher(self, provider, image, target, node.id, timeout)
+        node = session.createNode(provider.name, label.name, target.name)
+        t = NodeLauncher(self, provider, label, target, node.id, timeout)
         t.start()
 
     def launchSubNode(self, session, node):
@@ -1323,10 +1309,10 @@ class NodePool(threading.Thread):
 
     def _launchSubNode(self, session, node):
         provider = self.config.providers[node.provider_name]
-        image = provider.images[node.image_name]
+        label = self.config.labels[node.label_name]
         timeout = provider.boot_timeout
         subnode = session.createSubNode(node)
-        t = SubNodeLauncher(self, provider, image, subnode.id,
+        t = SubNodeLauncher(self, provider, label, subnode.id,
                             node.id, timeout)
         t.start()
 
@@ -1370,6 +1356,8 @@ class NodePool(threading.Thread):
         self.updateStats(session, node.provider_name)
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
+        label = self.config.labels[node.label_name]
+        image = provider.images[label.image]
         manager = self.getProviderManager(provider)
 
         if target.jenkins_url:
@@ -1409,7 +1397,7 @@ class NodePool(threading.Thread):
 
         if statsd:
             dt = int((time.time() - node.state_time) * 1000)
-            key = 'nodepool.delete.%s.%s.%s' % (node.image_name,
+            key = 'nodepool.delete.%s.%s.%s' % (image.name,
                                                 node.provider_name,
                                                 node.target_name)
             statsd.timing(key, dt)
@@ -1565,7 +1553,8 @@ class NodePool(threading.Thread):
                 continue
             try:
                 provider = self.config.providers[node.provider_name]
-                image = provider.images[node.image_name]
+                label = self.config.labels[node.label_name]
+                image = provider.images[label.image]
                 connect_kwargs = dict(key_filename=image.private_key)
                 if utils.ssh_connect(node.ip, image.username,
                                      connect_kwargs=connect_kwargs):
@@ -1584,18 +1573,18 @@ class NodePool(threading.Thread):
 
         states = {}
 
-        #nodepool.target.TARGET.IMAGE.min_ready
-        #nodepool.target.TARGET.IMAGE.PROVIDER.STATE
+        #nodepool.target.TARGET.LABEL.min_ready
+        #nodepool.target.TARGET.LABEL.PROVIDER.STATE
         #nodepool.target.STATE
         base_key = 'nodepool.target'
         for target in self.config.targets.values():
             target_key = '%s.%s' % (base_key, target.name)
-            for image in target.images.values():
-                image_key = '%s.%s' % (target_key, image.name)
-                key = '%s.min_ready' % image_key
-                statsd.gauge(key, image.min_ready)
-                for provider in image.providers.values():
-                    provider_key = '%s.%s' % (image_key, provider.name)
+            for label in self.config.labels.values():
+                label_key = '%s.%s' % (target_key, label.name)
+                key = '%s.min_ready' % label_key
+                statsd.gauge(key, label.min_ready)
+                for provider in label.providers.values():
+                    provider_key = '%s.%s' % (label_key, provider.name)
                     for state in nodedb.STATE_NAMES.values():
                         base_state_key = '%s.%s' % (base_key, state)
                         provider_state_key = '%s.%s' % (provider_key, state)
@@ -1607,8 +1596,8 @@ class NodePool(threading.Thread):
                 continue
             state = nodedb.STATE_NAMES[node.state]
             target_key = '%s.%s' % (base_key, node.target_name)
-            image_key = '%s.%s' % (target_key, node.image_name)
-            provider_key = '%s.%s' % (image_key, node.provider_name)
+            label_key = '%s.%s' % (target_key, node.label_name)
+            provider_key = '%s.%s' % (label_key, node.provider_name)
 
             base_state_key = '%s.%s' % (base_key, state)
             provider_state_key = '%s.%s' % (provider_key, state)

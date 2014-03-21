@@ -12,6 +12,19 @@ zmq-publishers:
 gearman-servers:
   - host: localhost
 
+labels:
+  - name: nodepool-fake
+    image: nodepool-fake
+    min-ready: 2
+    providers:
+      - name: fake-provider
+  - name: multi-fake
+    image: nodepool-fake
+    subnodes: 2
+    min-ready: 2
+    providers:
+      - name: fake-provider
+
 providers:
   - name: fake-provider
     keypair: 'if-present-use-this-keypair'
@@ -42,12 +55,3 @@ targets:
       url: https://jenkins.example.org/
       user: fake
       apikey: fake
-    images:
-      - name: nodepool-fake
-        min-ready: 2
-        providers:
-          - name: fake-provider
-      - name: multi-fake
-        min-ready: 2
-        providers:
-          - name: fake-provider

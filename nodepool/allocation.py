@@ -27,19 +27,19 @@ The algorithm is:
   * Establish the node providers with their current available
     capacity.
   * Establish requests that are to be made of each provider for a
-    certain image.
-  * Indicate which providers can supply nodes of that image.
-  * Indicate to which targets nodes of a certain image from a certain
+    certain label.
+  * Indicate which providers can supply nodes of that label.
+  * Indicate to which targets nodes of a certain label from a certain
     provider may be distributed (and the weight that should be
     given to each target when distributing).
 
   Run:
 
-  * For each image, set the requested number of nodes from each
+  * For each label, set the requested number of nodes from each
     provider to be proportional to that providers overall capacity.
 
   * Define the 'priority' of a request as the number of requests for
-    the same image from other providers.
+    the same label from other providers.
 
   * For each provider, sort the requests by the priority.  This puts
     requests that can be serviced by the fewest providers first.
@@ -48,9 +48,9 @@ The algorithm is:
     the total amount requested by requests of the same priority.
 
   * The nodes allocated by a grant are then distributed to the targets
-    which are associated with the provider and image, in proportion to
+    which are associated with the provider and label, in proportion to
     that target's portion of the sum of the weights of each target for
-    that image.
+    that label.
 """
 
 
@@ -93,7 +93,7 @@ class AllocationProvider(object):
 
 
 class AllocationRequest(object):
-    """A request for a number of images."""
+    """A request for a number of labels."""
     def __init__(self, name, amount):
         self.name = name
         self.amount = float(amount)
@@ -101,15 +101,14 @@ class AllocationRequest(object):
         # request.  AllocationProvider -> AllocationSubRequest
         self.sub_requests = {}
         # Targets to which nodes from this request may be assigned.
-        # Mostly here to hold the min_ready for the image for this
-        # target.  AllocationTarget -> AllocationRequestTarget
+        # AllocationTarget -> AllocationRequestTarget
         self.request_targets = {}
 
     def __repr__(self):
         return '<AllocationRequest for %s of %s>' % (self.amount, self.name)
 
-    def addTarget(self, target, min_ready, current):
-        art = AllocationRequestTarget(self, target, min_ready, current)
+    def addTarget(self, target, current):
+        art = AllocationRequestTarget(self, target, current)
         self.request_targets[target] = art
 
     def addProvider(self, provider, target, subnodes):
@@ -204,14 +203,9 @@ class AllocationGrant(object):
             self.amount, self.request.name, self.provider.name)
 
     def makeAllocations(self):
-        # Allocate this grant to the linked targets using min_ready as
-        # a weight for the total number of nodes of this image that
-        # should be assigned to the target.  Calculate the total
-        # min_ready as well as the total number of nodes for this image.
-        total_min_ready = 0.0
+        # Allocate this grant to the linked targets.
         total_current = 0
         for agt in self.targets:
-            total_min_ready += agt.request_target.min_ready
             total_current += agt.request_target.current
         amount = self.amount
         # Add the nodes in this allocation to the total number of
@@ -219,15 +213,11 @@ class AllocationGrant(object):
         # allocations based on a portion of the total future nodes.
         total_current += amount
         for agt in self.targets:
-            # Calculate the weight from the config file (as indicated
-            # by min_ready)
-            if total_min_ready:
-                ratio = float(agt.request_target.min_ready) / total_min_ready
-            else:
-                ratio = 0.0
-            # Take the min_ready weight and apply it to the total
-            # number of nodes to this image to figure out how many of
-            # the total nodes should ideally be on this target.
+            # Evenly distribute the grants across all targets
+            ratio = 1.0 / len(self.targets)
+            # Take the weight and apply it to the total number of
+            # nodes to this image to figure out how many of the total
+            # nodes should ideally be on this target.
             desired_count = int(round(ratio * total_current))
             # The number of nodes off from our calculated target.
             delta = desired_count - agt.request_target.current
@@ -240,8 +230,6 @@ class AllocationGrant(object):
             # The next time through the loop, we have reduced our
             # grant by this amount.
             amount -= allocation
-            # Similarly we have reduced the total weight.
-            total_min_ready -= agt.request_target.min_ready
             # Don't consider this target's count in the total number
             # of nodes in the next iteration, nor the nodes we have
             # just allocated.
@@ -262,10 +250,9 @@ class AllocationTarget(object):
 
 class AllocationRequestTarget(object):
     """A request associated with a target to which nodes may be assigned."""
-    def __init__(self, request, target, min_ready, current):
+    def __init__(self, request, target, current):
         self.target = target
         self.request = request
-        self.min_ready = min_ready
         self.current = current
 
 

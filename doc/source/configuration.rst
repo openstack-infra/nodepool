@@ -6,9 +6,11 @@ Configuration
 Nodepool reads its configuration from ``/etc/nodepool/nodepool.yaml``
 by default.  The configuration file follows the standard YAML syntax
 with a number of sections defined with top level keys.  For example, a
-full configuration file may have the ``providers`` and ``targets``
-sections::
+full configuration file may have the ``labels``, ``providers``, and
+``targets`` sections::
 
+  labels:
+    ...
   providers:
     ...
   targets:
@@ -80,6 +82,42 @@ Example::
 
 The ``port`` key is optional.
 
+labels
+------
+
+Defines the types of nodes that should be created.  Maps node types to
+the images that are used to back them and the providers that are used
+to supply them.  Jobs should be written to run on nodes of a certain
+label (so targets such as Jenkins don't need to know about what
+providers or images are used to create them).  Example::
+
+  labels:
+    - name: my-precise
+      image: precise
+      min-ready: 2
+      providers:
+        - name: provider1
+        - name: provider2
+    - name: multi-precise
+      image: precise
+      subnodes: 2
+      min-ready: 2
+      providers:
+        - name: provider1
+
+The `name`, `image`, and `min-ready` keys are required.  The
+`providers` list is also required if any nodes should actually be
+created (e.g., the label is not currently disabled).
+
+The `subnodes` key is used to configure multi-node support.  If a
+`subnodes` key is supplied to an image, it indicates that the specified
+number of additional nodes of the same image type should be created
+and associated with each node for that image.  Only one node from each
+such group will be added to the target, the subnodes are expected to
+communicate directly with each other.  In the example above, for each
+Precise node added to the target system, two additional nodes will be
+created and associated with it.
+
 providers
 ---------
 
@@ -114,7 +152,6 @@ same name.  Example::
           reset: reset_node.sh
           username: jenkins
           private-key: /var/lib/jenkins/.ssh/id_rsa
-          subnodes: 2
     - name: provider2
       username: 'username'
       password: 'password'
@@ -141,23 +178,12 @@ and `private-key` values default to the values indicated.  Nodepool
 expects that user to exist after running the script indicated by
 `setup`.
 
-The `subnode` key is used to configure multi-node support.  If a
-`subnode` key is supplied to an image, it indicates that the specified
-number of additional nodes of the same image type should be created
-and associated with each node for that image.  Only one node from each
-such group will be added to the target, the subnodes are expected to
-communicate directly with each other.  In the example above, for each
-Quantal node added to the target system, two additional nodes will be
-created and associated with it.
-
 targets
 -------
 
 Lists the Jenkins masters to which Nodepool should attach nodes after
-they are created.  Within each target, the images that are used to
-create nodes for that target are listed (so different targets may
-receive nodes based on either the same or different images).
-Example::
+they are created.  Nodes of each label will be evenly distributed
+across all of the targets which are on-line.
 
   targets:
     - name: jenkins1
@@ -166,39 +192,15 @@ Example::
         user: username
         apikey: key
         credentials-id: id
-      images:
-        - name: precise
-          providers:
-            - name: provider1
-              min-ready: 2
-            - name: provider2
-              min-ready: 2
-        - name: quantal
-          providers:
-            - name: provider1
-              min-ready: 4
     - name: jenkins2
       jenkins:
         url: https://jenkins2.example.org/
         user: username
         apikey: key
         credentials-id: id
-      images:
-        - name: precise
-          min-ready: 4
-          providers:
-            - name: provider1
 
 For targets, the `name` is required.  If using Jenkins, the `url`,
 `user`, and `apikey` keys are required.  If the `credentials-id` key
 is provided, Nodepool will configure the Jenkins slave to use the
 Jenkins credential identified by that ID, otherwise it will use the
 username and ssh keys configured in the image.
-
-For images specified for a target, all indicated keys are required.
-The name of an image should refer to one of the images specified in
-the `provider` section.  Within the image section, a list of providers
-should be provided; this indicates which providers should be used to
-supply this image to this target.  The `min-ready` field indicates
-that Nodepool should try to keep that number of nodes of this image
-type ready on this target at all times.

@@ -93,7 +93,7 @@ class NodePoolCmd(object):
         logging.basicConfig(level=logging.INFO)
 
     def list(self, node_id=None):
-        t = PrettyTable(["ID", "Provider", "Image", "Target", "Hostname",
+        t = PrettyTable(["ID", "Provider", "Label", "Target", "Hostname",
                          "NodeName", "Server ID", "IP", "State",
                          "Age (hours)"])
         t.align = 'l'
@@ -102,7 +102,7 @@ class NodePoolCmd(object):
             for node in session.getNodes():
                 if node_id and node.id != node_id:
                     continue
-                t.add_row([node.id, node.provider_name, node.image_name,
+                t.add_row([node.id, node.provider_name, node.label_name,
                            node.target_name, node.hostname, node.nodename,
                            node.external_id, node.ip,
                            nodedb.STATE_NAMES[node.state],

@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-# Copyright (C) 2011-2013 OpenStack Foundation
+# Copyright (C) 2011-2014 OpenStack Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import time
 
 # States:
@@ -72,7 +69,7 @@ node_table = Table(
     'node', metadata,
     Column('id', Integer, primary_key=True),
     Column('provider_name', String(255), index=True, nullable=False),
-    Column('image_name', String(255), index=True, nullable=False),
+    Column('label_name', String(255), index=True, nullable=False),
     Column('target_name', String(255), index=True, nullable=False),
     # Machine name
     Column('hostname', String(255), index=True),
@@ -134,11 +131,11 @@ class SnapshotImage(object):
 
 
 class Node(object):
-    def __init__(self, provider_name, image_name, target_name,
+    def __init__(self, provider_name, label_name, target_name,
                  hostname=None, external_id=None, ip=None,
                  state=BUILDING):
         self.provider_name = provider_name
-        self.image_name = image_name
+        self.label_name = label_name
         self.target_name = target_name
         self.external_id = external_id
         self.ip = ip
@@ -169,7 +166,7 @@ class SubNode(object):
                  state=BUILDING):
         self.node_id = node.id
         self.provider_name = node.provider_name
-        self.image_name = node.image_name
+        self.label_name = node.label_name
         self.target_name = node.target_name
         self.external_id = external_id
         self.ip = ip
@@ -243,28 +240,6 @@ class NodeDatabaseSession(object):
         self.session().close()
         self.session = None
 
-    def print_state(self):
-        for provider_name in self.getProviders():
-            print 'Provider:', provider_name
-            for image_name in self.getImages(provider_name):
-                print '  Base image:', image_name
-                current = self.getCurrentSnapshotImage(
-                    provider_name, image_name)
-                for snapshot_image in self.getSnapshotImages():
-                    if (snapshot_image.provider_name != provider_name or
-                        snapshot_image.image_name != image_name):
-                        continue
-                    is_current = ('[current]' if current == snapshot_image
-                                  else '')
-                    print '    Snapshot: %s %s %s' % (
-                        snapshot_image.hostname,
-                        STATE_NAMES[snapshot_image.state],
-                        is_current)
-                for node in self.getNodes():
-                    print '  Node: %s %s %s %s %s' % (
-                        node.id, node.hostname, STATE_NAMES[node.state],
-                        node.state_time, node.ip)
-
     def abort(self):
         self.session().rollback()
 
@@ -327,15 +302,15 @@ class NodeDatabaseSession(object):
         self.commit()
         return new
 
-    def getNodes(self, provider_name=None, image_name=None, target_name=None,
+    def getNodes(self, provider_name=None, label_name=None, target_name=None,
                  state=None):
         exp = self.session().query(Node).order_by(
             node_table.c.provider_name,
-            node_table.c.image_name)
+            node_table.c.label_name)
         if provider_name:
             exp = exp.filter_by(provider_name=provider_name)
-        if image_name:
-            exp = exp.filter_by(image_name=image_name)
+        if label_name:
+            exp = exp.filter_by(label_name=label_name)
         if target_name:
             exp = exp.filter_by(target_name=target_name)
         if state:
@@ -385,8 +360,3 @@ class NodeDatabaseSession(object):
         if not nodes:
             return None
         return nodes[0]
-
-
-if __name__ == '__main__':
-    db = NodeDatabase(sys.argv[0])
-    db.print_state()
