@@ -74,8 +74,8 @@ class AllocationProvider(object):
         reqs.sort(lambda a, b: cmp(a.getPriority(), b.getPriority()))
         for req in reqs:
             total_requested = 0.0
-            # Within a specific priority, grant requests
-            # proportionally.
+            # Within a specific priority, limit the number of
+            # available nodes to a value proportionate to the request.
             reqs_at_this_level = [r for r in reqs
                                   if r.getPriority() == req.getPriority()]
             for r in reqs_at_this_level:
@@ -84,8 +84,8 @@ class AllocationProvider(object):
                 ratio = float(req.amount) / total_requested
             else:
                 ratio = 0.0
-            grant = int(round(req.amount * ratio))
-            grant = min(grant, self.available)
+            grant = int(round(req.amount))
+            grant = min(grant, int(round(self.available * ratio)))
             # This adjusts our availability as well as the values of
             # other requests, so values will be correct the next time
             # through the loop.
