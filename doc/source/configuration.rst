@@ -206,7 +206,7 @@ targets
 
 Lists the Jenkins masters to which Nodepool should attach nodes after
 they are created.  Nodes of each label will be evenly distributed
-across all of the targets which are on-line.
+across all of the targets which are on-line::
 
   targets:
     - name: jenkins1
