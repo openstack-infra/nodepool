@@ -15,7 +15,10 @@
 
 """Common utilities used in testing"""
 
+import MySQLdb
 import os
+import random
+import string
 
 import fixtures
 import testresources
@@ -60,3 +63,42 @@ class AllocatorTestCase(BaseTestCase):
             print self.agt[i]
         for i, amount in enumerate(self.results):
             self.assertEqual(self.agt[i].amount, amount)
+
+
+class MySQLSchemaFixture(fixtures.Fixture):
+    def setUp(self):
+        super(MySQLSchemaFixture, self).setUp()
+
+        random_bits = ''.join(random.choice(string.ascii_lowercase +
+                                            string.ascii_uppercase)
+                              for x in range(8))
+        self.name = '%s_%s' % (random_bits, os.getpid())
+        db = MySQLdb.connect(host="localhost",
+                             user="openstack_citest",
+                             passwd="openstack_citest",
+                             db="openstack_citest")
+        cur = db.cursor()
+        cur.execute("create database %s" % self.name)
+        cur.execute("grant all on %s.* to '%s'@'localhost'" %
+                    (self.name, self.name))
+        cur.execute("flush privileges")
+
+        self.dburi = 'mysql://%s@localhost/%s' % (self.name, self.name)
+        self.addDetail('dburi', testtools.content.text_content(self.dburi))
+        self.addCleanup(self.cleanup)
+
+    def cleanup(self):
+        db = MySQLdb.connect(host="localhost",
+                             user="openstack_citest",
+                             passwd="openstack_citest",
+                             db="openstack_citest")
+        cur = db.cursor()
+        cur.execute("drop database %s" % self.name)
+
+
+class DBTestCase(BaseTestCase):
+    def setUp(self):
+        super(DBTestCase, self).setUp()
+        f = MySQLSchemaFixture()
+        self.useFixture(f)
+        self.dburi = f.dburi
