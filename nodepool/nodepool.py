@@ -137,6 +137,7 @@ class NodeUpdateListener(threading.Thread):
         threading.Thread.__init__(self, name='NodeUpdateListener')
         self.nodepool = nodepool
         self.socket = self.nodepool.zmq_context.socket(zmq.SUB)
+        self.socket.RCVTIMEO = 1000
         event_filter = b""
         self.socket.setsockopt(zmq.SUBSCRIBE, event_filter)
         self.socket.connect(addr)
@@ -144,12 +145,18 @@ class NodeUpdateListener(threading.Thread):
 
     def run(self):
         while not self._stopped:
-            m = self.socket.recv().decode('utf-8')
+            try:
+                m = self.socket.recv().decode('utf-8')
+            except zmq.error.Again:
+                continue
             try:
                 topic, data = m.split(None, 1)
                 self.handleEvent(topic, data)
             except Exception:
                 self.log.exception("Exception handling job:")
+
+    def stop(self):
+        self._stopped = True
 
     def handleEvent(self, topic, data):
         self.log.debug("Received: %s %s" % (topic, data))
@@ -842,6 +849,10 @@ class NodePool(threading.Thread):
 
     def stop(self):
         self._stopped = True
+        if self.config:
+            for z in self.config.zmq_publishers.values():
+                z.listener.stop()
+                z.listener.join()
         if self.zmq_context:
             self.zmq_context.destroy()
         if self.apsched:

@@ -15,6 +15,7 @@
 
 """Common utilities used in testing"""
 
+import logging
 import MySQLdb
 import os
 import random
@@ -31,7 +32,7 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
 
     def setUp(self):
         super(BaseTestCase, self).setUp()
-        test_timeout = os.environ.get('OS_TEST_TIMEOUT', 30)
+        test_timeout = os.environ.get('OS_TEST_TIMEOUT', 60)
         try:
             test_timeout = int(test_timeout)
         except ValueError:
@@ -49,7 +50,7 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
             stderr = self.useFixture(fixtures.StringStream('stderr')).stream
             self.useFixture(fixtures.MonkeyPatch('sys.stderr', stderr))
 
-        self.useFixture(fixtures.FakeLogger())
+        self.useFixture(fixtures.FakeLogger(level=logging.DEBUG))
         self.useFixture(fixtures.NestedTempfile())
 
 
