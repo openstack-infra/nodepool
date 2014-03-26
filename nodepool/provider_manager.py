@@ -342,8 +342,9 @@ class ProviderManager(TaskManager):
     def _waitForResource(self, resource_type, resource_id, timeout):
         last_status = None
         for count in iterate_timeout(timeout,
-                                     "waiting for %s %s" % (resource_type,
-                                                            resource_id)):
+                                     "%s %s in %s" % (resource_type,
+                                                      resource_id,
+                                                      self.provider.name)):
             try:
                 if resource_type == 'server':
                     resource = self.getServerFromList(resource_id)
@@ -381,7 +382,8 @@ class ProviderManager(TaskManager):
     def addPublicIP(self, server_id, pool=None):
         ip = self.createFloatingIP(pool)
         self.addFloatingIP(server_id, ip['ip'])
-        for count in iterate_timeout(600, "ip to be added"):
+        for count in iterate_timeout(600, "ip to be added to %s in %s" %
+                                     (server_id, self.provider.name)):
             try:
                 newip = self.getFloatingIP(ip['id'])
             except Exception:
@@ -455,8 +457,8 @@ class ProviderManager(TaskManager):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
-        for count in iterate_timeout(600, "waiting for server %s deletion" %
-                                     server_id):
+        for count in iterate_timeout(600, "server %s deletion in %s" %
+                                     (server_id, self.provider.name)):
             try:
                 self.getServerFromList(server_id)
             except NotFound:
