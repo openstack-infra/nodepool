@@ -255,7 +255,7 @@ class NodeDatabaseSession(object):
             snapshot_image_table.c.provider_name == provider_name,
             snapshot_image_table.c.image_name == image_name,
             snapshot_image_table.c.state == READY).order_by(
-            snapshot_image_table.c.version.desc()).all()
+                snapshot_image_table.c.version.desc()).all()
         return images
 
     def getCurrentSnapshotImage(self, provider_name, image_name):
