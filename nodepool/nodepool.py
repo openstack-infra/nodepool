@@ -836,9 +836,10 @@ class GearmanServer(ConfigValue):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    def __init__(self, configfile):
+    def __init__(self, configfile, watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.configfile = configfile
+        self.watermark_sleep = watermark_sleep
         self._stopped = False
         self.config = None
         self.zmq_context = None
@@ -1275,7 +1276,7 @@ class NodePool(threading.Thread):
                     self._run(session)
             except Exception:
                 self.log.exception("Exception in main loop:")
-            time.sleep(WATERMARK_SLEEP)
+            time.sleep(self.watermark_sleep)
 
     def _run(self, session):
         self.checkForMissingImages(session)

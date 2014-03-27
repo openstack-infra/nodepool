@@ -15,7 +15,14 @@ gearman-servers:
 labels:
   - name: fake-label
     image: fake-image
-    min-ready: 1
+    min-ready: 2
+    providers:
+      - name: fake-provider
+  - name: multi-fake
+    image: fake-image
+    ready-script: multinode_setup.sh
+    subnodes: 2
+    min-ready: 2
     providers:
       - name: fake-provider
 
