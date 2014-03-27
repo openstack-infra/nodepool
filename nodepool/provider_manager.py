@@ -363,7 +363,7 @@ class ProviderManager(TaskManager):
                 self.log.debug('Status of %s %s: %s' %
                                (resource_type, resource_id, status))
             last_status = status
-            if status == 'ACTIVE':
+            if status in ['ACTIVE', 'ERROR']:
                 return resource
 
     def waitForServer(self, server_id, timeout=3600):
