@@ -486,12 +486,13 @@ class SubNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.SubNodeLauncher")
 
     def __init__(self, nodepool, provider, label, subnode_id,
-                 node_id, timeout):
+                 node_id, node_target_name, timeout):
         threading.Thread.__init__(self, name='SubNodeLauncher for %s'
                                   % subnode_id)
         self.provider = provider
         self.label = label
         self.image = provider.images[label.image]
+        self.node_target_name = node_target_name
         self.subnode_id = subnode_id
         self.node_id = node_id
         self.timeout = timeout
@@ -585,7 +586,7 @@ class SubNodeLauncher(threading.Thread):
             dt = int((time.time() - start_time) * 1000)
             key = 'nodepool.launch.%s.%s.%s' % (self.image.name,
                                                 self.provider.name,
-                                                self.target.name)
+                                                self.node_target_name)
             statsd.timing(key, dt)
             statsd.incr(key)
 
@@ -1390,7 +1391,7 @@ class NodePool(threading.Thread):
         timeout = provider.boot_timeout
         subnode = session.createSubNode(node)
         t = SubNodeLauncher(self, provider, label, subnode.id,
-                            node.id, timeout)
+                            node.id, node.target_name, timeout)
         t.start()
 
     def deleteSubNode(self, subnode, manager):
