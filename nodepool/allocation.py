@@ -212,9 +212,10 @@ class AllocationGrant(object):
         # nodes for this image so that we're setting our target
         # allocations based on a portion of the total future nodes.
         total_current += amount
+        remaining_targets = len(self.targets)
         for agt in self.targets:
             # Evenly distribute the grants across all targets
-            ratio = 1.0 / len(self.targets)
+            ratio = 1.0 / remaining_targets
             # Take the weight and apply it to the total number of
             # nodes to this image to figure out how many of the total
             # nodes should ideally be on this target.
@@ -235,6 +236,10 @@ class AllocationGrant(object):
             # just allocated.
             total_current -= agt.request_target.current
             total_current -= allocation
+            # Since we aren't considering this target's count, also
+            # don't consider this target itself when calculating the
+            # ratio.
+            remaining_targets -= 1
             # Set the amount of this allocation.
             agt.allocate(allocation)
 
