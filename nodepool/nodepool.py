@@ -116,7 +116,7 @@ class NodeCompleteThread(threading.Thread):
             statsd.incr(key + '.builds')
 
             # nodepool.job.tempest.master.devstack-precise
-            key += '.%s' % node.image_name
+            key += '.%s' % node.label_name
             statsd.timing(key + '.runtime', dt)
             statsd.incr(key + '.builds')
 
