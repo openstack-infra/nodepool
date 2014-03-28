@@ -1079,7 +1079,7 @@ class NodePool(threading.Thread):
         # Actual need is demand - (ready + building)
         for image_name in total_image_min_ready:
             start_demand = image_demand.get(image_name, 0)
-            min_demand = max(start_demand, total_image_min_ready[image_name])
+            min_demand = start_demand + total_image_min_ready[image_name]
             n_ready = count_nodes(image_name, nodedb.READY)
             n_building = count_nodes(image_name, nodedb.BUILDING)
             n_test = count_nodes(image_name, nodedb.TEST)
