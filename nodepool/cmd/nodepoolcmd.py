@@ -129,7 +129,7 @@ class NodePoolCmd(object):
         image = provider.images[self.args.image]
 
         with self.pool.getDB().getSession() as session:
-            self.pool.updateImage(session, provider, image)
+            self.pool.updateImage(session, provider.name, image.name)
 
     def alien_list(self):
         self.pool.reconfigureManagers(self.pool.config)
