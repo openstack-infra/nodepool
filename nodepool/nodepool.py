@@ -443,26 +443,36 @@ class NodeLauncher(threading.Thread):
                                      timeout=self.timeout)
             if not host:
                 raise Exception("Unable to log in via SSH")
-            ftp = host.client.open_sftp()
 
-            f = ftp.open('/etc/nodepool/role', 'w')
-            f.write(role + '\n')
-            f.close()
-            f = ftp.open('/etc/nodepool/primary_node', 'w')
-            f.write(self.node.ip + '\n')
-            f.close()
-            f = ftp.open('/etc/nodepool/sub_nodes', 'w')
-            for subnode in self.node.subnodes:
-                f.write(subnode.ip + '\n')
-            f.close()
-            f = ftp.open('/etc/nodepool/id_rsa', 'w')
-            key.write_private_key(f)
-            f.close()
-            f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
-            f.write(public_key)
-            f.close()
+            # TODO(jeblair): Remove 'try' once we have updated images
+            # everywhere; this is just to help with the transition
+            # from images without /etc/nodepool to ones with.
+            try:
+                host.ssh("test for config dir", "ls /etc/nodepool")
 
-            ftp.close()
+                ftp = host.client.open_sftp()
+
+                f = ftp.open('/etc/nodepool/role', 'w')
+                f.write(role + '\n')
+                f.close()
+                f = ftp.open('/etc/nodepool/primary_node', 'w')
+                f.write(self.node.ip + '\n')
+                f.close()
+                f = ftp.open('/etc/nodepool/sub_nodes', 'w')
+                for subnode in self.node.subnodes:
+                    f.write(subnode.ip + '\n')
+                f.close()
+                f = ftp.open('/etc/nodepool/id_rsa', 'w')
+                key.write_private_key(f)
+                f.close()
+                f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
+                f.write(public_key)
+                f.close()
+
+                ftp.close()
+            except Exception:
+                self.log.info("/etc/nodepool does not exist on node id: %s"
+                              % self.node.id)
 
     def runReadyScript(self, nodelist):
         for role, n in nodelist:
