@@ -9,8 +9,8 @@ cron:
 zmq-publishers:
   - tcp://localhost:8881
 
-gearman-servers:
-  - host: localhost
+#gearman-servers:
+#  - host: localhost
 
 labels:
   - name: fake-label
