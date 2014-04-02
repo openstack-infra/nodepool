@@ -1003,7 +1003,9 @@ class NodePool(threading.Thread):
                     p.max_servers != oldmanager.provider.max_servers or
                     p.pool != oldmanager.provider.pool or
                     p.rate != oldmanager.provider.rate or
-                    p.boot_timeout != oldmanager.provider.boot_timeout):
+                    p.boot_timeout != oldmanager.provider.boot_timeout or
+                    p.use_neutron != oldmanager.provider.use_neutron or
+                    p.nics != oldmanager.provider.nics):
                     stop_managers.append(oldmanager)
                     oldmanager = None
             if oldmanager:
