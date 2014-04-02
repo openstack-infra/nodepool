@@ -389,7 +389,14 @@ class ProviderManager(TaskManager):
 
     def addPublicIP(self, server_id, pool=None):
         ip = self.createFloatingIP(pool)
-        self.addFloatingIP(server_id, ip['ip'])
+        try:
+            self.addFloatingIP(server_id, ip['ip'])
+        except novaclient.exceptions.ClientException:
+            # Delete the floating IP here as cleanupServer will not
+            # have access to the ip -> server mapping preventing it
+            # from removing this IP.
+            self.deleteFloatingIP(ip['id'])
+            raise
         for count in iterate_timeout(600, "ip to be added to %s in %s" %
                                      (server_id, self.provider.name)):
             try:
