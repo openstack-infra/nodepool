@@ -280,7 +280,8 @@ class NodeDeleter(threading.Thread):
 class NodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
-    def __init__(self, nodepool, provider, label, target, node_id, timeout):
+    def __init__(self, nodepool, provider, label, target, node_id, timeout,
+                 launch_timeout):
         threading.Thread.__init__(self, name='NodeLauncher for %s' % node_id)
         self.provider = provider
         self.label = label
@@ -289,6 +290,7 @@ class NodeLauncher(threading.Thread):
         self.node_id = node_id
         self.timeout = timeout
         self.nodepool = nodepool
+        self.launch_timeout = launch_timeout
 
     def run(self):
         try:
@@ -345,7 +347,7 @@ class NodeLauncher(threading.Thread):
 
         self.log.debug("Waiting for server %s for node id: %s" %
                        (server_id, self.node.id))
-        server = self.manager.waitForServer(server_id)
+        server = self.manager.waitForServer(server_id, self.launch_timeout)
         if server['status'] != 'ACTIVE':
             raise Exception("Server %s for node id: %s status: %s" %
                             (server_id, self.node.id, server['status']))
@@ -496,7 +498,7 @@ class SubNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.SubNodeLauncher")
 
     def __init__(self, nodepool, provider, label, subnode_id,
-                 node_id, node_target_name, timeout):
+                 node_id, node_target_name, timeout, launch_timeout):
         threading.Thread.__init__(self, name='SubNodeLauncher for %s'
                                   % subnode_id)
         self.provider = provider
@@ -507,6 +509,7 @@ class SubNodeLauncher(threading.Thread):
         self.node_id = node_id
         self.timeout = timeout
         self.nodepool = nodepool
+        self.launch_timeout = launch_timeout
 
     def run(self):
         try:
@@ -568,7 +571,7 @@ class SubNodeLauncher(threading.Thread):
         self.log.debug("Waiting for server %s for subnode id: %s for "
                        "node id: %s" %
                        (server_id, self.subnode_id, self.node_id))
-        server = self.manager.waitForServer(server_id)
+        server = self.manager.waitForServer(server_id, self.launch_timeout)
         if server['status'] != 'ACTIVE':
             raise Exception("Server %s for subnode id: %s for node id: %s "
                             "status: %s" %
@@ -942,6 +945,7 @@ class NodePool(threading.Thread):
             p.pool = provider.get('pool')
             p.rate = provider.get('rate', 1.0)
             p.boot_timeout = provider.get('boot-timeout', 60)
+            p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
             p.nics = provider.get('networks')
             p.images = {}
@@ -1003,6 +1007,7 @@ class NodePool(threading.Thread):
                     p.pool != oldmanager.provider.pool or
                     p.rate != oldmanager.provider.rate or
                     p.boot_timeout != oldmanager.provider.boot_timeout or
+                    p.launch_timeout != oldmanager.provider.launch_timeout or
                     p.use_neutron != oldmanager.provider.use_neutron or
                     p.nics != oldmanager.provider.nics):
                     stop_managers.append(oldmanager)
@@ -1385,8 +1390,10 @@ class NodePool(threading.Thread):
     def _launchNode(self, session, provider, label, target):
         provider = self.config.providers[provider.name]
         timeout = provider.boot_timeout
+        launch_timeout = provider.launch_timeout
         node = session.createNode(provider.name, label.name, target.name)
-        t = NodeLauncher(self, provider, label, target, node.id, timeout)
+        t = NodeLauncher(self, provider, label, target, node.id, timeout,
+                         launch_timeout)
         t.start()
 
     def launchSubNode(self, session, node):
@@ -1400,9 +1407,10 @@ class NodePool(threading.Thread):
         provider = self.config.providers[node.provider_name]
         label = self.config.labels[node.label_name]
         timeout = provider.boot_timeout
+        launch_timeout = provider.launch_timeout
         subnode = session.createSubNode(node)
         t = SubNodeLauncher(self, provider, label, subnode.id,
-                            node.id, node.target_name, timeout)
+                            node.id, node.target_name, timeout, launch_timeout)
         t.start()
 
     def deleteSubNode(self, subnode, manager):

@@ -160,6 +160,8 @@ same name.  Example::
       region-name: 'region1'
       max-servers: 96
       rate: 1.0
+      boot-timeout: 120
+      launch-timeout: 900
       images:
         - name: precise
           base-image: 'Precise'
@@ -200,6 +202,10 @@ For providers, the `name`, `username`, `password`, `auth-url`,
 and `private-key` values default to the values indicated.  Nodepool
 expects that user to exist after running the script indicated by
 `setup`.
+
+Both `boot-timeout` and `launch-timeout` keys are optional.  The
+`boot-timeout` key defaults to 60 seconds and `launch-timeout` key
+will default to 3600 seconds.
 
 targets
 -------
