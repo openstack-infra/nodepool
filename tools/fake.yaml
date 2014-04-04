@@ -4,7 +4,7 @@ dburi: 'mysql://nodepool@localhost/nodepool'
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  update-image: '14 2 * * *'
+  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881
