@@ -95,6 +95,8 @@ providers or images are used to create them).  Example::
     - name: my-precise
       image: precise
       min-ready: 2
+      hostname: '{label.name}-{provider.name}-{node_id}.slave.openstack.org'
+      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}.slave.openstack.org'
       providers:
         - name: provider1
         - name: provider2
@@ -102,6 +104,8 @@ providers or images are used to create them).  Example::
       image: precise
       subnodes: 2
       min-ready: 2
+      hostname: '{label.name}-{provider.name}-{node_id}'
+      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}'
       ready-script: setup_multinode.sh
       providers:
         - name: provider1
@@ -148,6 +152,7 @@ same name.  Example::
         - az1
       boot-timeout: 120
       launch-timeout: 900
+      template-hostname: '{image.name}-{timestamp}.template.openstack.org'
       images:
         - name: precise
           base-image: 'Precise'
@@ -173,6 +178,7 @@ same name.  Example::
       region-name: 'region1'
       max-servers: 96
       rate: 1.0
+      template-hostname: '{image.name}-{timestamp}-nodepool-template'
       images:
         - name: precise
           base-image: 'Fake Precise'
