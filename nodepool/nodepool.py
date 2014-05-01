@@ -51,6 +51,22 @@ DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
                              # its job.
 
 
+class LaunchNodepoolException(Exception):
+    statsd_key = 'error.nodepool'
+
+
+class LaunchStatusException(Exception):
+    statsd_key = 'error.status'
+
+
+class LaunchNetworkException(Exception):
+    statsd_key = 'error.network'
+
+
+class LaunchAuthException(Exception):
+    statsd_key = 'error.auth'
+
+
 class NodeCompleteThread(threading.Thread):
     log = logging.getLogger("nodepool.NodeCompleteThread")
 
@@ -308,16 +324,35 @@ class NodeLauncher(threading.Thread):
                 return
 
             try:
-                self.launchNode(session)
+                start_time = time.time()
+                dt = self.launchNode(session)
+                failed = False
+                statsd_key = 'ready'
+            except Exception, e:
+                self.log.exception("%s launching node id: %s "
+                                   "in provider: %s error:" %
+                                   (e.__class__.__name__,
+                                    self.node_id, self.provider.name))
+                dt = int((time.time() - start_time) * 1000)
+                failed = True
+                if hasattr(e, 'statsd_key'):
+                    statsd_key = e.statsd_key
+                else:
+                    statsd_key = 'error.unknown'
+
+            try:
+                self.nodepool.launchStats(statsd_key, dt, self.image.name,
+                                          self.provider.name,
+                                          self.node_target_name)
             except Exception:
-                self.log.exception("Exception launching node id: %s:" %
-                                   self.node_id)
+                self.log.exception("Exception reporting launch stats:")
+
+            if failed:
                 try:
                     self.nodepool.deleteNode(self.node_id)
                 except Exception:
                     self.log.exception("Exception deleting node id: %s:" %
                                        self.node_id)
-                    return
 
     def launchNode(self, session):
         start_time = time.time()
@@ -331,8 +366,10 @@ class NodeLauncher(threading.Thread):
         snap_image = session.getCurrentSnapshotImage(
             self.provider.name, self.image.name)
         if not snap_image:
-            raise Exception("Unable to find current snapshot image %s in %s" %
-                            (self.image.name, self.provider.name))
+            raise LaunchNodepoolException("Unable to find current snapshot "
+                                          "image %s in %s" %
+                                          (self.image.name,
+                                           self.provider.name))
 
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for node id: %s" % (hostname, self.provider.name,
@@ -347,15 +384,17 @@ class NodeLauncher(threading.Thread):
                        (server_id, self.node.id))
         server = self.manager.waitForServer(server_id)
         if server['status'] != 'ACTIVE':
-            raise Exception("Server %s for node id: %s status: %s" %
-                            (server_id, self.node.id, server['status']))
+            raise LaunchStatusException("Server %s for node id: %s "
+                                        "status: %s" %
+                                        (server_id, self.node.id,
+                                         server['status']))
 
         ip = server.get('public_v4')
         if not ip and self.manager.hasExtension('os-floating-ips'):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
         if not ip:
-            raise Exception("Unable to find public IP of server")
+            raise LaunchNetworkException("Unable to find public IP of server")
 
         self.node.ip = ip
         self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
@@ -364,15 +403,10 @@ class NodeLauncher(threading.Thread):
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
                                  timeout=self.timeout):
-            raise Exception("Unable to connect via ssh")
+            raise LaunchAuthException("Unable to connect via ssh")
 
-        if statsd:
-            dt = int((time.time() - start_time) * 1000)
-            key = 'nodepool.launch.%s.%s.%s' % (self.image.name,
-                                                self.provider.name,
-                                                self.target.name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+        # Save the elapsed time for statsd
+        dt = int((time.time() - start_time) * 1000)
 
         if self.label.subnodes:
             self.log.info("Node id: %s is waiting on subnodes" % self.node.id)
@@ -409,6 +443,8 @@ class NodeLauncher(threading.Thread):
             self.log.debug("Adding node id: %s to jenkins" % self.node.id)
             self.createJenkinsNode()
             self.log.info("Node id: %s added to jenkins" % self.node.id)
+
+        return dt
 
     def createJenkinsNode(self):
         jenkins = self.nodepool.getJenkinsManager(self.target)
@@ -528,11 +564,29 @@ class SubNodeLauncher(threading.Thread):
                 return
 
             try:
-                self.launchSubNode(session)
+                start_time = time.time()
+                dt = self.launchSubNode(session)
+                failed = False
+                statsd_key = 'ready'
+            except Exception, e:
+                self.log.exception("%s launching subnode id: %s "
+                                   "for node id: %s in provider: %s error:" %
+                                   (e.__class__.__name__, self.subnode_id,
+                                    self.node_id, self.provider.name))
+                dt = int((time.time() - start_time) * 1000)
+                failed = True
+                if hasattr(e, 'statsd_key'):
+                    statsd_key = e.statsd_key
+                else:
+                    statsd_key = 'error.unknown'
+
+            try:
+                self.nodepool.launchStats(statsd_key, dt, self.image.name,
+                                          self.provider.name, self.target.name)
             except Exception:
-                self.log.exception("Exception launching subnode id: %s for "
-                                   "node id: %s:" %
-                                   (self.subnode_id, self.node_id))
+                self.log.exception("Exception reporting launch stats:")
+
+            if failed:
                 try:
                     self.nodepool.deleteSubNode(self.subnode, self.manager)
                 except Exception:
@@ -552,8 +606,10 @@ class SubNodeLauncher(threading.Thread):
         snap_image = session.getCurrentSnapshotImage(
             self.provider.name, self.image.name)
         if not snap_image:
-            raise Exception("Unable to find current snapshot image %s in %s" %
-                            (self.image.name, self.provider.name))
+            raise LaunchNodepoolException("Unable to find current snapshot "
+                                          "image %s in %s" %
+                                          (self.image.name,
+                                           self.provider.name))
 
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for subnode id: %s for node id: %s"
@@ -570,17 +626,18 @@ class SubNodeLauncher(threading.Thread):
                        (server_id, self.subnode_id, self.node_id))
         server = self.manager.waitForServer(server_id)
         if server['status'] != 'ACTIVE':
-            raise Exception("Server %s for subnode id: %s for node id: %s "
-                            "status: %s" %
-                            (server_id, self.subnode_id, self.node_id,
-                             server['status']))
+            raise LaunchStatusException("Server %s for subnode id: "
+                                        "%s for node id: %s "
+                                        "status: %s" %
+                                        (server_id, self.subnode_id,
+                                         self.node_id, server['status']))
 
         ip = server.get('public_v4')
         if not ip and self.manager.hasExtension('os-floating-ips'):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
         if not ip:
-            raise Exception("Unable to find public IP of server")
+            raise LaunchNetworkException("Unable to find public IP of server")
 
         self.subnode.ip = ip
         self.log.debug("Subnode id: %s for node id: %s is running, ip: %s, "
@@ -590,20 +647,17 @@ class SubNodeLauncher(threading.Thread):
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
                                  timeout=self.timeout):
-            raise Exception("Unable to connect via ssh")
+            raise LaunchAuthException("Unable to connect via ssh")
 
-        if statsd:
-            dt = int((time.time() - start_time) * 1000)
-            key = 'nodepool.launch.%s.%s.%s' % (self.image.name,
-                                                self.provider.name,
-                                                self.node_target_name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+        # Save the elapsed time for statsd
+        dt = int((time.time() - start_time) * 1000)
 
         self.subnode.state = nodedb.READY
         self.log.info("Subnode id: %s for node id: %s is ready"
                       % (self.subnode_id, self.node_id))
         self.nodepool.updateStats(session, self.provider.name)
+
+        return dt
 
 
 class ImageUpdater(threading.Thread):
@@ -1703,3 +1757,19 @@ class NodePool(threading.Thread):
         for provider in self.config.providers.values():
             key = 'nodepool.provider.%s.max_servers' % provider.name
             statsd.gauge(key, provider.max_servers)
+
+    def launchStats(self, subkey, dt, image_name, provider_name, target_name):
+        if not statsd:
+            return
+        #nodepool.launch.provider.PROVIDER.subkey
+        #nodepool.launch.image.IMAGE.subkey
+        #nodepool.launch.target.TARGET.subkey
+        #nodepool.launch.subkey
+        for key in [
+            'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
+            'nodepool.launch.image.%s.%s' % (image_name, subkey),
+            'nodepool.launch.target.%s.%s' % (target_name, subkey),
+            'nodepool.launch.%s' % (subkey,),
+            ]:
+            statsd.timing(key, dt)
+            statsd.incr(key)
