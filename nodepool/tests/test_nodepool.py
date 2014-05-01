@@ -55,12 +55,19 @@ class TestNodepool(tests.DBTestCase):
                 return
             time.sleep(0.1)
 
+    def wait_for_config(self, pool):
+        for x in range(300):
+            if pool.config is not None:
+                return
+            time.sleep(0.1)
+
     def test_db(self):
         db = nodedb.NodeDatabase(self.dburi)
         with db.getSession() as session:
             session.getNodes()
 
     def waitForNodes(self, pool):
+        self.wait_for_config(pool)
         while True:
             self.wait_for_threads()
             with pool.getDB().getSession() as session:
