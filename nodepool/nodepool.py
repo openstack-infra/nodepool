@@ -345,7 +345,7 @@ class NodeLauncher(threading.Thread):
             try:
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
                                           self.provider.name,
-                                          self.node_target_name)
+                                          self.target.name)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
@@ -585,7 +585,8 @@ class SubNodeLauncher(threading.Thread):
 
             try:
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
-                                          self.provider.name, self.target.name)
+                                          self.provider.name,
+                                          self.node_target_name)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
