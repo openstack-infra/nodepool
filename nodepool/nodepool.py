@@ -975,7 +975,7 @@ class NodePool(threading.Thread):
             l.name = label['name']
             newconfig.labels[l.name] = l
             l.image = label['image']
-            l.min_ready = label['min-ready']
+            l.min_ready = label.get('min-ready', 2)
             l.subnodes = label.get('subnodes', 0)
             l.ready_script = label.get('ready-script')
             l.providers = {}
@@ -1386,7 +1386,8 @@ class NodePool(threading.Thread):
         # outside of its schedule.
         self.log.debug("Checking missing images.")
         for label in self.config.labels.values():
-            if not label.min_ready:
+            if label.min_ready < 0:
+                # Label is configured to be disabled, skip creating the image.
                 continue
             for provider_name in label.providers:
                 found = False
