@@ -1045,28 +1045,48 @@ class NodePool(threading.Thread):
         else:
             config.db = self.config.db
 
+    def _managersEquiv(self, new_pm, old_pm):
+        # Check if provider details have changed
+        if (new_pm.username != old_pm.provider.username or
+            new_pm.password != old_pm.provider.password or
+            new_pm.project_id != old_pm.provider.project_id or
+            new_pm.auth_url != old_pm.provider.auth_url or
+            new_pm.service_type != old_pm.provider.service_type or
+            new_pm.service_name != old_pm.provider.service_name or
+            new_pm.max_servers != old_pm.provider.max_servers or
+            new_pm.pool != old_pm.provider.pool or
+            new_pm.rate != old_pm.provider.rate or
+            new_pm.boot_timeout != old_pm.provider.boot_timeout or
+            new_pm.launch_timeout != old_pm.provider.launch_timeout or
+            new_pm.use_neutron != old_pm.provider.use_neutron or
+            new_pm.nics != old_pm.provider.nics):
+            return False
+        new_images = new_pm.images
+        old_images = old_pm.provider.images
+        # Check if new images have been added
+        if set(new_images.keys()) != set(old_images.keys()):
+            return False
+        # check if existing images have been updated
+        for k in new_images:
+            if (new_images[k].base_image != old_images[k].base_image or
+                new_images[k].min_ram != old_images[k].min_ram or
+                new_images[k].name_filter != old_images[k].name_filter or
+                new_images[k].setup != old_images[k].setup or
+                new_images[k].reset != old_images[k].reset or
+                new_images[k].username != old_images[k].username or
+                new_images[k].private_key != old_images[k].private_key):
+                return False
+        return True
+
     def reconfigureManagers(self, config):
         stop_managers = []
         for p in config.providers.values():
             oldmanager = None
             if self.config:
                 oldmanager = self.config.provider_managers.get(p.name)
-            if oldmanager:
-                if (p.username != oldmanager.provider.username or
-                    p.password != oldmanager.provider.password or
-                    p.project_id != oldmanager.provider.project_id or
-                    p.auth_url != oldmanager.provider.auth_url or
-                    p.service_type != oldmanager.provider.service_type or
-                    p.service_name != oldmanager.provider.service_name or
-                    p.max_servers != oldmanager.provider.max_servers or
-                    p.pool != oldmanager.provider.pool or
-                    p.rate != oldmanager.provider.rate or
-                    p.boot_timeout != oldmanager.provider.boot_timeout or
-                    p.launch_timeout != oldmanager.provider.launch_timeout or
-                    p.use_neutron != oldmanager.provider.use_neutron or
-                    p.nics != oldmanager.provider.nics):
-                    stop_managers.append(oldmanager)
-                    oldmanager = None
+            if oldmanager and not self._managersEquiv(p, oldmanager):
+                stop_managers.append(oldmanager)
+                oldmanager = None
             if oldmanager:
                 config.provider_managers[p.name] = oldmanager
             else:
