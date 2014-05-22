@@ -86,5 +86,7 @@ class TaskManager(threading.Thread):
             self.queue.task_done()
 
     def submitTask(self, task):
+        if not self._running:
+            raise Exception("Manager %s is no longer running" % self.name)
         self.queue.put(task)
         return task.wait()

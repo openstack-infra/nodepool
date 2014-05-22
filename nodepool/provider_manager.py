@@ -276,10 +276,6 @@ class ProviderManager(TaskManager):
             return True
         return False
 
-    def submitTask(self, task):
-        self.queue.put(task)
-        return task.wait()
-
     def findFlavor(self, min_ram, name_filter=None):
         # Note: this will throw an error if the provider is offline
         # but all the callers are in threads (they call in via CreateServer) so
