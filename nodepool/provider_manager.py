@@ -310,14 +310,16 @@ class ProviderManager(TaskManager):
     def deleteKeypair(self, name):
         return self.submitTask(DeleteKeypairTask(name=name))
 
-    def createServer(self, name, min_ram, image_id=None,
-                     image_name=None, key_name=None, name_filter=None):
+    def createServer(self, name, min_ram, image_id=None, image_name=None,
+                     az=None, key_name=None, name_filter=None):
         if image_name:
             image_id = self.findImage(image_name)['id']
         flavor = self.findFlavor(min_ram, name_filter)
         create_args = dict(name=name, image=image_id, flavor=flavor['id'])
         if key_name:
             create_args['key_name'] = key_name
+        if az:
+            create_args['availability_zone'] = az
         if self.provider.use_neutron:
             create_args['nics'] = self.provider.nics
 

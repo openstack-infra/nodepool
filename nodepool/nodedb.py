@@ -77,6 +77,8 @@ node_table = Table(
     Column('nodename', String(255), index=True),
     # Provider assigned id for this machine
     Column('external_id', String(255)),
+    # Provider availability zone for this machine
+    Column('az', String(255)),
     # Primary IP address
     Column('ip', String(255)),
     # One of the above values
@@ -131,13 +133,14 @@ class SnapshotImage(object):
 
 
 class Node(object):
-    def __init__(self, provider_name, label_name, target_name,
+    def __init__(self, provider_name, label_name, target_name, az,
                  hostname=None, external_id=None, ip=None,
                  state=BUILDING):
         self.provider_name = provider_name
         self.label_name = label_name
         self.target_name = target_name
         self.external_id = external_id
+        self.az = az
         self.ip = ip
         self.hostname = hostname
         self.state = state

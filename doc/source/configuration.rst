@@ -162,6 +162,8 @@ same name.  Example::
       region-name: 'region1'
       max-servers: 96
       rate: 1.0
+      availability-zones:
+        - az1
       boot-timeout: 120
       launch-timeout: 900
       images:
@@ -208,6 +210,14 @@ expects that user to exist after running the script indicated by
 Both `boot-timeout` and `launch-timeout` keys are optional.  The
 `boot-timeout` key defaults to 60 seconds and `launch-timeout` key
 will default to 3600 seconds.
+
+The `availability-zones` key is optional. Without it nodepool will rely
+on nova to schedule an availability zone. If it is provided the value
+should be a list of availability zone names. Nodepool will select one
+at random and provide that to nova. This should give a good distribution
+of availability zones being used. If you need more control of the
+distribution you can use multiple logical providers each providing a
+different list of availabiltiy zones.
 
 targets
 -------

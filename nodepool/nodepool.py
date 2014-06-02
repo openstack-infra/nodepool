@@ -23,6 +23,7 @@ import json
 import logging
 import os.path
 import paramiko
+import random
 import re
 import threading
 import time
@@ -377,8 +378,8 @@ class NodeLauncher(threading.Thread):
                       "for node id: %s" % (hostname, self.provider.name,
                                            self.image.name, self.node_id))
         server_id = self.manager.createServer(
-            hostname, self.image.min_ram,
-            snap_image.external_id, name_filter=self.image.name_filter)
+            hostname, self.image.min_ram, snap_image.external_id,
+            name_filter=self.image.name_filter, az=self.node.az)
         self.node.external_id = server_id
         session.commit()
 
@@ -534,7 +535,7 @@ class SubNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.SubNodeLauncher")
 
     def __init__(self, nodepool, provider, label, subnode_id,
-                 node_id, node_target_name, timeout, launch_timeout):
+                 node_id, node_target_name, timeout, launch_timeout, node_az):
         threading.Thread.__init__(self, name='SubNodeLauncher for %s'
                                   % subnode_id)
         self.provider = provider
@@ -546,6 +547,7 @@ class SubNodeLauncher(threading.Thread):
         self.timeout = timeout
         self.nodepool = nodepool
         self.launch_timeout = launch_timeout
+        self.node_az = node_az
 
     def run(self):
         try:
@@ -620,8 +622,8 @@ class SubNodeLauncher(threading.Thread):
                       % (hostname, self.provider.name,
                          self.image.name, self.subnode_id, self.node_id))
         server_id = self.manager.createServer(
-            hostname, self.image.min_ram,
-            snap_image.external_id, name_filter=self.image.name_filter)
+            hostname, self.image.min_ram, snap_image.external_id,
+            name_filter=self.image.name_filter, az=self.node_az)
         self.subnode.external_id = server_id
         session.commit()
 
@@ -1003,6 +1005,7 @@ class NodePool(threading.Thread):
             p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
             p.nics = provider.get('networks')
+            p.azs = provider.get('availability-zones')
             p.images = {}
             for image in provider['images']:
                 i = ProviderImage()
@@ -1059,7 +1062,8 @@ class NodePool(threading.Thread):
             new_pm.boot_timeout != old_pm.provider.boot_timeout or
             new_pm.launch_timeout != old_pm.provider.launch_timeout or
             new_pm.use_neutron != old_pm.provider.use_neutron or
-            new_pm.nics != old_pm.provider.nics):
+            new_pm.nics != old_pm.provider.nics or
+            new_pm.azs != old_pm.provider.azs):
             return False
         new_images = new_pm.images
         old_images = old_pm.provider.images
@@ -1467,7 +1471,11 @@ class NodePool(threading.Thread):
         provider = self.config.providers[provider.name]
         timeout = provider.boot_timeout
         launch_timeout = provider.launch_timeout
-        node = session.createNode(provider.name, label.name, target.name)
+        if provider.azs:
+            az = random.choice(provider.azs)
+        else:
+            az = None
+        node = session.createNode(provider.name, label.name, target.name, az)
         t = NodeLauncher(self, provider, label, target, node.id, timeout,
                          launch_timeout)
         t.start()
@@ -1486,7 +1494,8 @@ class NodePool(threading.Thread):
         launch_timeout = provider.launch_timeout
         subnode = session.createSubNode(node)
         t = SubNodeLauncher(self, provider, label, subnode.id,
-                            node.id, node.target_name, timeout, launch_timeout)
+                            node.id, node.target_name, timeout, launch_timeout,
+                            node_az=node.az)
         t.start()
 
     def deleteSubNode(self, subnode, manager):
