@@ -346,7 +346,8 @@ class NodeLauncher(threading.Thread):
             try:
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
                                           self.provider.name,
-                                          self.target.name)
+                                          self.target.name,
+                                          self.node.az)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
@@ -588,7 +589,8 @@ class SubNodeLauncher(threading.Thread):
             try:
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
                                           self.provider.name,
-                                          self.node_target_name)
+                                          self.node_target_name,
+                                          self.node_az)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
@@ -1797,18 +1799,24 @@ class NodePool(threading.Thread):
             key = 'nodepool.provider.%s.max_servers' % provider.name
             statsd.gauge(key, provider.max_servers)
 
-    def launchStats(self, subkey, dt, image_name, provider_name, target_name):
+    def launchStats(self, subkey, dt, image_name,
+                    provider_name, target_name, node_az):
         if not statsd:
             return
         #nodepool.launch.provider.PROVIDER.subkey
         #nodepool.launch.image.IMAGE.subkey
         #nodepool.launch.target.TARGET.subkey
         #nodepool.launch.subkey
-        for key in [
+        keys = [
             'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
             'nodepool.launch.image.%s.%s' % (image_name, subkey),
             'nodepool.launch.target.%s.%s' % (target_name, subkey),
             'nodepool.launch.%s' % (subkey,),
-            ]:
+            ]
+        if node_az:
+            #nodepool.launch.provider.PROVIDER.AZ.subkey
+            keys.append('nodepool.launch.provider.%s.%s.%s' %
+                        (provider_name, node_az, subkey))
+        for key in keys:
             statsd.timing(key, dt)
             statsd.incr(key)
