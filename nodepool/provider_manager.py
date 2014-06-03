@@ -20,6 +20,7 @@ import logging
 import paramiko
 import novaclient
 import novaclient.client
+import threading
 import time
 
 import fakeprovider
@@ -232,6 +233,7 @@ class ProviderManager(TaskManager):
         self.__extensions = {}
         self._servers = []
         self._servers_time = 0
+        self._servers_lock = threading.Lock()
 
     @property
     def _flavors(self):
@@ -434,22 +436,42 @@ class ProviderManager(TaskManager):
 
     def listServers(self):
         if time.time() - self._servers_time >= SERVER_LIST_AGE:
-            self._servers = self.submitTask(ListServersTask())
-            self._servers_time = time.time()
+            # Since we're using cached data anyway, we don't need to
+            # have more than one thread actually submit the list
+            # servers task.  Let the first one submit it while holding
+            # a lock, and the non-blocking acquire method will cause
+            # subsequent threads to just skip this and use the old
+            # data until it succeeds.
+            if self._servers_lock.acquire(False):
+                try:
+                    self._servers = self.submitTask(ListServersTask())
+                    self._servers_time = time.time()
+                finally:
+                    self._servers_lock.release()
         return self._servers
 
     def deleteServer(self, server_id):
         return self.submitTask(DeleteServerTask(server_id=server_id))
 
     def cleanupServer(self, server_id):
-        try:
-            server = self.getServerFromList(server_id)
-        except NotFound:
-            # In case this server is really new, make sure we have at
-            # least one server list update since it was created.  If
-            # it still doesn't exist, then propogate the exception.
-            time.sleep(SERVER_LIST_AGE + 1)
-            server = self.getServerFromList(server_id)
+        done = False
+        while not done:
+            try:
+                server = self.getServerFromList(server_id)
+                done = True
+            except NotFound:
+                # If we have old data, that's fine, it should only
+                # indicate that a server exists when it doesn't; we'll
+                # recover from that.  However, if we have no data at
+                # all, wait until the first server list task
+                # completes.
+                if self._servers_time == 0:
+                    time.sleep(SERVER_LIST_AGE + 1)
+                else:
+                    done = True
+
+        # This will either get the server or raise an exception
+        server = self.getServerFromList(server_id)
 
         if self.hasExtension('os-floating-ips'):
             for ip in self.listFloatingIPs():
