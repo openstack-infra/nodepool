@@ -331,7 +331,7 @@ class NodeLauncher(threading.Thread):
                 dt = self.launchNode(session)
                 failed = False
                 statsd_key = 'ready'
-            except Exception, e:
+            except Exception as e:
                 self.log.exception("%s launching node id: %s "
                                    "in provider: %s error:" %
                                    (e.__class__.__name__,
@@ -573,7 +573,7 @@ class SubNodeLauncher(threading.Thread):
                 dt = self.launchSubNode(session)
                 failed = False
                 statsd_key = 'ready'
-            except Exception, e:
+            except Exception as e:
                 self.log.exception("%s launching subnode id: %s "
                                    "for node id: %s in provider: %s error:" %
                                    (e.__class__.__name__, self.subnode_id,

@@ -47,11 +47,11 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
         try:
             client = SSHClient(ip, username, **connect_kwargs)
             break
-        except paramiko.AuthenticationException, e:
+        except paramiko.AuthenticationException as e:
             # This covers the case where the cloud user is created
             # after sshd is up (Fedora for example)
             log.info('Password auth exception. Try number %i...' % count)
-        except socket.error, e:
+        except socket.error as e:
             if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH]:
                 log.exception('Exception while testing ssh access:')
 
