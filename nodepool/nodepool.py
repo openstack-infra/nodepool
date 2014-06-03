@@ -785,7 +785,10 @@ class ImageUpdater(threading.Thread):
         self.log.debug("Image id: %s building image %s" %
                        (self.snap_image.id, image_id))
         # It can take a _very_ long time for Rackspace 1.0 to save an image
-        self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
+        image = self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
+        if image['status'] != 'ACTIVE':
+            raise Exception("Image %s for image id: %s status: %s" %
+                            (image_id, self.snap_image.id, image['status']))
 
         if statsd:
             dt = int((time.time() - start_time) * 1000)
