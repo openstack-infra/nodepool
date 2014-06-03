@@ -80,7 +80,8 @@ class TaskManager(threading.Thread):
                 if delta >= self.rate:
                     break
                 time.sleep(self.rate - delta)
-            self.log.debug("Manager %s running task %s" % (self.name, task))
+            self.log.debug("Manager %s running task %s (queue: %s)" %
+                           (self.name, task, self.queue.qsize()))
             task.run(self._client)
             last_ts = time.time()
             self.queue.task_done()
