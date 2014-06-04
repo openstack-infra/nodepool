@@ -55,6 +55,11 @@ Or install directly from a git checkout with::
 
   pip install .
 
+Note that some distributions provide a libzmq1 which does not support
+RCVTIMEO.  Removing this libzmq1 from the system libraries will ensure
+pip compiles a libzmq1 with appropriate options for the version of
+pyzmq used by nodepool.
+
 Configuration
 -------------
 
