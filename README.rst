@@ -11,7 +11,8 @@ Install dependencies:
 
 .. code-block:: bash
 
-    sudo apt-get -qy install git mysql-server libmysqlclient-dev g++ python-dev libzmq-dev python-pip
+    sudo apt-get update
+    sudo apt-get -qy install git mysql-server libmysqlclient-dev g++ python-dev python-pip
     mkdir src
     cd ~/src
     git clone git://git.openstack.org/openstack-infra/config
