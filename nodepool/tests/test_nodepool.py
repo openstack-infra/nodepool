@@ -80,9 +80,9 @@ class TestNodepool(tests.DBTestCase):
     def test_node(self):
         """Test that an image and node are created"""
         configfile = self.setup_config('node.yaml')
-        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=0.5)
+        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
-        time.sleep(2)
+        time.sleep(3)
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
@@ -96,9 +96,9 @@ class TestNodepool(tests.DBTestCase):
     def test_subnodes(self):
         """Test that an image and node are created"""
         configfile = self.setup_config('subnodes.yaml')
-        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=0.5)
+        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
-        time.sleep(2)
+        time.sleep(3)
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
@@ -121,9 +121,9 @@ class TestNodepool(tests.DBTestCase):
     def test_node_az(self):
         """Test that an image and node are created with az specified"""
         configfile = self.setup_config('node_az.yaml')
-        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=0.5)
+        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
-        time.sleep(2)
+        time.sleep(3)
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
