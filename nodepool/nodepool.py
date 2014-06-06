@@ -527,8 +527,8 @@ class NodeLauncher(threading.Thread):
                 if k.startswith('NODEPOOL_'):
                     env_vars += ' %s="%s"' % (k, v)
             host.ssh("run ready script",
-                     "cd /opt/nodepool-scripts && %s ./%s" %
-                     (env_vars, self.label.ready_script))
+                     "cd /opt/nodepool-scripts && %s ./%s %s" %
+                     (env_vars, self.label.ready_script, n.hostname))
 
 
 class SubNodeLauncher(threading.Thread):
@@ -863,8 +863,8 @@ class ImageUpdater(threading.Thread):
                 if k.startswith('NODEPOOL_'):
                     env_vars += ' %s="%s"' % (k, v)
             host.ssh("run setup script",
-                     "cd /opt/nodepool-scripts && %s ./%s" %
-                     (env_vars, self.image.setup))
+                     "cd /opt/nodepool-scripts && %s ./%s %s" %
+                     (env_vars, self.image.setup, server['name']))
 
 
 class ConfigValue(object):

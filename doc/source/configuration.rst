@@ -121,27 +121,9 @@ communicate directly with each other.  In the example above, for each
 Precise node added to the target system, two additional nodes will be
 created and associated with it.
 
-The script specified by `ready-script` (which is expected to be in
-`/opt/nodepool-scripts` along with the setup script) can be used to
-perform any last minute changes to a node after it has been launched
-but before it is put in the READY state to receive jobs.  In
-particular, it can read the files in /etc/nodepool to perform
-multi-node related setup.
-
-Those files include:
-
-**/etc/nodepool/role**
-  Either the string ``primary`` or ``sub`` indicating whether this
-  node is the primary (the node added to the target and which will run
-  the job), or a sub-node.
-**/etc/nodepool/primary_node**
-  The IP address of the primary node.
-**/etc/nodepool/sub_nodes**
-  The IP addresses of the sub nodes, one on each line.
-**/etc/nodepool/id_rsa**
-  An OpenSSH private key generated specifically for this node group.
-**/etc/nodepool/id_rsa.pub**
-  The corresponding public key.
+A script specified by `ready-script` can be used to perform any last minute
+changes to a node after it has been launched but before it is put in the READY
+state to receive jobs. For more information, see :ref:`scripts`.
 
 providers
 ---------
@@ -205,7 +187,7 @@ For providers, the `name`, `username`, `password`, `auth-url`,
 `name`, `base-image`, and `min-ram` keys are required.  The `username`
 and `private-key` values default to the values indicated.  Nodepool
 expects that user to exist after running the script indicated by
-`setup`.
+`setup`. See :ref:`scripts` for setup script details.
 
 Both `boot-timeout` and `launch-timeout` keys are optional.  The
 `boot-timeout` key defaults to 60 seconds and `launch-timeout` key
