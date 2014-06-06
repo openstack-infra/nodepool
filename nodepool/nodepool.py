@@ -1014,7 +1014,7 @@ class NodePool(threading.Thread):
             p.boot_timeout = provider.get('boot-timeout', 60)
             p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
-            p.nics = provider.get('networks')
+            p.networks = provider.get('networks')
             p.azs = provider.get('availability-zones')
             p.template_hostname = provider.get(
                 'template-hostname',
@@ -1084,7 +1084,7 @@ class NodePool(threading.Thread):
             new_pm.boot_timeout != old_pm.provider.boot_timeout or
             new_pm.launch_timeout != old_pm.provider.launch_timeout or
             new_pm.use_neutron != old_pm.provider.use_neutron or
-            new_pm.nics != old_pm.provider.nics or
+            new_pm.networks != old_pm.provider.networks or
             new_pm.azs != old_pm.provider.azs):
             return False
         new_images = new_pm.images

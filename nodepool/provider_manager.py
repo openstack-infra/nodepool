@@ -20,6 +20,8 @@ import logging
 import paramiko
 import novaclient
 import novaclient.client
+import novaclient.extension
+import novaclient.v1_1.contrib.tenant_networks
 import threading
 import time
 
@@ -219,6 +221,12 @@ class DeleteImageTask(Task):
         client.images.delete(**self.args)
 
 
+class FindNetworkTask(Task):
+    def main(self, client):
+        network = client.tenant_networks.find(**self.args)
+        return dict(id=str(network.id))
+
+
 class ProviderManager(TaskManager):
     log = logging.getLogger("nodepool.ProviderManager")
 
@@ -228,6 +236,7 @@ class ProviderManager(TaskManager):
         self.provider = provider
         self._client = self._getClient()
         self._images = {}
+        self._networks = {}
         self._cloud_metadata_read = False
         self.__flavors = {}
         self.__extensions = {}
@@ -253,9 +262,11 @@ class ProviderManager(TaskManager):
         self._cloud_metadata_read = True
 
     def _getClient(self):
+        tenant_networks = novaclient.extension.Extension(
+            'tenant_networks', novaclient.v1_1.contrib.tenant_networks)
         args = ['1.1', self.provider.username, self.provider.password,
                 self.provider.project_id, self.provider.auth_url]
-        kwargs = {}
+        kwargs = {'extensions': [tenant_networks]}
         if self.provider.service_type:
             kwargs['service_type'] = self.provider.service_type
         if self.provider.service_name:
@@ -295,6 +306,13 @@ class ProviderManager(TaskManager):
         self._images[name] = image
         return image
 
+    def findNetwork(self, label):
+        if label in self._networks:
+            return self._networks[label]
+        network = self.submitTask(FindNetworkTask(label=label))
+        self._networks[label] = network
+        return network
+
     def deleteImage(self, name):
         if name in self._images:
             del self._images[name]
@@ -323,7 +341,16 @@ class ProviderManager(TaskManager):
         if az:
             create_args['availability_zone'] = az
         if self.provider.use_neutron:
-            create_args['nics'] = self.provider.nics
+            nics = []
+            for network in self.provider.networks:
+                if 'net-id' in network:
+                    nics.append({'net-id': network['net-id']})
+                elif 'net-label' in network:
+                    net_id = self.findNetwork(network['net-label'])['id']
+                    nics.append({'net-id': net_id})
+                else:
+                    raise Exception("Invalid 'networks' configuration.")
+            create_args['nics'] = nics
 
         return self.submitTask(CreateServerTask(**create_args))
 
