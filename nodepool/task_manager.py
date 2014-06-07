@@ -18,7 +18,7 @@
 
 import sys
 import threading
-import Queue
+from six.moves import queue as Queue
 import logging
 import time
 
