@@ -16,6 +16,7 @@
 
 import argparse
 import daemon
+import errno
 import extras
 
 # as of python-daemon 1.6 it doesn't bundle pidlockfile anymore
@@ -52,6 +53,28 @@ def stack_dump_handler(signum, frame):
     log = logging.getLogger("nodepool.stack_dump")
     log.debug(log_str)
     signal.signal(signal.SIGUSR2, stack_dump_handler)
+
+
+def is_pidfile_stale(pidfile):
+    """ Determine whether a PID file is stale.
+
+        Return 'True' ("stale") if the contents of the PID file are
+        valid but do not match the PID of a currently-running process;
+        otherwise return 'False'.
+
+        """
+    result = False
+
+    pidfile_pid = pidfile.read_pid()
+    if pidfile_pid is not None:
+        try:
+            os.kill(pidfile_pid, 0)
+        except OSError as exc:
+            if exc.errno == errno.ESRCH:
+                # The specified PID does not exist
+                result = True
+
+    return result
 
 
 class NodePoolDaemon(object):
@@ -118,6 +141,8 @@ def main():
         return(0)
 
     pid = pid_file_module.TimeoutPIDLockFile(npd.args.pidfile, 10)
+    if is_pidfile_stale(pid):
+        pid.break_lock()
 
     if npd.args.nodaemon:
         npd.main()
