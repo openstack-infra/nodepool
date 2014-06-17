@@ -54,7 +54,7 @@ Set up database for unit tests:
 .. code-block:: bash
 
     mysql -u root
-    mysql> grant all privileges on *.* to 'openstack_citest' identified by 'openstack_citest' with grant option;
+    mysql> grant all privileges on *.* to 'openstack_citest'@'localhost' identified by 'openstack_citest' with grant option;
     mysql> flush privileges;
     mysql> create database openstack_citest;
 
