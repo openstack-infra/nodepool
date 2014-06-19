@@ -53,6 +53,96 @@ The algorithm is:
     that label.
 """
 
+import functools
+
+# History allocation tracking
+
+#  The goal of the history allocation tracking is to ensure forward
+#  progress by not starving any particular label when in over-quota
+#  situations.  For example, if you have two labels, say 'fedora' and
+#  'ubuntu', and 'ubuntu' is requesting many more nodes than 'fedora',
+#  it is quite possible that 'fedora' never gets any allocations.  If
+#  'fedora' is required for a gate-check job, older changes may wait
+#  in Zuul's pipelines longer than expected while jobs for newer
+#  changes continue to receive 'ubuntu' nodes and overall merge
+#  throughput decreases during such contention.
+#
+#  We track the history of allocations by label.  A persistent
+#  AllocationHistory object should be kept and passed along with each
+#  AllocationRequest, which records its initial request in the history
+#  via recordRequest().
+#
+#  When a sub-allocation gets a grant, it records this via a call to
+#  AllocationHistory.recordGrant().  All the sub-allocations
+#  contribute to tracking the total grants for the parent
+#  AllocationRequest.
+#
+#  When finished requesting grants from all providers,
+#  AllocationHistory.grantsDone() should be called to store the
+#  allocation state in the history.
+#
+#  This history is used AllocationProvider.makeGrants() to prioritize
+#  requests that have not been granted in prior iterations.
+#  AllocationHistory.getWaitTime will return how many iterations
+#  each label has been waiting for an allocation.
+
+
+class AllocationHistory(object):
+    '''A history of allocation requests and grants'''
+
+    def __init__(self, history=100):
+        # current allocations for this iteration
+        # keeps elements of type
+        #   label -> (request, granted)
+        self.current_allocations = {}
+
+        self.history = history
+        # list of up to <history> previous current_allocation
+        # dictionaries
+        self.past_allocations = []
+
+    def recordRequest(self, label, amount):
+        try:
+            a = self.current_allocations[label]
+            a[0] += amount
+        except KeyError:
+            self.current_allocations[label] = [amount, 0]
+
+    def recordGrant(self, label, amount):
+        try:
+            a = self.current_allocations[label]
+            a[1] += amount
+        except KeyError:
+            # granted but not requested?  shouldn't happen
+            raise
+
+    def grantsDone(self):
+        # save this round of allocations/grants up to our history
+        self.past_allocations.insert(0, self.current_allocations)
+        self.past_allocations = self.past_allocations[:self.history]
+        self.current_allocations = {}
+
+    def getWaitTime(self, label):
+        # go through the history of allocations and calculate how many
+        # previous iterations this label has received none of its
+        # requested allocations.
+        wait = 0
+
+        # We don't look at the current_alloctions here; only
+        # historical.  With multiple providers, possibly the first
+        # provider has given nodes to the waiting label (which would
+        # be recorded in current_allocations), and a second provider
+        # should fall back to using the usual ratio-based mechanism?
+        for i, a in enumerate(self.past_allocations):
+            if (label in a) and (a[label][1] == 0):
+                wait = i + 1
+                continue
+
+            # only interested in consecutive failures to allocate.
+            break
+
+        return wait
+
 
 class AllocationProvider(object):
     """A node provider and its capacity."""
@@ -66,12 +156,31 @@ class AllocationProvider(object):
         return '<AllocationProvider %s>' % self.name
 
     def makeGrants(self):
-        reqs = self.sub_requests[:]
-        # Sort the requests by priority so we fill the most specific
-        # requests first (e.g., if this provider is the only one that
-        # can supply foo nodes, then it should focus on supplying them
-        # and leave bar nodes to other providers).
+        # build a list of (request,wait-time) tuples
+        all_reqs = [(x, x.getWaitTime()) for x in self.sub_requests]
+
+        # reqs with no wait time get processed via ratio mechanism
+        reqs = [x[0] for x in all_reqs if x[1] == 0]
+
+        # we prioritize whoever has been waiting the longest and give
+        # them whatever is available.  If we run out, put them back in
+        # the ratio queue
+        waiters = [x for x in all_reqs if x[1] != 0]
+        waiters.sort(key=lambda x: x[1], reverse=True)
+
+        for w in waiters:
+            w = w[0]
+            if self.available:
+                w.grant(min(int(w.amount), self.available))
+            else:
+                reqs.append(w)
+
+        # Sort the remaining requests by priority so we fill the most
+        # specific requests first (e.g., if this provider is the only
+        # one that can supply foo nodes, then it should focus on
+        # supplying them and leave bar nodes to other providers).
         reqs.sort(lambda a, b: cmp(a.getPriority(), b.getPriority()))
+
         for req in reqs:
             total_requested = 0.0
             # Within a specific priority, limit the number of
@@ -84,6 +193,7 @@ class AllocationProvider(object):
                 ratio = float(req.amount) / total_requested
             else:
                 ratio = 0.0
+
             grant = int(round(req.amount))
             grant = min(grant, int(round(self.available * ratio)))
             # This adjusts our availability as well as the values of
@@ -94,7 +204,8 @@ class AllocationProvider(object):
 
 class AllocationRequest(object):
     """A request for a number of labels."""
-    def __init__(self, name, amount):
+
+    def __init__(self, name, amount, history=None):
         self.name = name
         self.amount = float(amount)
         # Sub-requests of individual providers that make up this
@@ -103,6 +214,17 @@ class AllocationRequest(object):
         # Targets to which nodes from this request may be assigned.
         # AllocationTarget -> AllocationRequestTarget
         self.request_targets = {}
+
+        if history is not None:
+            self.history = history
+        else:
+            self.history = AllocationHistory()
+
+        self.history.recordRequest(name, amount)
+
+        # subrequests use these
+        self.recordGrant = functools.partial(self.history.recordGrant, name)
+        self.getWaitTime = functools.partial(self.history.getWaitTime, name)
 
     def __repr__(self):
         return '<AllocationRequest for %s of %s>' % (self.amount, self.name)
@@ -161,10 +283,17 @@ class AllocationSubRequest(object):
     def getPriority(self):
         return len(self.request.sub_requests)
 
+    def getWaitTime(self):
+        return self.request.getWaitTime()
+
     def grant(self, amount):
         # Grant this request (with the supplied amount).  Adjust this
         # sub-request's value to the actual, as well as the values of
         # any remaining sub-requests.
+
+        # fractional amounts don't make sense
+        assert int(amount) == amount
+
         # Remove from the set of sub-requests so that this is not
         # included in future calculations.
         self.provider.sub_requests.remove(self)
@@ -172,6 +301,7 @@ class AllocationSubRequest(object):
         if amount > 0:
             grant = AllocationGrant(self.request, self.provider,
                                     amount, self.targets)
+            self.request.recordGrant(amount)
             # This is now a grant instead of a request.
             self.provider.grants.append(grant)
         else:
