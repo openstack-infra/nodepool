@@ -65,7 +65,11 @@ class AllocatorTestCase(BaseTestCase):
         for i, amount in enumerate(self.results):
             print self.agt[i]
         for i, amount in enumerate(self.results):
-            self.assertEqual(self.agt[i].amount, amount)
+            self.assertEqual(self.agt[i].amount, amount,
+                             'Error at pos %d, '
+                             'expected %s and got %s' % (i, self.results,
+                                                         [x.amount
+                                                          for x in self.agt]))
 
 
 class MySQLSchemaFixture(fixtures.Fixture):
