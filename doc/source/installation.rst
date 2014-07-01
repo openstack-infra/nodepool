@@ -69,4 +69,4 @@ logging configuration file.
 The logging configuration file is in the standard python logging
 `configuration file format
 <http://docs.python.org/2/library/logging.config.html#configuration-file-format>`.
-The Nodepool configuration file is described in configuration_.
+The Nodepool configuration file is described in :ref:`configuration`.
