@@ -35,6 +35,8 @@ class NodePoolCmd(object):
                             help='path to config file')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
+        parser.add_argument('--debug', dest='debug', action='store_true',
+                            help='show DEBUG level logging')
 
         subparsers = parser.add_subparsers(title='commands',
                                            description='valid commands',
@@ -90,7 +92,10 @@ class NodePoolCmd(object):
         self.args = parser.parse_args()
 
     def setup_logging(self):
-        logging.basicConfig(level=logging.INFO)
+        if self.args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
 
     def list(self, node_id=None):
         t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Hostname",
@@ -195,8 +200,6 @@ class NodePoolCmd(object):
             self.pool.deleteImage(snap_image)
 
     def main(self):
-        self.parse_arguments()
-
         if self.args.version:
             from nodepool.version import version_info as npc_version_info
             print "Nodepool version: %s" % npc_version_info.version_string()
@@ -211,6 +214,7 @@ class NodePoolCmd(object):
 
 def main():
     npc = NodePoolCmd()
+    npc.parse_arguments()
     npc.setup_logging()
     return npc.main()
 
