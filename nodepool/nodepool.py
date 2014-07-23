@@ -915,8 +915,6 @@ class GearmanServer(ConfigValue):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    allocation_history = allocation.AllocationHistory()
-
     def __init__(self, configfile, watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.configfile = configfile
@@ -1282,10 +1280,8 @@ class NodePool(threading.Thread):
                            (label.name, demand, start_demand, min_demand,
                             ready))
 
-        # Start setting up the allocation system.
-
-        # Add a provider for each node provider, along with current
-        # capacity
+        # Start setting up the allocation system.  Add a provider for
+        # each node provider, along with current capacity
         allocation_providers = {}
         for provider in self.config.providers.values():
             provider_max = provider.max_servers
@@ -1314,8 +1310,7 @@ class NodePool(threading.Thread):
                     # request from a previous target-label in this
                     # loop.
                     ar = allocation.AllocationRequest(label.name,
-                                                      label_demand[label.name],
-                                                      self.allocation_history)
+                                                      label_demand[label.name])
 
                 nodes = session.getNodes(label_name=label.name,
                                          target_name=target.name)
@@ -1350,8 +1345,6 @@ class NodePool(threading.Thread):
                     self.log.debug('      %s' % agt)
                     tlp = tlps[agt]
                     nodes_to_launch.append((tlp, agt.amount))
-
-        self.allocation_history.grantsDone()
 
         self.log.debug("Finished node launch calculation")
         return nodes_to_launch
