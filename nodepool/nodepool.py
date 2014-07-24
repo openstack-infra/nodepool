@@ -1472,6 +1472,11 @@ class NodePool(threading.Thread):
             provider_max = provider.max_servers
             n_provider = count_nodes_and_subnodes(provider.name)
             available = provider_max - n_provider
+            if available < 0:
+                self.log.warning("Provider %s over-allocated: "
+                                 "max-servers %d but counted %d " %
+                                 (provider.name, provider_max, n_provider))
+                available = 0
             ap = allocation.AllocationProvider(provider.name, available)
             allocation_providers[provider.name] = ap
 

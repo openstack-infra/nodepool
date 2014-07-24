@@ -101,6 +101,9 @@ class TwoProvidersTwoLabels(tests.AllocatorTestCase):
         ('four_nodes_over_quota',
          dict(provider1=2, provider2=2, label1=4, label2=4,
               results=[1, 1, 1, 1])),
+        ('negative_provider',
+         dict(provider1=-5, provider2=20, label1=5, label2=5,
+              results=[0, 0, 5, 5])),
         ]
 
     def setUp(self):

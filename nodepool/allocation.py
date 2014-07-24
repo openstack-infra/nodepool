@@ -58,7 +58,9 @@ class AllocationProvider(object):
     """A node provider and its capacity."""
     def __init__(self, name, available):
         self.name = name
-        self.available = available
+        # if this is negative, many of the calcuations turn around and
+        # we start handing out nodes that don't exist.
+        self.available = available if available >= 0 else 0
         self.sub_requests = []
         self.grants = []
 
