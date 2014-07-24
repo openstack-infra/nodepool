@@ -104,14 +104,15 @@ class AllocationHistory(object):
     def recordRequest(self, label, amount):
         try:
             a = self.current_allocations[label]
-            a[0] += amount
+            a['requested'] += amount
         except KeyError:
-            self.current_allocations[label] = [amount, 0]
+            self.current_allocations[label] = dict(requested=amount,
+                                                   allocated=0)
 
     def recordGrant(self, label, amount):
         try:
             a = self.current_allocations[label]
-            a[1] += amount
+            a['allocated'] += amount
         except KeyError:
             # granted but not requested?  shouldn't happen
             raise
@@ -134,7 +135,7 @@ class AllocationHistory(object):
         # be recorded in current_allocations), and a second provider
         # should fall back to using the usual ratio-based mechanism?
         for i, a in enumerate(self.past_allocations):
-            if (label in a) and (a[label][1] == 0):
+            if (label in a) and (a[label]['allocated'] == 0):
                 wait = i + 1
                 continue
 
