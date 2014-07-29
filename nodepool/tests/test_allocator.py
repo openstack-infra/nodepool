@@ -106,7 +106,7 @@ class TwoProvidersTwoLabels(tests.AllocatorTestCase):
     def setUp(self):
         super(TwoProvidersTwoLabels, self).setUp()
         ap1 = allocation.AllocationProvider('provider1', self.provider1)
-        ap2 = allocation.AllocationProvider('provider2', self.provider1)
+        ap2 = allocation.AllocationProvider('provider2', self.provider2)
         at1 = allocation.AllocationTarget('target1')
         ar1 = allocation.AllocationRequest('label1', self.label1)
         ar2 = allocation.AllocationRequest('label2', self.label2)
@@ -160,7 +160,7 @@ class TwoProvidersTwoLabelsOneShared(tests.AllocatorTestCase):
     def setUp(self):
         super(TwoProvidersTwoLabelsOneShared, self).setUp()
         ap1 = allocation.AllocationProvider('provider1', self.provider1)
-        ap2 = allocation.AllocationProvider('provider2', self.provider1)
+        ap2 = allocation.AllocationProvider('provider2', self.provider2)
         at1 = allocation.AllocationTarget('target1')
         ar1 = allocation.AllocationRequest('label1', self.label1)
         ar2 = allocation.AllocationRequest('label2', self.label2)
