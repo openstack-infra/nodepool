@@ -37,6 +37,7 @@ providers:
     pool: 'fake'
     networks:
       - net-id: 'some-uuid'
+      - net-label: 'some-label'
     images:
       - name: nodepool-fake
         base-image: 'Fake Precise'
