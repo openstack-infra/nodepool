@@ -93,9 +93,13 @@ class NodePoolCmd(object):
 
     def setup_logging(self):
         if self.args.debug:
-            logging.basicConfig(level=logging.DEBUG)
+            logging.basicConfig(level=logging.DEBUG,
+                                format='%(asctime)s %(levelname)s %(name)s: '
+                                       '%(message)s')
         else:
-            logging.basicConfig(level=logging.INFO)
+            logging.basicConfig(level=logging.INFO,
+                                format='%(asctime)s %(levelname)s %(name)s: '
+                                       '%(message)s')
 
     def list(self, node_id=None):
         t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Hostname",
