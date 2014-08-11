@@ -531,7 +531,8 @@ class NodeLauncher(threading.Thread):
                     env_vars += ' %s="%s"' % (k, v)
             host.ssh("run ready script",
                      "cd /opt/nodepool-scripts && %s ./%s %s" %
-                     (env_vars, self.label.ready_script, n.hostname))
+                     (env_vars, self.label.ready_script, n.hostname),
+                     output=True)
 
 
 class SubNodeLauncher(threading.Thread):
