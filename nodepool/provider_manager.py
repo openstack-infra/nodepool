@@ -505,7 +505,6 @@ class ProviderManager(TaskManager):
                 if ip['instance_id'] == server_id:
                     self.log.debug('Deleting floating ip for server %s' %
                                    server_id)
-                    self.removeFloatingIP(server_id, ip['ip'])
                     self.deleteFloatingIP(ip['id'])
 
         if (self.hasExtension('os-keypairs') and
