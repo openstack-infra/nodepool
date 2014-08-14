@@ -92,7 +92,7 @@ class FakeHTTPClient(object):
             return None, dict(extensions=dict())
 
 
-class FakeClient(object):
+class FakeNovaClient(object):
     def __init__(self):
         self.flavors = FakeList([
             Dummy(id='f1', ram=8192, name='Fake Flavor'),
@@ -103,12 +103,27 @@ class FakeClient(object):
         self.servers = FakeList([])
         self.servers.api = self
 
+
+class FakeGlanceClient(object):
+    def __init__(self):
+        self.id = 'fake-glance-id'
+
+    def update(self, **kwargs):
+        return True
+
+
+class FakeClient(object):
+    def __init__(self):
+        self.client = FakeHTTPClient()
         self.client.user = 'fake'
         self.client.password = 'fake'
         self.client.projectid = 'fake'
         self.client.service_type = None
         self.client.service_name = None
         self.client.region_name = None
+
+        self.nova = FakeNovaClient()
+        self.glance = FakeGlanceClient()
 
 
 class FakeFile(StringIO.StringIO):
@@ -187,5 +202,6 @@ class FakeJenkins(object):
                  {u'name': u'test-view',
                   u'url': u'https://jenkins.example.com/view/test-view/'}]}
         return d
+
 
 FAKE_CLIENT = FakeClient()
