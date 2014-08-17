@@ -71,7 +71,10 @@ class FakeList(object):
                   name=kw['name'],
                   status='BUILD',
                   adminPass='fake',
-                  addresses=dict(public=[dict(version=4, addr='fake')]),
+                  addresses=dict(
+                      public=[dict(version=4, addr='fake')],
+                      private=[dict(version=4, addr='fake')]
+                  ),
                   metadata={},
                   manager=self)
         self._list.append(s)

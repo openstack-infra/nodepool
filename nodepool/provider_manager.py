@@ -67,6 +67,28 @@ def get_public_ip(server, version=4):
     return None
 
 
+def get_private_ip(server):
+    ret = []
+    for (name, network) in server.addresses.iteritems():
+        if name == 'private':
+            ret.extend([addrs['addr']
+                        for addrs in network if addrs['version'] == 4])
+        else:
+            for interface_spec in network:
+                if interface_spec['version'] != 4:
+                    continue
+                if ('OS-EXT-IPS:type' in interface_spec
+                        and interface_spec['OS-EXT-IPS:type'] == 'fixed'):
+                    ret.append(interface_spec['addr'])
+    if not ret:
+        if server.status == 'ACTIVE':
+            # Server expected to have at least one address in ACTIVE status
+            raise KeyError('No private ip found for server')
+        else:
+            return None
+    return ret[0]
+
+
 def make_server_dict(server):
     d = dict(id=str(server.id),
              name=server.name,
@@ -79,6 +101,7 @@ def make_server_dict(server):
     if hasattr(server, 'progress'):
         d['progress'] = server.progress
     d['public_v4'] = get_public_ip(server)
+    d['private_v4'] = get_private_ip(server)
     return d
 
 

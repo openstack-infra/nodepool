@@ -405,6 +405,7 @@ class NodeLauncher(threading.Thread):
         if not ip:
             raise LaunchNetworkException("Unable to find public IP of server")
 
+        self.node.ip_private = server.get('private_v4')
         self.node.ip = ip
         self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
                        (self.node.id, ip))
@@ -502,14 +503,27 @@ class NodeLauncher(threading.Thread):
             f = ftp.open('/etc/nodepool/node', 'w')
             f.write(n.ip + '\n')
             f.close()
+            # The private IP of this node
+            f = ftp.open('/etc/nodepool/node_private', 'w')
+            f.write(n.ip_private + '\n')
+            f.close()
             # The IP of the primary node of this node set
             f = ftp.open('/etc/nodepool/primary_node', 'w')
             f.write(self.node.ip + '\n')
+            f.close()
+            # The private IP of the primary node of this node set
+            f = ftp.open('/etc/nodepool/primary_node_private', 'w')
+            f.write(self.node.ip_private + '\n')
             f.close()
             # The IPs of all sub nodes in this node set
             f = ftp.open('/etc/nodepool/sub_nodes', 'w')
             for subnode in self.node.subnodes:
                 f.write(subnode.ip + '\n')
+            f.close()
+            # The private IPs of all sub nodes in this node set
+            f = ftp.open('/etc/nodepool/sub_nodes_private', 'w')
+            for subnode in self.node.subnodes:
+                f.write(subnode.ip_private + '\n')
             f.close()
             # The SSH key for this node set
             f = ftp.open('/etc/nodepool/id_rsa', 'w')
@@ -665,6 +679,7 @@ class SubNodeLauncher(threading.Thread):
         if not ip:
             raise LaunchNetworkException("Unable to find public IP of server")
 
+        self.subnode.ip_private = server.get('private_v4')
         self.subnode.ip = ip
         self.log.debug("Subnode id: %s for node id: %s is running, "
                        "ip: %s, testing ssh" %

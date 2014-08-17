@@ -45,10 +45,17 @@ Those files include:
   the job), or a sub-node.
 **/etc/nodepool/node**
   The IP address of this node.
+**/etc/nodepool/node_private**
+  The private IP address of this node.
 **/etc/nodepool/primary_node**
-  The IP address of the primary node.
+  The IP address of the primary node, usable for external access.
+**/etc/nodepool/primary_node_private**
+  The Private IP address of the primary node, for internal communication.
 **/etc/nodepool/sub_nodes**
-  The IP addresses of the sub nodes, one on each line.
+  The IP addresses of the sub nodes, one on each line,
+  usable for external access.
+**/etc/nodepool/sub_nodes_private**
+  The Private IP addresses of the sub nodes, one on each line.
 **/etc/nodepool/id_rsa**
   An OpenSSH private key generated specifically for this node group.
 **/etc/nodepool/id_rsa.pub**
