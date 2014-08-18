@@ -186,7 +186,8 @@ class NodePoolCmd(object):
                                 break
                 else:
                     provider = self.pool.config.providers[self.args.provider]
-                    self.pool.updateImage(session, provider.self.args.image)
+                    self.pool.updateImage(session, provider.name,
+                                          self.args.image)
 
     def image_build(self):
         if self.args.image not in self.pool.config.diskimages:
