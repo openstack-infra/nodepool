@@ -149,7 +149,7 @@ class FakeSSHClient(object):
     def __init__(self):
         self.client = self
 
-    def ssh(self, description, cmd):
+    def ssh(self, description, cmd, output=False):
         return True
 
     def scp(self, src, dest):
