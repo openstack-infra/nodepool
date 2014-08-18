@@ -96,14 +96,14 @@ class NotFound(Exception):
 
 class CreateServerTask(Task):
     def main(self, client):
-        server = client.nova.servers.create(**self.args)
+        server = client.servers.create(**self.args)
         return str(server.id)
 
 
 class GetServerTask(Task):
     def main(self, client):
         try:
-            server = client.nova.servers.get(self.args['server_id'])
+            server = client.servers.get(self.args['server_id'])
         except novaclient.exceptions.NotFound:
             raise NotFound()
         return make_server_dict(server)
@@ -111,52 +111,52 @@ class GetServerTask(Task):
 
 class DeleteServerTask(Task):
     def main(self, client):
-        client.nova.servers.delete(self.args['server_id'])
+        client.servers.delete(self.args['server_id'])
 
 
 class ListServersTask(Task):
     def main(self, client):
-        servers = client.nova.servers.list()
+        servers = client.servers.list()
         return [make_server_dict(server) for server in servers]
 
 
 class AddKeypairTask(Task):
     def main(self, client):
-        client.nova.keypairs.create(**self.args)
+        client.keypairs.create(**self.args)
 
 
 class ListKeypairsTask(Task):
     def main(self, client):
-        keys = client.nova.keypairs.list()
+        keys = client.keypairs.list()
         return [dict(id=str(key.id), name=key.name) for
                 key in keys]
 
 
 class DeleteKeypairTask(Task):
     def main(self, client):
-        client.nova.keypairs.delete(self.args['name'])
+        client.keypairs.delete(self.args['name'])
 
 
 class CreateFloatingIPTask(Task):
     def main(self, client):
-        ip = client.nova.floating_ips.create(**self.args)
+        ip = client.floating_ips.create(**self.args)
         return dict(id=str(ip.id), ip=ip.ip)
 
 
 class AddFloatingIPTask(Task):
     def main(self, client):
-        client.nova.servers.add_floating_ip(**self.args)
+        client.servers.add_floating_ip(**self.args)
 
 
 class GetFloatingIPTask(Task):
     def main(self, client):
-        ip = client.nova.floating_ips.get(self.args['ip_id'])
+        ip = client.floating_ips.get(self.args['ip_id'])
         return dict(id=str(ip.id), ip=ip.ip, instance_id=str(ip.instance_id))
 
 
 class ListFloatingIPsTask(Task):
     def main(self, client):
-        ips = client.nova.floating_ips.list()
+        ips = client.floating_ips.list()
         return [dict(id=str(ip.id), ip=ip.ip,
                      instance_id=str(ip.instance_id)) for
                 ip in ips]
@@ -164,31 +164,57 @@ class ListFloatingIPsTask(Task):
 
 class RemoveFloatingIPTask(Task):
     def main(self, client):
-        client.nova.servers.remove_floating_ip(**self.args)
+        client.servers.remove_floating_ip(**self.args)
 
 
 class DeleteFloatingIPTask(Task):
     def main(self, client):
-        client.nova.floating_ips.delete(self.args['ip_id'])
+        client.floating_ips.delete(self.args['ip_id'])
 
 
 class CreateImageTask(Task):
     def main(self, client):
         # This returns an id
-        return str(client.nova.servers.create_image(**self.args))
+        return str(client.servers.create_image(**self.args))
 
 
 class UploadImageTask(Task):
+    def get_glance_client(self, provider):
+        keystone_kwargs = {'auth_url': provider.auth_url,
+                           'username': provider.username,
+                           'password': provider.password,
+                           'tenant_name': provider.project_id}
+        glance_kwargs = {'service_type': 'image'}
+        if provider.region_name:
+            keystone_kwargs['region_name'] = provider.region_name
+
+        # get endpoint and authtoken
+        keystone = ksclient.Client(**keystone_kwargs)
+        glance_endpoint = keystone.service_catalog.url_for(
+            attr='region',
+            filter_value=keystone_kwargs['region_name'],
+            service_type='image')
+        glance_endpoint = glance_endpoint.replace('/v1.0', '')
+
+        # configure glance client
+        glance = glanceclient.client.Client('1', glance_endpoint,
+                                            token=keystone.auth_token,
+                                            **glance_kwargs)
+        return glance
+
     def main(self, client):
         if self.args['image_name'].startswith('fake-dib-image'):
             image = fakeprovider.FakeGlanceClient()
             image.update(data='fake')
         else:
-            image = client.glance.images.create(
+            # configure glance and upload image
+            glanceclient = self.get_glance_client(self.args['provider'])
+            image = glanceclient.images.create(
                 name=self.args['image_name'], is_public=False,
                 disk_format=self.args['disk_format'],
                 container_format=self.args['container_format'])
             image.update(data=open(self.args['filename'], 'rb'))
+            glanceclient = None
 
         return image.id
 
@@ -196,7 +222,7 @@ class UploadImageTask(Task):
 class GetImageTask(Task):
     def main(self, client):
         try:
-            image = client.nova.images.get(**self.args)
+            image = client.images.get(**self.args)
         except novaclient.exceptions.NotFound:
             raise NotFound()
         # HP returns 404, rackspace can return a 'DELETED' image.
@@ -208,7 +234,7 @@ class GetImageTask(Task):
 class ListExtensionsTask(Task):
     def main(self, client):
         try:
-            resp, body = client.nova.client.get('/extensions')
+            resp, body = client.client.get('/extensions')
             return [x['alias'] for x in body['extensions']]
         except novaclient.exceptions.NotFound:
             # No extensions present.
@@ -217,32 +243,26 @@ class ListExtensionsTask(Task):
 
 class ListFlavorsTask(Task):
     def main(self, client):
-        flavors = client.nova.flavors.list()
+        flavors = client.flavors.list()
         return [dict(id=str(flavor.id), ram=flavor.ram, name=flavor.name)
                 for flavor in flavors]
 
 
 class ListImagesTask(Task):
     def main(self, client):
-        images = client.nova.images.list()
+        images = client.images.list()
         return [make_image_dict(image) for image in images]
 
 
 class FindImageTask(Task):
     def main(self, client):
-        image = client.nova.images.find(**self.args)
+        image = client.images.find(**self.args)
         return dict(id=str(image.id))
 
 
 class DeleteImageTask(Task):
     def main(self, client):
-        client.nova.images.delete(**self.args)
-
-
-class ClientContainer(object):
-    def __init__(self, nova, glance):
-        self.nova = nova
-        self.glance = glance
+        client.images.delete(**self.args)
 
 
 class FindNetworkTask(Task):
@@ -288,47 +308,18 @@ class ProviderManager(TaskManager):
     def _getClient(self):
         tenant_networks = novaclient.extension.Extension(
             'tenant_networks', novaclient.v1_1.contrib.tenant_networks)
-
-        nova_kwargs = {}
-        keystone_kwargs = {}
-        glance_kwargs = {}
-
-        # specific args for client
-        nova_kwargs['auth_url'] = keystone_kwargs['auth_url'] = \
-            self.provider.auth_url
-        nova_kwargs['extensions'] = [tenant_networks]
-
-        keystone_kwargs['username'] = self.provider.username
-        keystone_kwargs['password'] = self.provider.password
-        keystone_kwargs['tenant_name'] = self.provider.project_id
-
+        args = ['1.1', self.provider.username, self.provider.password,
+                self.provider.project_id, self.provider.auth_url]
+        kwargs = {'extensions': [tenant_networks]}
         if self.provider.service_type:
-            nova_kwargs['service_type'] = self.provider.service_type
-            glance_kwargs['service_type'] = 'image'
+            kwargs['service_type'] = self.provider.service_type
         if self.provider.service_name:
-            nova_kwargs['service_name'] = self.provider.service_name
+            kwargs['service_name'] = self.provider.service_name
         if self.provider.region_name:
-            nova_kwargs['region_name'] = keystone_kwargs['region_name'] = \
-                self.provider.region_name
+            kwargs['region_name'] = self.provider.region_name
         if self.provider.auth_url == 'fake':
             return fakeprovider.FAKE_CLIENT
-
-        nova = novaclient.client.Client(
-            '1.1', self.provider.username, self.provider.password,
-            self.provider.project_id, **nova_kwargs)
-
-        keystone = ksclient.Client(**keystone_kwargs)
-
-        glance_endpoint = keystone.service_catalog.url_for(
-            attr='region',
-            filter_value=keystone_kwargs['region_name'],
-            service_type='image')
-        glance_endpoint = glance_endpoint.replace("/v1.0", "")
-        glance = glanceclient.client.Client(
-            '1', glance_endpoint, token=keystone.auth_token,
-            **glance_kwargs)
-
-        return ClientContainer(nova, glance)
+        return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
         flavors = self.listFlavors()
@@ -500,7 +491,8 @@ class ProviderManager(TaskManager):
     def uploadImage(self, image_name, filename, disk_format, container_format):
         return self.submitTask(UploadImageTask(
             image_name=image_name, filename='%s.%s' % (filename, disk_format),
-            disk_format=disk_format, container_format=container_format))
+            disk_format=disk_format, container_format=container_format,
+            provider=self.provider))
 
     def listExtensions(self):
         return self.submitTask(ListExtensionsTask())
