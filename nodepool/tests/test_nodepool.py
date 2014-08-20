@@ -84,6 +84,7 @@ class TestNodepool(tests.DBTestCase):
         configfile = self.setup_config('node.yaml')
         pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
+        self.addCleanup(pool.stop)
         time.sleep(3)
         self.waitForNodes(pool)
 
@@ -93,13 +94,13 @@ class TestNodepool(tests.DBTestCase):
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
-        pool.stop()
 
     def test_dib_node(self):
         """Test that a dib image and node are created"""
         configfile = self.setup_config('node_dib.yaml')
         pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
+        self.addCleanup(pool.stop)
         time.sleep(3)
         self.waitForNodes(pool)
 
@@ -109,13 +110,13 @@ class TestNodepool(tests.DBTestCase):
                                      target_name='fake-target',
                                      state=nodedb.READY)
         self.assertEqual(len(nodes), 1)
-        pool.stop()
 
     def test_subnodes(self):
         """Test that an image and node are created"""
         configfile = self.setup_config('subnodes.yaml')
         pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
+        self.addCleanup(pool.stop)
         time.sleep(3)
         self.waitForNodes(pool)
 
@@ -134,13 +135,13 @@ class TestNodepool(tests.DBTestCase):
                 self.assertEqual(len(node.subnodes), 2)
                 for subnode in node.subnodes:
                     self.assertEqual(subnode.state, nodedb.READY)
-        pool.stop()
 
     def test_node_az(self):
         """Test that an image and node are created with az specified"""
         configfile = self.setup_config('node_az.yaml')
         pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
         pool.start()
+        self.addCleanup(pool.stop)
         time.sleep(3)
         self.waitForNodes(pool)
 
@@ -151,4 +152,3 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].az, 'az1')
-        pool.stop()
