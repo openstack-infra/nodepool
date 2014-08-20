@@ -25,7 +25,8 @@ Setup script
 Each provider can specify a setup script with `setup`, and that script is
 expected to exist in `script_dir`. If it is found, it will be run during image
 creation. When the script is invoked, the instance hostname will be passed in
-as the first parameter.
+as the first parameter. This setup script will only be applied when building
+images using provider snapshots, not using diskimage-builder.
 
 
 Ready script
