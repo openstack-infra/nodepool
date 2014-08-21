@@ -1701,7 +1701,7 @@ class NodePool(threading.Thread):
                 continue
 
             # check if image is there, if not, build it
-            if label.image.is_diskimage:
+            if label.is_diskimage:
                 self.buildImage(self.pool.config.diskimages[label.image])
                 needs_build = True
         if needs_build:
@@ -1714,7 +1714,7 @@ class NodePool(threading.Thread):
                 continue
 
             for provider in label.providers:
-                if label.image.is_diskimage:
+                if label.is_diskimage:
                     self.uploadImage(session, provider.name, label.image)
                 else:
                     self.updateImage(session, provider.name, label.image)
