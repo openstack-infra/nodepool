@@ -1651,10 +1651,10 @@ class NodePool(threading.Thread):
                     self.buildImage(self.config.diskimages[label.image])
                 else:
                     # check for providers, to upload it
-                    for provider_name in label.providers:
+                    for provider in label.providers.values():
                         found = False
                         for snap_image in session.getSnapshotImages():
-                            if (snap_image.provider_name == provider_name and
+                            if (snap_image.provider_name == provider.name and
                                 snap_image.image_name == label.image and
                                 snap_image.state in [nodedb.READY,
                                                      nodedb.BUILDING]):
@@ -1662,27 +1662,27 @@ class NodePool(threading.Thread):
                                 break
                         if not found:
                             self.log.warning("Missing image %s on %s" %
-                                             (label.image, provider_name))
+                                             (label.image, provider.name))
                             # when we have a READY image, upload it
                             available_images = \
                                 session.getOrderedReadyDibImages(label.image)
                             if available_images:
-                                self.uploadImage(session, provider_name,
+                                self.uploadImage(session, provider.name,
                                                  label.image)
             else:
                 # snapshots
-                for provider_name in label.providers:
+                for provider in label.providers.values():
                     found = False
                     for snap_image in session.getSnapshotImages():
-                        if (snap_image.provider_name == provider_name and
+                        if (snap_image.provider_name == provider.name and
                             snap_image.image_name == label.image and
                             snap_image.state in [nodedb.READY,
                                                  nodedb.BUILDING]):
                             found = True
                     if not found:
                         self.log.warning("Missing image %s on %s" %
-                                         (label.image, provider_name))
-                        self.updateImage(session, provider_name, label.image)
+                                         (label.image, provider.name))
+                        self.updateImage(session, provider.name, label.image)
 
     def _doUpdateImages(self):
         try:
