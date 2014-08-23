@@ -1713,7 +1713,7 @@ class NodePool(threading.Thread):
                 # Label is configured to be disabled, skip creating the image.
                 continue
 
-            for provider in label.providers:
+            for provider in label.providers.values():
                 if label.is_diskimage:
                     self.uploadImage(session, provider.name, label.image)
                 else:
