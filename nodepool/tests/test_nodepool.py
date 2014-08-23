@@ -25,7 +25,6 @@ import nodepool.nodepool
 
 class TestNodepool(tests.DBTestCase):
     def setup_config(self, filename):
-        super(TestNodepool, self).setUp()
         configfile = os.path.join(os.path.dirname(tests.__file__),
                                   'fixtures', filename)
         config = open(configfile).read()
