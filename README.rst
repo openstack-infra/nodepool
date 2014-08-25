@@ -62,7 +62,7 @@ Export variable for your ssh key so you can log into the created instances:
 
 .. code-block:: bash
 
-    export NODEPOOL_SSH_KEY=`cat ~/.ssh/id_rsa.pub`
+    export NODEPOOL_SSH_KEY=`cat ~/.ssh/id_rsa.pub | awk '{print $2}'`
 
 Start nodepool with a demo config file (copy or edit fake.yaml
 to contain your data):
