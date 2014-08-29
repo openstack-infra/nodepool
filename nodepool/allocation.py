@@ -173,7 +173,7 @@ class AllocationProvider(object):
 
         for w in waiters:
             w = w[0]
-            if self.available:
+            if self.available > 0:
                 w.grant(min(int(w.amount), self.available))
             else:
                 reqs.append(w)
@@ -309,6 +309,7 @@ class AllocationSubRequest(object):
             self.provider.grants.append(grant)
         else:
             grant = None
+            amount = 0
         self.amount = amount
         # Adjust provider and request values accordingly.
         self.request.amount -= amount
