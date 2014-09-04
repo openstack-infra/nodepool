@@ -514,6 +514,12 @@ class NodeLauncher(threading.Thread):
                 f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
                 f.write(public_key)
                 f.close()
+                f = ftp.open('/etc/nodepool/provider', 'w')
+                f.write('NODEPOOL_PROVIDER=%s\n' % self.provider.name)
+                f.write('NODEPOOL_REGION=%s\n' % (
+                    self.provider.region_name or '',))
+                f.write('NODEPOOL_AZ=%s\n' % (self.node.az or '',))
+                f.close()
 
                 ftp.close()
             except Exception:
