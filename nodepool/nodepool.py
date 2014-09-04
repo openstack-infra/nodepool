@@ -1447,15 +1447,19 @@ class NodePool(threading.Thread):
                 continue
             online_targets.add(target.name)
 
+        nodes = session.getNodes()
+
         def count_nodes(label_name, state):
-            nodes = session.getNodes(label_name=label_name,
-                                     state=state)
             return len([n for n in nodes
-                        if n.target_name in online_targets])
+                        if (n.target_name in online_targets and
+                            n.label_name == label_name and
+                            n.state == state)])
 
         def count_nodes_and_subnodes(provider_name):
             count = 0
-            for n in session.getNodes(provider_name):
+            for n in nodes:
+                if n.provider_name != provider_name:
+                    continue
                 count += 1 + len(n.subnodes)
             return count
 
