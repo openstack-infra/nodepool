@@ -678,6 +678,25 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
+class ImageDeleter(threading.Thread):
+    log = logging.getLogger("nodepool.ImageDeleter")
+
+    def __init__(self, nodepool, snap_image_id):
+        threading.Thread.__init__(self,
+                                  name='ImageDeleter for %s' % snap_image_id)
+        self.snap_image_id = snap_image_id
+        self.nodepool = nodepool
+
+    def run(self):
+        try:
+            with self.nodepool.getDB().getSession() as session:
+                snap_image = session.getSnapshotImage(self.snap_image_id)
+                self.nodepool._deleteImage(session, snap_image)
+        except Exception:
+            self.log.exception("Exception deleting image %s:" %
+                               self.snap_image_id)
+
+
 class ImageUpdater(threading.Thread):
     log = logging.getLogger("nodepool.ImageUpdater")
 
@@ -719,7 +738,7 @@ class ImageUpdater(threading.Thread):
                                    (self.image.name, self.provider.name))
                 try:
                     if self.snap_image:
-                        self.nodepool.deleteImage(self.snap_image)
+                        self.nodepool.deleteImage(self.snap_image.id)
                 except Exception:
                     self.log.exception("Exception deleting image id: %s:" %
                                        self.snap_image.id)
@@ -1081,6 +1100,8 @@ class NodePool(threading.Thread):
         self.apsched = None
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
+        self._image_delete_threads = {}
+        self._image_delete_threads_lock = threading.Lock()
         self._image_builder_queue = Queue.Queue()
         self._image_builder_thread = None
 
@@ -1952,7 +1973,20 @@ class NodePool(threading.Thread):
             statsd.incr(key)
         self.updateStats(session, node.provider_name)
 
-    def deleteImage(self, snap_image):
+    def deleteImage(self, snap_image_id):
+        try:
+            self._image_delete_threads_lock.acquire()
+            if snap_image_id in self._image_delete_threads:
+                return
+            t = ImageDeleter(self, snap_image_id)
+            self._image_delete_threads[snap_image_id] = t
+            t.start()
+        except Exception:
+            self.log.exception("Could not delete image %s", snap_image_id)
+        finally:
+            self._image_delete_threads_lock.release()
+
+    def _deleteImage(self, session, snap_image):
         # Delete an image (and its associated server)
         snap_image.state = nodedb.DELETE
         provider = self.config.providers[snap_image.provider_name]
@@ -2100,7 +2134,7 @@ class NodePool(threading.Thread):
                 delete = True
         if delete:
             try:
-                self.deleteImage(image)
+                self.deleteImage(image.id)
             except Exception:
                 self.log.exception("Exception deleting image id: %s:" %
                                    image.id)
