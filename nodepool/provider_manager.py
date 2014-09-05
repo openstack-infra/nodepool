@@ -29,7 +29,7 @@ import keystoneclient.v2_0.client as ksclient
 import time
 
 import fakeprovider
-from task_manager import Task, TaskManager
+from task_manager import Task, TaskManager, ManagerStoppedException
 
 
 SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
@@ -423,6 +423,8 @@ class ProviderManager(TaskManager):
                     resource = self.getImage(resource_id)
             except NotFound:
                 continue
+            except ManagerStoppedException:
+                raise
             except Exception:
                 self.log.exception('Unable to list %ss while waiting for '
                                    '%s will retry' % (resource_type,
@@ -474,6 +476,8 @@ class ProviderManager(TaskManager):
                                      (server_id, self.provider.name)):
             try:
                 newip = self.getFloatingIP(ip['id'])
+            except ManagerStoppedException:
+                raise
             except Exception:
                 self.log.exception('Unable to get IP details for server %s, '
                                    'will retry' % (server_id))

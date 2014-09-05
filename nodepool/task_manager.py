@@ -23,6 +23,10 @@ import logging
 import time
 
 
+class ManagerStoppedException(Exception):
+    pass
+
+
 class Task(object):
     def __init__(self, **kw):
         self._wait_event = threading.Event()
@@ -93,6 +97,7 @@ class TaskManager(threading.Thread):
 
     def submitTask(self, task):
         if not self._running:
-            raise Exception("Manager %s is no longer running" % self.name)
+            raise ManagerStoppedException(
+                "Manager %s is no longer running" % self.name)
         self.queue.put(task)
         return task.wait()
