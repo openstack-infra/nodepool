@@ -785,6 +785,7 @@ class DiskImageBuilder(threading.Thread):
             img_elements = image.elements
             env['DIB_IMAGE_NAME'] = image_name
             env['DIB_IMAGE_FILENAME'] = filename
+            env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
 
             if image.qemu_img_options:
                 extra_options = ('--qemu-img-options %s' %
