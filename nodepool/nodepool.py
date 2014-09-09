@@ -768,7 +768,7 @@ class DiskImageBuilder(threading.Thread):
             self.buildImage(self.disk_image)
             self.queue.task_done()
 
-    def _buildImage(self, image, filename):
+    def _buildImage(self, image, image_name, filename):
         if filename.startswith('./fake-dib-image'):
             return True
 
@@ -783,6 +783,8 @@ class DiskImageBuilder(threading.Thread):
             extra_options = ''
             env['DIB_RELEASE'] = image.release
             img_elements = image.elements
+            env['DIB_IMAGE_NAME'] = image_name
+            env['DIB_IMAGE_FILENAME'] = filename
 
             if image.qemu_img_options:
                 extra_options = ('--qemu-img-options %s' %
@@ -824,7 +826,10 @@ class DiskImageBuilder(threading.Thread):
             # retrieve image details
             image_details = \
                 self.nodepool.config.diskimages[self.dib_image.image_name]
-            self._buildImage(image_details, self.dib_image.filename)
+            self._buildImage(
+                image_details,
+                self.dib_image.image_name,
+                self.dib_image.filename)
 
             if statsd:
                 dt = int((time.time() - start_time) * 1000)
