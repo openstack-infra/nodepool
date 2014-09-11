@@ -284,9 +284,7 @@ class NodePoolCmd(object):
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config)
-        with self.pool.getDB().getSession() as session:
-            snap_image = session.getSnapshotImage(self.args.id)
-            self.pool.deleteImage(snap_image)
+        self.pool.deleteImage(self.args.id)
 
     def main(self):
         if self.args.version:
