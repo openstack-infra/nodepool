@@ -270,7 +270,9 @@ class NodePoolCmd(object):
         self.pool.reconfigureManagers(self.pool.config)
         with self.pool.getDB().getSession() as session:
             node = session.getNode(self.args.id)
-            if self.args.now:
+            if not node:
+                print "Node %s not found." % self.args.id
+            elif self.args.now:
                 self.pool._deleteNode(session, node)
             else:
                 node.state = nodedb.DELETE
