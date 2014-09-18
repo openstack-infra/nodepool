@@ -1484,22 +1484,6 @@ class NodePool(threading.Thread):
                 count += 1 + len(n.subnodes)
             return count
 
-        # Actual need is demand - (ready + building)
-        for label in self.config.labels.values():
-            start_demand = label_demand.get(label.name, 0)
-            min_demand = start_demand + label.min_ready
-            n_ready = count_nodes(label.name, nodedb.READY)
-            n_building = count_nodes(label.name, nodedb.BUILDING)
-            n_test = count_nodes(label.name, nodedb.TEST)
-            ready = n_ready + n_building + n_test
-            demand = max(min_demand - ready, 0)
-            label_demand[label.name] = demand
-            self.log.debug("  Deficit: %s: %s (start: %s min: %s ready: %s)" %
-                           (label.name, demand, start_demand, min_demand,
-                            ready))
-
-        # Start setting up the allocation system.
-
         # Add a provider for each node provider, along with current
         # capacity
         allocation_providers = {}
@@ -1514,6 +1498,32 @@ class NodePool(threading.Thread):
                 available = 0
             ap = allocation.AllocationProvider(provider.name, available)
             allocation_providers[provider.name] = ap
+
+        # calculate demand for labels
+        # Actual need is demand - (ready + building)
+        for label in self.config.labels.values():
+            start_demand = label_demand.get(label.name, 0)
+
+            # ignore min-ready if it doesn't look like we'll have the
+            # capacity to deal with it.
+            capacity = 0
+            for provider in label.providers.values():
+                capacity += allocation_providers[provider.name].available
+            if capacity < label.min_ready:
+                min_demand = start_demand
+            else:
+                min_demand = start_demand + label.min_ready
+
+            n_ready = count_nodes(label.name, nodedb.READY)
+            n_building = count_nodes(label.name, nodedb.BUILDING)
+            n_test = count_nodes(label.name, nodedb.TEST)
+            ready = n_ready + n_building + n_test
+            demand = max(min_demand - ready, 0)
+            label_demand[label.name] = demand
+            self.log.debug("  Deficit: %s: %s "
+                           "(start: %s min: %s ready: %s capacity: %s)" %
+                           (label.name, demand,
+                            start_demand, min_demand, ready, capacity))
 
         # "Target-Label-Provider" -- the triplet of info that identifies
         # the source and location of each node.  The mapping is

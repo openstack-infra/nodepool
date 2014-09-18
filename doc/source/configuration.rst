@@ -134,10 +134,11 @@ providers or images are used to create them).  Example::
         - name: provider1
 
 The `name` and `image` keys are required.  The `providers` list is
-also required if any nodes should actually be created (e.g., the
-label is not currently disabled). The `min-ready` key is optional
-and defaults to 2. If the value is -1 the label is considered
-disabled.
+also required if any nodes should actually be created (e.g., the label
+is not currently disabled). The `min-ready` key is optional and
+defaults to 2. If the value is -1 the label is considered disabled.
+``min-ready`` is best-effort based on available capacity and is not a
+guaranteed allocation.
 
 The `subnodes` key is used to configure multi-node support.  If a
 `subnodes` key is supplied to an image, it indicates that the specified
