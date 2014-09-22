@@ -703,54 +703,6 @@ class ImageDeleter(threading.Thread):
                                self.snap_image_id)
 
 
-class ImageUpdater(threading.Thread):
-    log = logging.getLogger("nodepool.ImageUpdater")
-
-    def __init__(self, nodepool, provider, image, snap_image_id):
-        threading.Thread.__init__(self, name='ImageUpdater for %s' %
-                                  snap_image_id)
-        self.provider = provider
-        self.image = image
-        self.snap_image_id = snap_image_id
-        self.nodepool = nodepool
-        self.scriptdir = self.nodepool.config.scriptdir
-        self.elementsdir = self.nodepool.config.elementsdir
-        self.imagesdir = self.nodepool.config.imagesdir
-
-    def run(self):
-        try:
-            self._run()
-        except Exception:
-            self.log.exception("Exception in run method:")
-
-    def _run(self):
-        with self.nodepool.getDB().getSession() as session:
-            self.log.debug("Updating image %s in %s " % (self.image.name,
-                                                         self.provider.name))
-            try:
-                self.snap_image = session.getSnapshotImage(
-                    self.snap_image_id)
-                self.manager = self.nodepool.getProviderManager(self.provider)
-            except Exception:
-                self.log.exception("Exception preparing to update image %s "
-                                   "in %s:" % (self.image.name,
-                                               self.provider.name))
-                return
-
-            try:
-                self.updateImage(session)
-            except Exception:
-                self.log.exception("Exception updating image %s in %s:" %
-                                   (self.image.name, self.provider.name))
-                try:
-                    if self.snap_image:
-                        self.nodepool.deleteImage(self.snap_image.id)
-                except Exception:
-                    self.log.exception("Exception deleting image id: %s:" %
-                                       self.snap_image.id)
-                    return
-
-
 class DiskImageBuilder(threading.Thread):
     log = logging.getLogger("nodepool.DiskImageBuilderThread")
 
@@ -840,6 +792,54 @@ class DiskImageBuilder(threading.Thread):
             self.dib_image.state = nodedb.READY
             session.commit()
             self.log.info("Image %s is built" % self.dib_image.image_name)
+
+
+class ImageUpdater(threading.Thread):
+    log = logging.getLogger("nodepool.ImageUpdater")
+
+    def __init__(self, nodepool, provider, image, snap_image_id):
+        threading.Thread.__init__(self, name='ImageUpdater for %s' %
+                                  snap_image_id)
+        self.provider = provider
+        self.image = image
+        self.snap_image_id = snap_image_id
+        self.nodepool = nodepool
+        self.scriptdir = self.nodepool.config.scriptdir
+        self.elementsdir = self.nodepool.config.elementsdir
+        self.imagesdir = self.nodepool.config.imagesdir
+
+    def run(self):
+        try:
+            self._run()
+        except Exception:
+            self.log.exception("Exception in run method:")
+
+    def _run(self):
+        with self.nodepool.getDB().getSession() as session:
+            self.log.debug("Updating image %s in %s " % (self.image.name,
+                                                         self.provider.name))
+            try:
+                self.snap_image = session.getSnapshotImage(
+                    self.snap_image_id)
+                self.manager = self.nodepool.getProviderManager(self.provider)
+            except Exception:
+                self.log.exception("Exception preparing to update image %s "
+                                   "in %s:" % (self.image.name,
+                                               self.provider.name))
+                return
+
+            try:
+                self.updateImage(session)
+            except Exception:
+                self.log.exception("Exception updating image %s in %s:" %
+                                   (self.image.name, self.provider.name))
+                try:
+                    if self.snap_image:
+                        self.nodepool.deleteImage(self.snap_image.id)
+                except Exception:
+                    self.log.exception("Exception deleting image id: %s:" %
+                                       self.snap_image.id)
+                    return
 
 
 class DiskImageUpdater(ImageUpdater):
