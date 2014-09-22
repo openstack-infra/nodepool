@@ -757,8 +757,6 @@ class DiskImageBuilder(threading.Thread):
     def __init__(self, nodepool):
         threading.Thread.__init__(self, name='DiskImageBuilder queue')
         self.nodepool = nodepool
-        self.elementsdir = self.nodepool.config.elementsdir
-        self.imagesdir = self.nodepool.config.imagesdir
         self.queue = nodepool._image_builder_queue
 
     def run(self):
@@ -774,25 +772,26 @@ class DiskImageBuilder(threading.Thread):
 
         try:
             env = os.environ.copy()
-            for k, v in os.environ.items():
-                if k.startswith('NODEPOOL_'):
-                    env[k] = v
 
-            env['ELEMENTS_PATH'] = self.elementsdir
-            img_elements = ''
-            extra_options = ''
             env['DIB_RELEASE'] = image.release
-            img_elements = image.elements
             env['DIB_IMAGE_NAME'] = image_name
             env['DIB_IMAGE_FILENAME'] = filename
+            # Note we use a reference to the nodepool config here so
+            # that whenever the config is updated we get up to date
+            # values in this thread.
+            env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
             env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
+            out_file_path = os.path.join(self.nodepool.config.imagesdir,
+                                         filename)
 
+            extra_options = ''
             if image.qemu_img_options:
                 extra_options = ('--qemu-img-options %s' %
                                  image.qemu_img_options)
+            img_elements = image.elements
 
             cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
-                   (extra_options, filename, img_elements))
+                   (extra_options, out_file_path, img_elements))
             self.log.info('Running %s' % cmd)
 
             p = subprocess.Popen(
@@ -870,7 +869,8 @@ class DiskImageUpdater(ImageUpdater):
 
         # strip extension from filename
         stripped_filename = self.filename.replace(".qcow2", "")
-        image_id = self.manager.uploadImage(image_name, stripped_filename,
+        image_path = os.path.join(self.imagesdir, stripped_filename)
+        image_id = self.manager.uploadImage(image_name, image_path,
                                             'qcow2', 'bare')
         self.snap_image.external_id = image_id
         session.commit()
