@@ -719,9 +719,6 @@ class DiskImageBuilder(threading.Thread):
             self.queue.task_done()
 
     def _buildImage(self, image, image_name, filename):
-        if filename.startswith('./fake-dib-image'):
-            return True
-
         try:
             env = os.environ.copy()
 
@@ -744,6 +741,13 @@ class DiskImageBuilder(threading.Thread):
 
             cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
                    (extra_options, out_file_path, img_elements))
+
+            if 'fake-dib-image' in filename:
+                cmd = 'echo ' + cmd
+
+            log = logging.getLogger("nodepool.image.build.%s" %
+                                    (image_name,))
+
             self.log.info('Running %s' % cmd)
 
             p = subprocess.Popen(
@@ -751,13 +755,14 @@ class DiskImageBuilder(threading.Thread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 env=env)
-            (stdout, stderr) = p.communicate()
-            if self.log:
-                self.log.info(stdout)
-            if stderr:
-                for line in stderr:
-                    if self.log:
-                        self.log.error(line.rstrip())
+
+            while True:
+                ln = p.stdout.readline()
+                log.info(ln.strip())
+                if not ln:
+                    break
+
+            p.wait()
             ret = p.returncode
             if ret:
                 raise Exception("Unable to create %s" % filename)
@@ -1694,8 +1699,7 @@ class NodePool(threading.Thread):
                         # to rebuild and delete this buggy image
                         if (dib_image.state == nodedb.READY and
                                 not os.path.exists(dib_image.filename) and
-                                not dib_image.filename.startswith(
-                                    './fake-dib-image')):
+                                not 'fake-dib-image' in dib_image.filename):
                             self.log.warning("Image filename %s does not "
                                              "exist. Removing image" %
                                              dib_image.filename)
