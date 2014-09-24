@@ -207,12 +207,14 @@ class UploadImageTask(Task):
             image = fakeprovider.FakeGlanceClient()
             image.update(data='fake')
         else:
-            # configure glance and upload image
+            # configure glance and upload image.  Note the meta flags
+            # are provided as custom glance properties
             glanceclient = self.get_glance_client(self.args['provider'])
             image = glanceclient.images.create(
                 name=self.args['image_name'], is_public=False,
                 disk_format=self.args['disk_format'],
-                container_format=self.args['container_format'])
+                container_format=self.args['container_format'],
+                **self.args['meta'])
             image.update(data=open(self.args['filename'], 'rb'))
             glanceclient = None
 
@@ -489,18 +491,20 @@ class ProviderManager(TaskManager):
             if newip['instance_id'] == server_id:
                 return newip['ip']
 
-    def createImage(self, server_id, image_name):
+    def createImage(self, server_id, image_name, meta):
         return self.submitTask(CreateImageTask(server=server_id,
-                                               image_name=image_name))
+                                               image_name=image_name,
+                                               metadata=meta))
 
     def getImage(self, image_id):
         return self.submitTask(GetImageTask(image=image_id))
 
-    def uploadImage(self, image_name, filename, disk_format, container_format):
+    def uploadImage(self, image_name, filename, disk_format, container_format,
+                    meta):
         return self.submitTask(UploadImageTask(
             image_name=image_name, filename='%s.%s' % (filename, disk_format),
             disk_format=disk_format, container_format=container_format,
-            provider=self.provider))
+            provider=self.provider, meta=meta))
 
     def listExtensions(self):
         return self.submitTask(ListExtensionsTask())

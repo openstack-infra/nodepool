@@ -36,6 +36,9 @@ providers:
         base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
         setup: prepare_node_devstack.sh
 
 targets:

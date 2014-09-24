@@ -220,6 +220,9 @@ same name.  Example::
           reset: reset_node.sh
           username: jenkins
           private-key: /var/lib/jenkins/.ssh/id_rsa
+          meta:
+              key: value
+              key2: value
         - name: quantal
           base-image: 'Quantal'
           min-ram: 8192
@@ -275,6 +278,11 @@ at random and provide that to nova. This should give a good distribution
 of availability zones being used. If you need more control of the
 distribution you can use multiple logical providers each providing a
 different list of availabiltiy zones.
+
+The `meta` section is optional.  It is a dict of arbitrary key/value
+metadata to store for this server using the nova metadata service. A
+maximum of five entries is allowed, and both keys and values must be
+255 characters or less.
 
 targets
 -------
