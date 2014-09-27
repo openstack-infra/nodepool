@@ -433,8 +433,12 @@ class ProviderManager(TaskManager):
 
             status = resource.get('status')
             if (last_status != status):
-                self.log.debug('Status of %s %s: %s' %
-                               (resource_type, resource_id, status))
+                self.log.debug(
+                    'Status of {type} in {provider} {id}: {status}'.format(
+                        type=resource_type,
+                        provider=self.provider.name,
+                        id=resource_id,
+                        status=status))
             last_status = status
             if status in ['ACTIVE', 'ERROR']:
                 return resource
