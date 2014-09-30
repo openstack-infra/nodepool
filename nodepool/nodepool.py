@@ -1765,7 +1765,7 @@ class NodePool(threading.Thread):
 
             # check if image is there, if not, build it
             if label.is_diskimage:
-                self.buildImage(self.pool.config.diskimages[label.image])
+                self.buildImage(self.config.diskimages[label.image])
                 needs_build = True
         if needs_build:
             # wait for all builds to finish, to have updated images to upload
