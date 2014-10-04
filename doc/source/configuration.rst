@@ -7,9 +7,12 @@ Nodepool reads its configuration from ``/etc/nodepool/nodepool.yaml``
 by default.  The configuration file follows the standard YAML syntax
 with a number of sections defined with top level keys.  For example, a
 full configuration file may have the ``labels``, ``providers``, and
-``targets`` sections::
+``targets`` sections. If building images using diskimage-builder, the
+``diskimages`` section is also required::
 
   labels:
+    ...
+  diskimages:
     ...
   providers:
     ...
@@ -153,6 +156,35 @@ A script specified by `ready-script` can be used to perform any last minute
 changes to a node after it has been launched but before it is put in the READY
 state to receive jobs. For more information, see :ref:`scripts`.
 
+diskimages
+----------
+
+Lists the images that are going to be built using diskimage-builder.
+Image keyword defined on labels section will be mapped to the
+images listed on diskimages. If an entry matching the image is found
+this will be built using diskimage-builder and the settings found
+on this configuration. If no matching image is found, image
+will be built using the provider snapshot approach::
+
+  diskimages:
+  - name: devstack-precise
+    elements:
+      - ubuntu
+      - vm
+      - puppet
+      - node-devstack
+    release: precise
+    qemu-img-options: compat=0.10
+
+For diskimages, the `name` is required. The `elements` section
+enumerates all the elements that will be included when building
+the image, and will point to the `elements-dir` path referenced
+in the same config file. `release` specifies the distro to be
+used as a base image to build the image using diskimage-builder.
+`qemu-img-options` allows to specify custom settings that qemu
+will be using to build the final image. Settings there have to
+be separated by commas, and must follow qemu syntax.
+
 providers
 ---------
 
@@ -220,7 +252,10 @@ For providers, the `name`, `username`, `password`, `auth-url`,
 `name`, `base-image`, and `min-ram` keys are required.  The `username`
 and `private-key` values default to the values indicated.  Nodepool
 expects that user to exist after running the script indicated by
-`setup`. See :ref:`scripts` for setup script details.
+`setup`. `setup` will be used only when not building images
+using diskimage-builder, in that case settings defined in
+the ``diskimages`` section will be used instead. See :ref:`scripts`
+for setup script details.
 
 Both `boot-timeout` and `launch-timeout` keys are optional.  The
 `boot-timeout` key defaults to 60 seconds and `launch-timeout` key

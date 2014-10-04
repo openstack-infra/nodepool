@@ -44,22 +44,27 @@ class NodePoolCmd(object):
 
         cmd_list = subparsers.add_parser('list', help='list nodes')
         cmd_list.set_defaults(func=self.list)
-        cmd_image_list = subparsers.add_parser('image-list',
-                                               help='list images')
+        cmd_image_list = subparsers.add_parser(
+            'image-list', help='list images from providers')
         cmd_image_list.set_defaults(func=self.image_list)
 
-        cmd_dib_image_list = subparsers.add_parser('dib-image-list',
-                                                   help='list dib images')
+        cmd_dib_image_list = subparsers.add_parser(
+            'dib-image-list',
+            help='list images built with diskimage-builder')
         cmd_dib_image_list.set_defaults(func=self.dib_image_list)
 
-        cmd_image_update = subparsers.add_parser('image-update',
-                                                 help='update image')
-        cmd_image_update.add_argument('provider', help='provider name')
+        cmd_image_update = subparsers.add_parser(
+            'image-update',
+            help='rebuild the image and upload to provider')
+        cmd_image_update.add_argument(
+            'provider',
+            help='provider name (`all` for uploading to all providers)')
         cmd_image_update.add_argument('image', help='image name')
         cmd_image_update.set_defaults(func=self.image_update)
 
-        cmd_image_build = subparsers.add_parser('image-build',
-                                                help='build image')
+        cmd_image_build = subparsers.add_parser(
+            'image-build',
+            help='build image using diskimage-builder')
         cmd_image_build.add_argument('image', help='image name')
         cmd_image_build.set_defaults(func=self.image_build)
 
@@ -100,16 +105,18 @@ class NodePoolCmd(object):
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
-            help='delete a dib image')
+            help='delete image built with diskimage-builder')
         cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
         cmd_dib_image_delete.add_argument('id', help='dib image id')
 
         cmd_image_upload = subparsers.add_parser(
             'image-upload',
-            help='upload an image')
+            help='upload an image to a provider ')
         cmd_image_upload.set_defaults(func=self.image_upload)
-        cmd_image_upload.add_argument('provider', help='provider name',
-                                      nargs='?', default='all')
+        cmd_image_upload.add_argument(
+            'provider',
+            help='provider name (`all` for uploading to all providers)',
+            nargs='?', default='all')
         cmd_image_upload.add_argument('image', help='image name')
 
         self.args = parser.parse_args()
@@ -227,13 +234,13 @@ class NodePoolCmd(object):
         with self.pool.getDB().getSession() as session:
             for provider in self.pool.config.providers.values():
                 if (self.args.provider and
-                    provider.name != self.args.provider):
+                        provider.name != self.args.provider):
                     continue
                 manager = self.pool.getProviderManager(provider)
 
                 for server in manager.listServers():
                     if not session.getNodeByExternalID(
-                        provider.name, server['id']):
+                            provider.name, server['id']):
                         t.add_row([provider.name, server['name'], server['id'],
                                    server['public_v4']])
         print t
@@ -246,14 +253,14 @@ class NodePoolCmd(object):
         with self.pool.getDB().getSession() as session:
             for provider in self.pool.config.providers.values():
                 if (self.args.provider and
-                    provider.name != self.args.provider):
+                        provider.name != self.args.provider):
                     continue
                 manager = self.pool.getProviderManager(provider)
 
                 for image in manager.listImages():
                     if image['metadata'].get('image_type') == 'snapshot':
                         if not session.getSnapshotImageByExternalID(
-                            provider.name, image['id']):
+                                provider.name, image['id']):
                             t.add_row([provider.name, image['name'],
                                        image['id']])
         print t

@@ -33,13 +33,29 @@ The general options that apply to all subcommands are:
 
 The following subcommands deal with nodepool images:
 
+dib-image-list
+^^^^^^^^^^^^^^
+.. program-output:: nodepool dib-image-list --help
+
 image-list
 ^^^^^^^^^^
 .. program-output:: nodepool image-list --help
 
+image-build
+^^^^^^^^^^^
+.. program-output:: nodepool image-build --help
+
 image-update
 ^^^^^^^^^^^^
 .. program-output:: nodepool image-update --help
+
+image-upload
+^^^^^^^^^^^^
+.. program-output:: nodepool image-upload --help
+
+dib-image-delete
+^^^^^^^^^^^^^^^^
+.. program-output:: nodepool dib-image-delete --help
 
 image-delete
 ^^^^^^^^^^^^
