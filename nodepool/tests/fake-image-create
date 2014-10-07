@@ -39,12 +39,14 @@ if [[ "${BASE_IMAGE_FILE}" != "Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2" 
 fi
 
 outfile=
+outtypes=("qcow2")
 
-TEMP=$(getopt -o o: -- "$@")
+TEMP=$(getopt -o o:t: -- "$@")
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
         -o) outfile=$2; shift 2;;
+        -t) IFS="," read -a outtypes <<< "$2"; shift 2;;
         --) shift ; break ;;
     esac
 done
@@ -53,7 +55,9 @@ if [ -z "$outfile" ]; then
     echo "No output file specified."
     exit 1
 else
-    echo "fake-data" > $outfile
+    for outtype in ${outtypes[@]} ; do
+        echo "fake-data" > $outfile.$outtype
+    done
 fi
 
 echo "*** fake-image-create: done"
