@@ -425,7 +425,7 @@ class NodeLauncher(threading.Thread):
         server_id = self.manager.createServer(
             hostname, self.image.min_ram, snap_image.external_id,
             name_filter=self.image.name_filter, az=self.node.az,
-            config_drive=self.image.config_drive)
+            config_drive=self.image.config_drive, node_id=self.node_id)
         self.node.external_id = server_id
         session.commit()
 
@@ -704,7 +704,7 @@ class SubNodeLauncher(threading.Thread):
         server_id = self.manager.createServer(
             hostname, self.image.min_ram, snap_image.external_id,
             name_filter=self.image.name_filter, az=self.node_az,
-            config_drive=self.image.config_drive)
+            config_drive=self.image.config_drive, node_id=self.node_id)
         self.subnode.external_id = server_id
         session.commit()
 

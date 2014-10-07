@@ -22,6 +22,29 @@ This way if you find that a newly created image is problematic, you
 may simply delete it and Nodepool will revert to using the previous
 image.
 
+Metadata
+--------
+
+When nodepool creates instances, it will assign the following nova
+metadata:
+
+  groups
+    A json-encoded list containing the name of the image and the name
+    of the provider.  This may be used by the Ansible OpenStack
+    inventory plugin.
+
+  nodepool
+    A json-encoded dictionary with the following entries:
+
+    image_name
+      The name of the image as a string.
+
+    provider_name
+      The name of the provider as a string.
+
+    node_id
+      The nodepool id of the node as an integer.
+
 Command Line Tools
 ==================
 
