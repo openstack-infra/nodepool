@@ -730,6 +730,11 @@ class DiskImageBuilder(threading.Thread):
             # values in this thread.
             env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
             env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
+
+            # send additional env vars if needed
+            for k, v in image.env_vars.items():
+                env[k] = v
+
             out_file_path = os.path.join(self.nodepool.config.imagesdir,
                                          filename)
 
@@ -1194,6 +1199,10 @@ class NodePool(threading.Thread):
                     d.elements = ''
                 d.release = diskimage.get('release', '')
                 d.qemu_img_options = diskimage.get('qemu-img-options', '')
+                if 'env-vars' in diskimage:
+                    d.env_vars = diskimage['env-vars']
+                else:
+                    d.env_vars = {}
 
         for label in config['labels']:
             l = Label()
