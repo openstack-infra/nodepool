@@ -50,7 +50,9 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
             stderr = self.useFixture(fixtures.StringStream('stderr')).stream
             self.useFixture(fixtures.MonkeyPatch('sys.stderr', stderr))
         if os.environ.get('OS_LOG_CAPTURE') in TRUE_VALUES:
-            self.useFixture(fixtures.FakeLogger(level=logging.DEBUG))
+            fs = '%(levelname)s [%(name)s] %(message)s'
+            self.useFixture(fixtures.FakeLogger(level=logging.DEBUG,
+                                                format=fs))
         else:
             logging.basicConfig(level=logging.DEBUG)
         self.useFixture(fixtures.NestedTempfile())
