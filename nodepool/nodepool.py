@@ -463,7 +463,7 @@ class NodeLauncher(threading.Thread):
                     host=self.node.ip,
                     description='Dynamic single use %s node' % self.label.name,
                     executors=1,
-                    root='/home/jenkins')
+                    root=self.image.user_home)
         if not self.target.jenkins_test_job:
             args['labels'] = self.label.name
         if self.target.jenkins_credentials_id:
@@ -1248,6 +1248,7 @@ class NodePool(threading.Thread):
                 i.reset = image.get('reset')
                 i.diskimage = image.get('diskimage', None)
                 i.username = image.get('username', 'jenkins')
+                i.user_home = image.get('user-home', '/home/jenkins')
                 i.private_key = image.get('private-key',
                                           '/var/lib/jenkins/.ssh/id_rsa')
 
@@ -1334,6 +1335,7 @@ class NodePool(threading.Thread):
                 new_images[k].setup != old_images[k].setup or
                 new_images[k].reset != old_images[k].reset or
                 new_images[k].username != old_images[k].username or
+                new_images[k].user_home != old_images[k].user_home or
                 new_images[k].private_key != old_images[k].private_key or
                 new_images[k].meta != old_images[k].meta):
                 return False
