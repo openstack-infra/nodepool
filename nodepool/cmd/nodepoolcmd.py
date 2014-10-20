@@ -227,7 +227,7 @@ class NodePoolCmd(object):
         self.pool.waitForBuiltImages()
 
     def image_upload(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        self.pool.reconfigureManagers(self.pool.config, False)
         if not self.args.image in self.pool.config.diskimages:
             # only can build disk images, not snapshots
             raise Exception("Trying to upload a non disk-image-builder "
@@ -247,7 +247,7 @@ class NodePoolCmd(object):
                                       self.args.image)
 
     def alien_list(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        self.pool.reconfigureManagers(self.pool.config, False)
 
         t = PrettyTable(["Provider", "Hostname", "Server ID", "IP"])
         t.align = 'l'
@@ -266,7 +266,7 @@ class NodePoolCmd(object):
         print t
 
     def alien_image_list(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        self.pool.reconfigureManagers(self.pool.config, False)
 
         t = PrettyTable(["Provider", "Name", "Image ID"])
         t.align = 'l'
@@ -306,13 +306,13 @@ class NodePoolCmd(object):
                 self.list(node_id=node.id)
 
     def dib_image_delete(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        self.pool.reconfigureManagers(self.pool.config, False)
         with self.pool.getDB().getSession() as session:
             dib_image = session.getDibImage(self.args.id)
             self.pool.deleteDibImage(dib_image)
 
     def image_delete(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        self.pool.reconfigureManagers(self.pool.config, False)
         self.pool.deleteImage(self.args.id)
 
     def main(self):
