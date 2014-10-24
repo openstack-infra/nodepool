@@ -1101,7 +1101,15 @@ class Target(ConfigValue):
 
 
 class Label(ConfigValue):
-    pass
+    def __init__(self):
+        self.snapshot_providers = {}
+        self.diskimage_providers = {}
+
+    @property
+    def providers(self):
+        tmp = self.snapshot_providers.copy()
+        tmp.update(self.diskimage_providers)
+        return tmp
 
 
 class LabelProvider(ConfigValue):
@@ -1221,23 +1229,6 @@ class NodePool(threading.Thread):
                 else:
                     d.env_vars = {}
 
-        for label in config['labels']:
-            l = Label()
-            l.name = label['name']
-            newconfig.labels[l.name] = l
-            l.image = label['image']
-            l.min_ready = label.get('min-ready', 2)
-            l.subnodes = label.get('subnodes', 0)
-            l.ready_script = label.get('ready-script')
-            l.providers = {}
-            for provider in label['providers']:
-                p = LabelProvider()
-                p.name = provider['name']
-                l.providers[p.name] = p
-
-            # if image is in diskimages, mark it to build once
-            l.is_diskimage = (l.image in newconfig.diskimages)
-
         for provider in config['providers']:
             p = Provider()
             p.name = provider['name']
@@ -1294,6 +1285,22 @@ class NodePool(threading.Thread):
                         self.log.error("Invalid metadata for %s; ignored"
                                        % i.name)
                         i.meta = {}
+
+        for label in config['labels']:
+            l = Label()
+            l.name = label['name']
+            newconfig.labels[l.name] = l
+            l.image = label['image']
+            l.min_ready = label.get('min-ready', 2)
+            l.subnodes = label.get('subnodes', 0)
+            l.ready_script = label.get('ready-script')
+            for provider in label['providers']:
+                p = LabelProvider()
+                p.name = provider['name']
+                if newconfig.providers[p.name].images[l.image].diskimage:
+                    l.diskimage_providers[p.name] = p
+                else:
+                    l.snapshot_providers[p.name] = p
 
         for target in config['targets']:
             t = Target()
@@ -1735,7 +1742,7 @@ class NodePool(threading.Thread):
                 continue
 
             # check if image is there, if not, build it
-            if label.is_diskimage:
+            if label.diskimage_providers:
                 found = False
                 for dib_image in session.getDibImages():
                     if (dib_image.image_name == label.image and
@@ -1761,10 +1768,10 @@ class NodePool(threading.Thread):
                     self.buildImage(self.config.diskimages[label.image])
                 else:
                     # check for providers, to upload it
-                    for provider in label.providers.values():
+                    for provider_name in label.diskimage_providers.keys():
                         found = False
                         for snap_image in session.getSnapshotImages():
-                            if (snap_image.provider_name == provider.name and
+                            if (snap_image.provider_name == provider_name and
                                 snap_image.image_name == label.image and
                                 snap_image.state in [nodedb.READY,
                                                      nodedb.BUILDING]):
@@ -1772,27 +1779,26 @@ class NodePool(threading.Thread):
                                 break
                         if not found:
                             self.log.warning("Missing image %s on %s" %
-                                             (label.image, provider.name))
+                                             (label.image, provider_name))
                             # when we have a READY image, upload it
                             available_images = \
                                 session.getOrderedReadyDibImages(label.image)
                             if available_images:
-                                self.uploadImage(session, provider.name,
+                                self.uploadImage(session, provider_name,
                                                  label.image)
-            else:
-                # snapshots
-                for provider in label.providers.values():
-                    found = False
-                    for snap_image in session.getSnapshotImages():
-                        if (snap_image.provider_name == provider.name and
-                            snap_image.image_name == label.image and
-                            snap_image.state in [nodedb.READY,
-                                                 nodedb.BUILDING]):
-                            found = True
-                    if not found:
-                        self.log.warning("Missing image %s on %s" %
-                                         (label.image, provider.name))
-                        self.updateImage(session, provider.name, label.image)
+            # snapshots
+            for provider_name in label.snapshot_providers.keys():
+                found = False
+                for snap_image in session.getSnapshotImages():
+                    if (snap_image.provider_name == provider_name and
+                        snap_image.image_name == label.image and
+                        snap_image.state in [nodedb.READY,
+                                             nodedb.BUILDING]):
+                        found = True
+                if not found:
+                    self.log.warning("Missing image %s on %s" %
+                                     (label.image, provider_name))
+                    self.updateImage(session, provider_name, label.image)
 
     def _doUpdateImages(self):
         try:
@@ -1805,15 +1811,15 @@ class NodePool(threading.Thread):
         # first run the snapshot image updates
         for label in self.config.labels.values():
             # only update if min_ready not negative
-            if (not label.is_diskimage) and (label.min_ready >= 0):
-                for provider in label.providers.values():
-                    self.updateImage(session, provider.name, label.image)
+            if label.snapshot_providers and label.min_ready >= 0:
+                for provider_name in label.snapshot_providers.keys():
+                    self.updateImage(session, provider_name, label.image)
 
-        # This function should be run periodically to create new snapshot
-        # images.
         needs_build = False
         for label in self.config.labels.values():
-            if label.is_diskimage and label.min_ready >= 0:
+            # If we use diskimages on at least one provider rebuild the image
+            # before updating it in the provider(s).
+            if label.diskimage_providers and label.min_ready >= 0:
                 # check if image is there, if not, build it
                 self.buildImage(self.config.diskimages[label.image])
                 needs_build = True
@@ -1821,10 +1827,11 @@ class NodePool(threading.Thread):
             # wait for all builds to finish, to have updated images to upload
             self.waitForBuiltImages()
 
+        # Upload newly built images to all providers that use dib built images
         for label in self.config.labels.values():
-            if label.is_diskimage and label.min_ready >= 0:
-                for provider in label.providers.values():
-                    self.uploadImage(session, provider.name, label.image)
+            if label.diskimage_providers and label.min_ready >= 0:
+                for provider_name in label.diskimage_providers.keys():
+                    self.uploadImage(session, provider_name, label.image)
 
     def updateImage(self, session, provider_name, image_name):
         try:
@@ -1834,15 +1841,14 @@ class NodePool(threading.Thread):
                 "Could not update image %s on %s", image_name, provider_name)
 
     def _updateImage(self, session, provider_name, image_name):
-        # check type of image depending on label
-        is_diskimage = (image_name in self.config.diskimages)
-        if is_diskimage:
+        provider = self.config.providers[provider_name]
+        image = provider.images[image_name]
+        # check type of image depending on diskimage flag
+        if image.diskimage:
             raise Exception(
                 "Cannot update disk image images. "
                 "Please build and upload images")
 
-        provider = self.config.providers[provider_name]
-        image = provider.images[image_name]
         if not image.setup:
             raise Exception(
                 "Invalid image config. Must specify either "
@@ -1859,13 +1865,6 @@ class NodePool(threading.Thread):
         return t
 
     def buildImage(self, image):
-        # check type of image depending on label
-        is_diskimage = (image.name in self.config.diskimages)
-        if not is_diskimage:
-            raise Exception(
-                "Cannot build non disk image images. "
-                "Please create snapshots for them")
-
         # check if we already have this item in the queue
         with self.getDB().getSession() as session:
             queued_images = session.getBuildingDibImagesByName(image.name)
