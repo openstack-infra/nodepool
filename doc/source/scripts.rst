@@ -43,6 +43,8 @@ Those files include:
   Either the string ``primary`` or ``sub`` indicating whether this
   node is the primary (the node added to the target and which will run
   the job), or a sub-node.
+**/etc/nodepool/node**
+  The IP address of this node.
 **/etc/nodepool/primary_node**
   The IP address of the primary node.
 **/etc/nodepool/sub_nodes**
@@ -51,4 +53,13 @@ Those files include:
   An OpenSSH private key generated specifically for this node group.
 **/etc/nodepool/id_rsa.pub**
   The corresponding public key.
+**/etc/nodepool/provider**
+  Information about the provider in a shell-usable form.  This
+  includes the following information:
 
+  **NODEPOOL_PROVIDER**
+    The name of the provider
+  **NODEPOOL_REGION**
+    The name of the region
+  **NODEPOOL_AZ**
+    The name of the availability zone (if available)

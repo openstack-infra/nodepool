@@ -490,41 +490,43 @@ class NodeLauncher(threading.Thread):
             if not host:
                 raise Exception("Unable to log in via SSH")
 
-            # TODO(jeblair): Remove 'try' once we have updated images
-            # everywhere; this is just to help with the transition
-            # from images without /etc/nodepool to ones with.
-            try:
-                host.ssh("test for config dir", "ls /etc/nodepool")
+            host.ssh("test for config dir", "ls /etc/nodepool")
 
-                ftp = host.client.open_sftp()
+            ftp = host.client.open_sftp()
 
-                f = ftp.open('/etc/nodepool/role', 'w')
-                f.write(role + '\n')
-                f.close()
-                f = ftp.open('/etc/nodepool/primary_node', 'w')
-                f.write(self.node.ip + '\n')
-                f.close()
-                f = ftp.open('/etc/nodepool/sub_nodes', 'w')
-                for subnode in self.node.subnodes:
-                    f.write(subnode.ip + '\n')
-                f.close()
-                f = ftp.open('/etc/nodepool/id_rsa', 'w')
-                key.write_private_key(f)
-                f.close()
-                f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
-                f.write(public_key)
-                f.close()
-                f = ftp.open('/etc/nodepool/provider', 'w')
-                f.write('NODEPOOL_PROVIDER=%s\n' % self.provider.name)
-                f.write('NODEPOOL_REGION=%s\n' % (
-                    self.provider.region_name or '',))
-                f.write('NODEPOOL_AZ=%s\n' % (self.node.az or '',))
-                f.close()
+            # The Role of this node
+            f = ftp.open('/etc/nodepool/role', 'w')
+            f.write(role + '\n')
+            f.close()
+            # The IP of this node
+            f = ftp.open('/etc/nodepool/node', 'w')
+            f.write(n.ip + '\n')
+            f.close()
+            # The IP of the primary node of this node set
+            f = ftp.open('/etc/nodepool/primary_node', 'w')
+            f.write(self.node.ip + '\n')
+            f.close()
+            # The IPs of all sub nodes in this node set
+            f = ftp.open('/etc/nodepool/sub_nodes', 'w')
+            for subnode in self.node.subnodes:
+                f.write(subnode.ip + '\n')
+            f.close()
+            # The SSH key for this node set
+            f = ftp.open('/etc/nodepool/id_rsa', 'w')
+            key.write_private_key(f)
+            f.close()
+            f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
+            f.write(public_key)
+            f.close()
+            # Provider information for this node set
+            f = ftp.open('/etc/nodepool/provider', 'w')
+            f.write('NODEPOOL_PROVIDER=%s\n' % self.provider.name)
+            f.write('NODEPOOL_REGION=%s\n' % (
+                self.provider.region_name or '',))
+            f.write('NODEPOOL_AZ=%s\n' % (self.node.az or '',))
+            f.close()
 
-                ftp.close()
-            except Exception:
-                self.log.info("/etc/nodepool does not exist on node id: %s"
-                              % self.node.id)
+            ftp.close()
 
     def runReadyScript(self, nodelist):
         for role, n in nodelist:
