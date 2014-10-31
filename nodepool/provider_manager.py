@@ -105,6 +105,7 @@ def make_server_dict(server):
         d['progress'] = server.progress
     d['public_v4'] = get_public_ip(server)
     d['private_v4'] = get_private_ip(server)
+    d['public_v6'] = get_public_ip(server, version=6)
     return d
 
 
