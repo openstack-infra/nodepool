@@ -83,7 +83,9 @@ def get_private_ip(server):
     if not ret:
         if server.status == 'ACTIVE':
             # Server expected to have at least one address in ACTIVE status
-            raise KeyError('No private ip found for server')
+            # TODO: uncomment this code when all nodes have private IPs
+            # raise KeyError('No private ip found for server')
+            return None
         else:
             return None
     return ret[0]
