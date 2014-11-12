@@ -15,7 +15,7 @@ Install dependencies:
     sudo apt-get -qy install git mysql-server libmysqlclient-dev g++ python-dev python-pip
     mkdir src
     cd ~/src
-    git clone git://git.openstack.org/openstack-infra/config
+    git clone git://git.openstack.org/openstack-infra/system-config
     git clone git://git.openstack.org/openstack-infra/nodepool
     cd nodepool
     sudo pip install -U -r requirements.txt
@@ -30,10 +30,10 @@ directory, ie:
     git review -x XXXXX
 
 
-Create or adapt a nodepool yaml file. You can adapt an infra/config one, or
+Create or adapt a nodepool yaml file. You can adapt an infra/system-config one, or
 fake.yaml as desired. Note that fake.yaml's settings won't Just Work - consult
 ./modules/openstack_project/templates/nodepool/nodepool.yaml.erb in the
-infra/config tree to see a production config.
+infra/system-config tree to see a production config.
 
 If the cloud being used has no default_floating_pool defined in nova.conf,
 you will need to define a pool name using the nodepool yaml file to use
