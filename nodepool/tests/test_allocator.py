@@ -19,7 +19,7 @@ from nodepool import tests
 from nodepool import allocation
 
 
-class OneLabel(tests.AllocatorTestCase):
+class OneLabel(tests.AllocatorTestCase, tests.BaseTestCase):
     """The simplest case: one each of providers, labels, and
     targets.
 
@@ -44,7 +44,7 @@ class OneLabel(tests.AllocatorTestCase):
         ap1.makeGrants()
 
 
-class TwoLabels(tests.AllocatorTestCase):
+class TwoLabels(tests.AllocatorTestCase, tests.BaseTestCase):
     """Two labels from one provider.
 
     Result AGTs are:
@@ -72,7 +72,7 @@ class TwoLabels(tests.AllocatorTestCase):
         ap1.makeGrants()
 
 
-class TwoProvidersTwoLabels(tests.AllocatorTestCase):
+class TwoProvidersTwoLabels(tests.AllocatorTestCase, tests.BaseTestCase):
     """Two labels, each of which is supplied by both providers.
 
     Result AGTs are:
@@ -123,7 +123,8 @@ class TwoProvidersTwoLabels(tests.AllocatorTestCase):
         ap2.makeGrants()
 
 
-class TwoProvidersTwoLabelsOneShared(tests.AllocatorTestCase):
+class TwoProvidersTwoLabelsOneShared(tests.AllocatorTestCase,
+                                     tests.BaseTestCase):
     """One label is served by both providers, the other can only come
     from one.  This tests that the allocator uses the diverse provider
     to supply the label that can come from either while reserving
@@ -176,7 +177,7 @@ class TwoProvidersTwoLabelsOneShared(tests.AllocatorTestCase):
         ap2.makeGrants()
 
 
-class RoundRobinAllocation(tests.RoundRobinTestCase):
+class RoundRobinAllocation(tests.RoundRobinTestCase, tests.BaseTestCase):
     """Test the round-robin behaviour of the AllocationHistory object to
     ensure fairness of distribution
 
@@ -310,7 +311,7 @@ class RoundRobinAllocation(tests.RoundRobinTestCase):
             do_it()
 
 
-class RoundRobinFixedProvider(tests.RoundRobinTestCase):
+class RoundRobinFixedProvider(tests.RoundRobinTestCase, tests.BaseTestCase):
     """Test that round-robin behaviour exists when we have a more complex
     situation where some nodes can only be provided by some providers
 

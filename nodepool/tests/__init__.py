@@ -58,7 +58,7 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         self.useFixture(fixtures.NestedTempfile())
 
 
-class AllocatorTestCase(BaseTestCase):
+class AllocatorTestCase(object):
     def setUp(self):
         super(AllocatorTestCase, self).setUp()
         self.agt = []
@@ -74,7 +74,7 @@ class AllocatorTestCase(BaseTestCase):
                                                           for x in self.agt]))
 
 
-class RoundRobinTestCase(BaseTestCase):
+class RoundRobinTestCase(object):
     def setUp(self):
         super(RoundRobinTestCase, self).setUp()
         self.allocations = []
