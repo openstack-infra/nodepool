@@ -242,6 +242,7 @@ class GearmanClient(gear.Client):
                 connection.sendAdminRequest(req)
             except Exception:
                 self.__log.exception("Exception while listing functions")
+                self._lostConnection(connection)
                 continue
             for line in req.response.split('\n'):
                 parts = [x.strip() for x in line.split()]
