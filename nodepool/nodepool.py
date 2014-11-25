@@ -1802,16 +1802,19 @@ class NodePool(threading.Thread):
             self.log.exception("Exception in periodic image update:")
 
     def updateImages(self, session):
+        # first run the snapshot image updates
+        for label in self.config.labels.values():
+            # only update if min_ready not negative
+            if (not label.is_diskimage) and (label.min_ready >= 0):
+                for provider in label.providers.values():
+                    self.updateImage(session, provider.name, label.image)
+
         # This function should be run periodically to create new snapshot
         # images.
         needs_build = False
         for label in self.config.labels.values():
-            if label.min_ready < 0:
-                # Label is configured to be disabled, skip creating the image.
-                continue
-
-            # check if image is there, if not, build it
-            if label.is_diskimage:
+            if label.is_diskimage and label.min_ready >= 0:
+                # check if image is there, if not, build it
                 self.buildImage(self.config.diskimages[label.image])
                 needs_build = True
         if needs_build:
@@ -1819,15 +1822,9 @@ class NodePool(threading.Thread):
             self.waitForBuiltImages()
 
         for label in self.config.labels.values():
-            if label.min_ready < 0:
-                # Label is configured to be disabled, skip creating the image.
-                continue
-
-            for provider in label.providers.values():
-                if label.is_diskimage:
+            if label.is_diskimage and label.min_ready >= 0:
+                for provider in label.providers.values():
                     self.uploadImage(session, provider.name, label.image)
-                else:
-                    self.updateImage(session, provider.name, label.image)
 
     def updateImage(self, session, provider_name, image_name):
         try:
