@@ -766,11 +766,13 @@ class DiskImageBuilder(threading.Thread):
                              image.qemu_img_options)
         img_elements = image.elements
 
-        cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
-               (extra_options, out_file_path, img_elements))
-
         if 'fake-' in filename:
-            cmd = 'echo ' + cmd
+            dib_cmd = 'nodepool/tests/fake-image-create'
+        else:
+            dib_cmd = 'disk-image-create'
+
+        cmd = ('%s -x --no-tmpfs %s -o %s %s' %
+               (dib_cmd, extra_options, out_file_path, img_elements))
 
         log = logging.getLogger("nodepool.image.build.%s" %
                                 (image_name,))
@@ -1247,9 +1249,10 @@ class NodePool(threading.Thread):
                     d.elements = ''
                 d.release = diskimage.get('release', '')
                 d.qemu_img_options = diskimage.get('qemu-img-options', '')
-                if 'env-vars' in diskimage:
-                    d.env_vars = diskimage['env-vars']
-                else:
+                d.env_vars = diskimage.get('env-vars', {})
+                if not isinstance(d.env_vars, dict):
+                    self.log.error("%s: ignoring env-vars; "
+                                   "should be a dict" % d.name)
                     d.env_vars = {}
 
         for provider in config['providers']:

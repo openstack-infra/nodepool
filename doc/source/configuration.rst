@@ -173,21 +173,18 @@ will be built using the provider snapshot approach::
     qemu-img-options: compat=0.10
     env-vars:
         DIB_DISTRIBUTION_MIRROR: http://archive.ubuntu.com
+        DIB_EXTRA_VARIABLE: foobar
 
 For diskimages, the `name` is required. The `elements` section
-enumerates all the elements that will be included when building
-the image, and will point to the `elements-dir` path referenced
-in the same config file. `release` specifies the distro to be
-used as a base image to build the image using diskimage-builder.
-`qemu-img-options` allows to specify custom settings that qemu
-will be using to build the final image. Settings there have to
-be separated by commas, and must follow qemu syntax.
-
-The `env-vars` key is optional. It allows to specify a list of
-environment variables that will be appended to the variables
-that are send by default to diskimage-builder. Using that approach
-it is possible to send the DIB_*environment variables neeeded by
-diskimage-builder elements per image type.
+enumerates all the elements that will be included when building the
+image, and will point to the `elements-dir` path referenced in the
+same config file. `release` specifies the distro to be used as a base
+image to build the image using diskimage-builder.  `qemu-img-options`
+allows to specify custom settings that qemu will be using to build the
+final image. Settings there have to be separated by commas, and must
+follow qemu syntax.  `env-vars` is an optional dictionary of arbitrary
+environment variables that will be available in the spawned
+diskimage-builder child process.
 
 providers
 ---------
