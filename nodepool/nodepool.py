@@ -757,9 +757,6 @@ class DiskImageBuilder(threading.Thread):
         for k, v in image.env_vars.items():
             env[k] = v
 
-        out_file_path = os.path.join(self.nodepool.config.imagesdir,
-                                     filename)
-
         extra_options = ''
         if image.qemu_img_options:
             extra_options = ('--qemu-img-options %s' %
@@ -772,7 +769,7 @@ class DiskImageBuilder(threading.Thread):
             dib_cmd = 'disk-image-create'
 
         cmd = ('%s -x --no-tmpfs %s -o %s %s' %
-               (dib_cmd, extra_options, out_file_path, img_elements))
+               (dib_cmd, extra_options, filename, img_elements))
 
         log = logging.getLogger("nodepool.image.build.%s" %
                                 (image_name,))
@@ -917,8 +914,7 @@ class DiskImageUpdater(ImageUpdater):
 
         # strip extension from filename
         stripped_filename = self.filename.replace(".qcow2", "")
-        image_path = os.path.join(self.imagesdir, stripped_filename)
-        image_id = self.manager.uploadImage(image_name, image_path,
+        image_id = self.manager.uploadImage(image_name, stripped_filename,
                                             'qcow2', 'bare', self.image.meta)
         self.snap_image.external_id = image_id
         session.commit()
