@@ -50,9 +50,9 @@ targets:
 diskimages:
   - name: fake-dib-image
     elements:
-      - ubuntu
+      - fedora
       - vm
-    release: precise
+    release: 21
     env-vars:
       TMPDIR: /opt/dib_tmp
       DIB_IMAGE_CACHE: /opt/dib_cache
