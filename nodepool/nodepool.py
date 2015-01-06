@@ -737,60 +737,57 @@ class DiskImageBuilder(threading.Thread):
             self.queue.task_done()
 
     def _buildImage(self, image, image_name, filename):
-        try:
-            env = os.environ.copy()
+        env = os.environ.copy()
 
-            env['DIB_RELEASE'] = image.release
-            env['DIB_IMAGE_NAME'] = image_name
-            env['DIB_IMAGE_FILENAME'] = filename
-            # Note we use a reference to the nodepool config here so
-            # that whenever the config is updated we get up to date
-            # values in this thread.
-            env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
-            env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
+        env['DIB_RELEASE'] = image.release
+        env['DIB_IMAGE_NAME'] = image_name
+        env['DIB_IMAGE_FILENAME'] = filename
+        # Note we use a reference to the nodepool config here so
+        # that whenever the config is updated we get up to date
+        # values in this thread.
+        env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
+        env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
 
-            # send additional env vars if needed
-            for k, v in image.env_vars.items():
-                env[k] = v
+        # send additional env vars if needed
+        for k, v in image.env_vars.items():
+            env[k] = v
 
-            out_file_path = os.path.join(self.nodepool.config.imagesdir,
-                                         filename)
+        out_file_path = os.path.join(self.nodepool.config.imagesdir,
+                                     filename)
 
-            extra_options = ''
-            if image.qemu_img_options:
-                extra_options = ('--qemu-img-options %s' %
-                                 image.qemu_img_options)
-            img_elements = image.elements
+        extra_options = ''
+        if image.qemu_img_options:
+            extra_options = ('--qemu-img-options %s' %
+                             image.qemu_img_options)
+        img_elements = image.elements
 
-            cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
-                   (extra_options, out_file_path, img_elements))
+        cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
+               (extra_options, out_file_path, img_elements))
 
-            if 'fake-dib-image' in filename:
-                cmd = 'echo ' + cmd
+        if 'fake-dib-image' in filename:
+            cmd = 'echo ' + cmd
 
-            log = logging.getLogger("nodepool.image.build.%s" %
-                                    (image_name,))
+        log = logging.getLogger("nodepool.image.build.%s" %
+                                (image_name,))
 
-            self.log.info('Running %s' % cmd)
+        self.log.info('Running %s' % cmd)
 
-            p = subprocess.Popen(
-                shlex.split(cmd),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env)
+        p = subprocess.Popen(
+            shlex.split(cmd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env)
 
-            while True:
-                ln = p.stdout.readline()
-                log.info(ln.strip())
-                if not ln:
-                    break
+        while True:
+            ln = p.stdout.readline()
+            log.info(ln.strip())
+            if not ln:
+                break
 
-            p.wait()
-            ret = p.returncode
-            if ret:
-                raise Exception("Unable to create %s" % filename)
-        except Exception:
-            self.log.exception("Exception in run method:")
+        p.wait()
+        ret = p.returncode
+        if ret:
+            raise Exception("Unable to create %s" % filename)
 
     def buildImage(self, image_id):
         with self.nodepool.getDB().getSession() as session:
@@ -806,20 +803,24 @@ class DiskImageBuilder(threading.Thread):
             # retrieve image details
             image_details = \
                 self.nodepool.config.diskimages[self.dib_image.image_name]
-            self._buildImage(
-                image_details,
-                self.dib_image.image_name,
-                self.dib_image.filename)
+            try:
+                self._buildImage(
+                    image_details,
+                    self.dib_image.image_name,
+                    self.dib_image.filename)
+            except Exception:
+                self.log.exception("Exception building DIB image:")
+                return
+
+            self.dib_image.state = nodedb.READY
+            session.commit()
+            self.log.info("Image %s is built" % self.dib_image.image_name)
 
             if statsd:
                 dt = int((time.time() - start_time) * 1000)
                 key = 'nodepool.dib_image_build.%s' % self.dib_image.image_name
                 statsd.timing(key, dt)
                 statsd.incr(key)
-
-            self.dib_image.state = nodedb.READY
-            session.commit()
-            self.log.info("Image %s is built" % self.dib_image.image_name)
 
 
 class ImageUpdater(threading.Thread):
