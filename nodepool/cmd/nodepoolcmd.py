@@ -21,6 +21,7 @@ import time
 
 from nodepool import nodedb
 from nodepool import nodepool
+from nodepool.version import version_info as npc_version_info
 from prettytable import PrettyTable
 
 
@@ -33,7 +34,8 @@ class NodePoolCmd(object):
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
-        parser.add_argument('--version', dest='version', action='store_true',
+        parser.add_argument('--version', action='version',
+                            version=npc_version_info.version_string(),
                             help='show version')
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='show DEBUG level logging')
@@ -316,11 +318,6 @@ class NodePoolCmd(object):
         self.pool.deleteImage(self.args.id)
 
     def main(self):
-        if self.args.version:
-            from nodepool.version import version_info as npc_version_info
-            print "Nodepool version: %s" % npc_version_info.version_string()
-            return(0)
-
         self.pool = nodepool.NodePool(self.args.config)
         config = self.pool.loadConfig()
         self.pool.reconfigureDatabase(config)
