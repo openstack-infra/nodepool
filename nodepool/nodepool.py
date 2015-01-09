@@ -810,6 +810,9 @@ class DiskImageBuilder(threading.Thread):
                     self.dib_image.filename)
             except Exception:
                 self.log.exception("Exception building DIB image:")
+                # DIB should've cleaned up after itself, just remove this
+                # image from the DB.
+                self.dib_image.delete()
                 return
 
             self.dib_image.state = nodedb.READY
