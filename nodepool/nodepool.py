@@ -732,9 +732,14 @@ class DiskImageBuilder(threading.Thread):
     def run(self):
         while True:
             # grabs image id from queue
-            self.disk_image = self.queue.get()
-            self.buildImage(self.disk_image)
-            self.queue.task_done()
+            image_id = self.queue.get()
+            try:
+                self.buildImage(image_id)
+            except Exception:
+                self.log.exception("Exception attempting DIB build "
+                                   "for image %s:" % (image_id,))
+            finally:
+                self.queue.task_done()
 
     def _buildImage(self, image, image_name, filename):
         env = os.environ.copy()
@@ -787,7 +792,7 @@ class DiskImageBuilder(threading.Thread):
         p.wait()
         ret = p.returncode
         if ret:
-            raise Exception("Unable to create %s" % filename)
+            raise Exception("DIB failed creating %s" % (filename,))
 
     def buildImage(self, image_id):
         with self.nodepool.getDB().getSession() as session:
@@ -809,7 +814,8 @@ class DiskImageBuilder(threading.Thread):
                     self.dib_image.image_name,
                     self.dib_image.filename)
             except Exception:
-                self.log.exception("Exception building DIB image:")
+                self.log.exception("Exception building DIB image %s:" %
+                                   (image_id,))
                 # DIB should've cleaned up after itself, just remove this
                 # image from the DB.
                 self.dib_image.delete()
@@ -817,7 +823,8 @@ class DiskImageBuilder(threading.Thread):
 
             self.dib_image.state = nodedb.READY
             session.commit()
-            self.log.info("Image %s is built" % self.dib_image.image_name)
+            self.log.info("DIB image %s with file %s is built" % (
+                image_id, self.dib_image.image_name))
 
             if statsd:
                 dt = int((time.time() - start_time) * 1000)
