@@ -1264,6 +1264,7 @@ class NodePool(threading.Thread):
             p.keypair = provider.get('keypair', None)
             p.pool = provider.get('pool')
             p.rate = provider.get('rate', 1.0)
+            p.api_timeout = provider.get('api-timeout')
             p.boot_timeout = provider.get('boot-timeout', 60)
             p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
@@ -1369,6 +1370,7 @@ class NodePool(threading.Thread):
             new_pm.max_servers != old_pm.provider.max_servers or
             new_pm.pool != old_pm.provider.pool or
             new_pm.rate != old_pm.provider.rate or
+            new_pm.api_timeout != old_pm.provider.api_timeout or
             new_pm.boot_timeout != old_pm.provider.boot_timeout or
             new_pm.launch_timeout != old_pm.provider.launch_timeout or
             new_pm.use_neutron != old_pm.provider.use_neutron or

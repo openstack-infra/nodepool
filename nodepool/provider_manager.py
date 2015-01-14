@@ -344,6 +344,8 @@ class ProviderManager(TaskManager):
             kwargs['service_name'] = self.provider.service_name
         if self.provider.region_name:
             kwargs['region_name'] = self.provider.region_name
+        if self.provider.api_timeout:
+            kwargs['timeout'] = self.provider.api_timeout
         if self.provider.auth_url == 'fake':
             return fakeprovider.FAKE_CLIENT
         return novaclient.client.Client(*args, **kwargs)
