@@ -178,23 +178,43 @@ class NodePoolCmd(object):
     def image_update(self):
         with self.pool.getDB().getSession() as session:
             self.pool.reconfigureManagers(self.pool.config)
-            if self.args.image in self.pool.config.diskimages:
-                # first build image, then upload it
-                self.image_build()
-                self.image_upload()
-            else:
-                if self.args.provider == 'all':
-                    # iterate for all providers listed in label
-                    for provider in self.pool.config.providers.values():
-                        for image in provider.images.values():
-                            if self.args.image == image.name:
-                                self.pool.updateImage(session, provider.name,
-                                                      self.args.image)
-                                break
+            label = self.pool.config.labels.get(self.args.image)
+
+            def provider_save_image(provider_name):
+                """Method to save an image to the given provider.
+
+                This works either by uploading a previously build dib
+                image or by spinning up a node and taking a snapshot
+                of that node.
+
+                This is a closure around the DB session and label being
+                updated.
+                """
+                if provider_name in label.diskimage_providers:
+                    self.pool.uploadImage(session, provider_name,
+                                          label.name)
+                elif provider_name in label.snapshot_providers:
+                    self.pool.updateImage(session, provider_name,
+                                          label.name)
+                elif provider_name in self.pool.config.providers:
+                    raise Exception("Provider %s does not provide label %s"
+                                    % (provider_name, label.name))
                 else:
-                    provider = self.pool.config.providers[self.args.provider]
-                    self.pool.updateImage(session, provider.name,
-                                          self.args.image)
+                    raise Exception("Provider %s does not exist"
+                                    % provider_name)
+
+            if label and self.args.provider == 'all':
+                if label.diskimage_providers:
+                    self.image_build()
+                for provider_name in label.providers:
+                    provider_save_image(provider_name)
+            elif label:
+                if label.diskimage_providers.get(self.args.provider):
+                    self.image_build()
+                provider_save_image(self.args.provider)
+            else:
+                raise Exception("Trying to update unknown label: %s"
+                                % self.args.image)
 
     def image_build(self):
         if self.args.image not in self.pool.config.diskimages:
