@@ -4,7 +4,6 @@ gear
 PyYAML
 python-jenkins
 paramiko>1.9.0
-lockfile
 python-daemon>=2.0.4
 extras
 statsd>=1.0.0,<3.0
