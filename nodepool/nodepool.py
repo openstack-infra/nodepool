@@ -900,6 +900,9 @@ class DiskImageUpdater(ImageUpdater):
         image_name = self.provider.template_hostname.format(
             provider=self.provider, image=dummy_image,
             timestamp=str(timestamp))
+        self.log.info("Uploading dib image id: %s from %s for %s in %s" %
+                      (self.snap_image.id, self.filename, image_name,
+                       self.provider.name))
 
         # TODO(mordred) abusing the hostname field
         self.snap_image.hostname = image_name
@@ -913,7 +916,7 @@ class DiskImageUpdater(ImageUpdater):
                                             'qcow2', 'bare', self.image.meta)
         self.snap_image.external_id = image_id
         session.commit()
-        self.log.debug("Image id: %s building image %s" %
+        self.log.debug("Image id: %s saving image %s" %
                        (self.snap_image.id, image_id))
         # It can take a _very_ long time for Rackspace 1.0 to save an image
         self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
@@ -1830,10 +1833,13 @@ class NodePool(threading.Thread):
             self.log.exception("Exception in periodic image update:")
 
     def updateImages(self, session):
+        self.log.debug("Updating all images.")
         # first run the snapshot image updates
         for label in self.config.labels.values():
             # only update if min_ready not negative
             if label.snapshot_providers and label.min_ready >= 0:
+                self.log.debug("Update snapshot label %s in providers %s" %
+                               (label.name, label.snapshot_providers.keys()))
                 for provider_name in label.snapshot_providers.keys():
                     self.updateImage(session, provider_name, label.image)
 
@@ -1852,6 +1858,8 @@ class NodePool(threading.Thread):
         # Upload newly built images to all providers that use dib built images
         for label in self.config.labels.values():
             if label.diskimage_providers and label.min_ready >= 0:
+                self.log.debug("Upload dib label %s in providers %s" %
+                               (label.name, label.diskimage_providers.keys()))
                 for provider_name in label.diskimage_providers.keys():
                     self.uploadImage(session, provider_name, label.image)
 
