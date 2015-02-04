@@ -1124,15 +1124,7 @@ class Target(ConfigValue):
 
 
 class Label(ConfigValue):
-    def __init__(self):
-        self.snapshot_providers = {}
-        self.diskimage_providers = {}
-
-    @property
-    def providers(self):
-        tmp = self.snapshot_providers.copy()
-        tmp.update(self.diskimage_providers)
-        return tmp
+    pass
 
 
 class LabelProvider(ConfigValue):
@@ -1318,13 +1310,11 @@ class NodePool(threading.Thread):
             l.min_ready = label.get('min-ready', 2)
             l.subnodes = label.get('subnodes', 0)
             l.ready_script = label.get('ready-script')
+            l.providers = {}
             for provider in label['providers']:
                 p = LabelProvider()
                 p.name = provider['name']
-                if newconfig.providers[p.name].images[l.image].diskimage:
-                    l.diskimage_providers[p.name] = p
-                else:
-                    l.snapshot_providers[p.name] = p
+                l.providers[p.name] = p
 
         for target in config['targets']:
             t = Target()
