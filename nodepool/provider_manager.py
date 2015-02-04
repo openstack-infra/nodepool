@@ -228,7 +228,7 @@ class UploadImageTask(Task):
         return glance
 
     def main(self, client):
-        if self.args['image_name'].startswith('fake-dib-image'):
+        if self.args['image_name'].startswith('fake-'):
             image = fakeprovider.FakeGlanceClient()
             image.update(data='fake')
         else:

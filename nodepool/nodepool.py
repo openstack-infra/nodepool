@@ -769,7 +769,7 @@ class DiskImageBuilder(threading.Thread):
         cmd = ('disk-image-create -x --no-tmpfs %s -o %s %s' %
                (extra_options, out_file_path, img_elements))
 
-        if 'fake-dib-image' in filename:
+        if 'fake-' in filename:
             cmd = 'echo ' + cmd
 
         log = logging.getLogger("nodepool.image.build.%s" %
@@ -1354,6 +1354,15 @@ class NodePool(threading.Thread):
                 '{label.name}-{provider.name}-{node_id}-{subnode_id}'
                 '.slave.openstack.org'
             )
+
+        # A set of image names that are in use by labels, to be
+        # used by the image update methods to determine whether
+        # a given image needs to be updated.
+        newconfig.images_in_use = set()
+        for label in newconfig.labels.values():
+            if label.min_ready >= 0:
+                newconfig.images_in_use.add(label.image)
+
         return newconfig
 
     def reconfigureDatabase(self, config):
@@ -1757,73 +1766,70 @@ class NodePool(threading.Thread):
                 else:
                     self.launchNode(session, provider, label, target)
 
+    def checkForMissingSnapshotImage(self, session, provider, image):
+        found = False
+        for snap_image in session.getSnapshotImages():
+            if (snap_image.provider_name == provider.name and
+                snap_image.image_name == image.name and
+                snap_image.state in [nodedb.READY,
+                                     nodedb.BUILDING]):
+                found = True
+        if not found:
+            self.log.warning("Missing image %s on %s" %
+                             (image.name, provider.name))
+            self.updateImage(session, provider.name, image.name)
+
+    def checkForMissingDiskImage(self, session, provider, image):
+        found = False
+        for dib_image in session.getDibImages():
+            if (dib_image.image_name == image.name and
+                dib_image.state in [nodedb.READY,
+                                    nodedb.BUILDING]):
+                # if image is in ready state, check if image
+                # file exists in directory, otherwise we need
+                # to rebuild and delete this buggy image
+                if (dib_image.state == nodedb.READY and
+                    not os.path.exists(dib_image.filename) and
+                    not 'fake-dib-image' in dib_image.filename):
+                    self.log.warning("Image filename %s does not "
+                                     "exist. Removing image" %
+                                     dib_image.filename)
+                    self.deleteDibImage(dib_image)
+                    continue
+                found = True
+                break
+        if not found:
+            # only build the image, we'll recheck again
+            self.log.warning("Missing disk image %s" % image.name)
+            self.buildImage(self.config.diskimages[image.name])
+        else:
+            found = False
+            for snap_image in session.getSnapshotImages():
+                if (snap_image.provider_name == provider.name and
+                    snap_image.image_name == image.name and
+                    snap_image.state in [nodedb.READY,
+                                         nodedb.BUILDING]):
+                    found = True
+                    break
+            if not found:
+                self.log.warning("Missing image %s on %s" %
+                                 (image.name, provider.name))
+                self.uploadImage(session, provider.name,
+                                 image.name)
+
     def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
         self.log.debug("Checking missing images.")
-        for label in self.config.labels.values():
-            if label.min_ready < 0:
-                # Label is configured to be disabled, skip creating the image.
-                continue
 
-            # check if image is there, if not, build it
-            if label.diskimage_providers:
-                found = False
-                for dib_image in session.getDibImages():
-                    if (dib_image.image_name == label.image and
-                            dib_image.state in [nodedb.READY,
-                                                nodedb.BUILDING]):
-                        # if image is in ready state, check if image
-                        # file exists in directory, otherwise we need
-                        # to rebuild and delete this buggy image
-                        if (dib_image.state == nodedb.READY and
-                                not os.path.exists(dib_image.filename) and
-                                not 'fake-dib-image' in dib_image.filename):
-                            self.log.warning("Image filename %s does not "
-                                             "exist. Removing image" %
-                                             dib_image.filename)
-                            self.deleteDibImage(dib_image)
-                            continue
-
-                        found = True
-                        break
-                if not found:
-                    # only build the image, we'll recheck again
-                    self.log.warning("Missing disk image %s" % label.image)
-                    self.buildImage(self.config.diskimages[label.image])
+        for provider in self.config.providers.values():
+            for image in provider.images.values():
+                if image.name not in self.config.images_in_use:
+                    continue
+                if not image.diskimage:
+                    self.checkForMissingSnapshotImage(session, provider, image)
                 else:
-                    # check for providers, to upload it
-                    for provider_name in label.diskimage_providers.keys():
-                        found = False
-                        for snap_image in session.getSnapshotImages():
-                            if (snap_image.provider_name == provider_name and
-                                snap_image.image_name == label.image and
-                                snap_image.state in [nodedb.READY,
-                                                     nodedb.BUILDING]):
-                                found = True
-                                break
-                        if not found:
-                            self.log.warning("Missing image %s on %s" %
-                                             (label.image, provider_name))
-                            # when we have a READY image, upload it
-                            available_images = \
-                                session.getOrderedReadyDibImages(label.image)
-                            if available_images:
-                                self.uploadImage(session, provider_name,
-                                                 label.image)
-            # snapshots
-            for provider_name in label.snapshot_providers.keys():
-                found = False
-                for snap_image in session.getSnapshotImages():
-                    if (snap_image.provider_name == provider_name and
-                        snap_image.image_name == label.image and
-                        snap_image.state in [nodedb.READY,
-                                             nodedb.BUILDING]):
-                        found = True
-                if not found:
-                    self.log.warning("Missing image %s on %s" %
-                                     (label.image, provider_name))
-                    self.updateImage(session, provider_name, label.image)
+                    self.checkForMissingDiskImage(session, provider, image)
 
     def _doUpdateImages(self):
         try:
@@ -1834,34 +1840,33 @@ class NodePool(threading.Thread):
 
     def updateImages(self, session):
         self.log.debug("Updating all images.")
+
         # first run the snapshot image updates
-        for label in self.config.labels.values():
-            # only update if min_ready not negative
-            if label.snapshot_providers and label.min_ready >= 0:
-                self.log.debug("Update snapshot label %s in providers %s" %
-                               (label.name, label.snapshot_providers.keys()))
-                for provider_name in label.snapshot_providers.keys():
-                    self.updateImage(session, provider_name, label.image)
+        for provider in self.config.providers.values():
+            for image in provider.images.values():
+                if image.name not in self.config.images_in_use:
+                    continue
+                if image.diskimage:
+                    continue
+                self.updateImage(session, provider.name, image.name)
 
         needs_build = False
-        for label in self.config.labels.values():
-            # If we use diskimages on at least one provider rebuild the image
-            # before updating it in the provider(s).
-            if label.diskimage_providers and label.min_ready >= 0:
-                # check if image is there, if not, build it
-                self.buildImage(self.config.diskimages[label.image])
-                needs_build = True
+        for diskimage in self.config.diskimages.values():
+            if diskimage.name not in self.config.images_in_use:
+                continue
+            self.buildImage(diskimage)
+            needs_build = True
         if needs_build:
             # wait for all builds to finish, to have updated images to upload
             self.waitForBuiltImages()
 
-        # Upload newly built images to all providers that use dib built images
-        for label in self.config.labels.values():
-            if label.diskimage_providers and label.min_ready >= 0:
-                self.log.debug("Upload dib label %s in providers %s" %
-                               (label.name, label.diskimage_providers.keys()))
-                for provider_name in label.diskimage_providers.keys():
-                    self.uploadImage(session, provider_name, label.image)
+        for provider in self.config.providers.values():
+            for image in provider.images.values():
+                if image.name not in self.config.images_in_use:
+                    continue
+                if not image.diskimage:
+                    continue
+                self.uploadImage(session, provider.name, image.name)
 
     def updateImage(self, session, provider_name, image_name):
         try:
