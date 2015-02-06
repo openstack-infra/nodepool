@@ -1703,9 +1703,9 @@ class NodePool(threading.Thread):
         config = self.loadConfig()
         self.reconfigureDatabase(config)
         self.reconfigureManagers(config)
-        self.reconfigureCrons(config)
         self.reconfigureUpdateListeners(config)
         self.reconfigureGearmanClient(config)
+        self.reconfigureCrons(config)
         self.setConfig(config)
         self.reconfigureImageBuilder()
 
