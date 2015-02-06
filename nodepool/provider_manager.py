@@ -33,6 +33,7 @@ from task_manager import Task, TaskManager, ManagerStoppedException
 
 
 SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
+IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 ITERATE_INTERVAL = 2  # How long to sleep while waiting for something
                       # in a loop
 
@@ -314,6 +315,9 @@ class ProviderManager(TaskManager):
         self._servers = []
         self._servers_time = 0
         self._servers_lock = threading.Lock()
+        self._ips = []
+        self._ips_time = 0
+        self._ips_lock = threading.Lock()
 
     @property
     def _flavors(self):
@@ -543,7 +547,14 @@ class ProviderManager(TaskManager):
         return self.submitTask(ListFlavorsTask())
 
     def listFloatingIPs(self):
-        return self.submitTask(ListFloatingIPsTask())
+        if time.time() - self._ips_time >= IPS_LIST_AGE:
+            if self._ips_lock.acquire(False):
+                try:
+                    self._ips = self.submitTask(ListFloatingIPsTask())
+                    self._ips_time = time.time()
+                finally:
+                    self._ips_lock.release()
+        return self._ips
 
     def removeFloatingIP(self, server_id, address):
         return self.submitTask(RemoveFloatingIPTask(server=server_id,
