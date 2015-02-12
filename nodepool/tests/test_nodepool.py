@@ -13,86 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import tempfile
-import threading
-import time
-
-from nodepool import allocation
 from nodepool import tests
 from nodepool import nodedb
 import nodepool.nodepool
 
 
 class TestNodepool(tests.DBTestCase):
-    def setup_config(self, filename):
-        configfile = os.path.join(os.path.dirname(tests.__file__),
-                                  'fixtures', filename)
-        config = open(configfile).read()
-        (fd, path) = tempfile.mkstemp()
-        os.write(fd, config.format(dburi=self.dburi))
-        os.close(fd)
-        return path
-
-    def wait_for_threads(self):
-        whitelist = ['APScheduler',
-                     'MainThread',
-                     'NodePool',
-                     'NodeUpdateListener',
-                     'Gearman client connect',
-                     'Gearman client poll',
-                     'fake-provider',
-                     'fake-provider1',
-                     'fake-provider2',
-                     'fake-dib-provider',
-                     'fake-jenkins',
-                     'fake-target',
-                     'DiskImageBuilder queue'
-                     ]
-
-        while True:
-            done = True
-            for t in threading.enumerate():
-                if t.name not in whitelist:
-                    done = False
-            if done:
-                return
-            time.sleep(0.1)
-
-    def wait_for_config(self, pool):
-        for x in range(300):
-            if pool.config is not None:
-                return
-            time.sleep(0.1)
-
     def test_db(self):
         db = nodedb.NodeDatabase(self.dburi)
         with db.getSession() as session:
             session.getNodes()
-
-    def waitForImage(self, pool, provider_name, image_name):
-        self.wait_for_config(pool)
-        while True:
-            self.wait_for_threads()
-            with pool.getDB().getSession() as session:
-                image = session.getCurrentSnapshotImage(provider_name,
-                                                        image_name)
-                if image:
-                    break
-                time.sleep(1)
-        self.wait_for_threads()
-
-    def waitForNodes(self, pool):
-        self.wait_for_config(pool)
-        allocation_history = allocation.AllocationHistory()
-        while True:
-            self.wait_for_threads()
-            with pool.getDB().getSession() as session:
-                needed = pool.getNeededNodes(session, allocation_history)
-                if not needed:
-                    break
-                time.sleep(1)
-        self.wait_for_threads()
 
     def test_node(self):
         """Test that an image and node are created"""
