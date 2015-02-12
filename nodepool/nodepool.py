@@ -777,11 +777,15 @@ class DiskImageBuilder(threading.Thread):
 
         self.log.info('Running %s' % cmd)
 
-        p = subprocess.Popen(
-            shlex.split(cmd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            env=env)
+        try:
+            p = subprocess.Popen(
+                shlex.split(cmd),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env)
+        except OSError as e:
+            raise Exception("Failed to exec '%s'. Error: '%s'" %
+                            (cmd, e.strerror))
 
         while True:
             ln = p.stdout.readline()
