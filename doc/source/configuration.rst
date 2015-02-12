@@ -212,6 +212,7 @@ provider, the Nodepool image types are also defined (see
       boot-timeout: 120
       launch-timeout: 900
       template-hostname: '{image.name}-{timestamp}.template.openstack.org'
+      pool: 'public'
       networks:
         - net-id: 'some-uuid'
         - net-label: 'some-network-name'
@@ -281,6 +282,9 @@ at random and provide that to nova. This should give a good distribution
 of availability zones being used. If you need more control of the
 distribution you can use multiple logical providers each providing a
 different list of availabiltiy zones.
+
+The 'pool' key is optional.  This can be used to specify a floating ip
+pool in cases where the 'public' pool is unavailable or undesirable.
 
 .. _images:
 
