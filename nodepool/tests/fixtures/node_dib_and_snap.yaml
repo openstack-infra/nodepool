@@ -69,7 +69,7 @@ diskimages:
     elements:
       - ubuntu
       - vm
-    release: precise
+    release: 21
     env-vars:
       TMPDIR: /opt/dib_tmp
       DIB_IMAGE_CACHE: /opt/dib_cache

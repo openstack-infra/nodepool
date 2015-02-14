@@ -1251,7 +1251,10 @@ class NodePool(threading.Thread):
                     d.elements = u' '.join(diskimage['elements'])
                 else:
                     d.elements = ''
-                d.release = diskimage.get('release', '')
+                # must be a string, as it's passed as env-var to
+                # d-i-b, but might be untyped in the yaml and
+                # interpreted as a number (e.g. "21" for fedora)
+                d.release = str(diskimage.get('release', ''))
                 d.qemu_img_options = diskimage.get('qemu-img-options', '')
                 d.env_vars = diskimage.get('env-vars', {})
                 if not isinstance(d.env_vars, dict):
