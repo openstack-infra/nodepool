@@ -1412,7 +1412,7 @@ class NodePool(threading.Thread):
                 return False
         return True
 
-    def reconfigureManagers(self, config):
+    def reconfigureManagers(self, config, check_targets=True):
         stop_managers = []
         for p in config.providers.values():
             oldmanager = None
@@ -1430,38 +1430,40 @@ class NodePool(threading.Thread):
                     provider_manager.ProviderManager(p)
                 config.provider_managers[p.name].start()
 
-        for t in config.targets.values():
-            oldmanager = None
-            if self.config:
-                oldmanager = self.config.jenkins_managers.get(t.name)
-            if oldmanager:
-                if (t.jenkins_url != oldmanager.target.jenkins_url or
-                    t.jenkins_user != oldmanager.target.jenkins_user or
-                    t.jenkins_apikey != oldmanager.target.jenkins_apikey):
-                    stop_managers.append(oldmanager)
-                    oldmanager = None
-            if oldmanager:
-                config.jenkins_managers[t.name] = oldmanager
-            else:
-                self.log.debug("Creating new JenkinsManager object for %s" %
-                               t.name)
-                config.jenkins_managers[t.name] = \
-                    jenkins_manager.JenkinsManager(t)
-                config.jenkins_managers[t.name].start()
-        for oldmanager in stop_managers:
-            oldmanager.stop()
-
-        for t in config.targets.values():
-            try:
-                info = config.jenkins_managers[t.name].getInfo()
-                if info['quietingDown']:
-                    self.log.info("Target %s is offline" % t.name)
-                    t.online = False
+        # only do it if we need to check for targets
+        if check_targets:
+            for t in config.targets.values():
+                oldmanager = None
+                if self.config:
+                    oldmanager = self.config.jenkins_managers.get(t.name)
+                if oldmanager:
+                    if (t.jenkins_url != oldmanager.target.jenkins_url or
+                        t.jenkins_user != oldmanager.target.jenkins_user or
+                        t.jenkins_apikey != oldmanager.target.jenkins_apikey):
+                        stop_managers.append(oldmanager)
+                        oldmanager = None
+                if oldmanager:
+                    config.jenkins_managers[t.name] = oldmanager
                 else:
-                    t.online = True
-            except Exception:
-                self.log.exception("Unable to check status of %s" % t.name)
-                t.online = False
+                    self.log.debug("Creating new JenkinsManager object "
+                                   "for %s" % t.name)
+                    config.jenkins_managers[t.name] = \
+                        jenkins_manager.JenkinsManager(t)
+                    config.jenkins_managers[t.name].start()
+            for oldmanager in stop_managers:
+                oldmanager.stop()
+
+            for t in config.targets.values():
+                try:
+                    info = config.jenkins_managers[t.name].getInfo()
+                    if info['quietingDown']:
+                        self.log.info("Target %s is offline" % t.name)
+                        t.online = False
+                    else:
+                        t.online = True
+                except Exception:
+                    self.log.exception("Unable to check status of %s" % t.name)
+                    t.online = False
 
     def reconfigureCrons(self, config):
         cron_map = {
