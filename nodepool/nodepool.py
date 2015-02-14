@@ -1560,7 +1560,11 @@ class NodePool(threading.Thread):
         return self.config.provider_managers[provider.name]
 
     def getJenkinsManager(self, target):
-        return self.config.jenkins_managers[target.name]
+        if target.name in self.config.jenkins_managers:
+            return self.config.jenkins_managers[target.name]
+        else:
+            raise KeyError("{0} not in {1}".format(target.name,
+                           self.config.jenkins_managers.keys()))
 
     def getNeededNodes(self, session):
         self.log.debug("Beginning node launch calculation")
