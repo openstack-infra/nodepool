@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo "*** fake-image-create: start"
+
+echo "arguments:"
+echo "----"
+echo $*
+echo "----"
+
+# test passing of real-life env-vars
+if [[ "${TMPDIR}" != "/opt/dib_tmp" ]]; then
+    echo "TMPDIR not set"
+    exit 1
+fi
+
+if [[ "${DIB_IMAGE_CACHE}" != "/opt/dib_cache" ]]; then
+    echo "DIB_IMAGE_CACHE not set"
+    exit 1
+fi
+
+if [[ "${DIB_CLOUD_IMAGES}" != "http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/" ]]; then
+    echo "DIB_CLOUD_IMAGES not set"
+    exit 1
+fi
+
+if [[ "${BASE_IMAGE_FILE}" != "Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2" ]]; then
+    echo "BASE_IMAGE_FILE not set"
+    exit 1
+fi
+
+echo "*** fake-image-create: done"
