@@ -83,14 +83,29 @@ class FakeList(object):
 
     def create(self, **kw):
         should_fail = kw.get('SHOULD_FAIL', '').lower() == 'true'
+        nics = kw.get('nics', [])
+        addresses = None
+        # if keyword 'ipv6-uuid' is found in provider config,
+        # ipv6 address will be available in public addr dict.
+        for nic in nics:
+            if 'ipv6-uuid' not in nic['net-id']:
+                continue
+            addresses = dict(
+                public=[dict(version=4, addr='fake'),
+                        dict(version=6, addr='fake_v6')],
+                private=[dict(version=4, addr='fake')]
+            )
+            break
+        if not addresses:
+            addresses = dict(
+                public=[dict(version=4, addr='fake')],
+                private=[dict(version=4, addr='fake')]
+            )
         s = Dummy(id=uuid.uuid4().hex,
                   name=kw['name'],
                   status='BUILD',
                   adminPass='fake',
-                  addresses=dict(
-                      public=[dict(version=4, addr='fake')],
-                      private=[dict(version=4, addr='fake')]
-                  ),
+                  addresses=addresses,
                   metadata=kw.get('meta', {}),
                   manager=self,
                   should_fail=should_fail)

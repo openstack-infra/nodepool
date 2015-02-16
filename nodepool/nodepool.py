@@ -478,6 +478,13 @@ class NodeLauncher(threading.Thread):
                                          server['status']))
 
         ip = server.get('public_v4')
+        ip_v6 = server.get('public_v6')
+        if self.provider.ipv6_preferred:
+            if ip_v6:
+                ip = ip_v6
+            else:
+                self.log.warning('Preferred ipv6 not available, '
+                                 'falling back to ipv4.')
         if not ip and self.manager.hasExtension('os-floating-ips'):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
@@ -486,8 +493,9 @@ class NodeLauncher(threading.Thread):
 
         self.node.ip_private = server.get('private_v4')
         self.node.ip = ip
-        self.log.debug("Node id: %s is running, ip: %s, ipv6: %s" %
-                       (self.node.id, ip, server.get('public_v6')))
+        self.log.debug("Node id: %s is running, ipv4: %s, ipv6: %s" %
+                       (self.node.id, server.get('public_v4'),
+                        server.get('public_v6')))
 
         self.log.debug("Node id: %s testing ssh at ip: %s" %
                        (self.node.id, ip))
@@ -761,6 +769,13 @@ class SubNodeLauncher(threading.Thread):
                                          self.node_id, server['status']))
 
         ip = server.get('public_v4')
+        ip_v6 = server.get('public_v6')
+        if self.provider.ipv6_preferred:
+            if ip_v6:
+                ip = ip_v6
+            else:
+                self.log.warning('Preferred ipv6 not available, '
+                                 'falling back to ipv4.')
         if not ip and self.manager.hasExtension('os-floating-ips'):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
@@ -770,8 +785,8 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.ip_private = server.get('private_v4')
         self.subnode.ip = ip
         self.log.debug("Subnode id: %s for node id: %s is running, "
-                       "ip: %s, ipv6: %s" %
-                       (self.subnode_id, self.node_id, ip,
+                       "ipv4: %s, ipv6: %s" %
+                       (self.subnode_id, self.node_id, server.get('public_v4'),
                         server.get('public_v6')))
 
         self.log.debug("Subnode id: %s for node id: %s testing ssh at ip: %s" %
@@ -1092,12 +1107,19 @@ class SnapshotImageUpdater(ImageUpdater):
                             (server_id, self.snap_image.id, server['status']))
 
         ip = server.get('public_v4')
+        ip_v6 = server.get('public_v6')
+        if self.provider.ipv6_preferred:
+            if ip_v6:
+                ip = ip_v6
+            else:
+                self.log.warning('Preferred ipv6 not available, '
+                                 'falling back to ipv4.')
         if not ip and self.manager.hasExtension('os-floating-ips'):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
         if not ip:
             raise Exception("Unable to find public IP of server")
-        server['public_v4'] = ip
+        server['public_ip'] = ip
 
         self.bootstrapServer(server, key, use_password=use_password)
 
@@ -1145,7 +1167,7 @@ class SnapshotImageUpdater(ImageUpdater):
         else:
             ssh_kwargs['password'] = server['admin_pass']
 
-        host = utils.ssh_connect(server['public_v4'], 'root', ssh_kwargs,
+        host = utils.ssh_connect(server['public_ip'], 'root', ssh_kwargs,
                                  timeout=CONNECT_TIMEOUT)
 
         if not host:
@@ -1154,7 +1176,7 @@ class SnapshotImageUpdater(ImageUpdater):
             # didn't occur), we can connect with a very sort timeout.
             for username in ['ubuntu', 'fedora', 'cloud-user', 'centos']:
                 try:
-                    host = utils.ssh_connect(server['public_v4'], username,
+                    host = utils.ssh_connect(server['public_ip'], username,
                                              ssh_kwargs,
                                              timeout=10)
                     if host:
@@ -1341,6 +1363,7 @@ class NodePool(threading.Thread):
             p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
             p.networks = provider.get('networks')
+            p.ipv6_preferred = provider.get('ipv6-preferred')
             p.azs = provider.get('availability-zones')
             p.template_hostname = provider.get(
                 'template-hostname',
@@ -1479,6 +1502,7 @@ class NodePool(threading.Thread):
             new_pm.launch_timeout != old_pm.provider.launch_timeout or
             new_pm.use_neutron != old_pm.provider.use_neutron or
             new_pm.networks != old_pm.provider.networks or
+            new_pm.ipv6_preferred != old_pm.provider.ipv6_preferred or
             new_pm.azs != old_pm.provider.azs):
             return False
         new_images = new_pm.images

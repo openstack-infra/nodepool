@@ -43,7 +43,7 @@ def iterate_timeout(max_seconds, purpose):
 
 
 def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
-    if ip == 'fake':
+    if 'fake' in ip:
         return fakeprovider.FakeSSHClient()
     # HPcloud may return ECONNREFUSED or EHOSTUNREACH
     # for about 30 seconds after adding the IP
