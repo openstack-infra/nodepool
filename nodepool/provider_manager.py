@@ -21,7 +21,7 @@ import paramiko
 import novaclient
 import novaclient.client
 import novaclient.extension
-import novaclient.v1_1.contrib.tenant_networks
+import novaclient.v2.contrib.tenant_networks
 import threading
 import glanceclient
 import glanceclient.client
@@ -285,7 +285,7 @@ class ProviderManager(TaskManager):
 
     def _getClient(self):
         tenant_networks = novaclient.extension.Extension(
-            'tenant_networks', novaclient.v1_1.contrib.tenant_networks)
+            'tenant_networks', novaclient.v2.contrib.tenant_networks)
         args = ['1.1', self.provider.username, self.provider.password,
                 self.provider.project_id, self.provider.auth_url]
         kwargs = {'extensions': [tenant_networks]}
