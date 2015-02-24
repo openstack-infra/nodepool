@@ -525,6 +525,7 @@ class ProviderManager(TaskManager):
                 disk_format=disk_format,
                 container_format=container_format,
                 **meta)
+            filename = '%s.%s' % (filename, disk_format)
             image.update(data=open(filename, 'rb'))
             glanceclient = None
         return image.id
