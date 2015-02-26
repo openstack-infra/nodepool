@@ -540,6 +540,10 @@ class NodeLauncher(threading.Thread):
                 self.provider.region_name or '',))
             f.write('NODEPOOL_AZ=%s\n' % (self.node.az or '',))
             f.close()
+            # The instance UUID for this node
+            f = ftp.open('/etc/nodepool/uuid', 'w')
+            f.write(n.external_id + '\n')
+            f.close()
 
             ftp.close()
 
