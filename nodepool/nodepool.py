@@ -1802,22 +1802,25 @@ class NodePool(threading.Thread):
     def checkForMissingDiskImage(self, session, provider, image):
         found = False
         for dib_image in session.getDibImages():
-            if (dib_image.image_name == image.name and
-                dib_image.state in [nodedb.READY,
-                                    nodedb.BUILDING]):
+            if dib_image.image_name != image.name:
+                continue
+            if dib_image.state != nodedb.READY:
+                # This is either building or in an error state
+                # that will be handled by periodic cleanup
+                return
+            if (not os.path.exists(dib_image.filename) and
+                not 'fake-dib-image' in dib_image.filename):
                 # if image is in ready state, check if image
                 # file exists in directory, otherwise we need
                 # to rebuild and delete this buggy image
-                if (dib_image.state == nodedb.READY and
-                    not os.path.exists(dib_image.filename) and
-                    not 'fake-dib-image' in dib_image.filename):
-                    self.log.warning("Image filename %s does not "
-                                     "exist. Removing image" %
-                                     dib_image.filename)
-                    self.deleteDibImage(dib_image)
-                    continue
-                found = True
-                break
+                self.log.warning("Image filename %s does not "
+                                 "exist. Removing image" %
+                                 dib_image.filename)
+                self.deleteDibImage(dib_image)
+                continue
+            # Found a matching image that is READY and has a file
+            found = True
+            break
         if not found:
             # only build the image, we'll recheck again
             self.log.warning("Missing disk image %s" % image.name)
