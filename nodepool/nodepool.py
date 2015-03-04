@@ -2204,7 +2204,8 @@ class NodePool(threading.Thread):
             try:
                 with self.getDB().getSession() as session:
                     dib_image = session.getDibImage(dib_image_id)
-                    self.cleanupOneDibImage(session, dib_image)
+                    if dib_image:
+                        self.cleanupOneDibImage(session, dib_image)
             except Exception:
                 self.log.exception("Exception cleaning up image id %s:" %
                                    dib_image_id)
