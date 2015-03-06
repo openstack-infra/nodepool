@@ -32,6 +32,15 @@ class NodePoolCmd(object):
     def __init__(self):
         self.args = None
 
+    @staticmethod
+    def _age(timestamp):
+        now = time.time()
+        dt = now - timestamp
+        m, s = divmod(dt, 60)
+        h, m = divmod(m, 60)
+        d, h = divmod(h, 24)
+        return '%02d:%02d:%02d:%02d' % (d, h, m, s)
+
     def parse_arguments(self):
         parser = argparse.ArgumentParser(description='Node pool.')
         parser.add_argument('-c', dest='config',
@@ -145,9 +154,8 @@ class NodePoolCmd(object):
     def list(self, node_id=None):
         t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Hostname",
                          "NodeName", "Server ID", "IP", "State",
-                         "Age (hours)"])
+                         "Age"])
         t.align = 'l'
-        now = time.time()
         with self.pool.getDB().getSession() as session:
             for node in session.getNodes():
                 if node_id and node.id != node_id:
@@ -156,34 +164,32 @@ class NodePoolCmd(object):
                            node.label_name, node.target_name, node.hostname,
                            node.nodename, node.external_id, node.ip,
                            nodedb.STATE_NAMES[node.state],
-                           '%.02f' % ((now - node.state_time) / 3600)])
+                           NodePoolCmd._age(node.state_time)])
             print t
 
     def dib_image_list(self):
         t = PrettyTable(["ID", "Image", "Filename", "Version",
-                         "State", "Age (hours)"])
+                         "State", "Age"])
         t.align = 'l'
-        now = time.time()
         with self.pool.getDB().getSession() as session:
             for image in session.getDibImages():
                 t.add_row([image.id, image.image_name,
                            image.filename, image.version,
                            nodedb.STATE_NAMES[image.state],
-                           '%.02f' % ((now - image.state_time) / 3600)])
+                           NodePoolCmd._age(image.state_time)])
             print t
 
     def image_list(self):
         t = PrettyTable(["ID", "Provider", "Image", "Hostname", "Version",
-                         "Image ID", "Server ID", "State", "Age (hours)"])
+                         "Image ID", "Server ID", "State", "Age"])
         t.align = 'l'
-        now = time.time()
         with self.pool.getDB().getSession() as session:
             for image in session.getSnapshotImages():
                 t.add_row([image.id, image.provider_name, image.image_name,
                            image.hostname, image.version,
                            image.external_id, image.server_external_id,
                            nodedb.STATE_NAMES[image.state],
-                           '%.02f' % ((now - image.state_time) / 3600)])
+                           NodePoolCmd._age(image.state_time)])
             print t
 
     def image_update(self):
