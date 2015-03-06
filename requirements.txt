@@ -17,3 +17,4 @@ MySQL-python
 PrettyTable>=0.6,<0.8
 six>=1.7.0
 diskimage-builder
+voluptuous
