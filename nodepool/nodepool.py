@@ -1678,14 +1678,22 @@ class NodePool(threading.Thread):
                 allocation_requests[label.name] = ar
                 ar.addTarget(at, len(nodes))
                 for provider in label.providers.values():
-                    # This request may be supplied by this provider
-                    # (and nodes from this provider supplying this
-                    # request should be distributed to this target).
-                    sr, agt = ar.addProvider(
-                        allocation_providers[provider.name],
-                        at, label.subnodes)
-                    tlps[agt] = (target, label,
-                                 self.config.providers[provider.name])
+                    image = session.getCurrentSnapshotImage(
+                        provider.name, label.image)
+                    if image:
+                        # This request may be supplied by this provider
+                        # (and nodes from this provider supplying this
+                        # request should be distributed to this target).
+                        sr, agt = ar.addProvider(
+                            allocation_providers[provider.name],
+                            at, label.subnodes)
+                        tlps[agt] = (target, label,
+                                     self.config.providers[provider.name])
+                    else:
+                        self.log.debug("  %s does not have image %s "
+                                       "for label %s." % (provider.name,
+                                                          label.image,
+                                                          label.name))
 
         self.log.debug("  Allocation requests:")
         for ar in allocation_requests.values():
