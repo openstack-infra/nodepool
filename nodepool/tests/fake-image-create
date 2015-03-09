@@ -7,6 +7,11 @@ echo "----"
 echo $*
 echo "----"
 
+if [[ "${SHOULD_FAIL}" == 'true' ]]; then
+    echo "Should fail is set, exiting with status 127"
+    exit 127
+fi
+
 if [[ "${DIB_RELEASE}" != "21" ]]; then
     echo "DIB_RELEASE not set correctly"
     exit 1

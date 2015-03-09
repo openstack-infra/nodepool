@@ -148,6 +148,34 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
+    def test_dib_and_snap_fail(self):
+        """Test that snap based nodes build when dib fails."""
+        configfile = self.setup_config('node_dib_and_snap_fail.yaml')
+        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
+        pool.start()
+        self.addCleanup(pool.stop)
+        # fake-provider1 will fail to build fake-dib-image
+        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            # fake-provider1 uses dib.
+            nodes = session.getNodes(provider_name='fake-provider1',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 0)
+            # fake-provider2 uses snapshots.
+            nodes = session.getNodes(provider_name='fake-provider2',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 2)
+        # The fake disk image create script will return 127 with
+        # SHOULD_FAIL flag set to true.
+        self.assertEqual(self.subprocesses[0].returncode, 127)
+        self.assertEqual(self.subprocesses[-1].returncode, 127)
+
     def test_subnodes(self):
         """Test that an image and node are created"""
         configfile = self.setup_config('subnodes.yaml')
