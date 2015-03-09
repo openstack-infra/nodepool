@@ -20,12 +20,17 @@ import MySQLdb
 import os
 import random
 import string
+import subprocess
 
 import fixtures
 import testresources
 import testtools
 
 TRUE_VALUES = ('true', '1', 'yes')
+
+
+class LoggingPopen(subprocess.Popen):
+    pass
 
 
 class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
@@ -56,6 +61,16 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         else:
             logging.basicConfig(level=logging.DEBUG)
         self.useFixture(fixtures.NestedTempfile())
+
+        self.subprocesses = []
+
+        def LoggingPopenFactory(*args, **kw):
+            p = LoggingPopen(*args, **kw)
+            self.subprocesses.append(p)
+            return p
+
+        self.useFixture(fixtures.MonkeyPatch('subprocess.Popen',
+                                             LoggingPopenFactory))
 
 
 class AllocatorTestCase(object):
