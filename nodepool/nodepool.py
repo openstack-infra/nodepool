@@ -1168,8 +1168,6 @@ class DiskImage(ConfigValue):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    allocation_history = allocation.AllocationHistory()
-
     def __init__(self, configfile, watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.configfile = configfile
@@ -1570,7 +1568,7 @@ class NodePool(threading.Thread):
             raise KeyError("{0} not in {1}".format(target.name,
                            self.config.jenkins_managers.keys()))
 
-    def getNeededNodes(self, session):
+    def getNeededNodes(self, session, allocation_history):
         self.log.debug("Beginning node launch calculation")
         # Get the current demand for nodes.
         if self.gearman_client:
@@ -1665,7 +1663,7 @@ class NodePool(threading.Thread):
                     # loop.
                     ar = allocation.AllocationRequest(label.name,
                                                       label_demand[label.name],
-                                                      self.allocation_history)
+                                                      allocation_history)
 
                 nodes = session.getNodes(label_name=label.name,
                                          target_name=target.name)
@@ -1701,7 +1699,7 @@ class NodePool(threading.Thread):
                     tlp = tlps[agt]
                     nodes_to_launch.append((tlp, agt.amount))
 
-        self.allocation_history.grantsDone()
+        allocation_history.grantsDone()
 
         self.log.debug("Finished node launch calculation")
         return nodes_to_launch
@@ -1746,16 +1744,17 @@ class NodePool(threading.Thread):
             self.startup()
         except Exception:
             self.log.exception("Exception in startup:")
+        allocation_history = allocation.AllocationHistory()
         while not self._stopped:
             try:
                 self.updateConfig()
                 with self.getDB().getSession() as session:
-                    self._run(session)
+                    self._run(session, allocation_history)
             except Exception:
                 self.log.exception("Exception in main loop:")
             time.sleep(self.watermark_sleep)
 
-    def _run(self, session):
+    def _run(self, session, allocation_history):
         self.checkForMissingImages(session)
 
         # Make up the subnode deficit first to make sure that an
@@ -1768,7 +1767,7 @@ class NodePool(threading.Thread):
             for i in range(num_to_launch):
                 self.launchSubNode(session, node)
 
-        nodes_to_launch = self.getNeededNodes(session)
+        nodes_to_launch = self.getNeededNodes(session, allocation_history)
 
         for (tlp, num_to_launch) in nodes_to_launch:
             (target, label, provider) = tlp

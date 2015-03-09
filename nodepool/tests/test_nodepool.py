@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 
+from nodepool import allocation
 from nodepool import tests
 from nodepool import nodedb
 import nodepool.nodepool
@@ -71,10 +72,11 @@ class TestNodepool(tests.DBTestCase):
 
     def waitForNodes(self, pool):
         self.wait_for_config(pool)
+        allocation_history = allocation.AllocationHistory()
         while True:
             self.wait_for_threads()
             with pool.getDB().getSession() as session:
-                needed = pool.getNeededNodes(session)
+                needed = pool.getNeededNodes(session, allocation_history)
                 if not needed:
                     break
                 time.sleep(1)
