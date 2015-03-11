@@ -513,7 +513,7 @@ class ProviderManager(TaskManager):
     def uploadImage(self, image_name, filename, disk_format, container_format,
                     meta):
         if image_name.startswith('fake-'):
-            image = fakeprovider.FakeGlanceClient()
+            image = fakeprovider.FakeGlanceClient(**meta)
             image.update(data='fake')
         else:
             # configure glance and upload image.  Note the meta flags

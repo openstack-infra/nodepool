@@ -1852,19 +1852,28 @@ class NodePool(threading.Thread):
                 self.uploadImage(session, provider.name,
                                  image.name)
 
+    def checkForMissingImage(self, session, provider, image):
+        if image.name in self.config.images_in_use:
+            if not image.diskimage:
+                self.checkForMissingSnapshotImage(session, provider, image)
+            else:
+                self.checkForMissingDiskImage(session, provider, image)
+
     def checkForMissingImages(self, session):
         # If we are missing an image, run the image update function
         # outside of its schedule.
         self.log.debug("Checking missing images.")
 
-        for provider in self.config.providers.values():
+        # this is sorted so we can have a deterministic pass on providers
+        # (very useful for testing/debugging)
+        providers = sorted(self.config.providers.values(),
+                           key=lambda x: x.name)
+        for provider in providers:
             for image in provider.images.values():
-                if image.name not in self.config.images_in_use:
-                    continue
-                if not image.diskimage:
-                    self.checkForMissingSnapshotImage(session, provider, image)
-                else:
-                    self.checkForMissingDiskImage(session, provider, image)
+                try:
+                    self.checkForMissingImage(session, provider, image)
+                except Exception:
+                    self.log.exception("Exception in missing image check:")
 
     def _doUpdateImages(self):
         try:
