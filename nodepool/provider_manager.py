@@ -29,23 +29,12 @@ import keystoneclient.v2_0.client as ksclient
 import time
 
 import fakeprovider
+from nodeutils import iterate_timeout
 from task_manager import Task, TaskManager, ManagerStoppedException
 
 
 SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
-ITERATE_INTERVAL = 2  # How long to sleep while waiting for something
-                      # in a loop
-
-
-def iterate_timeout(max_seconds, purpose):
-    start = time.time()
-    count = 0
-    while (time.time() < start + max_seconds):
-        count += 1
-        yield count
-        time.sleep(ITERATE_INTERVAL)
-    raise Exception("Timeout waiting for %s" % purpose)
 
 
 def get_public_ip(server, version=4):
