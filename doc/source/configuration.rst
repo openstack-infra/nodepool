@@ -219,7 +219,6 @@ provider, the Nodepool image types are also defined (see
           min-ram: 8192
           name-filter: 'something to match'
           setup: prepare_node.sh
-          reset: reset_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -230,7 +229,6 @@ provider, the Nodepool image types are also defined (see
           base-image: 'Precise'
           min-ram: 8192
           setup: prepare_node.sh
-          reset: reset_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -250,7 +248,6 @@ provider, the Nodepool image types are also defined (see
           base-image: 'Fake Precise'
           min-ram: 8192
           setup: prepare_node.sh
-          reset: reset_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -296,7 +293,6 @@ Example::
       min-ram: 8192
       name-filter: 'something to match'
       setup: prepare_node.sh
-      reset: reset_node.sh
       username: jenkins
       private-key: /var/lib/jenkins/.ssh/id_rsa
       meta:
