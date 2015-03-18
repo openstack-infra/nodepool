@@ -86,3 +86,8 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
+
+    def test_image_delete_invalid(self):
+        configfile = self.setup_config("node_cmd.yaml")
+        self.patch_argv("-c", configfile, "image-delete", "invalid-image")
+        nodepoolcmd.main()

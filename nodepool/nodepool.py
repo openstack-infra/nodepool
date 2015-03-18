@@ -2121,6 +2121,14 @@ class NodePool(threading.Thread):
     def deleteImage(self, snap_image_id):
         try:
             self._image_delete_threads_lock.acquire()
+
+            snap_image = None
+            with self.getDB().getSession() as session:
+                snap_image = session.getSnapshotImage(snap_image_id)
+            if snap_image is None:
+                self.log.error("No image '%s' found.", snap_image_id)
+                return
+
             if snap_image_id in self._image_delete_threads:
                 return
             t = ImageDeleter(self, snap_image_id)
