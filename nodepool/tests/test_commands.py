@@ -19,7 +19,7 @@ import fixtures
 import mock
 
 from nodepool.cmd import nodepoolcmd
-from nodepool import nodepool, tests
+from nodepool import tests
 
 
 class TestNodepoolCMD(tests.DBTestCase):
@@ -97,11 +97,10 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "all", "fake-image1")
         nodepoolcmd.main()
-        pool = nodepool.NodePool(configfile, watermark_sleep=1)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
         # This gives us a nodepool with a working db but not running which
         # is important so we can control image building
         pool.updateConfig()
-        self.addCleanup(pool.stop)
         self.waitForImage(pool, 'fake-provider1', 'fake-image1')
 
         self.patch_argv("-c", configfile, "image-delete", '1')

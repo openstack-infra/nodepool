@@ -29,7 +29,7 @@ import fixtures
 import testresources
 import testtools
 
-from nodepool import allocation
+from nodepool import nodepool, allocation
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -101,6 +101,11 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
             if done:
                 return
             time.sleep(0.1)
+
+    def useNodepool(self, *args, **kwargs):
+        pool = nodepool.NodePool(*args, **kwargs)
+        self.addCleanup(pool.stop)
+        return pool
 
 
 class AllocatorTestCase(object):
