@@ -22,7 +22,10 @@ import time
 from nodepool import nodedb
 from nodepool import nodepool
 from nodepool.version import version_info as npc_version_info
+from config_validator import ConfigValidator
 from prettytable import PrettyTable
+
+log = logging.getLogger(__name__)
 
 
 class NodePoolCmd(object):
@@ -42,6 +45,7 @@ class NodePoolCmd(object):
 
         subparsers = parser.add_subparsers(title='commands',
                                            description='valid commands',
+                                           dest='command',
                                            help='additional help')
 
         cmd_list = subparsers.add_parser('list', help='list nodes')
@@ -120,6 +124,11 @@ class NodePoolCmd(object):
             help='provider name (`all` for uploading to all providers)',
             nargs='?', default='all')
         cmd_image_upload.add_argument('image', help='image name')
+
+        cmd_config_validate = subparsers.add_parser(
+            'config-validate',
+            help='Validate configuration file')
+        cmd_config_validate.set_defaults(func=self.config_validate)
 
         self.args = parser.parse_args()
 
@@ -311,7 +320,16 @@ class NodePoolCmd(object):
         self.pool.reconfigureManagers(self.pool.config, False)
         self.pool.deleteImage(self.args.id)
 
+    def config_validate(self):
+        validator = ConfigValidator(self.args.config)
+        validator.validate()
+        log.info("Configuation validation complete")
+
     def main(self):
+        # commands which do not need to start-up or parse config
+        if self.args.command in ('config-validate'):
+            return self.args.func()
+
         self.pool = nodepool.NodePool(self.args.config)
         config = self.pool.loadConfig()
         self.pool.reconfigureDatabase(config)
