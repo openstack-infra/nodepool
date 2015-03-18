@@ -21,10 +21,15 @@ import os
 import random
 import string
 import subprocess
+import threading
+import tempfile
+import time
 
 import fixtures
 import testresources
 import testtools
+
+from nodepool import allocation
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -71,6 +76,31 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
 
         self.useFixture(fixtures.MonkeyPatch('subprocess.Popen',
                                              LoggingPopenFactory))
+
+    def wait_for_threads(self):
+        whitelist = ['APScheduler',
+                     'MainThread',
+                     'NodePool',
+                     'NodeUpdateListener',
+                     'Gearman client connect',
+                     'Gearman client poll',
+                     'fake-provider',
+                     'fake-provider1',
+                     'fake-provider2',
+                     'fake-dib-provider',
+                     'fake-jenkins',
+                     'fake-target',
+                     'DiskImageBuilder queue',
+                     ]
+
+        while True:
+            done = True
+            for t in threading.enumerate():
+                if t.name not in whitelist:
+                    done = False
+            if done:
+                return
+            time.sleep(0.1)
 
 
 class AllocatorTestCase(object):
@@ -139,3 +169,42 @@ class DBTestCase(BaseTestCase):
         f = MySQLSchemaFixture()
         self.useFixture(f)
         self.dburi = f.dburi
+
+    def setup_config(self, filename):
+        configfile = os.path.join(os.path.dirname(__file__),
+                                  'fixtures', filename)
+        config = open(configfile).read()
+        (fd, path) = tempfile.mkstemp()
+        os.write(fd, config.format(dburi=self.dburi))
+        os.close(fd)
+        return path
+
+    def wait_for_config(self, pool):
+        for x in range(300):
+            if pool.config is not None:
+                return
+            time.sleep(0.1)
+
+    def waitForImage(self, pool, provider_name, image_name):
+        self.wait_for_config(pool)
+        while True:
+            self.wait_for_threads()
+            with pool.getDB().getSession() as session:
+                image = session.getCurrentSnapshotImage(provider_name,
+                                                        image_name)
+                if image:
+                    break
+                time.sleep(1)
+        self.wait_for_threads()
+
+    def waitForNodes(self, pool):
+        self.wait_for_config(pool)
+        allocation_history = allocation.AllocationHistory()
+        while True:
+            self.wait_for_threads()
+            with pool.getDB().getSession() as session:
+                needed = pool.getNeededNodes(session, allocation_history)
+                if not needed:
+                    break
+                time.sleep(1)
+        self.wait_for_threads()
