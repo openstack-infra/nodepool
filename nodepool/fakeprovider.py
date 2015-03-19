@@ -31,6 +31,26 @@ class Dummy(object):
     def delete(self):
         self.manager.delete(self)
 
+    def update(self, data):
+        try:
+            if self.should_fail:
+                raise RuntimeError('This image has SHOULD_FAIL set to True.')
+        except AttributeError:
+            pass
+
+
+fake_images_list = None
+
+
+def get_fake_images_list():
+    global fake_images_list
+    if fake_images_list is None:
+        fake_images_list = FakeList([Dummy(id='fake-image-id',
+                                           status='READY',
+                                           name='Fake Precise',
+                                           metadata={})])
+    return fake_images_list
+
 
 class FakeList(object):
     def __init__(self, l):
@@ -67,6 +87,7 @@ class FakeList(object):
                 self._list.remove(self.get(obj))
 
     def create(self, **kw):
+        should_fail = kw.get('SHOULD_FAIL', '').lower() == 'true'
         s = Dummy(id=uuid.uuid4().hex,
                   name=kw['name'],
                   status='BUILD',
@@ -76,7 +97,8 @@ class FakeList(object):
                       private=[dict(version=4, addr='fake')]
                   ),
                   metadata={},
-                  manager=self)
+                  manager=self,
+                  should_fail=should_fail)
         self._list.append(s)
         t = threading.Thread(target=self._finish,
                              name='FakeProvider create',
@@ -97,27 +119,32 @@ class FakeHTTPClient(object):
 
 
 class FakeClient(object):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.flavors = FakeList([
             Dummy(id='f1', ram=8192, name='Fake Flavor'),
             Dummy(id='f2', ram=8192, name='Unreal Flavor'),
         ])
-        self.images = FakeList([Dummy(id='i1', name='Fake Precise')])
+        self.images = get_fake_images_list()
         self.client = FakeHTTPClient()
         self.servers = FakeList([])
         self.servers.api = self
 
 
 class FakeGlanceClient(object):
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.id = 'fake-glance-id'
-        self.should_fail = kwargs.get('SHOULD_FAIL', '').lower() == 'true'
+        self.images = get_fake_images_list()
 
-    def update(self, **kwargs):
-        if self.should_fail:
-            raise RuntimeError('This image has SHOULD_FAIL set to True.')
-        else:
-            return True
+
+class FakeServiceCatalog(object):
+    def url_for(self, **kwargs):
+        return 'fake-url'
+
+
+class FakeKeystoneClient(object):
+    def __init__(self, **kwargs):
+        self.service_catalog = FakeServiceCatalog()
+        self.auth_token = 'fake-auth-token'
 
 
 class FakeFile(StringIO.StringIO):

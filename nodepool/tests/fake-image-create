@@ -38,4 +38,22 @@ if [[ "${BASE_IMAGE_FILE}" != "Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2" 
     exit 1
 fi
 
+outfile=
+
+TEMP=$(getopt -o o: -- "$@")
+eval set -- "$TEMP"
+while true ; do
+    case "$1" in
+        -o) outfile=$2; shift 2;;
+        --) shift ; break ;;
+    esac
+done
+
+if [ -z "$outfile" ]; then
+    echo "No output file specified."
+    exit 1
+else
+    echo "fake-data" > $outfile
+fi
+
 echo "*** fake-image-create: done"
