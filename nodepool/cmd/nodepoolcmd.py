@@ -286,7 +286,14 @@ class NodePoolCmd(object):
                     continue
                 manager = self.pool.getProviderManager(provider)
 
-                for image in manager.listImages():
+                images = []
+                try:
+                    images = manager.listImages()
+                except Exception as e:
+                    sys.stderr.write(e.message + '\n')
+                    log.debug("Exception listing alien images", exc_info=True)
+
+                for image in images:
                     if image['metadata'].get('image_type') == 'snapshot':
                         if not session.getSnapshotImageByExternalID(
                                 provider.name, image['id']):
