@@ -30,51 +30,61 @@ Usage
 The general options that apply to all subcommands are:
 
 .. program-output:: nodepool --help
+   :nostderr:
 
 The following subcommands deal with nodepool images:
 
 dib-image-list
 ^^^^^^^^^^^^^^
 .. program-output:: nodepool dib-image-list --help
+   :nostderr:
 
 image-list
 ^^^^^^^^^^
 .. program-output:: nodepool image-list --help
+   :nostderr:
 
 image-build
 ^^^^^^^^^^^
 .. program-output:: nodepool image-build --help
+   :nostderr:
 
 image-update
 ^^^^^^^^^^^^
 .. program-output:: nodepool image-update --help
+   :nostderr:
 
 image-upload
 ^^^^^^^^^^^^
 .. program-output:: nodepool image-upload --help
+   :nostderr:
 
 dib-image-delete
 ^^^^^^^^^^^^^^^^
 .. program-output:: nodepool dib-image-delete --help
+   :nostderr:
 
 image-delete
 ^^^^^^^^^^^^
 .. program-output:: nodepool image-delete --help
-
+   :nostderr:
 
 The following subcommands deal with nodepool nodes:
 
 list
 ^^^^
 .. program-output:: nodepool list --help
+   :nostderr:
 
 hold
 ^^^^
 .. program-output:: nodepool hold --help
+   :nostderr:
 
 delete
 ^^^^^^
 .. program-output:: nodepool delete --help
+   :nostderr:
 
 If Nodepool's database gets out of sync with reality, the following
 commands can help identify compute instances or images that are
@@ -83,7 +93,9 @@ unknown to Nodepool:
 alien-list
 ^^^^^^^^^^
 .. program-output:: nodepool alien-list --help
+   :nostderr:
 
 alien-image-list
 ^^^^^^^^^^^^^^^^
 .. program-output:: nodepool alien-image-list --help
+   :nostderr:
