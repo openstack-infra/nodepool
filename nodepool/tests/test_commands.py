@@ -107,3 +107,14 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.wait_for_threads()
         self.assert_images_listed(configfile, 0)
+
+    def test_alien_list_fail(self):
+        def fail_list(self):
+            raise RuntimeError('Fake list error')
+        self.useFixture(fixtures.MonkeyPatch('nodepool.fakeprovider.FakeList'
+                                             '.list', fail_list))
+
+        configfile = self.setup_config("node_cmd.yaml")
+        self.patch_argv("-c", configfile, "alien-list")
+        nodepoolcmd.main()
+        self.wait_for_threads()

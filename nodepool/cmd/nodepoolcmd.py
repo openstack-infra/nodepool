@@ -263,11 +263,15 @@ class NodePoolCmd(object):
                     continue
                 manager = self.pool.getProviderManager(provider)
 
-                for server in manager.listServers():
-                    if not session.getNodeByExternalID(
-                            provider.name, server['id']):
-                        t.add_row([provider.name, server['name'], server['id'],
-                                   server['public_v4']])
+                try:
+                    for server in manager.listServers():
+                        if not session.getNodeByExternalID(
+                                provider.name, server['id']):
+                            t.add_row([provider.name, server['name'],
+                                       server['id'], server['public_v4']])
+                except Exception as e:
+                    sys.stderr.write(e.message + '\n')
+                    log.debug("Exception listing aliens", exc_info=True)
         print t
 
     def alien_image_list(self):
