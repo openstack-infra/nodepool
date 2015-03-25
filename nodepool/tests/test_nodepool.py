@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import fixtures
+
 from nodepool import tests
 from nodepool import nodedb
 import nodepool.nodepool
@@ -164,3 +166,80 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].az, 'az1')
+
+    def test_node_delete_success(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        node_id = -1
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            node_id = nodes[0].id
+
+        pool.deleteNode(node_id)
+        self.wait_for_threads()
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            ready_nodes = session.getNodes(provider_name='fake-provider',
+                                           label_name='fake-label',
+                                           target_name='fake-target',
+                                           state=nodedb.READY)
+            deleted_nodes = session.getNodes(provider_name='fake-provider',
+                                             label_name='fake-label',
+                                             target_name='fake-target',
+                                             state=nodedb.DELETE)
+            # Make sure we have one node which is a new node
+            self.assertEqual(len(ready_nodes), 1)
+            self.assertNotEqual(node_id, ready_nodes[0].id)
+
+            # Make sure our old node was deleted
+            self.assertEqual(len(deleted_nodes), 0)
+
+    def test_node_delete_failure(self):
+        def fail_delete(self, name):
+            raise RuntimeError('Fake Error')
+
+        fake_delete = 'nodepool.fakeprovider.FakeJenkins.delete_node'
+        self.useFixture(fixtures.MonkeyPatch(fake_delete, fail_delete))
+
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        node_id = -1
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            node_id = nodes[0].id
+
+        pool.deleteNode(node_id)
+        self.wait_for_threads()
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            ready_nodes = session.getNodes(provider_name='fake-provider',
+                                           label_name='fake-label',
+                                           target_name='fake-target',
+                                           state=nodedb.READY)
+            deleted_nodes = session.getNodes(provider_name='fake-provider',
+                                             label_name='fake-label',
+                                             target_name='fake-target',
+                                             state=nodedb.DELETE)
+            # Make sure we have one node which is a new node
+            self.assertEqual(len(ready_nodes), 1)
+            self.assertNotEqual(node_id, ready_nodes[0].id)
+
+            # Make sure our old node is in delete state
+            self.assertEqual(len(deleted_nodes), 1)
+            self.assertEqual(node_id, deleted_nodes[0].id)
