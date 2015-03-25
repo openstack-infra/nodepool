@@ -38,8 +38,8 @@ Example::
 elements-dir
 ------------
 
-If an image is configured to use disk-image-builder and glance to locally
-create and upload images, then a collection of disk-image-builder elements
+If an image is configured to use diskimage-builder and glance to locally
+create and upload images, then a collection of diskimage-builder elements
 must be present. The ``elements-dir`` parameter indicates a directory
 that holds one or more elements.
 
@@ -50,7 +50,7 @@ Example::
 images-dir
 ----------
 
-When we generate images using disk-image-builder they need to be
+When we generate images using diskimage-builder they need to be
 written to somewhere. The ``images-dir`` parameter is the place to
 write them.
 
