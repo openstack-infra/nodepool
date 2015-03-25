@@ -40,6 +40,7 @@ class ConfigValidator:
             'setup': str,
             'username': str,
             'private-key': str,
+            'config-drive': bool,
         }
 
         providers = {

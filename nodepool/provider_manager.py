@@ -354,11 +354,13 @@ class ProviderManager(TaskManager):
         return self.submitTask(DeleteKeypairTask(name=name))
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
-                     az=None, key_name=None, name_filter=None):
+                     az=None, key_name=None, name_filter=None,
+                     config_drive=None):
         if image_name:
             image_id = self.findImage(image_name)['id']
         flavor = self.findFlavor(min_ram, name_filter)
-        create_args = dict(name=name, image=image_id, flavor=flavor['id'])
+        create_args = dict(name=name, image=image_id, flavor=flavor['id'],
+                           config_drive=config_drive)
         if key_name:
             create_args['key_name'] = key_name
         if az:
