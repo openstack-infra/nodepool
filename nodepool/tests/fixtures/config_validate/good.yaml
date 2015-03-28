@@ -441,13 +441,8 @@ providers:
         username: jenkins
         private-key: /home/nodepool/.ssh/id_rsa
   - name: hpcloud-b1
+    cloud: hpcloud
     region-name: 'region-b.geo-1'
-    service-type: 'compute'
-    service-name: 'Compute'
-    username: '<%= hpcloud_username %>'
-    password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
-    auth-url: 'https://region-b.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     api-timeout: 60
     boot-timeout: 120
     max-servers: 100

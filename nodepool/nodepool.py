@@ -1249,10 +1249,11 @@ class NodePool(threading.Thread):
             p = Provider()
             p.name = provider['name']
             newconfig.providers[p.name] = p
-            p.username = provider['username']
-            p.password = provider['password']
-            p.project_id = provider['project-id']
-            p.auth_url = provider['auth-url']
+            p.username = provider.get('username')
+            p.password = provider.get('password')
+            p.project_id = provider.get('project-id')
+            p.auth_url = provider.get('auth-url')
+            p.cloud = provider.get('cloud')
             p.service_type = provider.get('service-type')
             p.service_name = provider.get('service-name')
             p.region_name = provider.get('region-name')
@@ -1397,6 +1398,7 @@ class NodePool(threading.Thread):
             new_pm.password != old_pm.provider.password or
             new_pm.project_id != old_pm.provider.project_id or
             new_pm.auth_url != old_pm.provider.auth_url or
+            new_pm.cloud != old_pm.provider.cloud or
             new_pm.service_type != old_pm.provider.service_type or
             new_pm.service_name != old_pm.provider.service_name or
             new_pm.max_servers != old_pm.provider.max_servers or

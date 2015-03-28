@@ -18,17 +18,14 @@
 
 import logging
 import paramiko
-import novaclient
-import novaclient.client
-import novaclient.extension
-import novaclient.v2.contrib.tenant_networks
+
 import threading
-import glanceclient
-import glanceclient.client
-import keystoneclient.v2_0.client as ksclient
 import time
 import requests.exceptions
 import sys
+
+import shade
+import novaclient
 
 from nodeutils import iterate_timeout
 from task_manager import Task, TaskManager, ManagerStoppedException
@@ -113,14 +110,14 @@ class NotFound(Exception):
 
 class CreateServerTask(Task):
     def main(self, client):
-        server = client.servers.create(**self.args)
+        server = client.nova_client.servers.create(**self.args)
         return str(server.id)
 
 
 class GetServerTask(Task):
     def main(self, client):
         try:
-            server = client.servers.get(self.args['server_id'])
+            server = client.nova_client.servers.get(self.args['server_id'])
         except novaclient.exceptions.NotFound:
             raise NotFound()
         return make_server_dict(server)
@@ -128,52 +125,52 @@ class GetServerTask(Task):
 
 class DeleteServerTask(Task):
     def main(self, client):
-        client.servers.delete(self.args['server_id'])
+        client.nova_client.servers.delete(self.args['server_id'])
 
 
 class ListServersTask(Task):
     def main(self, client):
-        servers = client.servers.list()
+        servers = client.nova_client.servers.list()
         return [make_server_dict(server) for server in servers]
 
 
 class AddKeypairTask(Task):
     def main(self, client):
-        client.keypairs.create(**self.args)
+        client.nova_client.keypairs.create(**self.args)
 
 
 class ListKeypairsTask(Task):
     def main(self, client):
-        keys = client.keypairs.list()
+        keys = client.nova_client.keypairs.list()
         return [dict(id=str(key.id), name=key.name) for
                 key in keys]
 
 
 class DeleteKeypairTask(Task):
     def main(self, client):
-        client.keypairs.delete(self.args['name'])
+        client.nova_client.keypairs.delete(self.args['name'])
 
 
 class CreateFloatingIPTask(Task):
     def main(self, client):
-        ip = client.floating_ips.create(**self.args)
+        ip = client.nova_client.floating_ips.create(**self.args)
         return dict(id=str(ip.id), ip=ip.ip)
 
 
 class AddFloatingIPTask(Task):
     def main(self, client):
-        client.servers.add_floating_ip(**self.args)
+        client.nova_client.servers.add_floating_ip(**self.args)
 
 
 class GetFloatingIPTask(Task):
     def main(self, client):
-        ip = client.floating_ips.get(self.args['ip_id'])
+        ip = client.nova_client.floating_ips.get(self.args['ip_id'])
         return dict(id=str(ip.id), ip=ip.ip, instance_id=str(ip.instance_id))
 
 
 class ListFloatingIPsTask(Task):
     def main(self, client):
-        ips = client.floating_ips.list()
+        ips = client.nova_client.floating_ips.list()
         return [dict(id=str(ip.id), ip=ip.ip,
                      instance_id=str(ip.instance_id)) for
                 ip in ips]
@@ -181,24 +178,24 @@ class ListFloatingIPsTask(Task):
 
 class RemoveFloatingIPTask(Task):
     def main(self, client):
-        client.servers.remove_floating_ip(**self.args)
+        client.nova_client.servers.remove_floating_ip(**self.args)
 
 
 class DeleteFloatingIPTask(Task):
     def main(self, client):
-        client.floating_ips.delete(self.args['ip_id'])
+        client.nova_client.floating_ips.delete(self.args['ip_id'])
 
 
 class CreateImageTask(Task):
     def main(self, client):
         # This returns an id
-        return str(client.servers.create_image(**self.args))
+        return str(client.nova_client.servers.create_image(**self.args))
 
 
 class GetImageTask(Task):
     def main(self, client):
         try:
-            image = client.images.get(**self.args)
+            image = client.nova_client.images.get(**self.args)
         except novaclient.exceptions.NotFound:
             raise NotFound()
         # HP returns 404, rackspace can return a 'DELETED' image.
@@ -210,7 +207,7 @@ class GetImageTask(Task):
 class ListExtensionsTask(Task):
     def main(self, client):
         try:
-            resp, body = client.client.get('/extensions')
+            resp, body = client.nova_client.client.get('/extensions')
             return [x['alias'] for x in body['extensions']]
         except novaclient.exceptions.NotFound:
             # No extensions present.
@@ -219,32 +216,33 @@ class ListExtensionsTask(Task):
 
 class ListFlavorsTask(Task):
     def main(self, client):
-        flavors = client.flavors.list()
+        flavors = client.nova_client.flavors.list()
         return [dict(id=str(flavor.id), ram=flavor.ram, name=flavor.name)
                 for flavor in flavors]
 
 
 class ListImagesTask(Task):
     def main(self, client):
-        images = client.images.list()
+        images = client.nova_client.images.list()
         return [make_image_dict(image) for image in images]
 
 
 class FindImageTask(Task):
     def main(self, client):
-        image = client.images.find(**self.args)
+        image = client.nova_client.images.find(**self.args)
         return dict(id=str(image.id))
 
 
 class DeleteImageTask(Task):
     def main(self, client):
-        client.images.delete(**self.args)
+        client.nova_client.images.delete(**self.args)
 
 
 class FindNetworkTask(Task):
     def main(self, client):
-        network = client.tenant_networks.find(**self.args)
-        return dict(id=str(network.id))
+        for network in client.neutron_client.list_networks()['networks']:
+            if self.args['label'] == network['name']:
+                return dict(id=str(network['id']))
 
 
 class ProviderManager(TaskManager):
@@ -285,20 +283,31 @@ class ProviderManager(TaskManager):
         self._cloud_metadata_read = True
 
     def _getClient(self):
-        tenant_networks = novaclient.extension.Extension(
-            'tenant_networks', novaclient.v2.contrib.tenant_networks)
-        args = ['1.1', self.provider.username, self.provider.password,
-                self.provider.project_id, self.provider.auth_url]
-        kwargs = {'extensions': [tenant_networks]}
-        if self.provider.service_type:
-            kwargs['service_type'] = self.provider.service_type
-        if self.provider.service_name:
-            kwargs['service_name'] = self.provider.service_name
+        kwargs = {}
         if self.provider.region_name:
             kwargs['region_name'] = self.provider.region_name
         if self.provider.api_timeout:
-            kwargs['timeout'] = self.provider.api_timeout
-        return novaclient.client.Client(*args, **kwargs)
+            kwargs['api_timeout'] = self.provider.api_timeout
+        # These are named from back when we only talked to Nova. They're
+        # actually compute service related
+        if self.provider.service_type:
+            kwargs['compute_service_type'] = self.provider.service_type
+        if self.provider.service_name:
+            kwargs['compute_service_name'] = self.provider.service_name
+        if self.provider.cloud is not None:
+            kwargs['cloud'] = self.provider.cloud
+
+        auth_kwargs = {}
+        for auth_attr in ('username', 'password', 'auth_url'):
+            auth_val = getattr(self.provider, auth_attr)
+            if auth_val is not None:
+                auth_kwargs[auth_attr] = auth_val
+
+        if self.provider.project_id is not None:
+            auth_kwargs['project_name'] = self.provider.project_id
+
+        kwargs['auth'] = auth_kwargs
+        return shade.openstack_cloud(**kwargs)
 
     def runTask(self, task):
         try:
@@ -454,6 +463,8 @@ class ProviderManager(TaskManager):
                 return
 
     def waitForImage(self, image_id, timeout=3600):
+        # TODO(mordred): This should just be handled by the Fake, but we're
+        #                not quite plumbed through for that yet
         if image_id == 'fake-glance-id':
             return True
         return self._waitForResource('image', image_id, timeout)
@@ -496,37 +507,11 @@ class ProviderManager(TaskManager):
     def getImage(self, image_id):
         return self.submitTask(GetImageTask(image=image_id))
 
-    def get_glance_client(self, provider):
-        keystone_kwargs = {'auth_url': provider.auth_url,
-                           'username': provider.username,
-                           'password': provider.password,
-                           'tenant_name': provider.project_id}
-        glance_kwargs = {'service_type': 'image'}
-        glance_endpoint_kwargs = {'service_type': 'image'}
-
-        if provider.region_name:
-            keystone_kwargs['region_name'] = provider.region_name
-            glance_endpoint_kwargs['attr'] = 'region'
-            glance_endpoint_kwargs['filter_value'] = provider.region_name
-
-        # get endpoint and authtoken
-        keystone = ksclient.Client(**keystone_kwargs)
-        glance_endpoint = keystone.service_catalog.url_for(
-            **glance_endpoint_kwargs)
-        glance_endpoint = glance_endpoint.replace('/v1.0', '')
-
-        # configure glance client
-        glance = glanceclient.client.Client('1', glance_endpoint,
-                                            token=keystone.auth_token,
-                                            **glance_kwargs)
-        return glance
-
     def uploadImage(self, image_name, filename, disk_format, container_format,
                     meta):
         # configure glance and upload image.  Note the meta flags
         # are provided as custom glance properties
-        glanceclient = self.get_glance_client(self.provider)
-        image = glanceclient.images.create(
+        image = self._client.glance_client.images.create(
             name=image_name,
             is_public=False,
             disk_format=disk_format,
@@ -534,7 +519,6 @@ class ProviderManager(TaskManager):
             **meta)
         filename = '%s.%s' % (filename, disk_format)
         image.update(data=open(filename, 'rb'))
-        glanceclient = None
         return image.id
 
     def listExtensions(self):
