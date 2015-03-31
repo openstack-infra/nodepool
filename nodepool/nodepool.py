@@ -1850,7 +1850,7 @@ class NodePool(threading.Thread):
         if not found:
             # only build the image, we'll recheck again
             self.log.warning("Missing disk image %s" % image.name)
-            self.buildImage(self.config.diskimages[image.name])
+            self.buildImage(self.config.diskimages[image.diskimage])
         else:
             found = False
             for snap_image in session.getSnapshotImages():
