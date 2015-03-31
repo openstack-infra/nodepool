@@ -21,6 +21,7 @@ import threading
 from six.moves import queue as Queue
 import logging
 import time
+from statsd import statsd
 
 
 class ManagerStoppedException(Exception):
@@ -91,8 +92,15 @@ class TaskManager(threading.Thread):
             start = time.time()
             task.run(self._client)
             last_ts = time.time()
+            dt = last_ts - start
             self.log.debug("Manager %s ran task %s in %ss" %
-                           (self.name, task, (last_ts - start)))
+                           (self.name, task, dt))
+            #nodepool.task.PROVIDER.subkey
+            subkey = type(task).__name__
+            key = 'nodepool.task.%s.%s' % (self.name, subkey)
+            statsd.timing(key, dt)
+            statsd.incr(key)
+
             self.queue.task_done()
 
     def submitTask(self, task):
