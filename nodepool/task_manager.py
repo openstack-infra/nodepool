@@ -95,11 +95,12 @@ class TaskManager(threading.Thread):
             dt = last_ts - start
             self.log.debug("Manager %s ran task %s in %ss" %
                            (self.name, task, dt))
-            #nodepool.task.PROVIDER.subkey
-            subkey = type(task).__name__
-            key = 'nodepool.task.%s.%s' % (self.name, subkey)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            if statsd:
+                #nodepool.task.PROVIDER.subkey
+                subkey = type(task).__name__
+                key = 'nodepool.task.%s.%s' % (self.name, subkey)
+                statsd.timing(key, dt)
+                statsd.incr(key)
 
             self.queue.task_done()
 
