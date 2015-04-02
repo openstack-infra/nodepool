@@ -65,7 +65,7 @@ documentation
 <http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls>`_
 for the syntax.  Example::
 
-  dburi: 'mysql://nodepool@localhost/nodepool'
+  dburi: 'mysql+pymysql://nodepool@localhost/nodepool'
 
 cron
 ----

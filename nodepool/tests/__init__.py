@@ -16,8 +16,8 @@
 """Common utilities used in testing"""
 
 import logging
-import MySQLdb
 import os
+import pymysql
 import random
 import string
 import subprocess
@@ -145,7 +145,7 @@ class MySQLSchemaFixture(fixtures.Fixture):
                                             string.ascii_uppercase)
                               for x in range(8))
         self.name = '%s_%s' % (random_bits, os.getpid())
-        db = MySQLdb.connect(host="localhost",
+        db = pymysql.connect(host="localhost",
                              user="openstack_citest",
                              passwd="openstack_citest",
                              db="openstack_citest")
@@ -155,12 +155,12 @@ class MySQLSchemaFixture(fixtures.Fixture):
                     (self.name, self.name))
         cur.execute("flush privileges")
 
-        self.dburi = 'mysql://%s@localhost/%s' % (self.name, self.name)
+        self.dburi = 'mysql+pymysql://%s@localhost/%s' % (self.name, self.name)
         self.addDetail('dburi', testtools.content.text_content(self.dburi))
         self.addCleanup(self.cleanup)
 
     def cleanup(self):
-        db = MySQLdb.connect(host="localhost",
+        db = pymysql.connect(host="localhost",
                              user="openstack_citest",
                              passwd="openstack_citest",
                              db="openstack_citest")

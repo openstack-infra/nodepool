@@ -1,7 +1,7 @@
 script-dir: .
 elements-dir: .
 images-dir: /tmp/nodepool_dib
-dburi: 'mysql://nodepool@localhost/nodepool'
+dburi: 'mysql+pymysql://nodepool@localhost/nodepool'
 
 cron:
   check: '*/15 * * * *'

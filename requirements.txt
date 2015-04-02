@@ -13,7 +13,7 @@ pyzmq>=13.1.0,<14.0.0
 python-glanceclient
 python-keystoneclient
 python-novaclient
-MySQL-python
+PyMySQL
 PrettyTable>=0.6,<0.8
 six>=1.7.0
 diskimage-builder

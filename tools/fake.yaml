@@ -1,5 +1,5 @@
 script-dir: .
-dburi: 'mysql://nodepool@localhost/nodepool'
+dburi: 'mysql+pymysql://nodepool@localhost/nodepool'
 
 cron:
   check: '*/15 * * * *'
