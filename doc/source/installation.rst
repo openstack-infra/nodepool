@@ -50,6 +50,14 @@ for the Nodepool daemon to enable this support.
 Install Nodepool
 ----------------
 
+Install Nodepool prerequisites.
+
+Nodepool requires Python 2.7 or newer.
+
+RHEL 7 / CentOS 7::
+
+  yum install libffi libffi-devel @development python python-devel
+
 You may install Nodepool directly from PyPI with pip::
 
   pip install nodepool
