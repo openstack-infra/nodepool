@@ -38,6 +38,16 @@ database connection for each node.  Be sure to configure the database
 server to support at least a number of connections equal to twice the
 number of nodes you expect to be in use at once.
 
+All that is necessary is that the database is created. Nodepool will
+handle the schema by itself when it is run.
+
+MySQL Example::
+
+  CREATE USER 'nodepool'@'localhost' IDENTIFIED BY '<password>';
+  CREATE DATABASE nodepooldb;
+  GRANT ALL ON nodepooldb.* TO 'nodepool'@'localhost';
+  FLUSH PRIVILEGES;
+
 Statsd and Graphite
 ~~~~~~~~~~~~~~~~~~~
 
