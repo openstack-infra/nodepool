@@ -29,7 +29,7 @@ import fixtures
 import testresources
 import testtools
 
-from nodepool import nodepool, allocation
+from nodepool import allocation, fakeprovider, nodepool
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -76,6 +76,16 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
 
         self.useFixture(fixtures.MonkeyPatch('subprocess.Popen',
                                              LoggingPopenFactory))
+        self.setUpFakes()
+
+    def setUpFakes(self):
+        self.useFixture(fixtures.MonkeyPatch('keystoneclient.v2_0.client.'
+                                             'Client',
+                                             fakeprovider.FakeKeystoneClient))
+        self.useFixture(fixtures.MonkeyPatch('glanceclient.client.Client',
+                                             fakeprovider.FakeGlanceClient))
+        self.useFixture(fixtures.MonkeyPatch('novaclient.client.Client',
+                                             fakeprovider.FakeClient))
 
     def wait_for_threads(self):
         whitelist = ['APScheduler',
@@ -176,11 +186,14 @@ class DBTestCase(BaseTestCase):
         self.dburi = f.dburi
 
     def setup_config(self, filename):
+        images_dir = fixtures.TempDir()
+        self.useFixture(images_dir)
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         config = open(configfile).read()
         (fd, path) = tempfile.mkstemp()
-        os.write(fd, config.format(dburi=self.dburi))
+        os.write(fd, config.format(dburi=self.dburi,
+                                   images_dir=images_dir.path))
         os.close(fd)
         return path
 

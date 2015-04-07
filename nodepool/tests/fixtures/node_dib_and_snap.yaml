@@ -1,6 +1,6 @@
 script-dir: .
 elements-dir: .
-images-dir: .
+images-dir: '{images_dir}'
 
 dburi: '{dburi}'
 

@@ -28,7 +28,6 @@ import glanceclient.client
 import keystoneclient.v2_0.client as ksclient
 import time
 
-import fakeprovider
 from nodeutils import iterate_timeout
 from task_manager import Task, TaskManager, ManagerStoppedException
 
@@ -296,8 +295,6 @@ class ProviderManager(TaskManager):
             kwargs['region_name'] = self.provider.region_name
         if self.provider.api_timeout:
             kwargs['timeout'] = self.provider.api_timeout
-        if self.provider.auth_url == 'fake':
-            return fakeprovider.FAKE_CLIENT
         return novaclient.client.Client(*args, **kwargs)
 
     def _getFlavors(self):
@@ -503,22 +500,18 @@ class ProviderManager(TaskManager):
 
     def uploadImage(self, image_name, filename, disk_format, container_format,
                     meta):
-        if image_name.startswith('fake-'):
-            image = fakeprovider.FakeGlanceClient(**meta)
-            image.update(data='fake')
-        else:
-            # configure glance and upload image.  Note the meta flags
-            # are provided as custom glance properties
-            glanceclient = self.get_glance_client(self.provider)
-            image = glanceclient.images.create(
-                name=image_name,
-                is_public=False,
-                disk_format=disk_format,
-                container_format=container_format,
-                **meta)
-            filename = '%s.%s' % (filename, disk_format)
-            image.update(data=open(filename, 'rb'))
-            glanceclient = None
+        # configure glance and upload image.  Note the meta flags
+        # are provided as custom glance properties
+        glanceclient = self.get_glance_client(self.provider)
+        image = glanceclient.images.create(
+            name=image_name,
+            is_public=False,
+            disk_format=disk_format,
+            container_format=container_format,
+            **meta)
+        filename = '%s.%s' % (filename, disk_format)
+        image.update(data=open(filename, 'rb'))
+        glanceclient = None
         return image.id
 
     def listExtensions(self):

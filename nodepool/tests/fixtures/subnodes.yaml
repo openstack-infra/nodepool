@@ -1,5 +1,6 @@
 script-dir: .
 dburi: '{dburi}'
+images-dir: '{images_dir}'
 
 cron:
   check: '*/15 * * * *'
