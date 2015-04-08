@@ -41,8 +41,11 @@ number of nodes you expect to be in use at once.
 Statsd and Graphite
 ~~~~~~~~~~~~~~~~~~~
 
-If you have a Graphite system with statsd, Nodepool can be configured
-to send information to statsd.
+If you have a Graphite system with ``statsd``, Nodepool can be
+configured to send information to it.  Set the environment variable
+``STATSD_HOST`` to the ``statsd`` hostname (and optionally
+``STATSD_PORT`` if this should be different to the default ``8125``)
+for the Nodepool daemon to enable this support.
 
 Install Nodepool
 ----------------

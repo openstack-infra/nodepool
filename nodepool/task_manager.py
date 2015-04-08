@@ -21,7 +21,7 @@ import threading
 from six.moves import queue as Queue
 import logging
 import time
-from statsd import statsd
+from stats import statsd
 import requests.exceptions
 
 
