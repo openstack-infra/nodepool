@@ -2074,7 +2074,7 @@ class NodePool(threading.Thread):
             image_name = None
         manager = self.getProviderManager(provider)
 
-        if target.jenkins_url:
+        if target.jenkins_url and (node.nodename is not None):
             jenkins = self.getJenkinsManager(target)
             jenkins_name = node.nodename
             if jenkins.nodeExists(jenkins_name):
