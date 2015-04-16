@@ -310,7 +310,8 @@ class NodePoolCmd(object):
         self.list(node_id=node_id)
 
     def delete(self):
-        self.pool.reconfigureManagers(self.pool.config)
+        if self.args.now:
+            self.pool.reconfigureManagers(self.pool.config)
         with self.pool.getDB().getSession() as session:
             node = session.getNode(self.args.id)
             if not node:
