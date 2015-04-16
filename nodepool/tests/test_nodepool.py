@@ -56,6 +56,42 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
         self.assertEqual(len(nodes), 1)
 
+    def test_dib_node_vhd_image(self):
+        """Test that a dib image and node are created vhd image"""
+        configfile = self.setup_config('node_dib_vhd.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-dib-provider',
+                                     label_name='fake-dib-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+        self.assertEqual(len(nodes), 1)
+
+    def test_dib_node_vhd_and_qcow2(self):
+        """Test label provided by vhd and qcow2 images builds"""
+        configfile = self.setup_config('node_dib_vhd_and_qcow2.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider1', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider1',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            nodes = session.getNodes(provider_name='fake-provider2',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+
     def test_dib_and_snap_label(self):
         """Test that a label with dib and snapshot images build."""
         configfile = self.setup_config('node_dib_and_snap.yaml')
