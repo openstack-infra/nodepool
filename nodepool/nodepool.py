@@ -1499,7 +1499,8 @@ class NodePool(threading.Thread):
         configured = set(config.zmq_publishers.keys())
         if running == configured:
             self.log.debug("ZMQ Listeners do not need to be updated")
-            config.zmq_publishers = self.config.zmq_publishers
+            if self.config:
+                config.zmq_publishers = self.config.zmq_publishers
             return
 
         if self.zmq_context:
