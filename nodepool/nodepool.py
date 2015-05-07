@@ -1463,7 +1463,7 @@ class NodePool(threading.Thread):
                         oldmanager = None
                 if oldmanager:
                     config.jenkins_managers[t.name] = oldmanager
-                else:
+                elif t.jenkins_url:
                     self.log.debug("Creating new JenkinsManager object "
                                    "for %s" % t.name)
                     config.jenkins_managers[t.name] = \
@@ -1473,16 +1473,18 @@ class NodePool(threading.Thread):
                 oldmanager.stop()
 
             for t in config.targets.values():
-                try:
-                    info = config.jenkins_managers[t.name].getInfo()
-                    if info['quietingDown']:
-                        self.log.info("Target %s is offline" % t.name)
+                if t.jenkins_url:
+                    try:
+                        info = config.jenkins_managers[t.name].getInfo()
+                        if info['quietingDown']:
+                            self.log.info("Target %s is offline" % t.name)
+                            t.online = False
+                        else:
+                            t.online = True
+                    except Exception:
+                        self.log.exception("Unable to check status of %s" %
+                                           t.name)
                         t.online = False
-                    else:
-                        t.online = True
-                except Exception:
-                    self.log.exception("Unable to check status of %s" % t.name)
-                    t.online = False
 
     def reconfigureCrons(self, config):
         cron_map = {
