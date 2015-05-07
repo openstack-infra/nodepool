@@ -413,10 +413,12 @@ class NodeLauncher(threading.Thread):
 
         self.node.ip_private = server.get('private_v4')
         self.node.ip = ip
-        self.log.debug("Node id: %s is running, ip: %s, testing ssh" %
+        self.log.debug("Node id: %s is running, ip: %s, ipv6: %s" %
+                       (self.node.id, ip, server.get('public_v6')))
+
+        self.log.debug("Node id: %s testing ssh at ip: %s" %
                        (self.node.id, ip))
         connect_kwargs = dict(key_filename=self.image.private_key)
-
         if not utils.ssh_connect(ip, self.image.username,
                                  connect_kwargs=connect_kwargs,
                                  timeout=self.timeout):
@@ -693,7 +695,11 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.ip_private = server.get('private_v4')
         self.subnode.ip = ip
         self.log.debug("Subnode id: %s for node id: %s is running, "
-                       "ip: %s, testing ssh" %
+                       "ip: %s, ipv6: %s" %
+                       (self.subnode_id, self.node_id, ip,
+                        server.get('public_v6')))
+
+        self.log.debug("Subnode id: %s for node id: %s testing ssh at ip: %s" %
                        (self.subnode_id, self.node_id, ip))
         connect_kwargs = dict(key_filename=self.image.private_key)
         if not utils.ssh_connect(ip, self.image.username,
