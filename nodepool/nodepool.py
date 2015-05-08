@@ -249,7 +249,7 @@ class GearmanClient(gear.Client):
                 self._lostConnection(connection)
                 continue
             for line in req.response.split('\n'):
-                parts = [x.strip() for x in line.split()]
+                parts = [x.strip() for x in line.split('\t')]
                 if not parts or parts[0] == '.':
                     continue
                 if not parts[0].startswith('build:'):
