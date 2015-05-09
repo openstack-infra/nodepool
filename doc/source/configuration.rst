@@ -35,6 +35,8 @@ Example::
 
   script-dir: /path/to/script/dir
 
+.. _elements-dir:
+
 elements-dir
 ------------
 
@@ -106,7 +108,9 @@ Example::
     - host: zuul.example.com
       port: 4730
 
-The ``port`` key is optional.
+The ``port`` key is optional (default: 4730).
+
+.. _labels:
 
 labels
 ------
@@ -132,25 +136,42 @@ providers or images are used to create them).  Example::
       providers:
         - name: provider1
 
-The `name` and `image` keys are required.  The `providers` list is
-also required if any nodes should actually be created (e.g., the label
-is not currently disabled). The `min-ready` key is optional and
-defaults to 2. If the value is -1 the label is considered disabled.
-``min-ready`` is best-effort based on available capacity and is not a
-guaranteed allocation.
+**required**
 
-The `subnodes` key is used to configure multi-node support.  If a
-`subnodes` key is supplied to an image, it indicates that the specified
-number of additional nodes of the same image type should be created
-and associated with each node for that image.  Only one node from each
-such group will be added to the target, the subnodes are expected to
-communicate directly with each other.  In the example above, for each
-Precise node added to the target system, two additional nodes will be
-created and associated with it.
+  ``name``
+    Unique name used to tie jobs to those instances.
 
-A script specified by `ready-script` can be used to perform any last minute
-changes to a node after it has been launched but before it is put in the READY
-state to receive jobs. For more information, see :ref:`scripts`.
+  ``image``
+    Refers to providers images, see :ref:`images`.
+
+  ``providers`` (list)
+    Required if any nodes should actually be created (e.g., the label is not
+    currently disabled, see ``min-ready`` below).
+
+**optional**
+
+  ``min-ready`` (default: 2)
+    Minimum instances that should be in a ready state. Set to -1 to have the
+    label considered disabled. ``min-ready`` is best-effort based on available
+    capacity and is not a guaranteed allocation.
+
+  ``subnodes``
+    Used to configure multi-node support.  If a `subnodes` key is supplied to
+    an image, it indicates that the specified number of additional nodes of the
+    same image type should be created and associated with each node for that
+    image.
+
+    Only one node from each such group will be added to the target, the
+    subnodes are expected to communicate directly with each other.  In the
+    example above, for each Precise node added to the target system, two
+    additional nodes will be created and associated with it.
+
+  ``ready-script``
+    A script to be used to perform any last minute changes to a node after it
+    has been launched but before it is put in the READY state to receive jobs.
+    For more information, see :ref:`scripts`.
+
+.. _diskimages:
 
 diskimages
 ----------
@@ -174,15 +195,30 @@ will be built using the provider snapshot approach::
         DIB_DISTRIBUTION_MIRROR: http://archive.ubuntu.com
         DIB_IMAGE_CACHE: /opt/dib_cache
 
-For diskimages, the `name` is required. The `elements` section
-enumerates all the elements that will be included when building the
-image, and will point to the `elements-dir` path referenced in the
-same config file. `release` specifies the distro to be used as a base
-image to build the image using diskimage-builder.  `env-vars` is an
-optional dictionary of arbitrary environment variables that will be
-available in the spawned diskimage-builder child process.
 
-providers
+**required**
+
+  ``name``
+    Identifier to reference the disk image in :ref:`images` and :ref:`labels`.
+
+**optional**
+
+  ``release``
+    Specifies the distro to be used as a base image to build the image using
+    diskimage-builder.
+
+  ``elements`` (list)
+    Enumerates all the elements that will be included when building the image,
+    and will point to the :ref:`elements-dir` path referenced in the same
+    config file.
+
+  ``env-vars`` (dict)
+    Arbitrary environment variables that will be available in the spawned
+    diskimage-builder child process.
+
+.. _provider:
+
+provider
 ---------
 
 Lists the OpenStack cloud providers Nodepool should use.  Within each
@@ -260,36 +296,76 @@ provider, the Nodepool image types are also defined (see
               key: value
               key2: value
 
-For providers, the `name`, `username`, `password`, `auth-url`,
-`project-id`, and `max-servers` keys are required.
+**required**
 
-Both `boot-timeout` and `launch-timeout` keys are optional.  The
-`boot-timeout` key defaults to 60 seconds and `launch-timeout` key
-will default to 3600 seconds.
+  ``name``
 
-The optional `networks` section may be used to specify custom
-Neutron networks that get attached to each node. You can specify
-Neutron networks using either the `net-id` or `net-label`. If
-only the `net-label` is specified the network UUID is automatically
-queried via the Nova os-tenant-networks API extension (this requires
-that the cloud provider has deployed this extension).
+  ``username``
 
-The `availability-zones` key is optional. Without it nodepool will rely
-on nova to schedule an availability zone. If it is provided the value
-should be a list of availability zone names. Nodepool will select one
-at random and provide that to nova. This should give a good distribution
-of availability zones being used. If you need more control of the
-distribution you can use multiple logical providers each providing a
-different list of availabiltiy zones.
+  ``password``
 
-The 'pool' key is optional.  This can be used to specify a floating ip
-pool in cases where the 'public' pool is unavailable or undesirable.
+  ``project-id``
 
-The ``image-type`` specifies the image type supported by this provider.
-The disk images built by diskimage-builder will output an image for each
-``image-type`` specified by a provider using that particular diskimage.
-The default value is ``qcow2``, and values of ``vhd``, ``raw`` are also
-expected to be valid if you have a sufficiently new diskimage-builder.
+  ``auth-url``
+    Keystone URL.
+
+  ``max-servers``
+    Maximum number of servers spawnable on this provider.
+
+**optional**
+
+  ``availability-zones`` (list)
+    Without it nodepool will rely on nova to schedule an availability zone.
+
+    If it is provided the value should be a list of availability zone names.
+    Nodepool will select one at random and provide that to nova. This should
+    give a good distribution of availability zones being used. If you need more
+    control of the distribution you can use multiple logical providers each
+    providing a different list of availabiltiy zones.
+
+  ``boot-timeout``
+    In seconds. Default 60.
+
+  ``launch-timeout``
+    In seconds. Default 3600.
+
+  ``image-type``
+    Specifies the image type supported by this provider.  The disk images built
+    by diskimage-builder will output an image for each ``image-type`` specified
+    by a provider using that particular diskimage.
+
+    The default value is ``qcow2``, and values of ``vhd``, ``raw`` are also
+    expected to be valid if you have a sufficiently new diskimage-builder.
+
+  ``keypair``
+    Default None
+
+  ``networks`` (dict)
+    Specify custom Neutron networks that get attached to each node. You can
+    specify Neutron networks using either the ``net-id`` or ``net-label``. If
+    only the ``net-label`` is specified the network UUID is automatically
+    queried via the Nova os-tenant-networks API extension (this requires that
+    the cloud provider has deployed this extension).
+
+  ``pool``
+    Specify a floating ip pool in cases where the 'public' pool is unavailable
+    or undesirable.
+
+  ``api_timeout``
+    Timeout for the Nova client in seconds.
+
+  ``service-type``
+
+  ``service-name``
+
+  ``region-name``
+
+  ``template-hostname``
+    Hostname template to use for the spawned instance.
+    Default ``{image.name}-{timestamp}.template.openstack.org``
+
+  ``rate``
+    In seconds. Default 1.0.
 
 .. _images:
 
@@ -311,40 +387,63 @@ Example::
           key: value
           key2: value
 
-For `images`, the `name`, `base-image`, and `min-ram` keys are
-required.
+**required**
 
-`base-image` is the UUID or string-name of the image to boot as
-specified by the provider.
+  ``name``
+    Identifier to refer this image from :ref:`labels` and :ref:`provider`
+    sections.
 
-If the resulting images from different providers `base-image` should
-be equivalent, give them the same name; e.g. if one provider has a
-``Fedora 20`` image and another has an equivalent ``Fedora 20
-(Heisenbug)`` image, they should use a common `name`.  Otherwise
-select a unique `name`.
+    If the resulting images from different providers ``base-image`` should be
+    equivalent, give them the same name; e.g. if one provider has a ``Fedora
+    20`` image and another has an equivalent ``Fedora 20 (Heisenbug)`` image,
+    they should use a common ``name``.  Otherwise select a unique ``name``.
 
-The `min-ram` setting will determine the flavor of `base-image` to use
-(e.g. ``m1.medium``, ``m1.large``, etc).  The smallest flavor that
-meets the `min-ram` requirements will be chosen.  You may specify an
-additional `name-filter` which will be required to match on the
-flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
-`name-filter` to ``Performance`` will ensure the chosen flavor also
-contains this string as well as meeting `min-ram` requirements).
+  ``base-image``
+    UUID or string-name of the image to boot as specified by the provider.
 
-The `username` and `private-key` values default to the values
-indicated.  Nodepool expects that user to exist after running the
-script indicated by `setup`. `setup` will be used only when not
-building images using diskimage-builder, in that case settings defined
-in the ``diskimages`` section will be used instead. See :ref:`scripts`
-for setup script details.
+  ``min-ram``
+    Determine the flavor of ``base-image`` to use (e.g. ``m1.medium``,
+    ``m1.large``, etc).  The smallest flavor that meets the ``min-ram``
+    requirements will be chosen. To further filter by flavor name, see optional
+    ``name-filter`` below.
 
-The `config-drive` boolean is optional and defines whether config drive
-should be used for the image.
+**optional**
 
-The `meta` section is optional.  It is a dict of arbitrary key/value
-metadata to store for this server using the nova metadata service. A
-maximum of five entries is allowed, and both keys and values must be
-255 characters or less.
+  ``name-filter``
+    Additional filter complementing ``min-ram``, will be required to match on
+    the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
+    `name-filter` to ``Performance`` will ensure the chosen flavor also
+    contains this string as well as meeting `min-ram` requirements).
+
+  ``setup``
+     Script to run to prepare the instance.
+
+     Used only when not building images using diskimage-builder, in that case
+     settings defined in the ``diskimages`` section will be used instead. See
+     :ref:`scripts` for setup script details.
+
+  ``reset``
+     See :ref:`scripts`.
+
+  ``diskimages``
+     See :ref:`diskimages`.
+
+  ``username``
+    Nodepool expects that user to exist after running the script indicated by
+    ``setup``. Default ``jenkins``
+
+  ``private-key``
+    Default ``/var/lib/jenkins/.ssh/id_rsa``
+
+  ``config-drive`` (boolean)
+    Whether config drive should be used for the image.
+
+  ``meta`` (dict)
+    Arbitrary key/value metadata to store for this server using the Nova
+    metadata service. A maximum of five entries is allowed, and both keys and
+    values must be 255 characters or less.
+
+.. _targets:
 
 targets
 -------
@@ -371,8 +470,46 @@ across all of the targets which are on-line::
       hostname: '{label.name}-{provider.name}-{node_id}'
       subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}'
 
-For targets, the `name` is required.  If using Jenkins, the `url`,
-`user`, and `apikey` keys are required.  If the `credentials-id` key
-is provided, Nodepool will configure the Jenkins slave to use the
-Jenkins credential identified by that ID, otherwise it will use the
-username and ssh keys configured in the image.
+**required**
+
+  ``name``
+  Identifier for the system an instance is attached to.
+
+**optional**
+
+  ``hostname``
+    Default ``{label.name}-{provider.name}-{node_id}.slave.openstack.org``
+
+  ``subnode-hostname``
+    Default ``{label.name}-{provider.name}-{node_id}-{subnode_id}.slave.openstack.org``
+
+  ``rate``
+    In seconds. Default 1.0
+
+  ``jenkins`` (dict)
+    ``url``
+      Url to the Jenkins REST API.
+
+    ``user``
+      Jenkins username.
+
+    ``apikey``
+      API key generated by Jenkins (not the user password).
+
+    ``credentials-id`` (optional)
+      If provided, Nodepool will configure the Jenkins slave to use the Jenkins
+      credential identified by that ID, otherwise it will use the username and
+      ssh keys configured in the image.
+
+    ``test-job`` (optional)
+      Setting this would cause a newly created instance to be in a TEST state.
+      The job name given will then be executed with the node name as a
+      parameter.
+
+      If the job succeeds, move the node into READY state and relabel it with
+      the appropriate label (from the image name).
+
+      If it fails, immediately delete the node.
+
+      If the job never runs, the node will eventually be cleaned up by the
+      periodic cleanup task.
