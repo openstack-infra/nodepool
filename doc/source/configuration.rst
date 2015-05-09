@@ -305,6 +305,7 @@ provider, the Nodepool image types are also defined (see
   ``password``
 
   ``project-id``
+    Some clouds may refer to the ``project-id`` as ``tenant-id``.
 
   ``auth-url``
     Keystone URL.
