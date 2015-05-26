@@ -22,6 +22,7 @@ import time
 import uuid
 
 from jenkins import JenkinsException
+import shade
 
 
 class Dummy(object):
@@ -35,7 +36,8 @@ class Dummy(object):
     def update(self, data):
         try:
             if self.should_fail:
-                raise RuntimeError('This image has SHOULD_FAIL set to True.')
+                raise shade.OpenStackCloudException('This image has '
+                                                    'SHOULD_FAIL set to True.')
         except AttributeError:
             pass
 
@@ -173,20 +175,14 @@ class FakeGlanceClient(object):
         self.images = get_fake_images_list()
 
 
-class FakeServiceCatalog(object):
-    def url_for(self, **kwargs):
-        return 'fake-url'
-
-
-class FakeKeystoneClient(object):
-    def __init__(self, **kwargs):
-        self.service_catalog = FakeServiceCatalog()
-        self.auth_token = 'fake-auth-token'
-
-
 class FakeOpenStackCloud(object):
     nova_client = FakeClient()
-    glance_client = FakeGlanceClient()
+    _glance_client = FakeGlanceClient()
+
+    def create_image(self, **kwargs):
+        image = self._glance_client.images.create(**kwargs)
+        image.update('fake data')
+        return image
 
 
 class FakeFile(StringIO.StringIO):
