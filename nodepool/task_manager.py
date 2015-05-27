@@ -79,33 +79,37 @@ class TaskManager(threading.Thread):
 
     def run(self):
         last_ts = 0
-        while True:
-            task = self.queue.get()
-            if not task:
-                if not self._running:
-                    break
-                continue
+        try:
             while True:
-                delta = time.time() - last_ts
-                if delta >= self.rate:
-                    break
-                time.sleep(self.rate - delta)
-            self.log.debug("Manager %s running task %s (queue: %s)" %
-                           (self.name, task, self.queue.qsize()))
-            start = time.time()
-            self.runTask(task)
-            last_ts = time.time()
-            dt = last_ts - start
-            self.log.debug("Manager %s ran task %s in %ss" %
-                           (self.name, task, dt))
-            if statsd:
-                #nodepool.task.PROVIDER.subkey
-                subkey = type(task).__name__
-                key = 'nodepool.task.%s.%s' % (self.name, subkey)
-                statsd.timing(key, dt)
-                statsd.incr(key)
+                task = self.queue.get()
+                if not task:
+                    if not self._running:
+                        break
+                    continue
+                while True:
+                    delta = time.time() - last_ts
+                    if delta >= self.rate:
+                        break
+                    time.sleep(self.rate - delta)
+                self.log.debug("Manager %s running task %s (queue: %s)" %
+                               (self.name, task, self.queue.qsize()))
+                start = time.time()
+                self.runTask(task)
+                last_ts = time.time()
+                dt = last_ts - start
+                self.log.debug("Manager %s ran task %s in %ss" %
+                               (self.name, task, dt))
+                if statsd:
+                    #nodepool.task.PROVIDER.subkey
+                    subkey = type(task).__name__
+                    key = 'nodepool.task.%s.%s' % (self.name, subkey)
+                    statsd.timing(key, dt)
+                    statsd.incr(key)
 
-            self.queue.task_done()
+                self.queue.task_done()
+        except Exception:
+            self.log.exception("Task manager died.")
+            raise
 
     def submitTask(self, task):
         if not self._running:
