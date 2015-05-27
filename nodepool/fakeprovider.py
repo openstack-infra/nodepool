@@ -68,7 +68,12 @@ def get_bad_client():
 FAKE_CLIENT = None
 
 
-def get_fake_client(**kwargs):
+def fake_get_one_cloud(cloud_config, cloud_kwargs):
+    cloud_kwargs['validate'] = False
+    return cloud_config.get_one_cloud(**cloud_kwargs)
+
+
+def get_fake_client(*args, **kwargs):
     global FAKE_CLIENT
     if FAKE_CLIENT is None:
         FAKE_CLIENT = FakeOpenStackCloud()

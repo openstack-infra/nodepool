@@ -283,31 +283,9 @@ class ProviderManager(TaskManager):
         self._cloud_metadata_read = True
 
     def _getClient(self):
-        kwargs = {}
-        if self.provider.region_name:
-            kwargs['region_name'] = self.provider.region_name
-        if self.provider.api_timeout:
-            kwargs['api_timeout'] = self.provider.api_timeout
-        # These are named from back when we only talked to Nova. They're
-        # actually compute service related
-        if self.provider.service_type:
-            kwargs['compute_service_type'] = self.provider.service_type
-        if self.provider.service_name:
-            kwargs['compute_service_name'] = self.provider.service_name
-        if self.provider.cloud is not None:
-            kwargs['cloud'] = self.provider.cloud
-
-        auth_kwargs = {}
-        for auth_attr in ('username', 'password', 'auth_url'):
-            auth_val = getattr(self.provider, auth_attr)
-            if auth_val is not None:
-                auth_kwargs[auth_attr] = auth_val
-
-        if self.provider.project_id is not None:
-            auth_kwargs['project_name'] = self.provider.project_id
-
-        kwargs['auth'] = auth_kwargs
-        return shade.openstack_cloud(**kwargs)
+        return shade.OpenStackCloud(
+            self.provider.cloud_config.name,
+            **self.provider.cloud_config.config)
 
     def runTask(self, task):
         try:

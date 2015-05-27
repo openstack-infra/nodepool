@@ -15,8 +15,9 @@ python-keystoneclient
 python-novaclient>=2.21.0
 PyMySQL
 PrettyTable>=0.6,<0.8
-six>=1.7.0
 # shade has a looser requirement on six than nodepool, so install six first
+six>=1.7.0
+os-client-config>=1.2.0
 shade
 diskimage-builder
 voluptuous
