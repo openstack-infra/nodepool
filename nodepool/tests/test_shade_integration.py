@@ -52,3 +52,27 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pool.updateConfig()
         provider_manager = pool.config.provider_managers['fake-provider']
         self.assertEqual(provider_manager._client.auth, auth_data)
+
+    def test_nodepool_osc_config_reload(self):
+        configfile = self.setup_config('node_osc.yaml')
+        auth_data = {'username': 'os_fake',
+                     'project_name': 'os_fake',
+                     'password': 'os_fake',
+                     'auth_url': 'os_fake'}
+        osc_config = {'clouds': {'fake-cloud': {'auth': auth_data}}}
+        self._use_cloud_config(osc_config)
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.updateConfig()
+        provider_manager = pool.config.provider_managers['fake-provider']
+        self.assertEqual(provider_manager._client.auth, auth_data)
+
+        # update the config
+        auth_data['password'] = 'os_new_fake'
+        os.remove('clouds.yaml')
+        with open('clouds.yaml', 'w') as h:
+            yaml.safe_dump(osc_config, h)
+
+        pool.updateConfig()
+        provider_manager = pool.config.provider_managers['fake-provider']
+        self.assertEqual(provider_manager._client.auth, auth_data)
