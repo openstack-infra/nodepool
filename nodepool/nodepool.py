@@ -62,27 +62,21 @@ DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
 
 def _cloudKwargsFromProvider(provider):
     cloud_kwargs = {}
-    if 'region-name' in provider:
-        cloud_kwargs['region_name'] = provider['region-name']
-    if 'api-timeout' in provider:
-        cloud_kwargs['api_timeout'] = provider['api-timeout']
+    for arg in ['region-name', 'api-timeout', 'cloud']:
+        if arg in provider:
+            cloud_kwargs[arg] = provider[arg]
+
     # These are named from back when we only talked to Nova. They're
     # actually compute service related
     if 'service-type' in provider:
-        cloud_kwargs['compute_service_type'] = provider['service-type']
+        cloud_kwargs['compute-service-type'] = provider['service-type']
     if 'service-name' in provider:
-        cloud_kwargs['compute_service_name'] = provider['service-name']
-    if 'cloud' in provider:
-        cloud_kwargs['cloud'] = provider['cloud']
+        cloud_kwargs['compute-service-name'] = provider['service-name']
 
     auth_kwargs = {}
-    for auth_key in ('username', 'password', 'auth-url'):
+    for auth_key in ('username', 'password', 'auth-url', 'project-id'):
         if auth_key in provider:
-            new_key = auth_key.replace('-', '_')
-            auth_kwargs[new_key] = provider[auth_key]
-
-    if 'project-id' in provider:
-        auth_kwargs['project_name'] = provider['project-id']
+            auth_kwargs[auth_key] = provider[auth_key]
 
     cloud_kwargs['auth'] = auth_kwargs
     return cloud_kwargs

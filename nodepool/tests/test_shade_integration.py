@@ -34,7 +34,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pool.updateConfig()
         provider_manager = pool.config.provider_managers['fake-provider']
         auth_data = {'username': 'fake',
-                     'project_name': 'fake',
+                     'project_id': 'fake',
                      'password': 'fake',
                      'auth_url': 'fake'}
         self.assertEqual(provider_manager._client.auth, auth_data)
