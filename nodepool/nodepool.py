@@ -62,15 +62,15 @@ DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
 
 def _cloudKwargsFromProvider(provider):
     cloud_kwargs = {}
-    if 'region_name' in provider:
+    if 'region-name' in provider:
         cloud_kwargs['region_name'] = provider['region-name']
-    if 'api_timeout' in provider:
+    if 'api-timeout' in provider:
         cloud_kwargs['api_timeout'] = provider['api-timeout']
     # These are named from back when we only talked to Nova. They're
     # actually compute service related
-    if 'service_type' in provider:
+    if 'service-type' in provider:
         cloud_kwargs['compute_service_type'] = provider['service-type']
-    if 'service_name' in provider:
+    if 'service-name' in provider:
         cloud_kwargs['compute_service_name'] = provider['service-name']
     if 'cloud' in provider:
         cloud_kwargs['cloud'] = provider['cloud']
