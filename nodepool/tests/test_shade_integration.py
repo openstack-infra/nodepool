@@ -14,6 +14,7 @@
 
 import os
 
+import fixtures
 import yaml
 
 from nodepool import tests
@@ -21,11 +22,19 @@ from nodepool import tests
 
 class TestShadeIntegration(tests.IntegrationTestCase):
     def _cleanup_cloud_config(self):
-        os.remove('clouds.yaml')
+        os.remove(self.clouds_path)
 
     def _use_cloud_config(self, config):
-        with open('clouds.yaml', 'w') as h:
+        config_dir = fixtures.TempDir()
+        self.useFixture(config_dir)
+        self.clouds_path = os.path.join(config_dir.path, 'clouds.yaml')
+        self.useFixture(fixtures.MonkeyPatch(
+            'os_client_config.config.CONFIG_FILES',
+            [self.clouds_path]))
+
+        with open(self.clouds_path, 'w') as h:
             yaml.safe_dump(config, h)
+
         self.addCleanup(self._cleanup_cloud_config)
 
     def test_nodepool_provider_config(self):
@@ -69,8 +78,8 @@ class TestShadeIntegration(tests.IntegrationTestCase):
 
         # update the config
         auth_data['password'] = 'os_new_fake'
-        os.remove('clouds.yaml')
-        with open('clouds.yaml', 'w') as h:
+        os.remove(self.clouds_path)
+        with open(self.clouds_path, 'w') as h:
             yaml.safe_dump(osc_config, h)
 
         pool.updateConfig()
