@@ -47,6 +47,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
                      'password': 'fake',
                      'auth_url': 'fake'}
         self.assertEqual(provider_manager._client.auth, auth_data)
+        self.assertEqual(provider_manager._client.region_name, 'fake-region')
 
     def test_nodepool_osc_config(self):
         configfile = self.setup_config('node_osc.yaml')

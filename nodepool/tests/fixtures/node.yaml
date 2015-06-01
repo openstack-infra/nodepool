@@ -22,6 +22,7 @@ labels:
 
 providers:
   - name: fake-provider
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
