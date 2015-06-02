@@ -161,8 +161,7 @@ class NodeCompleteThread(threading.Thread):
 
         if statsd and self.result == 'SUCCESS':
             start = node.state_time
-            end = time.time()
-            dt = end - start
+            dt = int((time.time() - start) * 1000)
 
             # nodepool.job.tempest
             key = 'nodepool.job.%s' % self.jobname

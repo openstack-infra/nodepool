@@ -103,7 +103,7 @@ class TaskManager(threading.Thread):
                     #nodepool.task.PROVIDER.subkey
                     subkey = type(task).__name__
                     key = 'nodepool.task.%s.%s' % (self.name, subkey)
-                    statsd.timing(key, dt)
+                    statsd.timing(key, int(dt * 1000))
                     statsd.incr(key)
 
                 self.queue.task_done()
