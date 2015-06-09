@@ -83,8 +83,12 @@ pyzmq used by nodepool.
 Configuration
 -------------
 
-Nodepool has a single required configuration file and an optional
-logging configuration file.
+Nodepool has two required configuration files: secure.conf and
+nodepool.yaml, and an optional logging configuration file logging.conf.
+The secure.conf file is used to store nodepool configurations that contain
+sensitive data, such as the Nodepool database password and Jenkins
+api key. The nodepool.yaml files is used to store all other
+configurations.
 
 The logging configuration file is in the standard python logging
 `configuration file format

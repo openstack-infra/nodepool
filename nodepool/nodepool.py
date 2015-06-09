@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from six.moves import configparser as ConfigParser
 import apscheduler.scheduler
 import gear
 import json
@@ -1265,8 +1266,10 @@ class DiskImage(ConfigValue):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    def __init__(self, configfile, watermark_sleep=WATERMARK_SLEEP):
+    def __init__(self, securefile, configfile,
+                 watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
+        self.securefile = securefile
         self.configfile = configfile
         self.watermark_sleep = watermark_sleep
         self._stopped = False
@@ -1300,6 +1303,8 @@ class NodePool(threading.Thread):
 
     def loadConfig(self):
         self.log.debug("Loading configuration")
+        secure = ConfigParser.ConfigParser()
+        secure.readfp(open(self.securefile))
         config = yaml.load(open(self.configfile))
         cloud_config = os_client_config.OpenStackConfig()
 
@@ -1312,7 +1317,7 @@ class NodePool(threading.Thread):
         newconfig.scriptdir = config.get('script-dir')
         newconfig.elementsdir = config.get('elements-dir')
         newconfig.imagesdir = config.get('images-dir')
-        newconfig.dburi = config.get('dburi')
+        newconfig.dburi = secure.get('database', 'dburi')
         newconfig.provider_managers = {}
         newconfig.jenkins_managers = {}
         newconfig.zmq_publishers = {}
@@ -1443,24 +1448,35 @@ class NodePool(threading.Thread):
                 l.providers[p.name] = p
 
         for target in config['targets']:
+            # look at secure file for that section
+            section_name = 'jenkins "%s"' % target['name']
             t = Target()
             t.name = target['name']
             newconfig.targets[t.name] = t
-            jenkins = target.get('jenkins')
             t.online = True
-            if jenkins:
-                t.jenkins_url = jenkins['url']
-                t.jenkins_user = jenkins['user']
-                t.jenkins_apikey = jenkins['apikey']
-                t.jenkins_credentials_id = jenkins.get('credentials-id')
-                t.jenkins_test_job = jenkins.get('test-job')
+
+            if secure.has_section(section_name):
+                t.jenkins_url = secure.get(section_name, 'url')
+                t.jenkins_user = secure.get(section_name, 'user')
+                t.jenkins_apikey = secure.get(section_name, 'apikey')
             else:
                 t.jenkins_url = None
                 t.jenkins_user = None
                 t.jenkins_apikey = None
-                t.jenkins_credentials_id = None
-                t.jenkins_test_job = None
+
             t.rate = target.get('rate', 1.0)
+            try:
+                t.jenkins_credentials_id = secure.get(
+                    section_name, 'credentials')
+            except:
+                t.jenkins_credentials_id = None
+
+            jenkins = target.get('jenkins')
+            if jenkins:
+                t.jenkins_test_job = jenkins.get('test-job', None)
+            else:
+                t.jenkins_test_job = None
+
             t.hostname = target.get(
                 'hostname',
                 '{label.name}-{provider.name}-{node_id}'

@@ -86,10 +86,7 @@ class ConfigValidator:
             'hostname': str,
             'subnode-hostname': str,
             'jenkins': {
-                'url': str,
-                'user': str,
-                'apikey': str,
-                'credentials-id': str,
+                'test-job': str
             }
         }
 
@@ -104,7 +101,6 @@ class ConfigValidator:
             'script-dir': str,
             'elements-dir': str,
             'images-dir': str,
-            'dburi': str,
             'zmq-publishers': [str],
             'gearman-servers': [{
                 'host': str,

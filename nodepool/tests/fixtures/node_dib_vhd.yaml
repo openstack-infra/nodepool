@@ -2,8 +2,6 @@ script-dir: .
 elements-dir: .
 images-dir: '{images_dir}'
 
-dburi: '{dburi}'
-
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
@@ -44,10 +42,6 @@ providers:
 
 targets:
   - name: fake-target
-    jenkins:
-      url: https://jenkins.example.org/
-      user: fake
-      apikey: fake
 
 diskimages:
   - name: fake-dib-image

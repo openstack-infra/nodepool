@@ -124,7 +124,7 @@ class TestNodepool(tests.DBTestCase):
     def test_dib_and_snap_fail(self):
         """Test that snap based nodes build when dib fails."""
         configfile = self.setup_config('node_dib_and_snap_fail.yaml')
-        pool = nodepool.nodepool.NodePool(configfile, watermark_sleep=1)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.addCleanup(pool.stop)
         # fake-provider1 will fail to build fake-dib-image
