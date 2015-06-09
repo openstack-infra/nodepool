@@ -18,6 +18,6 @@ PrettyTable>=0.6,<0.8
 # shade has a looser requirement on six than nodepool, so install six first
 six>=1.7.0
 os-client-config>=1.2.0
-shade
+shade>=0.7.0
 diskimage-builder
 voluptuous
