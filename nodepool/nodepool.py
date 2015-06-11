@@ -800,8 +800,10 @@ class DiskImageBuilder(threading.Thread):
         # Note we use a reference to the nodepool config here so
         # that whenever the config is updated we get up to date
         # values in this thread.
-        env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
-        env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
+        if self.nodepool.config.elementsdir:
+            env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
+        if self.nodepool.config.scriptdir:
+            env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
 
         # send additional env vars if needed
         for k, v in image.env_vars.items():
@@ -1123,21 +1125,23 @@ class SnapshotImageUpdater(ImageUpdater):
         if not host:
             raise Exception("Unable to log in via SSH")
 
-        host.ssh("make scripts dir", "mkdir -p scripts")
         # /etc/nodepool is world writable because by the time we write
         # the contents after the node is launched, we may not have
         # sudo access any more.
         host.ssh("make config dir", "sudo mkdir /etc/nodepool")
         host.ssh("chmod config dir", "sudo chmod 0777 /etc/nodepool")
-        for fname in os.listdir(self.scriptdir):
-            path = os.path.join(self.scriptdir, fname)
-            if not os.path.isfile(path):
-                continue
-            host.scp(path, 'scripts/%s' % fname)
-        host.ssh("move scripts to opt",
-                 "sudo mv scripts /opt/nodepool-scripts")
-        host.ssh("set scripts permissions",
-                 "sudo chmod -R a+rx /opt/nodepool-scripts")
+        if self.scriptdir:
+            host.ssh("make scripts dir", "mkdir -p scripts")
+            for fname in os.listdir(self.scriptdir):
+                path = os.path.join(self.scriptdir, fname)
+                if not os.path.isfile(path):
+                    continue
+                host.scp(path, 'scripts/%s' % fname)
+            host.ssh("move scripts to opt",
+                     "sudo mv scripts /opt/nodepool-scripts")
+            host.ssh("set scripts permissions",
+                     "sudo chmod -R a+rx /opt/nodepool-scripts")
+
         if self.image.setup:
             env_vars = ''
             for k, v in os.environ.items():
