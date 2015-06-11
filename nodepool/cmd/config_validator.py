@@ -65,7 +65,8 @@ class ConfigValidator:
             'boot-timeout': int,
             'api-timeout': int,
             'rate': float,
-            'images': [images]
+            'images': [images],
+            'template-hostname': str
         }
 
         labels = {
@@ -81,6 +82,8 @@ class ConfigValidator:
 
         targets = {
             'name': str,
+            'hostname': str,
+            'subnode-hostname': str,
             'jenkins': {
                 'url': str,
                 'user': str,
