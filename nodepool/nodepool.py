@@ -425,7 +425,9 @@ class NodeLauncher(threading.Thread):
         server_id = self.manager.createServer(
             hostname, self.image.min_ram, snap_image.external_id,
             name_filter=self.image.name_filter, az=self.node.az,
-            config_drive=self.image.config_drive, node_id=self.node_id)
+            config_drive=self.image.config_drive,
+            nodepool_node_id=self.node_id,
+            nodepool_image_name=self.image.name)
         self.node.external_id = server_id
         session.commit()
 
@@ -704,7 +706,9 @@ class SubNodeLauncher(threading.Thread):
         server_id = self.manager.createServer(
             hostname, self.image.min_ram, snap_image.external_id,
             name_filter=self.image.name_filter, az=self.node_az,
-            config_drive=self.image.config_drive, node_id=self.node_id)
+            config_drive=self.image.config_drive,
+            nodepool_node_id=self.node_id,
+            nodepool_image_name=self.image.name)
         self.subnode.external_id = server_id
         session.commit()
 
@@ -1025,7 +1029,8 @@ class SnapshotImageUpdater(ImageUpdater):
             server_id = self.manager.createServer(
                 hostname, self.image.min_ram, image_name=image_name,
                 key_name=key_name, name_filter=self.image.name_filter,
-                image_id=image_id, config_drive=self.image.config_drive)
+                image_id=image_id, config_drive=self.image.config_drive,
+                nodepool_snapshot_image_id=self.snap_image.id)
         except Exception:
             if (self.manager.hasExtension('os-keypairs') and
                 not self.provider.keypair):

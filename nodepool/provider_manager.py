@@ -361,7 +361,9 @@ class ProviderManager(TaskManager):
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
-                     config_drive=None, node_id=None):
+                     config_drive=None, nodepool_node_id=None,
+                     nodepool_image_name=None,
+                     nodepool_snapshot_image_id=None):
         if image_name:
             image_id = self.findImage(image_name)['id']
         flavor = self.findFlavor(min_ram, name_filter)
@@ -390,11 +392,13 @@ class ProviderManager(TaskManager):
         # groups[0] is the image name or anything silly like that.
         nodepool_meta = dict(provider_name=self.provider.name)
         groups_meta = [self.provider.name]
-        if node_id:
-            nodepool_meta['node_id'] = node_id
-        if image_name:
-            nodepool_meta['image_name'] = image_name
-            groups_meta.append(image_name)
+        if nodepool_node_id:
+            nodepool_meta['node_id'] = nodepool_node_id
+        if nodepool_snapshot_image_id:
+            nodepool_meta['snapshot_image_id'] = nodepool_snapshot_image_id
+        if nodepool_image_name:
+            nodepool_meta['image_name'] = nodepool_image_name
+            groups_meta.append(nodepool_image_name)
         create_args['meta'] = dict(
             groups=json.dumps(groups_meta),
             nodepool=json.dumps(nodepool_meta)
