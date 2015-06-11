@@ -1,0 +1,51 @@
+script-dir: .
+dburi: '{dburi}'
+images-dir: '{images_dir}'
+
+cron:
+  check: '*/15 * * * *'
+  cleanup: '* * * * * *'
+  image-update: '14 2 * * *'
+
+zmq-publishers:
+  - tcp://localhost:8881
+
+#gearman-servers:
+#  - host: localhost
+
+labels:
+  - name: fake-label
+    image: fake-image
+    min-ready: 1
+    providers:
+      - name: fake-provider
+
+providers:
+  - name: fake-provider
+    region-name: fake-region
+    keypair: 'if-present-use-this-keypair'
+    username: 'fake'
+    password: 'fake'
+    auth-url: 'fake'
+    project-id: 'fake'
+    max-servers: 96
+    pool: 'fake'
+    networks:
+      - net-id: 'some-uuid'
+    rate: 0.0001
+    images:
+      - name: fake-image
+        base-image: 'Fake Precise'
+        min-ram: 8192
+        name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
+        setup: prepare_node_devstack.sh
+
+targets:
+  - name: fake-target
+    jenkins:
+      url: https://jenkins.example.org/
+      user: fake
+      apikey: fake
