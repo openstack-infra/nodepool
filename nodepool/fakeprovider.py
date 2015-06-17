@@ -42,42 +42,9 @@ class Dummy(object):
             pass
 
 
-fake_images_list = None
-
-
-def get_fake_images_list():
-    global fake_images_list
-    if fake_images_list is None:
-        fake_images_list = FakeList([Dummy(id='fake-image-id',
-                                           status='READY',
-                                           name='Fake Precise',
-                                           metadata={})])
-    return fake_images_list
-
-
-BAD_CLIENT = None
-
-
-def get_bad_client():
-    global BAD_CLIENT
-    if BAD_CLIENT is None:
-        BAD_CLIENT = BadOpenstackCloud()
-    return BAD_CLIENT
-
-
-FAKE_CLIENT = None
-
-
 def fake_get_one_cloud(cloud_config, cloud_kwargs):
     cloud_kwargs['validate'] = False
     return cloud_config.get_one_cloud(**cloud_kwargs)
-
-
-def get_fake_client(*args, **kwargs):
-    global FAKE_CLIENT
-    if FAKE_CLIENT is None:
-        FAKE_CLIENT = FakeOpenStackCloud()
-    return FAKE_CLIENT
 
 
 class FakeList(object):
@@ -153,36 +120,48 @@ class BadHTTPClient(object):
 
 
 class FakeClient(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, images, *args, **kwargs):
         self.flavors = FakeList([
             Dummy(id='f1', ram=8192, name='Fake Flavor'),
             Dummy(id='f2', ram=8192, name='Unreal Flavor'),
         ])
-        self.images = get_fake_images_list()
+        self.images = images
         self.client = FakeHTTPClient()
         self.servers = FakeList([])
         self.servers.api = self
 
 
 class BadClient(FakeClient):
-    def __init__(self):
-        super(BadClient, self).__init__()
+    def __init__(self, images):
+        super(BadClient, self).__init__(images)
         self.client = BadHTTPClient()
 
 
 class BadOpenstackCloud(object):
-    nova_client = BadClient()
+    def __init__(self, images=None):
+        if images is None:
+            images = FakeList([Dummy(id='fake-image-id',
+                                     status='READY',
+                                     name='Fake Precise',
+                                     metadata={})])
+        self.nova_client = BadClient(images)
 
 
 class FakeGlanceClient(object):
-    def __init__(self, **kwargs):
+    def __init__(self, images, **kwargs):
         self.kwargs = kwargs
-        self.images = get_fake_images_list()
+        self.images = images
 
 
 class FakeOpenStackCloud(object):
-    nova_client = FakeClient()
-    _glance_client = FakeGlanceClient()
+    def __init__(self, images=None):
+        if images is None:
+            images = FakeList([Dummy(id='fake-image-id',
+                                     status='READY',
+                                     name='Fake Precise',
+                                     metadata={})])
+        self.nova_client = FakeClient(images)
+        self._glance_client = FakeGlanceClient(images)
 
     def create_image(self, **kwargs):
         image = self._glance_client.images.create(**kwargs)

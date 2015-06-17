@@ -294,12 +294,16 @@ class TestNodepool(tests.DBTestCase):
         provider = pool.config.providers['fake-provider']
         manager = pool.getProviderManager(provider)
 
+        def get_bad_client(manager):
+            return nodepool.fakeprovider.BadOpenstackCloud(
+                manager._client.nova_client.images)
+
         # In order to test recovering from a ProxyError from the client
         # we are going manually set the client object to be a bad client that
         # always raises a ProxyError. If our client reset works correctly
         # then we will create a new client object, which in this case would
         # be a new fake client in place of the bad client.
-        manager._client = nodepool.fakeprovider.get_bad_client()
+        manager._client = get_bad_client(manager)
 
         # The only implemented function for the fake and bad clients
         # If we don't raise an uncaught exception, we pass
@@ -307,8 +311,8 @@ class TestNodepool(tests.DBTestCase):
 
         # Now let's do it again, but let's prevent the client object from being
         # replaced and then assert that we raised the exception that we expect.
-        manager._client = nodepool.fakeprovider.BAD_CLIENT
-        manager._getClient = lambda: nodepool.fakeprovider.get_bad_client()
+        manager._client = get_bad_client(manager)
+        manager._getClient = lambda: get_bad_client(manager)
 
         with ExpectedException(requests.exceptions.ProxyError):
             manager.listExtensions()
