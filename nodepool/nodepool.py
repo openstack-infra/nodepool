@@ -284,18 +284,36 @@ class GearmanClient(gear.Client):
                 continue
             for line in req.response.split('\n'):
                 parts = [x.strip() for x in line.split('\t')]
+                # parts[0] - function name
+                # parts[1] - total jobs queued (including building)
+                # parts[2] - jobs building
+                # parts[3] - workers registered
                 if not parts or parts[0] == '.':
                     continue
                 if not parts[0].startswith('build:'):
                     continue
                 function = parts[0][len('build:'):]
-                # total jobs in queue - running
-                queued = int(parts[1]) - int(parts[2])
+                # total jobs in queue (including building jobs)
+                # NOTE(jhesketh): Jobs that are being built are accounted for
+                # in the demand algorithm by subtracting the running nodes.
+                # If there are foreign (to nodepool) workers accepting jobs
+                # the demand will be higher than actually required. However
+                # better to have too many than too few and if you have a
+                # foreign worker this may be desired.
+                try:
+                    queued = int(parts[1])
+                except ValueError as e:
+                    self.__log.warn(
+                        'Server returned non-integer value in status. (%s)' %
+                        str(e))
+                    queued = 0
                 if queued > 0:
                     self.__log.debug("Function: %s queued: %s" % (function,
                                                                   queued))
                 if ':' in function:
                     fparts = function.split(':')
+                    # fparts[0] - function name
+                    # fparts[1] - target node [type]
                     job = fparts[-2]
                     worker = fparts[-1]
                     workers = job_worker_map.get(job, [])
@@ -1663,13 +1681,16 @@ class NodePool(threading.Thread):
             allocation_providers[provider.name] = ap
 
         # calculate demand for labels
-        # Actual need is demand - (ready + building)
+        # Actual need is: demand - (ready + building + used)
+        # NOTE(jhesketh): This assumes that the nodes in use are actually being
+        # used for a job in demand.
         for label in self.config.labels.values():
             start_demand = label_demand.get(label.name, 0)
             n_ready = count_nodes(label.name, nodedb.READY)
             n_building = count_nodes(label.name, nodedb.BUILDING)
+            n_used = count_nodes(label.name, nodedb.USED)
             n_test = count_nodes(label.name, nodedb.TEST)
-            ready = n_ready + n_building + n_test
+            ready = n_ready + n_building + n_used + n_test
 
             capacity = 0
             for provider in label.providers.values():
