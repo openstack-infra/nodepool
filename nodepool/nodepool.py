@@ -1755,7 +1755,8 @@ class NodePool(threading.Thread):
 
             capacity = 0
             for provider in label.providers.values():
-                capacity += allocation_providers[provider.name].available
+                if provider.name in allocation_providers:
+                    capacity += allocation_providers[provider.name].available
 
             # Note actual_demand and extra_demand are written this way
             # because max(0, x - y + z) != max(0, x - y) + z.
@@ -2211,58 +2212,75 @@ class NodePool(threading.Thread):
             # Don't write to the session if not needed.
             node.state = nodedb.DELETE
         self.updateStats(session, node.provider_name)
-        provider = self.config.providers[node.provider_name]
-        target = self.config.targets[node.target_name]
-        label = self.config.labels.get(node.label_name, None)
-        if label:
-            image_name = provider.images[label.image].name
-        else:
-            image_name = None
-        manager = self.getProviderManager(provider)
 
-        if target.jenkins_url and (node.nodename is not None):
+        # remove node from jenkins
+        target = self.config.targets[node.target_name]
+        if target and target.jenkins_url and (node.nodename is not None):
             jenkins = self.getJenkinsManager(target)
             jenkins_name = node.nodename
             if jenkins.nodeExists(jenkins_name):
                 jenkins.deleteNode(jenkins_name)
             self.log.info("Deleted jenkins node id: %s" % node.id)
 
-        for subnode in node.subnodes:
-            if subnode.external_id:
+        # remove node from cloud
+        try:
+            provider = self.config.providers[node.provider_name]
+        except:
+            # In this case, provider is not found on nodepool.yaml, maybe
+            # because of an incorrect worflow followed to remove from settings.
+            # But there are still pending nodes to be deleted, pointing to that
+            # provider, so we will continue with the removal process
+            # (from jenkins and from database)
+            self.log.warning("Provider %s not found" % node.provider_name)
+            provider = None
+        if provider:
+            manager = self.getProviderManager(provider)
+            for subnode in node.subnodes:
+                if subnode.external_id:
+                    try:
+                        self.log.debug('Deleting server %s for subnode id: '
+                                       '%s of node id: %s' %
+                                       (subnode.external_id, subnode.id,
+                                        node.id))
+                        manager.cleanupServer(subnode.external_id)
+                    except provider_manager.NotFound:
+                        pass
+
+            if node.external_id:
                 try:
-                    self.log.debug('Deleting server %s for subnode id: '
-                                   '%s of node id: %s' %
-                                   (subnode.external_id, subnode.id, node.id))
-                    manager.cleanupServer(subnode.external_id)
+                    self.log.debug('Deleting server %s for node id: %s' %
+                                   (node.external_id, node.id))
+                    manager.cleanupServer(node.external_id)
+                    manager.waitForServerDeletion(node.external_id)
                 except provider_manager.NotFound:
                     pass
-
-        if node.external_id:
-            try:
-                self.log.debug('Deleting server %s for node id: %s' %
-                               (node.external_id, node.id))
-                manager.cleanupServer(node.external_id)
-                manager.waitForServerDeletion(node.external_id)
-            except provider_manager.NotFound:
-                pass
             node.external_id = None
 
+        # remove from database
         for subnode in node.subnodes:
             if subnode.external_id:
-                manager.waitForServerDeletion(subnode.external_id)
+                if manager:
+                    manager.waitForServerDeletion(subnode.external_id)
                 subnode.delete()
-
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
 
-        if statsd:
-            dt = int((time.time() - node.state_time) * 1000)
-            key = 'nodepool.delete.%s.%s.%s' % (image_name,
-                                                node.provider_name,
-                                                node.target_name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
-        self.updateStats(session, node.provider_name)
+        if provider:
+            if statsd:
+                # update stats
+                label = self.config.labels.get(node.label_name, None)
+                if label and provider and label.image in provider.images:
+                    image_name = provider.images[label.image].name
+                else:
+                    image_name = None
+
+                dt = int((time.time() - node.state_time) * 1000)
+                key = 'nodepool.delete.%s.%s.%s' % (image_name,
+                                                    node.provider_name,
+                                                    node.target_name)
+                statsd.timing(key, dt)
+                statsd.incr(key)
+            self.updateStats(session, node.provider_name)
 
     def deleteImage(self, snap_image_id):
         try:
@@ -2593,6 +2611,9 @@ class NodePool(threading.Thread):
         if not statsd:
             return
         # This may be called outside of the main thread.
+        if provider_name not in self.config.providers:
+            return
+
         provider = self.config.providers[provider_name]
 
         states = {}
