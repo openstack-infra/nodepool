@@ -33,7 +33,8 @@ class SSHClient(object):
 
     def ssh(self, action, command, get_pty=True, output=False):
         if self.log:
-            self.log.info(command)
+            self.log.debug("*** START to %s" % action)
+            self.log.debug("executing: %s" % command)
         stdin, stdout, stderr = self.client.exec_command(
             command, get_pty=get_pty)
         out = ''
@@ -50,9 +51,13 @@ class SSHClient(object):
                 self.log.error(line.rstrip())
         ret = stdout.channel.recv_exit_status()
         if ret:
+            if self.log:
+                self.log.debug("*** FAILED to %s (%s)" % (action, ret))
             raise Exception(
                 "Unable to %s\ncommand: %s\nstdout: %s\nstderr: %s"
                 % (action, command, out, err))
+        if self.log:
+            self.log.debug("*** SUCCESSFULLY %s" % action)
         return out
 
     def scp(self, source, dest):
