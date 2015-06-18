@@ -336,6 +336,25 @@ class GearmanClient(gear.Client):
         return needed_workers
 
 
+class InstanceDeleter(threading.Thread):
+    log = logging.getLogger("nodepool.InstanceDeleter")
+
+    def __init__(self, nodepool, provider_name, external_id):
+        threading.Thread.__init__(self, name='InstanceDeleter for %s %s' %
+                                  (provider_name, external_id))
+        self.nodepool = nodepool
+        self.provider_name = provider_name
+        self.external_id = external_id
+
+    def run(self):
+        try:
+            self.nodepool._deleteInstance(self.provider_name,
+                                          self.external_id)
+        except Exception:
+            self.log.exception("Exception deleting node %s:" %
+                               self.node_id)
+
+
 class NodeDeleter(threading.Thread):
     log = logging.getLogger("nodepool.NodeDeleter")
 
@@ -1239,6 +1258,8 @@ class NodePool(threading.Thread):
         self._delete_threads_lock = threading.Lock()
         self._image_delete_threads = {}
         self._image_delete_threads_lock = threading.Lock()
+        self._instance_delete_threads = {}
+        self._instance_delete_threads_lock = threading.Lock()
         self._image_builder_queue = Queue.Queue()
         self._image_builder_thread = None
 
@@ -1553,13 +1574,18 @@ class NodePool(threading.Thread):
                 if self.config and self.config.crons[c.name].job:
                     self.apsched.unschedule_job(self.config.crons[c.name].job)
                 parts = c.timespec.split()
+                if len(parts) > 5:
+                    second = parts[5]
+                else:
+                    second = None
                 minute, hour, dom, month, dow = parts[:5]
                 c.job = self.apsched.add_cron_job(
                     cron_map[c.name],
                     day=dom,
                     day_of_week=dow,
                     hour=hour,
-                    minute=minute)
+                    minute=minute,
+                    second=second)
             else:
                 c.job = self.config.crons[c.name].job
 
@@ -2266,6 +2292,26 @@ class NodePool(threading.Thread):
         dib_image.delete()
         self.log.info("Deleted dib image id: %s" % dib_image.id)
 
+    def deleteInstance(self, provider_name, external_id):
+        key = (provider_name, external_id)
+        try:
+            self._instance_delete_threads_lock.acquire()
+            if key in self._instance_delete_threads:
+                return
+            t = InstanceDeleter(self, provider_name, external_id)
+            self._instance_delete_threads[key] = t
+            t.start()
+        except Exception:
+            self.log.exception("Could not delete instance %s on provider %s",
+                               provider_name, external_id)
+        finally:
+            self._instance_delete_threads_lock.release()
+
+    def _deleteInstance(self, provider_name, external_id):
+        provider = self.config.providers[provider_name]
+        manager = self.getProviderManager(provider)
+        manager.cleanupServer(external_id)
+
     def _doPeriodicCleanup(self):
         try:
             self.periodicCleanup()
@@ -2322,7 +2368,62 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception cleaning up image id %s:" %
                                    dib_image_id)
+
+        try:
+            self.cleanupLeakedInstances()
+            pass
+        except Exception:
+            self.log.exception("Exception cleaning up leaked nodes")
+
         self.log.debug("Finished periodic cleanup")
+
+    def cleanupLeakedInstances(self):
+        known_providers = self.config.providers.keys()
+        with self.getDB().getSession() as session:
+            for provider in self.config.providers.values():
+                manager = self.getProviderManager(provider)
+                servers = manager.listServers()
+                for server in servers:
+                    meta = server.get('metadata', {}).get('nodepool')
+                    if not meta:
+                        self.log.debug("Instance %s (%s) in %s has no "
+                                       "nodepool metadata" % (
+                                           server['name'], server['id'],
+                                           provider.name))
+                        continue
+                    meta = json.loads(meta)
+                    if meta['provider_name'] not in known_providers:
+                        self.log.debug("Instance %s (%s) in %s "
+                                       "lists unknown provider %s" % (
+                                           server['name'], server['id'],
+                                           provider.name,
+                                           meta['provider_name']))
+                        continue
+                    snap_image_id = meta.get('snapshot_image_id')
+                    node_id = meta.get('node_id')
+                    if snap_image_id:
+                        if session.getSnapshotImage(snap_image_id):
+                            continue
+                        self.log.warning("Deleting leaked instance %s (%s) "
+                                         "in %s for snapshot image id %s" % (
+                                             server['name'], server['id'],
+                                             provider.name,
+                                             snap_image_id))
+                        self.deleteInstance(provider.name, server['id'])
+                    elif node_id:
+                        if session.getNode(node_id):
+                            continue
+                        self.log.warning("Deleting leaked instance %s (%s) "
+                                         "in %s for node id %s " % (
+                                             server['name'], server['id'],
+                                             provider.name, node_id))
+                        self.deleteInstance(provider.name, server['id'])
+                    else:
+                        self.log.warning("Instance %s (%s) in %s has no "
+                                         "database id" % (
+                                             server['name'], server['id'],
+                                             provider.name))
+                        continue
 
     def cleanupOneNode(self, session, node):
         now = time.time()

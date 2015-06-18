@@ -91,6 +91,8 @@ def make_server_dict(server):
         d['key_name'] = server.key_name
     if hasattr(server, 'progress'):
         d['progress'] = server.progress
+    if hasattr(server, 'metadata'):
+        d['metadata'] = server.metadata
     d['public_v4'] = get_public_ip(server)
     d['private_v4'] = get_private_ip(server)
     d['public_v6'] = get_public_ip(server, version=6)

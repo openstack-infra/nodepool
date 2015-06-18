@@ -111,6 +111,9 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         while True:
             done = True
             for t in threading.enumerate():
+                if t.name.startswith("Thread-"):
+                    # apscheduler thread pool
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
