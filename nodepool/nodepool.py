@@ -25,19 +25,18 @@ import os_client_config
 import os.path
 import paramiko
 import pprint
-import Queue
 import random
 import re
-import shlex
-import subprocess
 import threading
 import time
+from uuid import uuid4
 import yaml
 import zmq
 
 import allocation
 import jenkins_manager
 import nodedb
+import builder
 import nodeutils as utils
 import provider_manager
 from stats import statsd
@@ -56,10 +55,6 @@ IMAGE_CLEANUP = 8 * HOURS    # When to start deleting an image that is not
                              # READY or is not the current or previous image
 DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
                              # its job.
-
-# HP Cloud requires qemu compat with 0.10. That version works elsewhere,
-# so just hardcode it for all qcow2 building
-DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
 
 
 def _cloudKwargsFromProvider(provider):
@@ -261,6 +256,32 @@ class NodeUpdateListener(threading.Thread):
         t.start()
 
 
+class WatchableJob(gear.Job):
+    def __init__(self, *args, **kwargs):
+        super(WatchableJob, self).__init__(*args, **kwargs)
+        self._completion_handlers = []
+
+    def addCompletionHandler(self, handler):
+        self._completion_handlers.append(handler)
+
+    def onCompleted(self):
+        for handler in self._completion_handlers:
+            handler(self)
+
+
+class JobTracker(object):
+    def __init__(self):
+        self._running_jobs = set()
+
+    @property
+    def running_jobs(self):
+        return list(self._running_jobs)
+
+    def addJob(self, job):
+        self._running_jobs.add(job)
+        job.addCompletionHandler(self._running_jobs.remove)
+
+
 class GearmanClient(gear.Client):
     def __init__(self):
         super(GearmanClient, self).__init__(client_id='nodepool')
@@ -330,6 +351,10 @@ class GearmanClient(gear.Client):
             needed_workers[worker] = (needed_workers.get(worker, 0) +
                                       queued)
         return needed_workers
+
+    def handleWorkComplete(self, packet):
+        job = super(GearmanClient, self).handleWorkComplete(packet)
+        job.onCompleted()
 
 
 class InstanceDeleter(threading.Thread):
@@ -827,124 +852,6 @@ class ImageDeleter(threading.Thread):
                                self.snap_image_id)
 
 
-class DiskImageBuilder(threading.Thread):
-    log = logging.getLogger("nodepool.DiskImageBuilderThread")
-
-    def __init__(self, nodepool):
-        threading.Thread.__init__(self, name='DiskImageBuilder queue')
-        self.nodepool = nodepool
-        self.queue = nodepool._image_builder_queue
-
-    def run(self):
-        while True:
-            # grabs image id from queue
-            image_id = self.queue.get()
-            try:
-                self.buildImage(image_id)
-            except Exception:
-                self.log.exception("Exception attempting DIB build "
-                                   "for image %s:" % (image_id,))
-            finally:
-                self.queue.task_done()
-
-    def _buildImage(self, image, image_name, filename):
-        env = os.environ.copy()
-
-        env['DIB_RELEASE'] = image.release
-        env['DIB_IMAGE_NAME'] = image_name
-        env['DIB_IMAGE_FILENAME'] = filename
-        # Note we use a reference to the nodepool config here so
-        # that whenever the config is updated we get up to date
-        # values in this thread.
-        if self.nodepool.config.elementsdir:
-            env['ELEMENTS_PATH'] = self.nodepool.config.elementsdir
-        if self.nodepool.config.scriptdir:
-            env['NODEPOOL_SCRIPTDIR'] = self.nodepool.config.scriptdir
-
-        # send additional env vars if needed
-        for k, v in image.env_vars.items():
-            env[k] = v
-
-        img_elements = image.elements
-        img_types = ",".join(image.image_types)
-
-        qemu_img_options = ''
-        if 'qcow2' in img_types:
-            qemu_img_options = DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS
-
-        if 'fake-' in filename:
-            dib_cmd = 'nodepool/tests/fake-image-create'
-        else:
-            dib_cmd = 'disk-image-create'
-
-        cmd = ('%s -x -t %s --no-tmpfs %s -o %s %s' %
-               (dib_cmd, img_types, qemu_img_options, filename, img_elements))
-
-        log = logging.getLogger("nodepool.image.build.%s" %
-                                (image_name,))
-
-        self.log.info('Running %s' % cmd)
-
-        try:
-            p = subprocess.Popen(
-                shlex.split(cmd),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env)
-        except OSError as e:
-            raise Exception("Failed to exec '%s'. Error: '%s'" %
-                            (cmd, e.strerror))
-
-        while True:
-            ln = p.stdout.readline()
-            log.info(ln.strip())
-            if not ln:
-                break
-
-        p.wait()
-        ret = p.returncode
-        if ret:
-            raise Exception("DIB failed creating %s" % (filename,))
-
-    def buildImage(self, image_id):
-        with self.nodepool.getDB().getSession() as session:
-            self.dib_image = session.getDibImage(image_id)
-            self.log.info("Creating image: %s with filename %s" %
-                          (self.dib_image.image_name, self.dib_image.filename))
-
-            start_time = time.time()
-            timestamp = int(start_time)
-            self.dib_image.version = timestamp
-            session.commit()
-
-            # retrieve image details
-            image_details = \
-                self.nodepool.config.diskimages[self.dib_image.image_name]
-            try:
-                self._buildImage(
-                    image_details,
-                    self.dib_image.image_name,
-                    self.dib_image.filename)
-            except Exception:
-                self.log.exception("Exception building DIB image %s:" %
-                                   (image_id,))
-                # DIB should've cleaned up after itself, just remove this
-                # image from the DB.
-                self.dib_image.delete()
-                return
-
-            self.dib_image.state = nodedb.READY
-            session.commit()
-            self.log.info("DIB image %s with file %s is built" % (
-                image_id, self.dib_image.image_name))
-
-            if statsd:
-                dt = int((time.time() - start_time) * 1000)
-                key = 'nodepool.dib_image_build.%s' % self.dib_image.image_name
-                statsd.timing(key, dt)
-                statsd.incr(key)
-
-
 class ImageUpdater(threading.Thread):
     log = logging.getLogger("nodepool.ImageUpdater")
 
@@ -1281,12 +1188,13 @@ class Network(ConfigValue):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    def __init__(self, securefile, configfile,
-                 watermark_sleep=WATERMARK_SLEEP):
+    def __init__(self, securefile, configfile, watermark_sleep=WATERMARK_SLEEP,
+                 run_builder=True):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
         self.watermark_sleep = watermark_sleep
+        self.run_builder = run_builder
         self._stopped = False
         self.config = None
         self.zmq_context = None
@@ -1298,8 +1206,8 @@ class NodePool(threading.Thread):
         self._image_delete_threads_lock = threading.Lock()
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
-        self._image_builder_queue = Queue.Queue()
         self._image_builder_thread = None
+        self._image_build_jobs = JobTracker()
 
     def stop(self):
         self._stopped = True
@@ -1311,10 +1219,14 @@ class NodePool(threading.Thread):
             self.zmq_context.destroy()
         if self.apsched:
             self.apsched.shutdown()
+        if self._image_builder_thread and self._image_builder_thread.running:
+            self._image_builder_thread.stop()
 
     def waitForBuiltImages(self):
-        # wait on the queue until everything has been processed
-        self._image_builder_queue.join()
+        self.log.debug("Waiting for images to complete building.")
+        while len(self._image_build_jobs.running_jobs) > 0:
+            time.sleep(.5)
+        self.log.debug("Done waiting for images to complete building.")
 
     def loadConfig(self):
         self.log.debug("Loading configuration")
@@ -1700,9 +1612,8 @@ class NodePool(threading.Thread):
 
     def reconfigureImageBuilder(self):
         # start disk image builder thread
-        if not self._image_builder_thread:
-            self._image_builder_thread = DiskImageBuilder(self)
-            self._image_builder_thread.daemon = True
+        if not self._image_builder_thread and self.run_builder:
+            self._image_builder_thread = builder.NodePoolBuilder(self)
             self._image_builder_thread.start()
 
     def setConfig(self, config):
@@ -2109,6 +2020,8 @@ class NodePool(threading.Thread):
         return t
 
     def buildImage(self, image):
+        gearman_job = None
+
         # check if we already have this item in the queue
         with self.getDB().getSession() as session:
             queued_images = session.getBuildingDibImagesByName(image.name)
@@ -2129,9 +2042,17 @@ class NodePool(threading.Thread):
                                    image.name)
                     dib_image = session.createDibImage(image_name=image.name,
                                                        filename=filename)
+                    session.commit()
 
-                    # add this build to queue
-                    self._image_builder_queue.put(dib_image.id)
+                    # Submit image-build job
+                    job_uuid = str(uuid4().hex)
+                    gearman_job = WatchableJob(
+                        'image-build:%s' % image.name,
+                        json.dumps({'image_id': dib_image.id}),
+                        job_uuid)
+                    self._image_build_jobs.addJob(gearman_job)
+
+                    self.gearman_client.submitJob(gearman_job)
                 except Exception:
                     self.log.exception(
                         "Could not build image %s", image.name)

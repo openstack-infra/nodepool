@@ -31,7 +31,7 @@ import gear
 import testresources
 import testtools
 
-from nodepool import allocation, fakeprovider, nodepool, nodedb
+from nodepool import allocation, builder, fakeprovider, nodepool, nodedb
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -156,6 +156,7 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         whitelist = ['APScheduler',
                      'MainThread',
                      'NodePool',
+                     'NodePool Builder',
                      'NodeUpdateListener',
                      'Gearman client connect',
                      'Gearman client poll',
@@ -240,6 +241,22 @@ class MySQLSchemaFixture(fixtures.Fixture):
                              db="openstack_citest")
         cur = db.cursor()
         cur.execute("drop database %s" % self.name)
+
+
+class BuilderFixture(fixtures.Fixture):
+    def __init__(self, nodepool):
+        super(BuilderFixture, self).__init__()
+        self.nodepool = nodepool
+        self.builder = None
+
+    def setUp(self):
+        super(BuilderFixture, self).setUp()
+        self.builder = builder.NodePoolBuilder(self.nodepool)
+        self.addCleanup(self.cleanup)
+        self.builder.start()
+
+    def cleanup(self):
+        self.builder.stop()
 
 
 class DBTestCase(BaseTestCase):

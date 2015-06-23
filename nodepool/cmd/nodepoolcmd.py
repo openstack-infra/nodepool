@@ -373,8 +373,10 @@ class NodePoolCmd(object):
         if self.args.command in ('config-validate'):
             return self.args.func()
 
-        self.pool = nodepool.NodePool(self.args.secure, self.args.config)
+        self.pool = nodepool.NodePool(self.args.secure, self.args.config,
+                                      run_builder=False)
         config = self.pool.loadConfig()
+        self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
         self.args.func()
