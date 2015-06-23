@@ -1356,7 +1356,6 @@ class NodePool(threading.Thread):
                 i.min_ram = image['min-ram']
                 i.name_filter = image.get('name-filter', None)
                 i.setup = image.get('setup', None)
-                i.reset = image.get('reset')
                 i.diskimage = image.get('diskimage', None)
                 i.username = image.get('username', 'jenkins')
                 i.user_home = image.get('user-home', '/home/jenkins')
@@ -1492,7 +1491,6 @@ class NodePool(threading.Thread):
                 new_images[k].min_ram != old_images[k].min_ram or
                 new_images[k].name_filter != old_images[k].name_filter or
                 new_images[k].setup != old_images[k].setup or
-                new_images[k].reset != old_images[k].reset or
                 new_images[k].username != old_images[k].username or
                 new_images[k].user_home != old_images[k].user_home or
                 new_images[k].diskimage != old_images[k].diskimage or
