@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from statsd import statsd
 import apscheduler.scheduler
 import gear
 import json
@@ -39,6 +38,7 @@ import jenkins_manager
 import nodedb
 import nodeutils as utils
 import provider_manager
+from stats import statsd
 
 MINS = 60
 HOURS = 60 * MINS
