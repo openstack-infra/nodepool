@@ -19,6 +19,7 @@ import logging
 import os
 import pymysql
 import random
+import re
 import string
 import subprocess
 import threading
@@ -26,6 +27,7 @@ import tempfile
 import time
 
 import fixtures
+import gear
 import testresources
 import testtools
 
@@ -36,6 +38,64 @@ TRUE_VALUES = ('true', '1', 'yes')
 
 class LoggingPopen(subprocess.Popen):
     pass
+
+
+class FakeGearmanServer(gear.Server):
+    def __init__(self):
+        self.hold_jobs_in_queue = False
+        super(FakeGearmanServer, self).__init__(0)
+
+    def getJobForConnection(self, connection, peek=False):
+        for queue in [self.high_queue, self.normal_queue, self.low_queue]:
+            for job in queue:
+                if not hasattr(job, 'waiting'):
+                    if job.name.startswith('build:'):
+                        job.waiting = self.hold_jobs_in_queue
+                    else:
+                        job.waiting = False
+                if job.waiting:
+                    continue
+                if job.name in connection.functions:
+                    if not peek:
+                        queue.remove(job)
+                        connection.related_jobs[job.handle] = job
+                        job.worker_connection = connection
+                    job.running = True
+                    return job
+        return None
+
+    def release(self, regex=None):
+        released = False
+        qlen = (len(self.high_queue) + len(self.normal_queue) +
+                len(self.low_queue))
+        self.log.debug("releasing queued job %s (%s)" % (regex, qlen))
+        for job in self.getQueue():
+            cmd, name = job.name.split(':')
+            if cmd != 'build':
+                continue
+            if not regex or re.match(regex, name):
+                self.log.debug("releasing queued job %s" %
+                               job.unique)
+                job.waiting = False
+                released = True
+            else:
+                self.log.debug("not releasing queued job %s" %
+                               job.unique)
+        if released:
+            self.wakeConnections()
+        qlen = (len(self.high_queue) + len(self.normal_queue) +
+                len(self.low_queue))
+        self.log.debug("done releasing queued jobs %s (%s)" % (regex, qlen))
+
+
+class GearmanServerFixture(fixtures.Fixture):
+    def setUp(self):
+        super(GearmanServerFixture, self).setUp()
+        self.gearman_server = FakeGearmanServer()
+        self.addCleanup(self.shutdownGearman)
+
+    def shutdownGearman(self):
+        self.gearman_server.shutdown()
 
 
 class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
@@ -194,6 +254,10 @@ class DBTestCase(BaseTestCase):
         self.useFixture(f)
         self.dburi = f.dburi
 
+        gearman_fixture = GearmanServerFixture()
+        self.useFixture(gearman_fixture)
+        self.gearman_server = gearman_fixture.gearman_server
+
     def setup_config(self, filename):
         images_dir = fixtures.TempDir()
         self.useFixture(images_dir)
@@ -202,7 +266,8 @@ class DBTestCase(BaseTestCase):
         config = open(configfile).read()
         (fd, path) = tempfile.mkstemp()
         os.write(fd, config.format(dburi=self.dburi,
-                                   images_dir=images_dir.path))
+                                   images_dir=images_dir.path,
+                                   gearman_port=self.gearman_server.port))
         os.close(fd)
         return path
 

@@ -12,8 +12,9 @@ cron:
 zmq-publishers:
   - tcp://localhost:8881
 
-#gearman-servers:
-#  - host: localhost
+gearman-servers:
+  - host: localhost
+    port: {gearman_port}
 
 labels:
   - name: fake-dib-label
