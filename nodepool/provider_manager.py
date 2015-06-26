@@ -288,6 +288,7 @@ class ProviderManager(TaskManager):
     def _getClient(self):
         return shade.OpenStackCloud(
             self.provider.cloud_config.name,
+            cloud_config=self.provider.cloud_config,
             **self.provider.cloud_config.config)
 
     def runTask(self, task):
