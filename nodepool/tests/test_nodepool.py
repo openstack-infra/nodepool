@@ -207,6 +207,39 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].az, 'az1')
 
+    def test_node_ipv6(self):
+        """Test that a node is created w/ or w/o ipv6 preferred flag"""
+        configfile = self.setup_config('node_ipv6.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider1', 'fake-image')
+        self.waitForImage(pool, 'fake-provider2', 'fake-image')
+        self.waitForImage(pool, 'fake-provider3', 'fake-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            # ipv6 preferred set to true and ipv6 address available
+            nodes = session.getNodes(provider_name='fake-provider1',
+                                     label_name='fake-label1',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            self.assertEqual(nodes[0].ip, 'fake_v6')
+            # ipv6 preferred unspecified and ipv6 address available
+            nodes = session.getNodes(provider_name='fake-provider2',
+                                     label_name='fake-label2',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            self.assertEqual(nodes[0].ip, 'fake')
+            # ipv6 preferred set to true but ipv6 address unavailable
+            nodes = session.getNodes(provider_name='fake-provider3',
+                                     label_name='fake-label3',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            self.assertEqual(nodes[0].ip, 'fake')
+
     def test_node_delete_success(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

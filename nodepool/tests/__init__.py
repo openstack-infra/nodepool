@@ -102,6 +102,7 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
                      'fake-provider',
                      'fake-provider1',
                      'fake-provider2',
+                     'fake-provider3',
                      'fake-dib-provider',
                      'fake-jenkins',
                      'fake-target',
