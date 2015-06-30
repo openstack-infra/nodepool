@@ -189,6 +189,7 @@ will be built using the provider snapshot approach::
       - ubuntu
       - vm
       - puppet
+      - nodepool-base
       - node-devstack
     release: precise
     env-vars:
