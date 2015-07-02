@@ -124,7 +124,21 @@ class NodePoolBuilder(object):
     def _registerImageId(self, image_id):
         self.log.debug('registering image %d', image_id)
         self._gearman_worker.registerFunction('image-upload:%s' % image_id)
+        self._gearman_worker.registerFunction('image-delete:%s' % image_id)
         self._built_image_ids.add(image_id)
+
+    def _unregisterImageId(self, worker, image_id):
+        if image_id in self._built_image_ids:
+            self.log.debug('unregistering image %d', image_id)
+            worker.unRegisterFunction('image-upload:%d' % image_id)
+            self._built_image_ids.remove(image_id)
+        else:
+            self.log.warning('Attempting to remove image %d but image not '
+                             'found', image_id)
+
+    def _canHandleImageidJob(self, job, image_op):
+        return (job.name.startswith(image_op + ':') and
+                int(job.name.split(':')[1]) in self._built_image_ids)
 
     def _handleJob(self, job):
         try:
@@ -136,21 +150,46 @@ class NodePoolBuilder(object):
 
                 # We can now upload this image
                 self._registerImageId(args['image_id'])
-
                 job.sendWorkComplete()
-            elif (job.name.startswith('image-upload:') and
-                  int(job.name.split(':')[1]) in self._built_image_ids):
+            elif self._canHandleImageidJob(job, 'image-upload'):
                 args = json.loads(job.arguments)
                 image_id = job.name.split(':')[1]
                 external_id = self._uploadImage(int(image_id),
                                                  args['provider'])
                 job.sendWorkComplete(json.dumps({'external-id': external_id}))
+            elif self._canHandleImageidJob(job, 'image-delete'):
+                image_id = job.name.split(':')[1]
+                self._deleteImage(int(image_id))
+                self._unregisterImageId(self._gearman_worker, int(image_id))
+                job.sendWorkComplete()
             else:
                 self.log.error('Unable to handle job %s', job.name)
                 job.sendWorkFail()
         except Exception:
             self.log.exception('Exception while running job')
             job.sendWorkException(traceback.format_exc())
+
+    def _deleteImage(self, image_id):
+        with self.nodepool.getDB().getSession() as session:
+            dib_image = session.getDibImage(image_id)
+
+            # Remove image from the nodedb
+            dib_image.state = nodedb.DELETE
+            dib_image.delete()
+
+            config = self.nodepool.config
+            image_config = config.diskimages.get(dib_image.image_name)
+            if not image_config:
+                self.log.error("Deleting image %d but configuration not found."
+                               "Cannot delete image from disk without a "
+                               "configuration.", image_id)
+                return
+            # Delete a dib image and its associated file
+            for image_type in image_config.image_types:
+                if os.path.exists(dib_image.filename + '.' + image_type):
+                    os.remove(dib_image.filename + '.' + image_type)
+
+            self.log.info("Deleted dib image id: %s" % dib_image.id)
 
     def _uploadImage(self, image_id, provider_name):
         with self.nodepool.getDB().getSession() as session:

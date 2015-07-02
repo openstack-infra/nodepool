@@ -228,9 +228,12 @@ class TestNodepool(tests.DBTestCase):
             image_id = images[0].id
             pool.deleteDibImage(images[0])
 
-        with pool.getDB().getSession() as session:
-            images = session.getDibImages()
-            self.assertNotIn(image_id, [x.id for x in images])
+        while True:
+            with pool.getDB().getSession() as session:
+                images = session.getDibImages()
+                if image_id not in [x.id for x in images]:
+                    break
+                time.sleep(.1)
 
     def test_subnodes(self):
         """Test that an image and node are created"""

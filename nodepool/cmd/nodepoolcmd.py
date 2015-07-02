@@ -351,10 +351,12 @@ class NodePoolCmd(object):
                 self.list(node_id=node.id)
 
     def dib_image_delete(self):
+        job = None
         self.pool.reconfigureManagers(self.pool.config, False)
         with self.pool.getDB().getSession() as session:
             dib_image = session.getDibImage(self.args.id)
-            self.pool.deleteDibImage(dib_image)
+            job = self.pool.deleteDibImage(dib_image)
+        job.waitForCompletion()
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config, False)
