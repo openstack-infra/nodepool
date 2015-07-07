@@ -267,7 +267,7 @@ class NodeUpdateListener(threading.Thread):
 
 class GearmanClient(gear.Client):
     def __init__(self):
-        super(GearmanClient, self).__init__()
+        super(GearmanClient, self).__init__(client_id='nodepool')
         self.__log = logging.getLogger("nodepool.GearmanClient")
 
     def getNeededWorkers(self):
