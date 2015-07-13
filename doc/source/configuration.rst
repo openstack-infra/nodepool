@@ -464,8 +464,8 @@ across all of the targets which are on-line::
         user: username
         apikey: key
         credentials-id: id
-      hostname: '{label.name}-{provider.name}-{node_id}.slave.openstack.org'
-      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}.slave.openstack.org'
+      hostname: '{label.name}-{provider.name}-{node_id}'
+      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}'
     - name: jenkins2
       jenkins:
         url: https://jenkins2.example.org/
@@ -483,10 +483,10 @@ across all of the targets which are on-line::
 **optional**
 
   ``hostname``
-    Default ``{label.name}-{provider.name}-{node_id}.slave.openstack.org``
+    Default ``{label.name}-{provider.name}-{node_id}``
 
   ``subnode-hostname``
-    Default ``{label.name}-{provider.name}-{node_id}-{subnode_id}.slave.openstack.org``
+    Default ``{label.name}-{provider.name}-{node_id}-{subnode_id}``
 
   ``rate``
     In seconds. Default 1.0

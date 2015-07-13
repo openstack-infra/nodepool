@@ -1464,12 +1464,11 @@ class NodePool(threading.Thread):
             t.rate = target.get('rate', 1.0)
             t.hostname = target.get(
                 'hostname',
-                '{label.name}-{provider.name}-{node_id}.slave.openstack.org'
+                '{label.name}-{provider.name}-{node_id}'
             )
             t.subnode_hostname = target.get(
                 'subnode-hostname',
                 '{label.name}-{provider.name}-{node_id}-{subnode_id}'
-                '.slave.openstack.org'
             )
 
         # A set of image names that are in use by labels, to be
