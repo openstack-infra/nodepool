@@ -23,6 +23,7 @@ import logging
 import os_client_config
 import os.path
 import paramiko
+import pprint
 import Queue
 import random
 import re
@@ -488,6 +489,9 @@ class NodeLauncher(threading.Thread):
             ip = self.manager.addPublicIP(server_id,
                                           pool=self.provider.pool)
         if not ip:
+            self.log.debug(
+                "Server data for failed IP: %s" % pprint.pformat(
+                    server))
             raise LaunchNetworkException("Unable to find public IP of server")
 
         self.node.ip_private = server.get('private_v4')
