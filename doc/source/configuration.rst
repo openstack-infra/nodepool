@@ -324,9 +324,18 @@ provider, the Nodepool image types are also defined (see
     providing a different list of availabiltiy zones.
 
   ``boot-timeout``
+    Once an instance is active, how long to try connecting to the
+    image via SSH.  If the timeout is exceeded, the node launch is
+    aborted and the instance deleted.
+
     In seconds. Default 60.
 
   ``launch-timeout``
+
+    The time to wait from issuing the command to create a new instance
+    until that instance is reported as "active".  If the timeout is
+    exceeded, the node launch is aborted and the instance deleted.
+
     In seconds. Default 3600.
 
   ``image-type``
