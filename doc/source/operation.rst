@@ -22,6 +22,30 @@ This way if you find that a newly created image is problematic, you
 may simply delete it and Nodepool will revert to using the previous
 image.
 
+Daemon usage
+------------
+
+To start Nodepool daemon, run **nodepoold**:
+
+.. program-output:: nodepoold --help
+   :nostderr:
+
+If you send a SIGINT to the nodepoold process, Nodepool will wait for
+diskimages to finish building (if any) and disconnect all its internal
+process.
+
+If you send a SIGUSR2 to the nodepoold process, Nodepool  will dump a
+stack trace for each running thread into its debug log. It is written
+under the log bucket ``nodepool.stack_dump``.  This is useful for
+tracking down deadlock or otherwise slow threads.
+
+When `yappi <https://code.google.com/p/yappi/>`_ (Yet Another Python
+Profiler) is available, additional functions' and threads' stats are
+emitted as well. The first SIGUSR2 will enable yappi, on the second
+SIGUSR2 it dumps the information collected, resets all yappi state and
+stops profiling. This is to minimize the impact of yappi on a running
+system.
+
 Metadata
 --------
 
