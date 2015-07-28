@@ -120,17 +120,17 @@ class NodePoolDaemon(object):
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.config)
 
+        signal.signal(signal.SIGINT, self.exit_handler)
+        # For back compatibility:
         signal.signal(signal.SIGUSR1, self.exit_handler)
+
         signal.signal(signal.SIGUSR2, stack_dump_handler)
         signal.signal(signal.SIGTERM, self.term_handler)
 
         self.pool.start()
 
         while True:
-            try:
-                signal.pause()
-            except KeyboardInterrupt:
-                return self.exit_handler(signal.SIGINT, None)
+            signal.pause()
 
 
 def main():
