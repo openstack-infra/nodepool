@@ -75,7 +75,9 @@ elements-dir: $(dirname $NODEPOOL_CONFIG)/elements
 # the value).
 dburi: '$dburi'
 
-gearman-servers: []
+gearman-servers:
+  - host: localhost
+    port: 8991
 zmq-publishers: []
 # Need to have at least one target for node allocations, but
 # this does not need to be a jenkins target.
@@ -161,6 +163,9 @@ function start_nodepool {
         nova --os-project-name demo --os-username demo \
              secgroup-add-rule default udp 1 65535 0.0.0.0/0
     fi
+
+    # start gearman server
+    run_process geard "geard -p 8991 -d"
 
     run_process nodepool "nodepoold -c /etc/nodepool/nodepool.yaml -d"
     :
