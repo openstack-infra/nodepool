@@ -1370,7 +1370,7 @@ class NodePool(threading.Thread):
             p.azs = provider.get('availability-zones')
             p.template_hostname = provider.get(
                 'template-hostname',
-                '{image.name}-{timestamp}.template.openstack.org'
+                'template-{image.name}-{timestamp}'
             )
             p.image_type = provider.get('image-type', 'qcow2')
             p.images = {}
