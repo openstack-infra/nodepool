@@ -2403,10 +2403,10 @@ class NodePool(threading.Thread):
 
     def cleanupLeakedInstances(self):
         known_providers = self.config.providers.keys()
-        with self.getDB().getSession() as session:
-            for provider in self.config.providers.values():
-                manager = self.getProviderManager(provider)
-                servers = manager.listServers()
+        for provider in self.config.providers.values():
+            manager = self.getProviderManager(provider)
+            servers = manager.listServers()
+            with self.getDB().getSession() as session:
                 for server in servers:
                     meta = server.get('metadata', {}).get('nodepool')
                     if not meta:
@@ -2429,7 +2429,7 @@ class NodePool(threading.Thread):
                         if session.getSnapshotImage(snap_image_id):
                             continue
                         self.log.warning("Deleting leaked instance %s (%s) "
-                                         "in %s for snapshot image id %s" % (
+                                         "in %s for snapshot image id: %s" % (
                                              server['name'], server['id'],
                                              provider.name,
                                              snap_image_id))
@@ -2438,7 +2438,7 @@ class NodePool(threading.Thread):
                         if session.getNode(node_id):
                             continue
                         self.log.warning("Deleting leaked instance %s (%s) "
-                                         "in %s for node id %s " % (
+                                         "in %s for node id: %s" % (
                                              server['name'], server['id'],
                                              provider.name, node_id))
                         self.deleteInstance(provider.name, server['id'])
