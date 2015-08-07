@@ -60,6 +60,7 @@ dib_image_table = Table(
     Column('state', Integer),
     # Time of last state change
     Column('state_time', Integer),
+    mysql_engine='InnoDB',
     )
 snapshot_image_table = Table(
     'snapshot_image', metadata,
@@ -78,6 +79,7 @@ snapshot_image_table = Table(
     Column('state', Integer),
     # Time of last state change
     Column('state_time', Integer),
+    mysql_engine='InnoDB',
     )
 node_table = Table(
     'node', metadata,
@@ -101,6 +103,7 @@ node_table = Table(
     Column('state', Integer),
     # Time of last state change
     Column('state_time', Integer),
+    mysql_engine='InnoDB',
     )
 subnode_table = Table(
     'subnode', metadata,
@@ -118,6 +121,7 @@ subnode_table = Table(
     Column('state', Integer),
     # Time of last state change
     Column('state_time', Integer),
+    mysql_engine='InnoDB',
     )
 
 
