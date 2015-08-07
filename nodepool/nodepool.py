@@ -2353,6 +2353,14 @@ class NodePool(threading.Thread):
             if not t.isAlive():
                 del self._delete_threads[k]
 
+        for k, t in self._image_delete_threads.items()[:]:
+            if not t.isAlive():
+                del self._image_delete_threads[k]
+
+        for k, t in self._instance_delete_threads.items()[:]:
+            if not t.isAlive():
+                del self._instance_delete_threads[k]
+
         node_ids = []
         image_ids = []
         dib_image_ids = []
