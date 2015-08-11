@@ -56,6 +56,23 @@ EOF
 
     sudo chmod a+x $(dirname $NODEPOOL_CONFIG)/scripts/prepare_node_ubuntu.sh
 
+    sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
+    cat > /tmp/01-nodepool-setup <<EOF
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
+sudo mkdir -p /etc/nodepool
+# Make it world writeable so nodepool can write here later.
+sudo chmod 777 /etc/nodepool
+EOF
+
+    sudo mv /tmp/01-nodepool-setup \
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
+    sudo chmod a+x \
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
+    sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/images
+    sudo mkdir -p /opt/dib/tmp
+    sudo mkdir -p /opt/dib/cache
+    sudo chown stack:stack $(dirname $NODEPOOL_CONFIG)/images
+    sudo chown -R stack:stack /opt/dib
 }
 
 function nodepool_write_config {
@@ -69,6 +86,7 @@ function nodepool_write_config {
 # example script for /path/to/nodepool/things/scripts.
 script-dir: $(dirname $NODEPOOL_CONFIG)/scripts
 elements-dir: $(dirname $NODEPOOL_CONFIG)/elements
+images-dir: $(dirname $NODEPOOL_CONFIG)/images
 # The mysql password here may be different depending on your
 # devstack install, you should double check it (the devstack var
 # is MYSQL_PASSWORD and if unset devstack should prompt you for
@@ -94,6 +112,11 @@ cron:
 labels:
   - name: $NODEPOOL_IMAGE
     image: $NODEPOOL_IMAGE
+    min-ready: 1
+    providers:
+      - name: devstack
+  - name: ubuntu-dib
+    image: ubuntu-dib
     min-ready: 1
     providers:
       - name: devstack
@@ -123,6 +146,28 @@ providers:
         # Alter below to point to your local user private key
         private-key: $NODEPOOL_KEY
         config-drive: true
+      - name: ubuntu-dib
+        min-ram: 1024
+        diskimage: ubuntu-dib
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+
+diskimages:
+  - name: ubuntu-dib
+    elements:
+      - ubuntu-minimal
+      - vm
+      - simple-init
+      - devuser
+      - nodepool-setup
+    release: trusty
+    env-vars:
+      TMPDIR: /opt/dib/tmp
+      DIB_IMAGE_CACHE: /opt/dib/cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
 EOF
 
     sudo mv /tmp/nodepool.yaml $NODEPOOL_CONFIG
