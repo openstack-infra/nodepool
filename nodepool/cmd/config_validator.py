@@ -106,7 +106,8 @@ class ConfigValidator:
             'dburi': str,
             'zmq-publishers': [str],
             'gearman-servers': [{
-                'host': str
+                'host': str,
+                'port': int,
             }],
             'cron': cron,
             'providers': [providers],
