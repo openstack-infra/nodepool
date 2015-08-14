@@ -29,7 +29,7 @@ import fixtures
 import testresources
 import testtools
 
-from nodepool import allocation, fakeprovider, nodepool
+from nodepool import allocation, fakeprovider, nodepool, nodedb
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -232,8 +232,10 @@ class DBTestCase(BaseTestCase):
             with pool.getDB().getSession() as session:
                 needed = pool.getNeededNodes(session, allocation_history)
                 if not needed:
-                    break
-                time.sleep(1)
+                    nodes = session.getNodes(state=nodedb.BUILDING)
+                    if not nodes:
+                        break
+            time.sleep(1)
         self.wait_for_threads()
 
 
