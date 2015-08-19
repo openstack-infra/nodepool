@@ -105,7 +105,7 @@ providers:
     region-name: '$REGION_NAME'
     service-type: 'compute'
     username: 'demo'
-    project-id: 'demo'
+    project-name: 'demo'
     password: '$ADMIN_PASSWORD'
     auth-url: '$KEYSTONE_AUTH_URI/v$IDENTITY_API_VERSION'
     api-timeout: 60

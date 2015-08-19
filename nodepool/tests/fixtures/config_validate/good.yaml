@@ -428,7 +428,7 @@ providers:
     service-name: 'Compute'
     username: '<%= hpcloud_username %>'
     password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
+    project-name: '<%= hpcloud_project %>'
     auth-url: 'https://region-a.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     boot-timeout: 120
     max-servers: 0
@@ -531,7 +531,7 @@ providers:
     service-name: 'Compute'
     username: '<%= hpcloud_username %>'
     password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
+    project-name: '<%= hpcloud_project %>'
     auth-url: 'https://region-b.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     api-timeout: 60
     boot-timeout: 120
@@ -620,7 +620,7 @@ providers:
     service-name: 'Compute'
     username: '<%= hpcloud_username %>'
     password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
+    project-name: '<%= hpcloud_project %>'
     auth-url: 'https://region-b.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     api-timeout: 60
     boot-timeout: 120
@@ -709,7 +709,7 @@ providers:
     service-name: 'Compute'
     username: '<%= hpcloud_username %>'
     password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
+    project-name: '<%= hpcloud_project %>'
     auth-url: 'https://region-b.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     api-timeout: 60
     boot-timeout: 120
@@ -799,7 +799,7 @@ providers:
     service-name: 'Compute'
     username: '<%= hpcloud_username %>'
     password: '<%= hpcloud_password %>'
-    project-id: '<%= hpcloud_project %>'
+    project-name: '<%= hpcloud_project %>'
     auth-url: 'https://region-b.geo-1.identity.hpcloudsvc.com:35357/v2.0'
     api-timeout: 60
     boot-timeout: 120
