@@ -345,8 +345,8 @@ class InstanceDeleter(threading.Thread):
             self.nodepool._deleteInstance(self.provider_name,
                                           self.external_id)
         except Exception:
-            self.log.exception("Exception deleting node %s:" %
-                               self.node_id)
+            self.log.exception("Exception deleting instance %s from %s:" %
+                               (self.external_id, self.provider_name))
 
 
 class NodeDeleter(threading.Thread):
