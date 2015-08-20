@@ -55,6 +55,7 @@ class ConfigValidator:
             'password': str,
             'auth-url': str,
             'project-id': str,
+            'project-name': str,
             'max-servers': int,
             'pool': str,
             'image-type': str,

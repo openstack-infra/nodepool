@@ -75,7 +75,8 @@ def _cloudKwargsFromProvider(provider):
         cloud_kwargs['compute-service-name'] = provider['service-name']
 
     auth_kwargs = {}
-    for auth_key in ('username', 'password', 'auth-url', 'project-id'):
+    for auth_key in (
+            'username', 'password', 'auth-url', 'project-id', 'project-name'):
         if auth_key in provider:
             auth_kwargs[auth_key] = provider[auth_key]
 

@@ -276,7 +276,7 @@ provider, the Nodepool image types are also defined (see
       username: 'username'
       password: 'password'
       auth-url: 'http://auth.provider2.example.com/'
-      project-id: 'project'
+      project-name: 'project'
       service-type: 'compute'
       service-name: 'compute'
       region-name: 'region1'
@@ -303,8 +303,9 @@ provider, the Nodepool image types are also defined (see
 
   ``password``
 
-  ``project-id``
+  ``project-id`` OR ``project-name``
     Some clouds may refer to the ``project-id`` as ``tenant-id``.
+    Some clouds may refer to the ``project-name`` as ``tenant-name``.
 
   ``auth-url``
     Keystone URL.
