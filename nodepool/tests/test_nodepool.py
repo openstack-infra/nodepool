@@ -14,8 +14,8 @@
 # limitations under the License.
 
 import logging
-import time
 import threading
+import time
 
 import fixtures
 import testtools
@@ -188,6 +188,49 @@ class TestNodepool(tests.DBTestCase):
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 2)
+
+    def test_dib_snapimage_delete(self):
+        """Test that a dib image (snapshot) can be deleted."""
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        snap_id = None
+
+        with pool.getDB().getSession() as session:
+            snapshot_images = session.getSnapshotImages()
+            self.assertEqual(len(snapshot_images), 1)
+            snap_id = snapshot_images[0].id
+            pool.deleteImage(snap_id)
+
+        self.wait_for_threads()
+
+        with pool.getDB().getSession() as session:
+            while True:
+                snap_image = session.getSnapshotImage(snap_id)
+                if snap_image is None:
+                    break
+                time.sleep(.2)
+
+    def test_dib_image_delete(self):
+        """Test that a dib image (snapshot) can be deleted."""
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        image_id = None
+
+        with pool.getDB().getSession() as session:
+            images = session.getDibImages()
+            self.assertEqual(len(images), 1)
+            image_id = images[0].id
+            pool.deleteDibImage(images[0])
+
+        with pool.getDB().getSession() as session:
+            images = session.getDibImages()
+            self.assertNotIn(image_id, [x.id for x in images])
 
     def test_subnodes(self):
         """Test that an image and node are created"""
