@@ -46,7 +46,6 @@ MySQL Example::
   CREATE USER 'nodepool'@'localhost' IDENTIFIED BY '<password>';
   CREATE DATABASE nodepooldb;
   GRANT ALL ON nodepooldb.* TO 'nodepool'@'localhost';
-  FLUSH PRIVILEGES;
 
 Statsd and Graphite
 ~~~~~~~~~~~~~~~~~~~
