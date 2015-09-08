@@ -212,7 +212,7 @@ function start_nodepool {
     # start gearman server
     run_process geard "geard -p 8991 -d"
 
-    run_process nodepool "nodepoold -c /etc/nodepool/nodepool.yaml -d"
+    run_process nodepool "nodepoold -c $NODEPOOL_CONFIG -d"
     :
 }
 
