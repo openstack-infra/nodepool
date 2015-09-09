@@ -1172,7 +1172,8 @@ class SnapshotImageUpdater(ImageUpdater):
             # We have connected to the node but couldn't do anything as root
             # try distro specific users, since we know ssh is up (a timeout
             # didn't occur), we can connect with a very sort timeout.
-            for username in ['ubuntu', 'fedora', 'cloud-user', 'centos']:
+            for username in ['ubuntu', 'fedora', 'cloud-user', 'centos',
+                             'debian']:
                 try:
                     host = utils.ssh_connect(server['public_ip'], username,
                                              ssh_kwargs,
