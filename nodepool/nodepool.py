@@ -1189,7 +1189,7 @@ class SnapshotImageUpdater(ImageUpdater):
         # /etc/nodepool is world writable because by the time we write
         # the contents after the node is launched, we may not have
         # sudo access any more.
-        host.ssh("make config dir", "sudo mkdir /etc/nodepool")
+        host.ssh("make config dir", "sudo mkdir -p /etc/nodepool")
         host.ssh("chmod config dir", "sudo chmod 0777 /etc/nodepool")
         for fname in os.listdir(self.scriptdir):
             path = os.path.join(self.scriptdir, fname)
