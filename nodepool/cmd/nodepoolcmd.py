@@ -200,12 +200,13 @@ class NodePoolCmd(object):
                                 % self.args.image)
 
             if self.args.provider == 'all':
-                dib_image_built = False
+                dib_images_built = set()
                 for provider in self.pool.config.providers.values():
                     image = provider.images.get(self.args.image)
                     if image and image.diskimage:
-                        if not dib_image_built:
-                            self.image_build()
+                        if image.diskimage not in dib_images_built:
+                            self.image_build(image.diskimage)
+                            dib_images_built.add(image.diskimage)
                             dib_image_built = True
                         self.pool.uploadImage(session, provider.name,
                                               image.name)
@@ -219,7 +220,7 @@ class NodePoolCmd(object):
                                     % self.args.provider)
                 image = provider.images.get(self.args.image)
                 if image and image.diskimage:
-                    self.image_build()
+                    self.image_build(image.diskimage)
                     self.pool.uploadImage(session, provider.name, image.name)
                 elif image:
                     self.pool.updateImage(session, provider.name, image.name)
@@ -227,14 +228,15 @@ class NodePoolCmd(object):
                     raise Exception("Image %s not in use by provider %s"
                                     % (self.args.image, self.args.provider))
 
-    def image_build(self):
-        if self.args.image not in self.pool.config.diskimages:
+    def image_build(self, diskimage=None):
+        diskimage = diskimage or self.args.image
+        if diskimage not in self.pool.config.diskimages:
             # only can build disk images, not snapshots
             raise Exception("Trying to build a non disk-image-builder "
-                            "image: %s" % self.args.image)
+                            "image: %s" % diskimage)
 
         self.pool.reconfigureImageBuilder()
-        self.pool.buildImage(self.pool.config.diskimages[self.args.image])
+        self.pool.buildImage(self.pool.config.diskimages[diskimage])
         self.pool.waitForBuiltImages()
 
     def image_upload(self):

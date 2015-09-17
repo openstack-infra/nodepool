@@ -39,7 +39,7 @@ providers:
       - name: fake-dib-image
         base-image: 'Fake Precise'
         min-ram: 8192
-        diskimage: fake-dib-image
+        diskimage: fake-dib-diskimage
 
 targets:
   - name: fake-target
@@ -49,7 +49,7 @@ targets:
       apikey: fake
 
 diskimages:
-  - name: fake-dib-image
+  - name: fake-dib-diskimage
     elements:
       - fedora
       - vm
