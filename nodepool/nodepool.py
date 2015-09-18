@@ -2069,8 +2069,9 @@ class NodePool(threading.Thread):
         with self.getDB().getSession() as session:
             queued_images = session.getBuildingDibImagesByName(image.name)
             if queued_images:
-                self.log.exception('Image %s is already being built' %
-                                   image.name)
+                self.log.error('Image %s is already being built' %
+                               image.name)
+                return
             else:
                 try:
                     start_time = time.time()
