@@ -19,6 +19,7 @@
 import json
 import logging
 import paramiko
+from contextlib import contextmanager
 
 import threading
 import time
@@ -123,6 +124,15 @@ def make_image_dict(image):
     if hasattr(image, 'progress'):
         d['progress'] = image.progress
     return d
+
+
+@contextmanager
+def shade_inner_exceptions():
+    try:
+        yield
+    except shade.OpenStackCloudException as e:
+        e.log_error()
+        raise
 
 
 class NotFound(Exception):
@@ -574,14 +584,15 @@ class ProviderManager(TaskManager):
         #              block for our v1 clouds anyway, so we might as well
         #              have the interface be the same and treat faking-out
         #              a shade-level fake-async interface later
-        image = self._client.create_image(
-            name=image_name,
-            filename='%s.%s' % (filename, disk_format),
-            is_public=False,
-            disk_format=disk_format,
-            container_format=container_format,
-            wait=True,
-            **meta)
+        with shade_inner_exceptions():
+            image = self._client.create_image(
+                name=image_name,
+                filename='%s.%s' % (filename, disk_format),
+                is_public=False,
+                disk_format=disk_format,
+                container_format=container_format,
+                wait=True,
+                **meta)
         return image.id
 
     def listExtensions(self):

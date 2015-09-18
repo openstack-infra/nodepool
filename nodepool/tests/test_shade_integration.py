@@ -12,12 +12,16 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import logging
 import os
 
 import fixtures
+import shade
+import testtools
 import yaml
 
 from nodepool import tests
+from nodepool.provider_manager import shade_inner_exceptions
 
 
 class TestShadeIntegration(tests.IntegrationTestCase):
@@ -86,3 +90,13 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pool.updateConfig()
         provider_manager = pool.config.provider_managers['fake-provider']
         self.assertEqual(provider_manager._client.auth, auth_data)
+
+    def test_exceptions(self):
+        log = self.useFixture(fixtures.FakeLogger(level=logging.DEBUG))
+        with testtools.ExpectedException(shade.OpenStackCloudException):
+            with shade_inner_exceptions():
+                try:
+                    raise Exception("inner test")
+                except:
+                    raise shade.OpenStackCloudException("outer test")
+        self.assertTrue('Exception("inner test")' in log.output)
