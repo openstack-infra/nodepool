@@ -105,6 +105,8 @@ class NodePoolCmd(object):
             help='place a node in the HOLD state')
         cmd_hold.set_defaults(func=self.hold)
         cmd_hold.add_argument('id', help='node id')
+        cmd_hold.add_argument('--reason',
+                              help='Optional reason this node is held')
 
         cmd_delete = subparsers.add_parser(
             'delete',
@@ -157,7 +159,7 @@ class NodePoolCmd(object):
     def list(self, node_id=None):
         t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Manager",
                          "Hostname", "NodeName", "Server ID", "IP", "State",
-                         "Age"])
+                         "Age", "Comment"])
         t.align = 'l'
         with self.pool.getDB().getSession() as session:
             for node in session.getNodes():
@@ -168,7 +170,8 @@ class NodePoolCmd(object):
                            node.manager_name, node.hostname,
                            node.nodename, node.external_id, node.ip,
                            nodedb.STATE_NAMES[node.state],
-                           NodePoolCmd._age(node.state_time)])
+                           NodePoolCmd._age(node.state_time),
+                           node.comment])
             print t
 
     def dib_image_list(self):
@@ -334,6 +337,8 @@ class NodePoolCmd(object):
         with self.pool.getDB().getSession() as session:
             node = session.getNode(self.args.id)
             node.state = nodedb.HOLD
+            if self.args.reason:
+                node.comment = self.args.reason
             node_id = node.id
         self.list(node_id=node_id)
 

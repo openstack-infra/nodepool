@@ -104,6 +104,8 @@ node_table = Table(
     Column('state', Integer),
     # Time of last state change
     Column('state_time', Integer),
+    # Comment about the state of the node - used to annotate held nodes
+    Column('comment', String(255)),
     mysql_engine='InnoDB',
     )
 subnode_table = Table(
@@ -184,7 +186,7 @@ class SnapshotImage(object):
 class Node(object):
     def __init__(self, provider_name, label_name, target_name, az,
                  hostname=None, external_id=None, ip=None, ip_private=None,
-                 manager_name=None, state=BUILDING):
+                 manager_name=None, state=BUILDING, comment=None):
         self.provider_name = provider_name
         self.label_name = label_name
         self.target_name = target_name
@@ -195,6 +197,7 @@ class Node(object):
         self.ip_private = ip_private
         self.hostname = hostname
         self.state = state
+        self.comment = comment
 
     def delete(self):
         session = Session.object_session(self)
