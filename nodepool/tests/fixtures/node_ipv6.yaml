@@ -1,4 +1,6 @@
 script-dir: .
+elements-dir: .
+images-dir: '{images_dir}'
 
 cron:
   check: '*/15 * * * *'

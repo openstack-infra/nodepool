@@ -1,3 +1,4 @@
+import os_client_config
 from six.moves import configparser as ConfigParser
 import yaml
 
@@ -54,8 +55,9 @@ class Network(ConfigValue):
     pass
 
 
-def loadConfig(config_path, cloud_config):
+def loadConfig(config_path):
     config = yaml.load(open(config_path))
+    cloud_config = os_client_config.OpenStackConfig()
 
     newconfig = Config()
     newconfig.db = None
