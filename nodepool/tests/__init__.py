@@ -98,6 +98,37 @@ class GearmanServerFixture(fixtures.Fixture):
         self.gearman_server.shutdown()
 
 
+class GearmanClient(gear.Client):
+    def __init__(self):
+        super(GearmanClient, self).__init__(client_id='test_client')
+        self.__log = logging.getLogger("tests.GearmanClient")
+
+    def get_queued_image_jobs(self):
+        'Count the number of image-build and upload jobs queued.'
+        queued = 0
+        for connection in self.active_connections:
+            try:
+                req = gear.StatusAdminRequest()
+                connection.sendAdminRequest(req)
+            except Exception:
+                self.__log.exception("Exception while listing functions")
+                self._lostConnection(connection)
+                continue
+            for line in req.response.split('\n'):
+                parts = [x.strip() for x in line.split('\t')]
+                # parts[0] - function name
+                # parts[1] - total jobs queued (including building)
+                # parts[2] - jobs building
+                # parts[3] - workers registered
+                if not parts or parts[0] == '.':
+                    continue
+                if (not parts[0].startswith('image-build:') and
+                    not parts[0].startswith('image-upload:')):
+                    continue
+                queued += int(parts[1])
+        return queued
+
+
 class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -303,9 +334,11 @@ class DBTestCase(BaseTestCase):
         self.wait_for_config(pool)
         while True:
             self.wait_for_threads()
+            self.waitForJobs()
             with pool.getDB().getSession() as session:
                 image = session.getCurrentSnapshotImage(provider_name,
                                                         image_name)
+
                 if image:
                     break
                 time.sleep(1)
@@ -324,6 +357,17 @@ class DBTestCase(BaseTestCase):
                         break
             time.sleep(1)
         self.wait_for_threads()
+
+    def waitForJobs(self):
+        # XXX:greghaynes - There is a very narrow race here where nodepool
+        # is who actually updates the database so this may return before the
+        # image rows are updated.
+        client = GearmanClient()
+        client.addServer('localhost', self.gearman_server.port)
+        client.waitForServer()
+
+        while client.get_queued_image_jobs() > 0:
+            time.sleep(.2)
 
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args

@@ -14,8 +14,11 @@
 # limitations under the License.
 
 import logging
+import time
+import threading
 
 import fixtures
+import testtools
 
 from nodepool import tests
 from nodepool import nodedb
@@ -418,3 +421,16 @@ class TestNodepool(tests.DBTestCase):
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
+
+
+class TestWatchableJob(testtools.TestCase):
+    def test_wait_for_completion(self):
+        wj = nodepool.nodepool.WatchableJob('test', 'test', 'test')
+
+        def call_on_completed():
+            time.sleep(.2)
+            wj.onCompleted()
+
+        t = threading.Thread(target=call_on_completed)
+        t.start()
+        wj.waitForCompletion()

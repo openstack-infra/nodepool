@@ -260,13 +260,21 @@ class WatchableJob(gear.Job):
     def __init__(self, *args, **kwargs):
         super(WatchableJob, self).__init__(*args, **kwargs)
         self._completion_handlers = []
+        self._event = threading.Event()
+        self._completed = False
 
-    def addCompletionHandler(self, handler):
-        self._completion_handlers.append(handler)
+    def addCompletionHandler(self, handler, *args, **kwargs):
+        self._completion_handlers.append((handler, args, kwargs))
 
     def onCompleted(self):
-        for handler in self._completion_handlers:
-            handler(self)
+        for handler, args, kwargs in self._completion_handlers:
+            handler(self, *args, **kwargs)
+
+        self._completed = True
+        self._event.set()
+
+    def waitForCompletion(self, timeout=None):
+        return self._event.wait(timeout)
 
 
 class JobTracker(object):
@@ -900,58 +908,6 @@ class ImageUpdater(threading.Thread):
                     return
 
 
-class DiskImageUpdater(ImageUpdater):
-
-    log = logging.getLogger("nodepool.DiskImageUpdater")
-
-    def __init__(self, nodepool, provider, image, snap_image_id,
-                 filename, image_type):
-        super(DiskImageUpdater, self).__init__(nodepool, provider, image,
-                                               snap_image_id)
-        self.filename = filename
-        self.image_type = image_type
-        self.image_name = image.name
-
-    def updateImage(self, session):
-        start_time = time.time()
-        timestamp = int(start_time)
-
-        dummy_image = type('obj', (object,), {'name': self.image_name})
-        image_name = self.provider.template_hostname.format(
-            provider=self.provider, image=dummy_image,
-            timestamp=str(timestamp))
-        self.log.info("Uploading dib image id: %s from %s for %s in %s" %
-                      (self.snap_image.id, self.filename, image_name,
-                       self.provider.name))
-
-        # TODO(mordred) abusing the hostname field
-        self.snap_image.hostname = image_name
-        self.snap_image.version = timestamp
-        session.commit()
-
-        image_id = self.manager.uploadImage(image_name, self.filename,
-                                            self.image_type, 'bare',
-                                            self.image.meta)
-        self.snap_image.external_id = image_id
-        session.commit()
-        self.log.debug("Image id: %s saving image %s" %
-                       (self.snap_image.id, image_id))
-        # It can take a _very_ long time for Rackspace 1.0 to save an image
-        self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
-
-        if statsd:
-            dt = int((time.time() - start_time) * 1000)
-            key = 'nodepool.image_update.%s.%s' % (self.image_name,
-                                                   self.provider.name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
-
-        self.snap_image.state = nodedb.READY
-        session.commit()
-        self.log.info("Image %s in %s is ready" % (self.snap_image.hostname,
-                                                   self.provider.name))
-
-
 class SnapshotImageUpdater(ImageUpdater):
 
     log = logging.getLogger("nodepool.SnapshotImageUpdater")
@@ -1208,6 +1164,7 @@ class NodePool(threading.Thread):
         self._instance_delete_threads_lock = threading.Lock()
         self._image_builder_thread = None
         self._image_build_jobs = JobTracker()
+        self._image_upload_jobs = JobTracker()
 
     def stop(self):
         self._stopped = True
@@ -2058,31 +2015,58 @@ class NodePool(threading.Thread):
                         "Could not build image %s", image.name)
 
     def uploadImage(self, session, provider, image_name):
-        provider_entity = self.config.providers[provider]
-        provider_image = provider_entity.images[image_name]
-        images = session.getOrderedReadyDibImages(provider_image.diskimage)
-        if not images:
-            # raise error, no image ready for uploading
-            raise Exception(
-                "No image available for that upload. Please build one first.")
-
         try:
-            filename = images[0].filename
+            provider_entity = self.config.providers[provider]
+            provider_image = provider_entity.images[image_name]
+            images = session.getOrderedReadyDibImages(provider_image.diskimage)
+            image_id = images[0].id
+            timestamp = int(time.time())
+            job_uuid = str(uuid4().hex)
 
-            image_type = provider_entity.image_type
             snap_image = session.createSnapshotImage(
                 provider_name=provider, image_name=provider_image.name)
-            t = DiskImageUpdater(self, provider_entity, provider_image,
-                                 snap_image.id, filename, image_type)
-            t.start()
+            self.log.debug('Created snap_image with job_id %s', job_uuid)
 
-            # Enough time to give them different timestamps (versions)
-            # Just to keep things clearer.
-            time.sleep(2)
-            return t
+            # TODO(mordred) abusing the hostname field
+            snap_image.hostname = image_name
+            snap_image.version = timestamp
+            session.commit()
+
+            # Submit image-upload job
+            gearman_job = WatchableJob(
+                'image-upload:%d' % image_id,
+                json.dumps({'provider': provider}),
+                job_uuid)
+            self._image_upload_jobs.addJob(gearman_job)
+            gearman_job.addCompletionHandler(self.handleImageUploadComplete,
+                                             snap_image_id=snap_image.id)
+
+            self.log.debug('Submitting image-upload job for %d', image_id)
+            self.gearman_client.submitJob(gearman_job)
+
+            return gearman_job
         except Exception:
             self.log.exception(
                 "Could not upload image %s on %s", image_name, provider)
+
+    def handleImageUploadComplete(self, job, snap_image_id):
+        job_uuid = job.unique
+        job_data = json.loads(job.data[0])
+        external_id = job_data['external-id']
+
+        with self.getDB().getSession() as session:
+            snap_image = session.getSnapshotImage(snap_image_id)
+            if snap_image is None:
+                self.log.error(
+                    'Unable to find matching snap_image for job_id %s',
+                    job_uuid)
+                return
+
+            snap_image.external_id = external_id
+            snap_image.state = nodedb.READY
+            session.commit()
+            self.log.debug('Image %s is ready with external_id %s',
+                           snap_image_id, external_id)
 
     def launchNode(self, session, provider, label, target):
         try:

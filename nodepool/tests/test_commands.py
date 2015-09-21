@@ -32,6 +32,7 @@ class TestNodepoolCMD(tests.DBTestCase):
                                  run_builder=False)
         config = pool.loadConfig()
         pool.reconfigureDatabase(config)
+        pool.reconfigureManagers(config)
         pool.setConfig(config)
         self.builder = tests.BuilderFixture(pool)
         self.useFixture(self.builder)
