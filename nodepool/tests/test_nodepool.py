@@ -367,7 +367,7 @@ class TestNodepool(tests.DBTestCase):
         # Make sure we have a node built and ready
         provider = pool.config.providers['fake-provider']
         manager = pool.getProviderManager(provider)
-        servers = manager.listServers()
+        servers = manager.listServers(cache=False)
         self.assertEqual(len(servers), 1)
 
         with pool.getDB().getSession() as session:
@@ -395,7 +395,7 @@ class TestNodepool(tests.DBTestCase):
         self.log.debug("...done waiting for replacement pool.")
 
         # Make sure we end up with only one server (the replacement)
-        servers = manager.listServers()
+        servers = manager.listServers(cache=False)
         self.assertEqual(len(servers), 1)
         with pool.getDB().getSession() as session:
             nodes = session.getNodes(provider_name='fake-provider',

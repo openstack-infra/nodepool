@@ -557,8 +557,9 @@ class ProviderManager(TaskManager):
     def deleteFloatingIP(self, ip_id):
         return self.submitTask(DeleteFloatingIPTask(ip_id=ip_id))
 
-    def listServers(self):
-        if time.time() - self._servers_time >= SERVER_LIST_AGE:
+    def listServers(self, cache=True):
+        if (not cache or
+            time.time() - self._servers_time >= SERVER_LIST_AGE):
             # Since we're using cached data anyway, we don't need to
             # have more than one thread actually submit the list
             # servers task.  Let the first one submit it while holding
