@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import fixtures
 
 from nodepool import tests
@@ -25,6 +27,8 @@ from testtools import ExpectedException
 
 
 class TestNodepool(tests.DBTestCase):
+    log = logging.getLogger("nodepool.TestNodepool")
+
     def test_db(self):
         db = nodedb.NodeDatabase(self.dburi)
         with db.getSession() as session:
@@ -356,7 +360,9 @@ class TestNodepool(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
         self.waitForNodes(pool)
+        self.log.debug("...done waiting for initial pool.")
 
         # Make sure we have a node built and ready
         provider = pool.config.providers['fake-provider']
@@ -372,8 +378,10 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(nodes), 1)
             # Delete the node from the db, but leave the instance
             # so it is leaked.
+            self.log.debug("Delete node db record so instance is leaked...")
             for node in nodes:
                 node.delete()
+            self.log.debug("...deleted node db so instance is leaked.")
             nodes = session.getNodes(provider_name='fake-provider',
                                      label_name='fake-label',
                                      target_name='fake-target',
@@ -382,7 +390,9 @@ class TestNodepool(tests.DBTestCase):
 
         # Wait for nodepool to replace it, which should be enough
         # time for it to also delete the leaked node
+        self.log.debug("Waiting for replacement pool...")
         self.waitForNodes(pool)
+        self.log.debug("...done waiting for replacement pool.")
 
         # Make sure we end up with only one server (the replacement)
         servers = manager.listServers()
