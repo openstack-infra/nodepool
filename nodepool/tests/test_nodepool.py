@@ -484,6 +484,51 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
+    def test_building_image_cleanup_on_start(self):
+        """Test that a building image is deleted on start"""
+        configfile = self.setup_config('node.yaml')
+        pool = nodepool.nodepool.NodePool(self.secure_conf, configfile,
+                                          watermark_sleep=1)
+        try:
+            pool.start()
+            self.waitForImage(pool, 'fake-provider', 'fake-image')
+            self.waitForNodes(pool)
+        finally:
+            # Stop nodepool instance so that it can be restarted.
+            pool.stop()
+
+        with pool.getDB().getSession() as session:
+            images = session.getSnapshotImages()
+            self.assertEqual(len(images), 1)
+            self.assertEqual(images[0].state, nodedb.READY)
+            images[0].state = nodedb.BUILDING
+
+        # Start nodepool instance which should delete our old image.
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        # Ensure we have a config loaded for periodic cleanup.
+        while not pool.config:
+            time.sleep(0)
+        # Wait for startup to shift state to a state that periodic cleanup
+        # will act on.
+        while True:
+            with pool.getDB().getSession() as session:
+                if session.getSnapshotImages()[0].state != nodedb.BUILDING:
+                    break
+                print session.getSnapshotImages()[0].state
+                time.sleep(0)
+        # Necessary to force cleanup to happen within the test timeframe
+        pool.periodicCleanup()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            images = session.getSnapshotImages()
+            self.assertEqual(len(images), 1)
+            self.assertEqual(images[0].state, nodedb.READY)
+            # should be second image built.
+            self.assertEqual(images[0].id, 2)
+
 
 class TestGearClient(tests.DBTestCase):
     def test_wait_for_completion(self):

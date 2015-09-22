@@ -322,10 +322,13 @@ class NodeDatabaseSession(object):
                 snapshot_image_table.c.provider_name == provider_name
                 ).distinct(snapshot_image_table.c.image_name).all()]
 
-    def getSnapshotImages(self):
-        return self.session().query(SnapshotImage).order_by(
+    def getSnapshotImages(self, state=None):
+        exp = self.session().query(SnapshotImage).order_by(
             snapshot_image_table.c.provider_name,
-            snapshot_image_table.c.image_name).all()
+            snapshot_image_table.c.image_name)
+        if state:
+            exp = exp.filter(snapshot_image_table.c.state == state)
+        return exp.all()
 
     def getDibImage(self, image_id):
         images = self.session().query(DibImage).filter_by(
