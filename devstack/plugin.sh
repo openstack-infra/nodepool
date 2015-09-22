@@ -79,6 +79,37 @@ function nodepool_write_config {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)
     local dburi=$(database_connection_url nodepool)
 
+    cat > /tmp/logging.conf <<EOF
+[formatters]
+keys=simple
+
+[loggers]
+keys=root,nodepool
+
+[handlers]
+keys=console
+
+[logger_root]
+level=WARNING
+handlers=console
+
+[logger_nodepool]
+level=DEBUG
+handlers=console
+qualname=nodepool
+
+[handler_console]
+level=DEBUG
+class=StreamHandler
+formatter=simple
+args=(sys.stdout,)
+
+[formatter_simple]
+format=%(asctime)s %(levelname)s %(name)s: %(message)s
+datefmt=
+EOF
+
+    sudo mv /tmp/logging.conf $NODEPOOL_LOGGING
 
     cat > /tmp/nodepool.yaml <<EOF
 # You will need to make and populate these two paths as necessary,
@@ -212,7 +243,7 @@ function start_nodepool {
     # start gearman server
     run_process geard "geard -p 8991 -d"
 
-    run_process nodepool "nodepoold -c $NODEPOOL_CONFIG -d"
+    run_process nodepool "nodepoold -c $NODEPOOL_CONFIG -l $NODEPOOL_LOGGING -d"
     :
 }
 
