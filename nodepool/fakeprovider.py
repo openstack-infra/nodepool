@@ -15,6 +15,7 @@
 # under the License.
 
 import StringIO
+import logging
 import novaclient
 import requests.exceptions
 import threading
@@ -26,9 +27,22 @@ import shade
 
 
 class Dummy(object):
-    def __init__(self, **kw):
+    IMAGE = 'Image'
+    INSTANCE = 'Instance'
+    FLAVOR = 'Flavor'
+
+    def __init__(self, kind, **kw):
+        self.__kind = kind
+        self.__kw = kw
         for k, v in kw.items():
             setattr(self, k, v)
+
+    def __repr__(self):
+        args = []
+        for k in self.__kw.keys():
+            args.append('%s=%s' % (k, getattr(self, k)))
+        args = ' '.join(args)
+        return '<%s %s %s>' % (self.__kind, id(self), args)
 
     def delete(self):
         self.manager.delete(self)
@@ -48,10 +62,13 @@ def fake_get_one_cloud(cloud_config, cloud_kwargs):
 
 
 class FakeList(object):
+    log = logging.getLogger("nodepool.FakeList")
+
     def __init__(self, l):
         self._list = l
 
     def list(self):
+        self.log.debug("List %s" % repr(self._list))
         return self._list
 
     def find(self, name):
@@ -62,6 +79,7 @@ class FakeList(object):
     def get(self, image=None):
         if image:
             id = image
+        self.log.debug("Get %s in %s" % (id, repr(self._list)))
         for x in self._list:
             if x.id == id:
                 return x
@@ -72,6 +90,7 @@ class FakeList(object):
         obj.status = status
 
     def delete(self, *args, **kw):
+        self.log.debug("Delete from %s" % repr(self._list))
         if 'image' in kw:
             self._list.remove(self.get(kw['image']))
         else:
@@ -80,6 +99,7 @@ class FakeList(object):
                 self._list.remove(obj)
             else:
                 self._list.remove(self.get(obj))
+        self.log.debug("Deleted from %s" % repr(self._list))
 
     def create(self, **kw):
         should_fail = kw.get('SHOULD_FAIL', '').lower() == 'true'
@@ -101,7 +121,8 @@ class FakeList(object):
                 public=[dict(version=4, addr='fake')],
                 private=[dict(version=4, addr='fake')]
             )
-        s = Dummy(id=uuid.uuid4().hex,
+        s = Dummy(Dummy.INSTANCE,
+                  id=uuid.uuid4().hex,
                   name=kw['name'],
                   status='BUILD',
                   adminPass='fake',
@@ -137,8 +158,8 @@ class BadHTTPClient(object):
 class FakeClient(object):
     def __init__(self, images, *args, **kwargs):
         self.flavors = FakeList([
-            Dummy(id='f1', ram=8192, name='Fake Flavor'),
-            Dummy(id='f2', ram=8192, name='Unreal Flavor'),
+            Dummy(Dummy.FLAVOR, id='f1', ram=8192, name='Fake Flavor'),
+            Dummy(Dummy.FLAVOR, id='f2', ram=8192, name='Unreal Flavor'),
         ])
         self.images = images
         self.client = FakeHTTPClient()
@@ -155,7 +176,8 @@ class BadClient(FakeClient):
 class BadOpenstackCloud(object):
     def __init__(self, images=None):
         if images is None:
-            images = FakeList([Dummy(id='fake-image-id',
+            images = FakeList([Dummy(Dummy.IMAGE,
+                                     id='fake-image-id',
                                      status='READY',
                                      name='Fake Precise',
                                      metadata={})])
@@ -171,7 +193,8 @@ class FakeGlanceClient(object):
 class FakeOpenStackCloud(object):
     def __init__(self, images=None):
         if images is None:
-            images = FakeList([Dummy(id='fake-image-id',
+            images = FakeList([Dummy(Dummy.IMAGE,
+                                     id='fake-image-id',
                                      status='READY',
                                      name='Fake Precise',
                                      metadata={})])
