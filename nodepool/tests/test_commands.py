@@ -41,6 +41,21 @@ class TestNodepoolCMD(tests.DBTestCase):
                     images_with_status += 1
             self.assertEquals(images_with_status, image_cnt)
 
+    def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
+        self.patch_argv("-c", configfile, "list")
+        with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
+            nodepoolcmd.main()
+            nodes_with_status = 0
+            # Find add_rows with the status were looking for
+            for args, kwargs in m_add_row.call_args_list:
+                row = args[0]
+                # this is the major difference between the two assert
+                # functions.
+                status_column = 9
+                if row[status_column] == status:
+                    nodes_with_status += 1
+            self.assertEquals(nodes_with_status, node_cnt)
+
     def test_snapshot_image_update(self):
         configfile = self.setup_config("node.yaml")
         self.patch_argv("-c", configfile, "image-update",
@@ -129,3 +144,11 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
         self.wait_for_threads()
+
+    def test_list_nodes(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        self.assert_nodes_listed(configfile, 1)
