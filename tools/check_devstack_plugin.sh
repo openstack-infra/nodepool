@@ -1,16 +1,40 @@
-#!/bin/bash -ex
-
-# Sleep long enough for the below checks to have a chance
-# at being completed.
-sleep 15m
+#!/bin/bash -x
 
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
-NODEPOOL_CMD="nodepool -c $NODEPOOL_CONFIG"
+NODEPOOL="nodepool -c $NODEPOOL_CONFIG"
+
+function waitforimage {
+    name=$1
+    state='ready'
+
+    while ! $NODEPOOL image-list | grep $name | grep $state; do
+	$NODEPOOL image-list > /tmp/.nodepool-image-list.txt
+	$NODEPOOL list > /tmp/.nodepool-list.txt
+	sudo mv /tmp/.nodepool-image-list.txt $WORKSPACE/logs/nodepool-image-list.txt
+	sudo mv /tmp/.nodepool-list.txt $WORKSPACE/logs/nodepool-list.txt
+	sleep 10
+    done
+}
+
+function waitfornode {
+    name=$1
+    state='ready'
+
+    while ! $NODEPOOL list | grep $name | grep $state; do
+	$NODEPOOL image-list > /tmp/.nodepool-image-list.txt
+	$NODEPOOL list > /tmp/.nodepool-list.txt
+	sudo mv /tmp/.nodepool-image-list.txt $WORKSPACE/logs/nodepool-image-list.txt
+	sudo mv /tmp/.nodepool-list.txt $WORKSPACE/logs/nodepool-list.txt
+	sleep 10
+    done
+}
+
 # Check that snapshot image built
-$NODEPOOL_CMD image-list | grep ready | grep trusty-server
+waitforimage trusty-server
 # check that dib image built
-$NODEPOOL_CMD image-list | grep ready | grep ubuntu-dib
+waitforimage ubuntu-dib
+
 # check snapshot image was bootable
-$NODEPOOL_CMD list | grep ready | grep trusty-server
+waitfornode trusty-server
 # check dib image was bootable
-$NODEPOOL_CMD list | grep ready | grep ubuntu-dib
+waitfornode ubuntu-dib
