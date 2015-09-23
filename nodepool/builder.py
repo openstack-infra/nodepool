@@ -347,7 +347,7 @@ class NodePoolBuilder(object):
 
         image_file = image_files[0]
         filename = image_file.to_path(self._config.imagesdir,
-                                      with_extension=False)
+                                      with_extension=True)
 
         dummy_image = type('obj', (object,),
                            {'name': image_name})
@@ -364,13 +364,11 @@ class NodePoolBuilder(object):
                 "Could not find matching provider image for %s", image_name
             )
         image_meta = provider_image.meta
-        external_id = manager.uploadImage(ext_image_name, filename,
-                                          image_file.extension, 'bare',
-                                          image_meta)
-        self.log.info("Saving image id: %s with external id %s" %
-                      (image_id, external_id))
-        # It can take a _very_ long time for Rackspace 1.0 to save an image
-        manager.waitForImage(external_id, IMAGE_TIMEOUT)
+        # uploadImage is synchronous
+        external_id = manager.uploadImage(
+            ext_image_name, filename,
+            image_type=image_file.extension,
+            meta=image_meta)
 
         if self.statsd:
             dt = int((time.time() - start_time) * 1000)

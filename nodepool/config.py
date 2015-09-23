@@ -145,7 +145,7 @@ def loadConfig(config_path):
         p.region_name = provider.get('region-name')
         p.max_servers = provider['max-servers']
         p.keypair = provider.get('keypair', None)
-        p.pool = provider.get('pool')
+        p.pool = provider.get('pool', None)
         p.rate = provider.get('rate', 1.0)
         p.api_timeout = provider.get('api-timeout')
         p.boot_timeout = provider.get('boot-timeout', 60)
@@ -171,7 +171,8 @@ def loadConfig(config_path):
             'template-hostname',
             'template-{image.name}-{timestamp}'
         )
-        p.image_type = provider.get('image-type', 'qcow2')
+        p.image_type = provider.get(
+            'image-type', p.cloud_config.config['image_format'])
         p.images = {}
         for image in provider['images']:
             i = ProviderImage()
@@ -195,7 +196,7 @@ def loadConfig(config_path):
             # custom properties when the image is uploaded.
             i.meta = image.get('meta', {})
             # 5 elements, and no key or value can be > 255 chars
-            # per novaclient.servers.create() rules
+            # per Nova API rules
             if i.meta:
                 if len(i.meta) > 5 or \
                    any([len(k) > 255 or len(v) > 255

@@ -115,8 +115,9 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_alien_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
-        self.useFixture(fixtures.MonkeyPatch('nodepool.fakeprovider.FakeList'
-                                             '.list', fail_list))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
+            fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "alien-list")
@@ -125,8 +126,9 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_alien_image_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
-        self.useFixture(fixtures.MonkeyPatch('nodepool.fakeprovider.FakeList'
-                                             '.list', fail_list))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
+            fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "alien-image-list")

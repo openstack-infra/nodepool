@@ -39,3 +39,14 @@ waitforimage ubuntu-dib
 waitfornode trusty-server
 # check dib image was bootable
 waitfornode ubuntu-dib
+
+set -o errexit
+# Show the built nodes
+$NODEPOOL list
+
+# Try to delete the nodes that were just built
+$NODEPOOL delete --now 1
+$NODEPOOL delete --now 2
+
+# show the deleted nodes (and their replacements may be building)
+$NODEPOOL list

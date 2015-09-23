@@ -21,29 +21,14 @@ import logging
 import paramiko
 from contextlib import contextmanager
 
-import threading
-import time
-import requests.exceptions
-import sys
-
 import shade
-import novaclient
 
 import exceptions
 from nodeutils import iterate_timeout
-from task_manager import Task, TaskManager, ManagerStoppedException
+from task_manager import TaskManager, ManagerStoppedException
 
 
-SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
-
-
-class ServerCreateException(exceptions.TimeoutException):
-    statsd_key = 'error.servertimeout'
-
-
-class ImageCreateException(exceptions.TimeoutException):
-    statsd_key = 'error.imagetimeout'
 
 
 def get_public_ip(server, provider, version=4):
@@ -99,25 +84,6 @@ def get_private_ip(server):
     return ret[0]
 
 
-def make_server_dict(server, provider):
-    d = dict(id=str(server.id),
-             name=server.name,
-             status=server.status,
-             addresses=server.addresses)
-    if hasattr(server, 'adminPass'):
-        d['admin_pass'] = server.adminPass
-    if hasattr(server, 'key_name'):
-        d['key_name'] = server.key_name
-    if hasattr(server, 'progress'):
-        d['progress'] = server.progress
-    if hasattr(server, 'metadata'):
-        d['metadata'] = server.metadata
-    d['public_v4'] = get_public_ip(server, provider)
-    d['private_v4'] = get_private_ip(server)
-    d['public_v6'] = get_public_ip(server, provider, version=6)
-    return d
-
-
 def make_image_dict(image):
     d = dict(id=str(image.id), name=image.name, status=image.status,
              metadata=image.metadata)
@@ -137,146 +103,6 @@ def shade_inner_exceptions():
 
 class NotFound(Exception):
     pass
-
-
-class CreateServerTask(Task):
-    def main(self, client):
-        server = client.nova_client.servers.create(**self.args)
-        return str(server.id)
-
-
-class GetServerTask(Task):
-    def main(self, client):
-        provider = self.args.pop('_nodepool_provider')
-        try:
-            server = client.nova_client.servers.get(self.args['server_id'])
-        except novaclient.exceptions.NotFound:
-            raise NotFound()
-        return make_server_dict(server, provider)
-
-
-class DeleteServerTask(Task):
-    def main(self, client):
-        client.nova_client.servers.delete(self.args['server_id'])
-
-
-class ListServersTask(Task):
-    def main(self, client):
-        provider = self.args.pop('_nodepool_provider')
-        servers = client.nova_client.servers.list()
-        return [make_server_dict(server, provider)
-                for server in servers]
-
-
-class AddKeypairTask(Task):
-    def main(self, client):
-        client.nova_client.keypairs.create(**self.args)
-
-
-class ListKeypairsTask(Task):
-    def main(self, client):
-        keys = client.nova_client.keypairs.list()
-        return [dict(id=str(key.id), name=key.name) for
-                key in keys]
-
-
-class DeleteKeypairTask(Task):
-    def main(self, client):
-        client.nova_client.keypairs.delete(self.args['name'])
-
-
-class CreateFloatingIPTask(Task):
-    def main(self, client):
-        ip = client.nova_client.floating_ips.create(**self.args)
-        return dict(id=str(ip.id), ip=ip.ip)
-
-
-class AddFloatingIPTask(Task):
-    def main(self, client):
-        client.nova_client.servers.add_floating_ip(**self.args)
-
-
-class GetFloatingIPTask(Task):
-    def main(self, client):
-        ip = client.nova_client.floating_ips.get(self.args['ip_id'])
-        return dict(id=str(ip.id), ip=ip.ip, instance_id=str(ip.instance_id))
-
-
-class ListFloatingIPsTask(Task):
-    def main(self, client):
-        ips = client.nova_client.floating_ips.list()
-        return [dict(id=str(ip.id), ip=ip.ip,
-                     instance_id=str(ip.instance_id)) for
-                ip in ips]
-
-
-class RemoveFloatingIPTask(Task):
-    def main(self, client):
-        client.nova_client.servers.remove_floating_ip(**self.args)
-
-
-class DeleteFloatingIPTask(Task):
-    def main(self, client):
-        client.nova_client.floating_ips.delete(self.args['ip_id'])
-
-
-class CreateImageTask(Task):
-    def main(self, client):
-        # This returns an id
-        return str(client.nova_client.servers.create_image(**self.args))
-
-
-class GetImageTask(Task):
-    def main(self, client):
-        try:
-            image = client.nova_client.images.get(**self.args)
-        except novaclient.exceptions.NotFound:
-            raise NotFound()
-        # HP returns 404, rackspace can return a 'DELETED' image.
-        if image.status == 'DELETED':
-            raise NotFound()
-        return make_image_dict(image)
-
-
-class ListExtensionsTask(Task):
-    def main(self, client):
-        try:
-            resp, body = client.nova_client.client.get('/extensions')
-            return [x['alias'] for x in body['extensions']]
-        except novaclient.exceptions.NotFound:
-            # No extensions present.
-            return []
-
-
-class ListFlavorsTask(Task):
-    def main(self, client):
-        flavors = client.nova_client.flavors.list()
-        return [dict(id=str(flavor.id), ram=flavor.ram, name=flavor.name)
-                for flavor in flavors]
-
-
-class ListImagesTask(Task):
-    def main(self, client):
-        images = client.nova_client.images.list()
-        return [make_image_dict(image) for image in images]
-
-
-class FindImageTask(Task):
-    def main(self, client):
-        image = client.nova_client.images.find(**self.args)
-        return dict(id=str(image.id))
-
-
-class DeleteImageTask(Task):
-    def main(self, client):
-        client.nova_client.images.delete(**self.args)
-
-
-class FindNetworkTask(Task):
-    def main(self, client):
-        for network in client.neutron_client.list_networks()['networks']:
-            if self.args['name'] == network['name']:
-                return dict(id=str(network['id']))
 
 
 class ProviderManager(TaskManager):
@@ -310,52 +136,25 @@ class ProviderManager(TaskManager):
         self.resetClient()
         self._images = {}
         self._networks = {}
-        self._cloud_metadata_read = False
         self.__flavors = {}
-        self.__extensions = {}
-        self._servers = []
-        self._servers_time = 0
-        self._servers_lock = threading.Lock()
-        self._ips = []
-        self._ips_time = 0
-        self._ips_lock = threading.Lock()
 
     @property
     def _flavors(self):
-        if not self._cloud_metadata_read:
-            self._getCloudMetadata()
+        if not self.__flavors:
+            self.__flavors = self._getFlavors()
         return self.__flavors
-
-    @property
-    def _extensions(self):
-        if not self._cloud_metadata_read:
-            self._getCloudMetadata()
-        return self.__extensions
-
-    def _getCloudMetadata(self):
-        self.__flavors = self._getFlavors()
-        self.__extensions = self.listExtensions()
-        self._cloud_metadata_read = True
 
     def _getClient(self):
         return shade.OpenStackCloud(
             cloud_config=self.provider.cloud_config,
+            manager=self,
             **self.provider.cloud_config.config)
 
     def runTask(self, task):
-        try:
-            task.run(self._client)
-        except requests.exceptions.ProxyError:
-            # Try to get a new client object if we get a ProxyError
-            self.log.exception('Resetting client due to ProxyError')
-            self.resetClient()
-            try:
-                task.run(self._client)
-            except requests.exceptions.ProxyError as e:
-                # If we get a second ProxyError, then make sure it gets raised
-                # the same way all other Exceptions from the Task object do.
-                # This will move the Exception to the main thread.
-                task.exception(e, sys.exc_info()[2])
+        # Run the given task in the TaskManager passed to shade. It turns
+        # out that this provider manager is the TaskManager we pass, so
+        # this is a way of running each cloud operation in its own thread
+        task.run(self._client)
 
     def resetClient(self):
         self._client = self._getClient()
@@ -364,13 +163,6 @@ class ProviderManager(TaskManager):
         flavors = self.listFlavors()
         flavors.sort(lambda a, b: cmp(a['ram'], b['ram']))
         return flavors
-
-    def hasExtension(self, extension):
-        # Note: this will throw an error if the provider is offline
-        # but all the callers are in threads so the mainloop won't be affected.
-        if extension in self._extensions:
-            return True
-        return False
 
     def findFlavor(self, min_ram, name_filter=None):
         # Note: this will throw an error if the provider is offline
@@ -385,33 +177,43 @@ class ProviderManager(TaskManager):
     def findImage(self, name):
         if name in self._images:
             return self._images[name]
-        image = self.submitTask(FindImageTask(name=name))
+
+        with shade_inner_exceptions():
+            image = self._client.get_image(name)
         self._images[name] = image
         return image
 
     def findNetwork(self, name):
         if name in self._networks:
             return self._networks[name]
-        network = self.submitTask(FindNetworkTask(name=name))
+
+        with shade_inner_exceptions():
+            network = self._client.get_network(name)
         self._networks[name] = network
         return network
 
     def deleteImage(self, name):
         if name in self._images:
             del self._images[name]
-        return self.submitTask(DeleteImageTask(image=name))
+
+        with shade_inner_exceptions():
+            return self._client.delete_image(name)
 
     def addKeypair(self, name):
         key = paramiko.RSAKey.generate(2048)
         public_key = key.get_name() + ' ' + key.get_base64()
-        self.submitTask(AddKeypairTask(name=name, public_key=public_key))
+        with shade_inner_exceptions():
+            self._client.create_keypair(name=name, public_key=public_key)
         return key
 
     def listKeypairs(self):
-        return self.submitTask(ListKeypairsTask())
+        with shade_inner_exceptions():
+            keypairs = self._client.list_keypairs()
+        return keypairs
 
     def deleteKeypair(self, name):
-        return self.submitTask(DeleteKeypairTask(name=name))
+        with shade_inner_exceptions():
+            return self._client.delete_keypair(name=name)
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
@@ -437,7 +239,8 @@ class ProviderManager(TaskManager):
                     nics.append({'net-id': net_id})
                 else:
                     raise Exception("Invalid 'networks' configuration.")
-            create_args['nics'] = nics
+            if nics:
+                create_args['nics'] = nics
         # Put provider.name and image_name in as groups so that ansible
         # inventory can auto-create groups for us based on each of those
         # qualities
@@ -458,232 +261,120 @@ class ProviderManager(TaskManager):
             nodepool=json.dumps(nodepool_meta)
         )
 
-        return self.submitTask(CreateServerTask(**create_args))
+        with shade_inner_exceptions():
+            return self._client.create_server(wait=False, **create_args)
 
     def getServer(self, server_id):
-        return self.submitTask(GetServerTask(server_id=server_id,
-                                             _nodepool_provider=self.provider))
+        with shade_inner_exceptions():
+            return self._client.get_server(server_id)
 
-    def getFloatingIP(self, ip_id):
-        return self.submitTask(GetFloatingIPTask(ip_id=ip_id))
-
-    def getServerFromList(self, server_id):
-        for s in self.listServers():
-            if s['id'] == server_id:
-                return s
-        raise NotFound()
-
-    def _waitForResource(self, resource_type, resource_id, timeout):
-        last_status = None
-        if resource_type == 'server':
-            exc = ServerCreateException
-        elif resource_type == 'image':
-            exc = ImageCreateException
-        for count in iterate_timeout(timeout, exc,
-                                     "%s creation" % resource_type):
-            try:
-                if resource_type == 'server':
-                    resource = self.getServerFromList(resource_id)
-                elif resource_type == 'image':
-                    resource = self.getImage(resource_id)
-            except NotFound:
-                continue
-            except ManagerStoppedException:
-                raise
-            except Exception:
-                self.log.exception('Unable to list %ss while waiting for '
-                                   '%s will retry' % (resource_type,
-                                                      resource_id))
-                continue
-
-            status = resource.get('status')
-            if (last_status != status):
-                self.log.debug(
-                    'Status of {type} in {provider} {id}: {status}'.format(
-                        type=resource_type,
-                        provider=self.provider.name,
-                        id=resource_id,
-                        status=status))
-                if status == 'ERROR' and 'fault' in resource:
-                    self.log.debug(
-                        'ERROR in {provider} on {id}: {resason}'.format(
-                            provider=self.provider.name,
-                            id=resource_id,
-                            resason=resource['fault']['message']))
-            last_status = status
-            if status in ['ACTIVE', 'ERROR']:
-                return resource
-
-    def waitForServer(self, server_id, timeout=3600):
-        return self._waitForResource('server', server_id, timeout)
+    def waitForServer(self, server, timeout=3600):
+        with shade_inner_exceptions():
+            return self._client.wait_for_server(
+                server=server, auto_ip=True, reuse=False,
+                timeout=timeout)
 
     def waitForServerDeletion(self, server_id, timeout=600):
-        for count in iterate_timeout(600,
-                                     exceptions.ServerDeleteException,
-                                     "server %s deletion " % server_id):
-            try:
-                self.getServerFromList(server_id)
-            except NotFound:
+        for count in iterate_timeout(
+                timeout, exceptions.ServerDeleteException,
+                "server %s deletion" % server_id):
+            if not self.getServer(server_id):
                 return
 
     def waitForImage(self, image_id, timeout=3600):
-        # TODO(mordred): This should just be handled by the Fake, but we're
-        #                not quite plumbed through for that yet
-        if image_id == 'fake-glance-id':
-            return True
-        return self._waitForResource('image', image_id, timeout)
-
-    def createFloatingIP(self, pool=None):
-        return self.submitTask(CreateFloatingIPTask(pool=pool))
-
-    def addFloatingIP(self, server_id, address):
-        self.submitTask(AddFloatingIPTask(server=server_id,
-                                          address=address))
-
-    def addPublicIP(self, server_id, pool=None):
-        ip = self.createFloatingIP(pool)
-        try:
-            self.addFloatingIP(server_id, ip['ip'])
-        except novaclient.exceptions.ClientException:
-            # Delete the floating IP here as cleanupServer will not
-            # have access to the ip -> server mapping preventing it
-            # from removing this IP.
-            self.deleteFloatingIP(ip['id'])
-            raise
-        for count in iterate_timeout(600,
-                                     exceptions.IPAddTimeoutException,
-                                     "ip to be added to %s" % server_id):
+        last_status = None
+        for count in iterate_timeout(
+                timeout, exceptions.ImageCreateException, "image creation"):
             try:
-                newip = self.getFloatingIP(ip['id'])
+                image = self.getImage(image_id)
+            except NotFound:
+                continue
             except ManagerStoppedException:
                 raise
             except Exception:
-                self.log.exception('Unable to get IP details for server %s, '
-                                   'will retry' % (server_id))
+                self.log.exception('Unable to list images while waiting for '
+                                   '%s will retry' % (image_id))
                 continue
-            if newip['instance_id'] == server_id:
-                return newip['ip']
 
-    def createImage(self, server_id, image_name, meta):
-        return self.submitTask(CreateImageTask(server=server_id,
-                                               image_name=image_name,
-                                               metadata=meta))
+            # shade returns None when not found
+            if not image:
+                continue
+
+            status = image['status']
+            if (last_status != status):
+                self.log.debug(
+                    'Status of image in {provider} {id}: {status}'.format(
+                        provider=self.provider.name,
+                        id=image_id,
+                        status=status))
+                if status == 'ERROR' and 'fault' in image:
+                    self.log.debug(
+                        'ERROR in {provider} on {id}: {resason}'.format(
+                            provider=self.provider.name,
+                            id=image_id,
+                            resason=image['fault']['message']))
+            last_status = status
+            # Glance client returns lower case statuses - but let's be sure
+            if status.lower() in ['active', 'error']:
+                return image
+
+    def createImage(self, server, image_name, meta):
+        with shade_inner_exceptions():
+            return self._client.create_image_snapshot(
+                image_name, server, **meta)
 
     def getImage(self, image_id):
-        return self.submitTask(GetImageTask(image=image_id))
+        with shade_inner_exceptions():
+            return self._client.get_image(image_id)
 
-    def uploadImage(self, image_name, filename, disk_format, container_format,
-                    meta):
+    def uploadImage(self, image_name, filename, image_type=None, meta=None):
         # configure glance and upload image.  Note the meta flags
         # are provided as custom glance properties
         # NOTE: we have wait=True set here. This is not how we normally
         # do things in nodepool, preferring to poll ourselves thankyouverymuch.
         # However - two things to note:
-        #  - glance v1 has no aysnc mechanism, so we have to handle it anyway
-        #  - glance v2 waiting is very strange and complex - but we have to
+        #  - PUT has no aysnc mechanism, so we have to handle it anyway
+        #  - v2 w/task waiting is very strange and complex - but we have to
         #              block for our v1 clouds anyway, so we might as well
         #              have the interface be the same and treat faking-out
         #              a shade-level fake-async interface later
+        if not meta:
+            meta = {}
+        if image_type:
+            meta['disk_format'] = image_type
         with shade_inner_exceptions():
             image = self._client.create_image(
                 name=image_name,
-                filename='%s.%s' % (filename, disk_format),
+                filename=filename,
                 is_public=False,
-                disk_format=disk_format,
-                container_format=container_format,
                 wait=True,
                 **meta)
         return image.id
 
-    def listExtensions(self):
-        return self.submitTask(ListExtensionsTask())
-
     def listImages(self):
-        return self.submitTask(ListImagesTask())
+        with shade_inner_exceptions():
+            return self._client.list_images()
 
     def listFlavors(self):
-        return self.submitTask(ListFlavorsTask())
+        with shade_inner_exceptions():
+            return self._client.list_flavors()
 
-    def listFloatingIPs(self):
-        if time.time() - self._ips_time >= IPS_LIST_AGE:
-            if self._ips_lock.acquire(False):
-                try:
-                    self._ips = self.submitTask(ListFloatingIPsTask())
-                    self._ips_time = time.time()
-                finally:
-                    self._ips_lock.release()
-        return self._ips
-
-    def removeFloatingIP(self, server_id, address):
-        return self.submitTask(RemoveFloatingIPTask(server=server_id,
-                                                    address=address))
-
-    def deleteFloatingIP(self, ip_id):
-        return self.submitTask(DeleteFloatingIPTask(ip_id=ip_id))
-
-    def listServers(self, cache=True):
-        if (not cache or
-            time.time() - self._servers_time >= SERVER_LIST_AGE):
-            # Since we're using cached data anyway, we don't need to
-            # have more than one thread actually submit the list
-            # servers task.  Let the first one submit it while holding
-            # a lock, and the non-blocking acquire method will cause
-            # subsequent threads to just skip this and use the old
-            # data until it succeeds.
-            if self._servers_lock.acquire(False):
-                try:
-                    self._servers = self.submitTask(ListServersTask(
-                        _nodepool_provider=self.provider))
-                    self._servers_time = time.time()
-                finally:
-                    self._servers_lock.release()
-        return self._servers
+    def listServers(self):
+        # shade list_servers carries the nodepool server list caching logic
+        with shade_inner_exceptions():
+            return self._client.list_servers()
 
     def deleteServer(self, server_id):
-        return self.submitTask(DeleteServerTask(server_id=server_id))
+        with shade_inner_exceptions():
+            return self._client.delete_server(server_id, delete_ips=True)
 
     def cleanupServer(self, server_id):
-        done = False
-        while not done:
-            try:
-                server = self.getServerFromList(server_id)
-                done = True
-            except NotFound:
-                # If we have old data, that's fine, it should only
-                # indicate that a server exists when it doesn't; we'll
-                # recover from that.  However, if we have no data at
-                # all, wait until the first server list task
-                # completes.
-                if self._servers_time == 0:
-                    time.sleep(SERVER_LIST_AGE + 1)
-                else:
-                    done = True
+        server = self.getServer(server_id)
+        if not server:
+            raise NotFound()
 
-        # This will either get the server or raise an exception
-        server = self.getServerFromList(server_id)
-
-        has_floating_ip = False
-        for (name, network) in server['addresses'].iteritems():
-            for interface_spec in network:
-                if interface_spec['version'] != 4:
-                    continue
-                if ('OS-EXT-IPS:type' in interface_spec
-                        and interface_spec['OS-EXT-IPS:type'] == 'floating'):
-                    has_floating_ip = True
-        if has_floating_ip:
-            for ip in self.listFloatingIPs():
-                if ip['instance_id'] == server_id:
-                    self.log.debug('Deleting floating ip for server %s' %
-                                   server_id)
-                    self.deleteFloatingIP(ip['id'])
-
-        if (self.hasExtension('os-keypairs') and
-                server['key_name'] != self.provider.keypair):
-            for kp in self.listKeypairs():
-                if kp['name'] == server['key_name']:
-                    self.log.debug('Deleting keypair for server %s' %
-                                   server_id)
-                    self.deleteKeypair(kp['name'])
+        with shade_inner_exceptions():
+            self._client.delete_keypair(name=server['key_name'])
 
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)

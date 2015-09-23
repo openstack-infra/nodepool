@@ -25,9 +25,6 @@ from nodepool import nodedb
 import nodepool.fakeprovider
 import nodepool.nodepool
 
-import requests.exceptions
-from testtools import ExpectedException
-
 
 class TestNodepool(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestNodepool")
@@ -401,39 +398,6 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(deleted_nodes), 1)
             self.assertEqual(node_id, deleted_nodes[0].id)
 
-    def test_proxy_timeout(self):
-        """Test that we re-run a task after a ProxyError"""
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.start()
-        self.waitForNodes(pool)
-
-        provider = pool.config.providers['fake-provider']
-        manager = pool.getProviderManager(provider)
-
-        def get_bad_client(manager):
-            return nodepool.fakeprovider.BadOpenstackCloud(
-                manager._client.nova_client.images)
-
-        # In order to test recovering from a ProxyError from the client
-        # we are going manually set the client object to be a bad client that
-        # always raises a ProxyError. If our client reset works correctly
-        # then we will create a new client object, which in this case would
-        # be a new fake client in place of the bad client.
-        manager._client = get_bad_client(manager)
-
-        # The only implemented function for the fake and bad clients
-        # If we don't raise an uncaught exception, we pass
-        manager.listExtensions()
-
-        # Now let's do it again, but let's prevent the client object from being
-        # replaced and then assert that we raised the exception that we expect.
-        manager._client = get_bad_client(manager)
-        manager._getClient = lambda: get_bad_client(manager)
-
-        with ExpectedException(requests.exceptions.ProxyError):
-            manager.listExtensions()
-
     def test_leaked_node(self):
         """Test that a leaked node is deleted"""
         configfile = self.setup_config('leaked_node.yaml')
@@ -447,7 +411,7 @@ class TestNodepool(tests.DBTestCase):
         # Make sure we have a node built and ready
         provider = pool.config.providers['fake-provider']
         manager = pool.getProviderManager(provider)
-        servers = manager.listServers(cache=False)
+        servers = manager.listServers()
         self.assertEqual(len(servers), 1)
 
         with pool.getDB().getSession() as session:
@@ -475,7 +439,7 @@ class TestNodepool(tests.DBTestCase):
         self.log.debug("...done waiting for replacement pool.")
 
         # Make sure we end up with only one server (the replacement)
-        servers = manager.listServers(cache=False)
+        servers = manager.listServers()
         self.assertEqual(len(servers), 1)
         with pool.getDB().getSession() as session:
             nodes = session.getNodes(provider_name='fake-provider',
