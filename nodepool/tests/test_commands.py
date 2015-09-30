@@ -30,7 +30,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
     def assert_listed(self, configfile, cmd, col, val, count):
-        self.patch_argv("-c", configfile, cmd)
+        self.patch_argv("-c", configfile, *cmd)
         with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
             nodepoolcmd.main()
             rows_with_val = 0
@@ -42,10 +42,10 @@ class TestNodepoolCMD(tests.DBTestCase):
             self.assertEquals(rows_with_val, count)
 
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
-        self.assert_listed(configfile, 'image-list', 7, status, image_cnt)
+        self.assert_listed(configfile, ['image-list'], 7, status, image_cnt)
 
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
-        self.assert_listed(configfile, 'list', 9, status, node_cnt)
+        self.assert_listed(configfile, ['list'], 9, status, node_cnt)
 
     def test_snapshot_image_update(self):
         configfile = self.setup_config("node.yaml")
@@ -156,7 +156,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool.start()
         self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
         self.waitForNodes(pool)
-        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 
     def test_dib_image_delete(self):
         configfile = self.setup_config('node_dib.yaml')
@@ -165,14 +165,14 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
         self.waitForNodes(pool)
         # Check the image exists
-        self.assert_listed(configfile, 'dib-image-list', 0, 1, 1)
-        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 0, 1, 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
         # Delete the image
         self.patch_argv('-c', configfile, 'dib-image-delete', '1')
         nodepoolcmd.main()
         self.wait_for_threads()
         # Check the the image is no longer listed
-        self.assert_listed(configfile, 'dib-image-list', 0, 1, 0)
+        self.assert_listed(configfile, ['dib-image-list'], 0, 1, 0)
 
     def test_image_upload(self):
         configfile = self.setup_config('node_dib.yaml')
@@ -181,7 +181,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
@@ -198,7 +198,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
@@ -207,3 +207,46 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.wait_for_threads()
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
+
+    def test_hold(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        # Assert one node exists and it is node 1 in a ready state.
+        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_nodes_listed(configfile, 1, 'ready')
+        # Hold node 1
+        self.patch_argv('-c', configfile, 'hold', '1')
+        nodepoolcmd.main()
+        # Assert the state changed to HOLD
+        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_nodes_listed(configfile, 1, 'hold')
+
+    def test_delete(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        # Assert one node exists and it is node 1 in a ready state.
+        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_nodes_listed(configfile, 1, 'ready')
+        # Delete node 1
+        self.assert_listed(configfile, ['delete', '1'], 9, 'delete', 1)
+
+    def test_delete_now(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        # Assert one node exists and it is node 1 in a ready state.
+        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_nodes_listed(configfile, 1, 'ready')
+        # Delete node 1
+        self.patch_argv('-c', configfile, 'delete', '--now', '1')
+        nodepoolcmd.main()
+        # Assert the node is gone
+        self.assert_listed(configfile, ['list'], 0, 1, 0)
