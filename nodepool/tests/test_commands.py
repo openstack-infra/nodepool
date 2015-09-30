@@ -149,3 +149,61 @@ class TestNodepoolCMD(tests.DBTestCase):
                               'fixtures', 'config_validate', 'good.yaml')
         self.patch_argv('-c', config, 'config-validate')
         nodepoolcmd.main()
+
+    def test_dib_image_list(self):
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+
+    def test_dib_image_delete(self):
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        # Check the image exists
+        self.assert_listed(configfile, 'dib-image-list', 0, 1, 1)
+        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        # Delete the image
+        self.patch_argv('-c', configfile, 'dib-image-delete', '1')
+        nodepoolcmd.main()
+        self.wait_for_threads()
+        # Check the the image is no longer listed
+        self.assert_listed(configfile, 'dib-image-list', 0, 1, 0)
+
+    def test_image_upload(self):
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        # Check dib image exists and a single upload is available for it.
+        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_images_listed(configfile, 1)
+        # Reupload the image
+        self.patch_argv('-c', configfile, 'image-upload',
+                        'fake-dib-provider', 'fake-dib-image')
+        nodepoolcmd.main()
+        self.wait_for_threads()
+        # Check that two images are ready for it now.
+        self.assert_images_listed(configfile, 2)
+
+    def test_image_upload_all(self):
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        # Check dib image exists and a single upload is available for it.
+        self.assert_listed(configfile, 'dib-image-list', 4, 'ready', 1)
+        self.assert_images_listed(configfile, 1)
+        # Reupload the image
+        self.patch_argv('-c', configfile, 'image-upload',
+                        'all', 'fake-dib-image')
+        nodepoolcmd.main()
+        self.wait_for_threads()
+        # Check that two images are ready for it now.
+        self.assert_images_listed(configfile, 2)
