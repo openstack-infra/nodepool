@@ -29,33 +29,23 @@ class TestNodepoolCMD(tests.DBTestCase):
         argv.extend(args)
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
-    def assert_images_listed(self, configfile, image_cnt, status="ready"):
-        self.patch_argv("-c", configfile, "image-list")
+    def assert_listed(self, configfile, cmd, col, val, count):
+        self.patch_argv("-c", configfile, cmd)
         with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
             nodepoolcmd.main()
-            images_with_status = 0
+            rows_with_val = 0
             # Find add_rows with the status were looking for
             for args, kwargs in m_add_row.call_args_list:
                 row = args[0]
-                status_column = 7
-                if row[status_column] == status:
-                    images_with_status += 1
-            self.assertEquals(images_with_status, image_cnt)
+                if row[col] == val:
+                    rows_with_val += 1
+            self.assertEquals(rows_with_val, count)
+
+    def assert_images_listed(self, configfile, image_cnt, status="ready"):
+        self.assert_listed(configfile, 'image-list', 7, status, image_cnt)
 
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
-        self.patch_argv("-c", configfile, "list")
-        with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
-            nodepoolcmd.main()
-            nodes_with_status = 0
-            # Find add_rows with the status were looking for
-            for args, kwargs in m_add_row.call_args_list:
-                row = args[0]
-                # this is the major difference between the two assert
-                # functions.
-                status_column = 9
-                if row[status_column] == status:
-                    nodes_with_status += 1
-            self.assertEquals(nodes_with_status, node_cnt)
+        self.assert_listed(configfile, 'list', 9, status, node_cnt)
 
     def test_snapshot_image_update(self):
         configfile = self.setup_config("node.yaml")
