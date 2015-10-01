@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 import threading
 import time
@@ -575,6 +576,54 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
         self.waitForNodes(pool)
+
+    def test_job_start_event(self):
+        """Test that job start marks node used"""
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+
+        msg_obj = {'name': 'fake-job',
+                   'build': {'node_name': 'fake-label-fake-provider-1'}}
+        json_string = json.dumps(msg_obj)
+        handler = nodepool.nodepool.NodeUpdateListener(pool,
+                                                       'tcp://localhost:8881')
+        handler.handleEvent('onStarted', json_string)
+        self.wait_for_threads()
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.USED)
+            self.assertEqual(len(nodes), 1)
+
+    def test_job_end_event(self):
+        """Test that job end marks node delete"""
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+
+        msg_obj = {'name': 'fake-job',
+                   'build': {'node_name': 'fake-label-fake-provider-1',
+                             'status': 'SUCCESS'}}
+        json_string = json.dumps(msg_obj)
+        # Don't delay when deleting.
+        self.useFixture(fixtures.MonkeyPatch(
+            'nodepool.nodepool.DELETE_DELAY',
+            0))
+        handler = nodepool.nodepool.NodeUpdateListener(pool,
+                                                       'tcp://localhost:8881')
+        handler.handleEvent('onFinalized', json_string)
+        self.wait_for_threads()
+
+        with pool.getDB().getSession() as session:
+            node = session.getNode(1)
+            self.assertEqual(node, None)
 
 
 class TestGearClient(tests.DBTestCase):
