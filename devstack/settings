@@ -5,5 +5,8 @@ NODEPOOL_IMAGE=$(basename "$NODEPOOL_IMAGE_URL" ".img")
 
 IMAGE_URLS+=",$NODEPOOL_IMAGE_URL"
 
+SHADE_REPO_URL=${SHADE_REPO_URL:-https://git.openstack.org/openstack-infra/shade}
+SHADE_REPO_REF=${SHADE_REPO_REF:-master}
+
 enable_service geard
 enable_service nodepool

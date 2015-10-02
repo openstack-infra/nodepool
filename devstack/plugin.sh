@@ -17,10 +17,23 @@
 NODEPOOL_KEY=$HOME/.ssh/id_nodepool
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 
+# Install shade from git if requested. If not requested
+# nodepool install will pull it in.
+function install_shade {
+    if use_library_from_git "shade"; then
+        GITREPO["shade"]=$SHADE_REPO_URL
+        GITDIR["shade"]=$DEST/shade
+        GITBRANCH["shade"]=$SHADE_REPO_REF
+        git_clone_by_name "shade"
+        setup_dev_lib "shade"
+    fi
+}
+
 # Install nodepool code
 function install_nodepool {
     # This function is currently blank because just installing a git
     # tree does not require any additional code
+    install_shade
     setup_develop $DEST/nodepool
 }
 
