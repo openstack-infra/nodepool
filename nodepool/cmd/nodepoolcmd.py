@@ -207,7 +207,6 @@ class NodePoolCmd(object):
                         if image.diskimage not in dib_images_built:
                             self.image_build(image.diskimage)
                             dib_images_built.add(image.diskimage)
-                            dib_image_built = True
                         self.pool.uploadImage(session, provider.name,
                                               image.name)
                     elif image:
