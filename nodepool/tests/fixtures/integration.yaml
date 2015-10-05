@@ -14,26 +14,30 @@ gearman-servers:
     port: {gearman_port}
 
 labels:
-  - name: fake-label
-    image: fake-image
+  - name: real-label
+    image: real-image
     min-ready: 1
     providers:
-      - name: fake-provider
+      - name: real-provider
 
 providers:
-  - name: fake-provider
-    cloud: fake-cloud
+  - name: real-provider
+    region-name: real-region
     keypair: 'if-present-use-this-keypair'
+    username: 'real'
+    password: 'real'
+    auth-url: 'real'
+    project-id: 'real'
     max-servers: 96
-    pool: 'fake'
+    pool: 'real'
     networks:
       - net-id: 'some-uuid'
     rate: 0.0001
     images:
-      - name: fake-image
-        base-image: 'Fake Precise'
+      - name: real-image
+        base-image: 'Real Precise'
         min-ram: 8192
-        name-filter: 'Fake'
+        name-filter: 'Real'
         meta:
           key: value
           key2: value
@@ -41,3 +45,7 @@ providers:
 
 targets:
   - name: fake-target
+    jenkins:
+      url: https://jenkins.example.org/
+      user: fake
+      apikey: fake

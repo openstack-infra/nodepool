@@ -42,53 +42,53 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         self.addCleanup(self._cleanup_cloud_config)
 
     def test_nodepool_provider_config(self):
-        configfile = self.setup_config('node.yaml')
+        configfile = self.setup_config('integration.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
-        provider_manager = pool.config.provider_managers['fake-provider']
-        auth_data = {'username': 'fake',
-                     'project_id': 'fake',
-                     'password': 'fake',
-                     'auth_url': 'fake'}
+        provider_manager = pool.config.provider_managers['real-provider']
+        auth_data = {'username': 'real',
+                     'project_id': 'real',
+                     'password': 'real',
+                     'auth_url': 'real'}
         self.assertEqual(provider_manager._client.auth, auth_data)
-        self.assertEqual(provider_manager._client.region_name, 'fake-region')
+        self.assertEqual(provider_manager._client.region_name, 'real-region')
 
     def test_nodepool_osc_config(self):
-        configfile = self.setup_config('node_osc.yaml')
-        auth_data = {'username': 'os_fake',
-                     'project_name': 'os_fake',
-                     'password': 'os_fake',
-                     'auth_url': 'os_fake'}
-        osc_config = {'clouds': {'fake-cloud': {'auth': auth_data}}}
+        configfile = self.setup_config('integration_osc.yaml')
+        auth_data = {'username': 'os_real',
+                     'project_name': 'os_real',
+                     'password': 'os_real',
+                     'auth_url': 'os_real'}
+        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
         self._use_cloud_config(osc_config)
 
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
-        provider_manager = pool.config.provider_managers['fake-provider']
+        provider_manager = pool.config.provider_managers['real-provider']
         self.assertEqual(provider_manager._client.auth, auth_data)
 
     def test_nodepool_osc_config_reload(self):
-        configfile = self.setup_config('node_osc.yaml')
-        auth_data = {'username': 'os_fake',
-                     'project_name': 'os_fake',
-                     'password': 'os_fake',
-                     'auth_url': 'os_fake'}
-        osc_config = {'clouds': {'fake-cloud': {'auth': auth_data}}}
+        configfile = self.setup_config('integration_osc.yaml')
+        auth_data = {'username': 'os_real',
+                     'project_name': 'os_real',
+                     'password': 'os_real',
+                     'auth_url': 'os_real'}
+        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
         self._use_cloud_config(osc_config)
 
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
-        provider_manager = pool.config.provider_managers['fake-provider']
+        provider_manager = pool.config.provider_managers['real-provider']
         self.assertEqual(provider_manager._client.auth, auth_data)
 
         # update the config
-        auth_data['password'] = 'os_new_fake'
+        auth_data['password'] = 'os_new_real'
         os.remove(self.clouds_path)
         with open(self.clouds_path, 'w') as h:
             yaml.safe_dump(osc_config, h)
 
         pool.updateConfig()
-        provider_manager = pool.config.provider_managers['fake-provider']
+        provider_manager = pool.config.provider_managers['real-provider']
         self.assertEqual(provider_manager._client.auth, auth_data)
 
     def test_exceptions(self):

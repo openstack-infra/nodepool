@@ -1,4 +1,5 @@
 script-dir: .
+images-dir: tools/images
 
 cron:
   check: '*/15 * * * *'
