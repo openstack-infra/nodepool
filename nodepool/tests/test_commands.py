@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os.path
 import sys  # noqa making sure its available for monkey patching
 
 import fixtures
@@ -152,3 +153,9 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         self.assert_nodes_listed(configfile, 1)
+
+    def test_config_validate(self):
+        config = os.path.join(os.path.dirname(tests.__file__),
+                              'fixtures', 'config_validate', 'good.yaml')
+        self.patch_argv('-c', config, 'config-validate')
+        nodepoolcmd.main()
