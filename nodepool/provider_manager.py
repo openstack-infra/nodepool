@@ -53,6 +53,9 @@ def get_public_ip(server, version=4):
             if quad[0] == 172 and (16 <= quad[1] <= 31):
                 continue
             return addr['addr']
+    for addr in server.addresses.get('Ext-Net', []):
+        if addr['version'] == version:  # OVH
+            return addr['addr']
     return None
 
 
