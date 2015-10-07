@@ -16,7 +16,42 @@ class Config(ConfigValue):
 
 
 class Provider(ConfigValue):
-    pass
+    def __eq__(self, other):
+        if (other.cloud_config != self.cloud_config or
+            other.max_servers != self.max_servers or
+            other.pool != self.pool or
+            other.image_type != self.image_type or
+            other.rate != self.rate or
+            other.api_timeout != self.api_timeout or
+            other.boot_timeout != self.boot_timeout or
+            other.launch_timeout != self.launch_timeout or
+            other.use_neutron != self.use_neutron or
+            other.networks != self.networks or
+            other.ipv6_preferred != self.ipv6_preferred or
+            other.azs != self.azs):
+            return False
+        new_images = other.images
+        old_images = self.images
+        # Check if images have been added or removed
+        if set(new_images.keys()) != set(old_images.keys()):
+            return False
+        # check if existing images have been updated
+        for k in new_images:
+            if (new_images[k].base_image != old_images[k].base_image or
+                new_images[k].min_ram != old_images[k].min_ram or
+                new_images[k].name_filter != old_images[k].name_filter or
+                new_images[k].setup != old_images[k].setup or
+                new_images[k].username != old_images[k].username or
+                new_images[k].user_home != old_images[k].user_home or
+                new_images[k].diskimage != old_images[k].diskimage or
+                new_images[k].private_key != old_images[k].private_key or
+                new_images[k].meta != old_images[k].meta or
+                new_images[k].config_drive != old_images[k].config_drive):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 class ProviderImage(ConfigValue):

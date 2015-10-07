@@ -263,6 +263,27 @@ class FindNetworkTask(Task):
 class ProviderManager(TaskManager):
     log = logging.getLogger("nodepool.ProviderManager")
 
+    @staticmethod
+    def reconfigure(old_config, new_config):
+        stop_managers = []
+        for p in new_config.providers.values():
+            oldmanager = None
+            if old_config:
+                oldmanager = old_config.provider_managers.get(p.name)
+            if oldmanager and p != oldmanager.provider:
+                stop_managers.append(oldmanager)
+                oldmanager = None
+            if oldmanager:
+                new_config.provider_managers[p.name] = oldmanager
+            else:
+                ProviderManager.log.debug("Creating new ProviderManager object"
+                                          " for %s" % p.name)
+                new_config.provider_managers[p.name] = ProviderManager(p)
+                new_config.provider_managers[p.name].start()
+
+        for stop_manager in stop_managers:
+            stop_manager.stop()
+
     def __init__(self, provider):
         super(ProviderManager, self).__init__(None, provider.name,
                                               provider.rate)

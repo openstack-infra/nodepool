@@ -1116,59 +1116,10 @@ class NodePool(threading.Thread):
         else:
             config.db = self.config.db
 
-    def _managersEquiv(self, new_pm, old_pm):
-        # Check if provider details have changed
-        if (new_pm.cloud_config != old_pm.provider.cloud_config or
-            new_pm.max_servers != old_pm.provider.max_servers or
-            new_pm.pool != old_pm.provider.pool or
-            new_pm.image_type != old_pm.provider.image_type or
-            new_pm.rate != old_pm.provider.rate or
-            new_pm.api_timeout != old_pm.provider.api_timeout or
-            new_pm.boot_timeout != old_pm.provider.boot_timeout or
-            new_pm.launch_timeout != old_pm.provider.launch_timeout or
-            new_pm.use_neutron != old_pm.provider.use_neutron or
-            new_pm.networks != old_pm.provider.networks or
-            new_pm.ipv6_preferred != old_pm.provider.ipv6_preferred or
-            new_pm.azs != old_pm.provider.azs):
-            return False
-        new_images = new_pm.images
-        old_images = old_pm.provider.images
-        # Check if new images have been added
-        if set(new_images.keys()) != set(old_images.keys()):
-            return False
-        # check if existing images have been updated
-        for k in new_images:
-            if (new_images[k].base_image != old_images[k].base_image or
-                new_images[k].min_ram != old_images[k].min_ram or
-                new_images[k].name_filter != old_images[k].name_filter or
-                new_images[k].setup != old_images[k].setup or
-                new_images[k].username != old_images[k].username or
-                new_images[k].user_home != old_images[k].user_home or
-                new_images[k].diskimage != old_images[k].diskimage or
-                new_images[k].private_key != old_images[k].private_key or
-                new_images[k].meta != old_images[k].meta or
-                new_images[k].config_drive != old_images[k].config_drive):
-                return False
-        return True
-
     def reconfigureManagers(self, config, check_targets=True):
-        stop_managers = []
-        for p in config.providers.values():
-            oldmanager = None
-            if self.config:
-                oldmanager = self.config.provider_managers.get(p.name)
-            if oldmanager and not self._managersEquiv(p, oldmanager):
-                stop_managers.append(oldmanager)
-                oldmanager = None
-            if oldmanager:
-                config.provider_managers[p.name] = oldmanager
-            else:
-                self.log.debug("Creating new ProviderManager object for %s" %
-                               p.name)
-                config.provider_managers[p.name] = \
-                    provider_manager.ProviderManager(p)
-                config.provider_managers[p.name].start()
+        provider_manager.ProviderManager.reconfigure(self.config, config)
 
+        stop_managers = []
         for t in config.targets.values():
             oldmanager = None
             if self.config:
@@ -1288,7 +1239,7 @@ class NodePool(threading.Thread):
         # start disk image builder thread
         if not self._image_builder_thread and self.run_builder:
             self._image_builder_thread = builder.NodePoolBuilder(
-                self.configfile, self)
+                self.configfile)
             self._image_builder_thread.start()
 
     def setConfig(self, config):

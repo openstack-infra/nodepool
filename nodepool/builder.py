@@ -26,8 +26,9 @@ import gear
 import shlex
 from stats import statsd
 
-from config import loadConfig
+import config as nodepool_config
 import exceptions
+import provider_manager
 
 MINS = 60
 HOURS = 60 * MINS
@@ -76,9 +77,8 @@ class DibImageFile(object):
 class NodePoolBuilder(object):
     log = logging.getLogger("nodepool.builder")
 
-    def __init__(self, config_path, nodepool):
+    def __init__(self, config_path):
         self._config_path = config_path
-        self.nodepool = nodepool
         self._running = False
         self._built_image_ids = set()
         self._start_lock = threading.Lock()
@@ -131,7 +131,10 @@ class NodePoolBuilder(object):
                     raise
 
     def load_config(self, config_path):
-        self._config = loadConfig(config_path)
+        config = nodepool_config.loadConfig(config_path)
+        provider_manager.ProviderManager.reconfigure(
+            self._config, config)
+        self._config = config
 
     def _run(self):
         self.log.debug('Starting listener for build jobs')
@@ -277,7 +280,7 @@ class NodePoolBuilder(object):
         self.log.info("Uploading dib image id: %s from %s in %s" %
                       (image_id, filename, provider.name))
 
-        manager = self.nodepool.getProviderManager(provider)
+        manager = self._config.provider_managers[provider.name]
         try:
             provider_image = provider.images[image_name]
         except KeyError:

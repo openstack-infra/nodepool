@@ -282,8 +282,7 @@ class BuilderFixture(fixtures.Fixture):
 
     def setUp(self):
         super(BuilderFixture, self).setUp()
-        self.builder = builder.NodePoolBuilder(self.nodepool.configfile,
-                                               self.nodepool)
+        self.builder = builder.NodePoolBuilder(self.nodepool.configfile)
         self.addCleanup(self.cleanup)
         self.builder.start()
 
