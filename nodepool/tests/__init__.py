@@ -275,16 +275,18 @@ class MySQLSchemaFixture(fixtures.Fixture):
 
 
 class BuilderFixture(fixtures.Fixture):
-    def __init__(self, nodepool):
+    def __init__(self, configfile):
         super(BuilderFixture, self).__init__()
-        self.nodepool = nodepool
+        self.configfile = configfile
         self.builder = None
 
     def setUp(self):
         super(BuilderFixture, self).setUp()
-        self.builder = builder.NodePoolBuilder(self.nodepool.configfile)
+        self.builder = builder.NodePoolBuilder(self.configfile)
+        nb_thread = threading.Thread(target=self.builder.runForever)
+        nb_thread.daemon = True
         self.addCleanup(self.cleanup)
-        self.builder.start()
+        nb_thread.start()
 
     def cleanup(self):
         self.builder.stop()
@@ -374,6 +376,9 @@ class DBTestCase(BaseTestCase):
         pool = nodepool.NodePool(*args, **kwargs)
         self.addCleanup(pool.stop)
         return pool
+
+    def _useBuilder(self, configfile):
+        self.useFixture(BuilderFixture(configfile))
 
 
 class IntegrationTestCase(DBTestCase):

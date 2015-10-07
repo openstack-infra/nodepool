@@ -33,7 +33,6 @@ import zmq
 import allocation
 import jenkins_manager
 import nodedb
-import builder
 import nodeutils as utils
 import provider_manager
 from stats import statsd
@@ -1063,13 +1062,12 @@ class SnapshotImageUpdater(ImageUpdater):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    def __init__(self, securefile, configfile, watermark_sleep=WATERMARK_SLEEP,
-                 run_builder=True):
+    def __init__(self, securefile, configfile,
+                 watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
         self.watermark_sleep = watermark_sleep
-        self.run_builder = run_builder
         self._stopped = False
         self.config = None
         self.zmq_context = None
@@ -1081,7 +1079,6 @@ class NodePool(threading.Thread):
         self._image_delete_threads_lock = threading.Lock()
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
-        self._image_builder_thread = None
         self._image_build_jobs = JobTracker()
         self._image_upload_jobs = JobTracker()
 
@@ -1095,8 +1092,6 @@ class NodePool(threading.Thread):
             self.zmq_context.destroy()
         if self.apsched:
             self.apsched.shutdown()
-        if self._image_builder_thread and self._image_builder_thread.running:
-            self._image_builder_thread.stop()
 
     def waitForBuiltImages(self):
         self.log.debug("Waiting for images to complete building.")
@@ -1234,13 +1229,6 @@ class NodePool(threading.Thread):
                 self.log.debug("Adding gearman server %s" % g.name)
                 self.gearman_client.addServer(g.host, g.port)
             self.gearman_client.waitForServer()
-
-    def reconfigureImageBuilder(self):
-        # start disk image builder thread
-        if not self._image_builder_thread and self.run_builder:
-            self._image_builder_thread = builder.NodePoolBuilder(
-                self.configfile)
-            self._image_builder_thread.start()
 
     def setConfig(self, config):
         self.config = config
@@ -1434,7 +1422,6 @@ class NodePool(threading.Thread):
         self.reconfigureGearmanClient(config)
         self.reconfigureCrons(config)
         self.setConfig(config)
-        self.reconfigureImageBuilder()
 
     def startup(self):
         self.updateConfig()

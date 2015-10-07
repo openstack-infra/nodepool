@@ -12,3 +12,4 @@ SHADE_REPO_REF=${SHADE_REPO_REF:-master}
 
 enable_service geard
 enable_service nodepool
+enable_service nodepool-builder

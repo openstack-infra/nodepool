@@ -122,7 +122,7 @@ def loadConfig(config_path):
         c.job = None
         c.timespec = config.get('cron', {}).get(name, default)
 
-    for addr in config['zmq-publishers']:
+    for addr in config.get('zmq-publishers', []):
         z = ZMQPublisher()
         z.name = addr
         z.listener = None
@@ -135,7 +135,7 @@ def loadConfig(config_path):
         g.name = g.host + '_' + str(g.port)
         newconfig.gearman_servers[g.name] = g
 
-    for provider in config['providers']:
+    for provider in config.get('providers', []):
         p = Provider()
         p.name = provider['name']
         newconfig.providers[p.name] = p
@@ -232,7 +232,7 @@ def loadConfig(config_path):
                     diskimage = newconfig.diskimages[image.diskimage]
                     diskimage.image_types.add(provider.image_type)
 
-    for label in config['labels']:
+    for label in config.get('labels', []):
         l = Label()
         l.name = label['name']
         newconfig.labels[l.name] = l
@@ -246,7 +246,7 @@ def loadConfig(config_path):
             p.name = provider['name']
             l.providers[p.name] = p
 
-    for target in config['targets']:
+    for target in config.get('targets', []):
         t = Target()
         t.name = target['name']
         newconfig.targets[t.name] = t

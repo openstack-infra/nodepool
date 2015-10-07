@@ -80,6 +80,7 @@ class NodePoolBuilder(object):
     def __init__(self, config_path):
         self._config_path = config_path
         self._running = False
+        self._stop_running = True
         self._built_image_ids = set()
         self._start_lock = threading.Lock()
         self._gearman_worker = None
@@ -89,21 +90,35 @@ class NodePoolBuilder(object):
     def running(self):
         return self._running
 
-    def start(self):
-        self.load_config(self._config_path)
-
+    def runForever(self):
         with self._start_lock:
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
-            self._running = True
+
+            self.load_config(self._config_path)
+            self._validate_config()
 
             self._gearman_worker = self._initializeGearmanWorker(
                 self._config.gearman_servers.values())
+
             self._registerGearmanFunctions(self._config.diskimages.values())
             self._registerExistingImageUploads()
-            self.thread = threading.Thread(target=self._run,
-                                           name='NodePool Builder')
-            self.thread.start()
+
+            self._stop_running = False
+            self._running = True
+
+        self.log.debug('Starting listener for build jobs')
+
+        while not self._stop_running:
+            try:
+                job = self._gearman_worker.getJob()
+                self._handleJob(job)
+            except gear.InterruptedError:
+                pass
+            except Exception:
+                self.log.exception('Exception while getting job')
+
+        self._running = False
 
     def stop(self):
         with self._start_lock:
@@ -112,13 +127,13 @@ class NodePoolBuilder(object):
                 self.log.warning("Stop called when we are already stopped.")
                 return
 
-            self._running = False
+            self._stop_running = True
 
             self._gearman_worker.stopWaitingForJobs()
 
-            self.log.debug('Waiting for builder thread to complete.')
-            self.thread.join()
-            self.log.debug('Builder thread completed.')
+            # Wait for the builder to complete any currently running jobs
+            while self._running:
+                time.sleep(1)
 
             try:
                 self._gearman_worker.shutdown()
@@ -136,16 +151,12 @@ class NodePoolBuilder(object):
             self._config, config)
         self._config = config
 
-    def _run(self):
-        self.log.debug('Starting listener for build jobs')
-        while self._running:
-            try:
-                job = self._gearman_worker.getJob()
-                self._handleJob(job)
-            except gear.InterruptedError:
-                pass
-            except Exception:
-                self.log.exception('Exception while getting job')
+    def _validate_config(self):
+        if not self._config.gearman_servers.values():
+            raise RuntimeError('No gearman servers specified in config.')
+
+        if not self._config.imagesdir:
+            raise RuntimeError('No images-dir specified in config.')
 
     def _initializeGearmanWorker(self, servers):
         worker = gear.Worker('Nodepool Builder')

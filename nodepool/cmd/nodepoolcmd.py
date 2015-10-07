@@ -246,7 +246,6 @@ class NodePoolCmd(object):
             raise Exception("Trying to build a non disk-image-builder "
                             "image: %s" % diskimage)
 
-        self.pool.reconfigureImageBuilder()
         self.pool.buildImage(self.pool.config.diskimages[diskimage])
         self.pool.waitForBuiltImages()
 
@@ -379,8 +378,7 @@ class NodePoolCmd(object):
         if self.args.command in ('config-validate'):
             return self.args.func()
 
-        self.pool = nodepool.NodePool(self.args.secure, self.args.config,
-                                      run_builder=False)
+        self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
         self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)

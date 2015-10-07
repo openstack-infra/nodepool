@@ -263,7 +263,8 @@ function start_nodepool {
     # start gearman server
     run_process geard "geard -p 8991 -d"
 
-    run_process nodepool "nodepoold -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
+    run_process nodepool "nodepoold --no-builder -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
+    run_process nodepool-builder "nodepool-builder -c $NODEPOOL_CONFIG -d"
     :
 }
 

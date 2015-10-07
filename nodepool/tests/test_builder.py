@@ -14,6 +14,8 @@
 # limitations under the License.
 
 import os
+import time
+import threading
 
 import fixtures
 
@@ -83,3 +85,18 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
 
         image = builder.DibImageFile('myid1234')
         self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')
+
+class TestNodepoolBuilder(tests.DBTestCase):
+    def test_start_stop(self):
+        config = self.setup_config('node_dib.yaml')
+        nb = builder.NodePoolBuilder(config)
+        nb_thread = threading.Thread(target=nb.runForever)
+        nb_thread.daemon = True
+
+        nb_thread.start()
+        while not nb.running:
+            time.sleep(.5)
+
+        nb.stop()
+        while nb_thread.isAlive():
+            time.sleep(.5)
