@@ -54,9 +54,7 @@ class Network(ConfigValue):
     pass
 
 
-def loadConfig(secure_config_path, config_path, cloud_config):
-    secure = ConfigParser.ConfigParser()
-    secure.readfp(open(secure_config_path))
+def loadConfig(config_path, cloud_config):
     config = yaml.load(open(config_path))
 
     newconfig = Config()
@@ -68,7 +66,7 @@ def loadConfig(secure_config_path, config_path, cloud_config):
     newconfig.scriptdir = config.get('script-dir')
     newconfig.elementsdir = config.get('elements-dir')
     newconfig.imagesdir = config.get('images-dir')
-    newconfig.dburi = secure.get('database', 'dburi')
+    newconfig.dburi = None
     newconfig.provider_managers = {}
     newconfig.jenkins_managers = {}
     newconfig.zmq_publishers = {}
@@ -212,34 +210,17 @@ def loadConfig(secure_config_path, config_path, cloud_config):
             l.providers[p.name] = p
 
     for target in config['targets']:
-        # look at secure file for that section
-        section_name = 'jenkins "%s"' % target['name']
         t = Target()
         t.name = target['name']
         newconfig.targets[t.name] = t
+        jenkins = target.get('jenkins', {})
         t.online = True
-
-        if secure.has_section(section_name):
-            t.jenkins_url = secure.get(section_name, 'url')
-            t.jenkins_user = secure.get(section_name, 'user')
-            t.jenkins_apikey = secure.get(section_name, 'apikey')
-        else:
-            t.jenkins_url = None
-            t.jenkins_user = None
-            t.jenkins_apikey = None
-
         t.rate = target.get('rate', 1.0)
-        try:
-            t.jenkins_credentials_id = secure.get(
-                section_name, 'credentials')
-        except:
-            t.jenkins_credentials_id = None
-
-        jenkins = target.get('jenkins')
-        if jenkins:
-            t.jenkins_test_job = jenkins.get('test-job', None)
-        else:
-            t.jenkins_test_job = None
+        t.jenkins_test_job = jenkins.get('test-job')
+        t.jenkins_url = None
+        t.jenkins_user = None
+        t.jenkins_apikey = None
+        t.jenkins_credentials_id = None
 
         t.hostname = target.get(
             'hostname',
@@ -259,6 +240,26 @@ def loadConfig(secure_config_path, config_path, cloud_config):
             newconfig.images_in_use.add(label.image)
 
     return newconfig
+
+
+def loadSecureConfig(config, secure_config_path):
+    secure = ConfigParser.ConfigParser()
+    secure.readfp(open(secure_config_path))
+
+    config.dburi = secure.get('database', 'dburi')
+
+    for target in config.targets.values():
+        section_name = 'jenkins "%s"' % target.name
+        if secure.has_section(section_name):
+            target.jenkins_url = secure.get(section_name, 'url')
+            target.jenkins_user = secure.get(section_name, 'user')
+            target.jenkins_apikey = secure.get(section_name, 'apikey')
+
+        try:
+            target.jenkins_credentials_id = secure.get(
+                section_name, 'credentials')
+        except:
+            pass
 
 
 def _cloudKwargsFromProvider(provider):

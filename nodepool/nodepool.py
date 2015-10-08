@@ -1108,8 +1108,10 @@ class NodePool(threading.Thread):
 
     def loadConfig(self):
         self.log.debug("Loading configuration")
-        return nodepool_config.loadConfig(self.securefile, self.configfile,
-                                          os_client_config.OpenStackConfig())
+        config = nodepool_config.loadConfig(self.configfile,
+                                            os_client_config.OpenStackConfig())
+        nodepool_config.loadSecureConfig(config, self.securefile)
+        return config
 
     def reconfigureDatabase(self, config):
         if (not self.config) or config.dburi != self.config.dburi:
