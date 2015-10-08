@@ -126,7 +126,6 @@ class TestNodepool(tests.DBTestCase):
         configfile = self.setup_config('node_dib_and_snap_fail.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
-        self.addCleanup(pool.stop)
         # fake-provider1 will fail to build fake-dib-image
         self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
         self.waitForNodes(pool)
