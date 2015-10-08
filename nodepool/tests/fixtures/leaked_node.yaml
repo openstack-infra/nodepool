@@ -1,5 +1,4 @@
 script-dir: .
-dburi: '{dburi}'
 images-dir: '{images_dir}'
 
 cron:
@@ -46,7 +45,3 @@ providers:
 
 targets:
   - name: fake-target
-    jenkins:
-      url: https://jenkins.example.org/
-      user: fake
-      apikey: fake

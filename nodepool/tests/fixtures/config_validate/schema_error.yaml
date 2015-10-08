@@ -1,6 +1,5 @@
 script-dir: /etc/nodepool/scripts
 elements-dir: /etc/nodepool/elements
 images-dir: /opt/nodepool_dib
-dburi: 'mysql+pymysql://nodepool:<%= mysql_password %>@localhost/nodepool'
 
 nothandled: element

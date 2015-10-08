@@ -181,11 +181,6 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
                 return
             time.sleep(0.1)
 
-    def useNodepool(self, *args, **kwargs):
-        pool = nodepool.NodePool(*args, **kwargs)
-        self.addCleanup(pool.stop)
-        return pool
-
 
 class AllocatorTestCase(object):
     def setUp(self):
@@ -253,6 +248,7 @@ class DBTestCase(BaseTestCase):
         f = MySQLSchemaFixture()
         self.useFixture(f)
         self.dburi = f.dburi
+        self.secure_conf = self._setup_secure()
 
         gearman_fixture = GearmanServerFixture()
         self.useFixture(gearman_fixture)
@@ -265,9 +261,18 @@ class DBTestCase(BaseTestCase):
                                   'fixtures', filename)
         config = open(configfile).read()
         (fd, path) = tempfile.mkstemp()
-        os.write(fd, config.format(dburi=self.dburi,
-                                   images_dir=images_dir.path,
+        os.write(fd, config.format(images_dir=images_dir.path,
                                    gearman_port=self.gearman_server.port))
+        os.close(fd)
+        return path
+
+    def _setup_secure(self):
+        # replace entries in secure.conf
+        configfile = os.path.join(os.path.dirname(__file__),
+                                  'fixtures', 'secure.conf')
+        config = open(configfile).read()
+        (fd, path) = tempfile.mkstemp()
+        os.write(fd, config.format(dburi=self.dburi))
         os.close(fd)
         return path
 
@@ -302,6 +307,12 @@ class DBTestCase(BaseTestCase):
                         break
             time.sleep(1)
         self.wait_for_threads()
+
+    def useNodepool(self, *args, **kwargs):
+        args = (self.secure_conf,) + args
+        pool = nodepool.NodePool(*args, **kwargs)
+        self.addCleanup(pool.stop)
+        return pool
 
 
 class IntegrationTestCase(DBTestCase):

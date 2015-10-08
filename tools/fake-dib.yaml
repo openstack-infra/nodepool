@@ -1,7 +1,6 @@
 script-dir: .
 elements-dir: .
 images-dir: /tmp/nodepool_dib
-dburi: 'mysql+pymysql://nodepool@localhost/nodepool'
 
 cron:
   check: '*/15 * * * *'
@@ -48,7 +47,3 @@ providers:
 
 targets:
   - name: fake-jenkins
-    jenkins:
-      url: https://jenkins.example.org/
-      user: fake
-      apikey: fake
