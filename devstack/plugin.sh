@@ -180,11 +180,7 @@ labels:
 providers:
   - name: devstack
     region-name: '$REGION_NAME'
-    service-type: 'compute'
-    username: 'demo'
-    project-name: 'demo'
-    password: '$ADMIN_PASSWORD'
-    auth-url: '$KEYSTONE_AUTH_URI/v$IDENTITY_API_VERSION'
+    cloud: devstack
     api-timeout: 60
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
