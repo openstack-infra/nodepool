@@ -243,21 +243,25 @@ class NodePoolCmd(object):
 
     def image_upload(self):
         self.pool.reconfigureManagers(self.pool.config, False)
-        if not self.args.image in self.pool.config.diskimages:
-            # only can build disk images, not snapshots
-            raise Exception("Trying to upload a non disk-image-builder "
-                            "image: %s" % self.args.image)
 
         with self.pool.getDB().getSession() as session:
             if self.args.provider == 'all':
                 # iterate for all providers listed in label
                 for provider in self.pool.config.providers.values():
-                    for image in provider.images.values():
-                        if self.args.image == image.name:
-                            self.pool.uploadImage(session, provider.name,
-                                                  self.args.image)
-                            break
+                    image = provider.images[self.args.image]
+                    if not image.diskimage:
+                        self.log.warning("Trying to upload a non "
+                                         "disk-image-builder image: %s",
+                                         self.args.image)
+                    else:
+                        self.pool.uploadImage(session, provider.name,
+                                              self.args.image)
             else:
+                provider = self.pool.config.providers[self.args.provider]
+                if not provider.images[self.args.image].diskimage:
+                    raise Exception("Trying to upload a non "
+                                    "disk-image-builder image: %s",
+                                    self.args.image)
                 self.pool.uploadImage(session, self.args.provider,
                                       self.args.image)
 
