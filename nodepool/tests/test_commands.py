@@ -52,7 +52,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "fake-provider", "fake-image")
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 1)
 
     def test_dib_image_update(self):
@@ -60,7 +59,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "fake-dib-provider", "fake-dib-image")
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 1)
 
     def test_dib_snapshot_image_update(self):
@@ -71,7 +69,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "fake-provider2", "fake-dib-image")
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 2)
 
     def test_dib_snapshot_image_update_all(self):
@@ -79,7 +76,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "all", "fake-dib-image")
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 2)
 
     def test_image_update_all(self):
@@ -87,7 +83,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-update",
                         "all", "fake-image1")
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 1)
 
     def test_image_list_empty(self):
@@ -187,7 +182,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv('-c', configfile, 'image-upload',
                         'fake-dib-provider', 'fake-dib-image')
         nodepoolcmd.main()
-        self.wait_for_threads()
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
 
@@ -204,7 +198,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv('-c', configfile, 'image-upload',
                         'all', 'fake-dib-image')
         nodepoolcmd.main()
-        self.wait_for_threads()
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
 

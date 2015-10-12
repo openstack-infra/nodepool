@@ -196,6 +196,8 @@ class NodePoolCmd(object):
             print t
 
     def image_update(self):
+        threads = []
+
         with self.pool.getDB().getSession() as session:
             self.pool.reconfigureManagers(self.pool.config)
             if self.args.image not in self.pool.config.images_in_use:
@@ -210,11 +212,11 @@ class NodePoolCmd(object):
                         if image.diskimage not in dib_images_built:
                             self.image_build(image.diskimage)
                             dib_images_built.add(image.diskimage)
-                        self.pool.uploadImage(session, provider.name,
-                                              image.name)
+                        threads.append(self.pool.uploadImage(
+                            session, provider.name, image.name))
                     elif image:
-                        self.pool.updateImage(session, provider.name,
-                                              image.name)
+                        threads.append(self.pool.updateImage(
+                            session, provider.name, image.name))
             else:
                 provider = self.pool.config.providers.get(self.args.provider)
                 if not provider:
@@ -223,12 +225,16 @@ class NodePoolCmd(object):
                 image = provider.images.get(self.args.image)
                 if image and image.diskimage:
                     self.image_build(image.diskimage)
-                    self.pool.uploadImage(session, provider.name, image.name)
+                    threads.append(self.pool.uploadImage(
+                        session, provider.name, image.name))
                 elif image:
-                    self.pool.updateImage(session, provider.name, image.name)
+                    threads.append(self.pool.updateImage(
+                        session, provider.name, image.name))
                 else:
                     raise Exception("Image %s not in use by provider %s"
                                     % (self.args.image, self.args.provider))
+
+        self._wait_for_threads(threads)
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -244,6 +250,8 @@ class NodePoolCmd(object):
     def image_upload(self):
         self.pool.reconfigureManagers(self.pool.config, False)
 
+        threads = []
+
         with self.pool.getDB().getSession() as session:
             if self.args.provider == 'all':
                 # iterate for all providers listed in label
@@ -254,16 +262,18 @@ class NodePoolCmd(object):
                                          "disk-image-builder image: %s",
                                          self.args.image)
                     else:
-                        self.pool.uploadImage(session, provider.name,
-                                              self.args.image)
+                        threads.append(self.pool.uploadImage(
+                            session, provider.name, self.args.image))
             else:
                 provider = self.pool.config.providers[self.args.provider]
                 if not provider.images[self.args.image].diskimage:
                     raise Exception("Trying to upload a non "
                                     "disk-image-builder image: %s",
                                     self.args.image)
-                self.pool.uploadImage(session, self.args.provider,
-                                      self.args.image)
+                threads.append(self.pool.uploadImage(
+                    session, self.args.provider, self.args.image))
+
+        self._wait_for_threads(threads)
 
     def alien_list(self):
         self.pool.reconfigureManagers(self.pool.config, False)
@@ -351,6 +361,10 @@ class NodePoolCmd(object):
         validator.validate()
         log.info("Configuation validation complete")
         #TODO(asselin,yolanda): add validation of secure.conf
+
+    def _wait_for_threads(self, threads):
+        for t in threads:
+            t.join()
 
     def main(self):
         # commands which do not need to start-up or parse config

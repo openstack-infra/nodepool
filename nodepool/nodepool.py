@@ -2051,7 +2051,7 @@ class NodePool(threading.Thread):
 
     def updateImage(self, session, provider_name, image_name):
         try:
-            self._updateImage(session, provider_name, image_name)
+            return self._updateImage(session, provider_name, image_name)
         except Exception:
             self.log.exception(
                 "Could not update image %s on %s", image_name, provider_name)
