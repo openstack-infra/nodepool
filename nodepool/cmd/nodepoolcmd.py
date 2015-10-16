@@ -354,7 +354,8 @@ class NodePoolCmd(object):
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config, False)
-        self.pool.deleteImage(self.args.id)
+        thread = self.pool.deleteImage(self.args.id)
+        self._wait_for_threads((thread, ))
 
     def config_validate(self):
         validator = ConfigValidator(self.args.config)
@@ -364,7 +365,8 @@ class NodePoolCmd(object):
 
     def _wait_for_threads(self, threads):
         for t in threads:
-            t.join()
+            if t:
+                t.join()
 
     def main(self):
         # commands which do not need to start-up or parse config

@@ -2280,6 +2280,7 @@ class NodePool(threading.Thread):
             t = ImageDeleter(self, snap_image_id)
             self._image_delete_threads[snap_image_id] = t
             t.start()
+            return t
         except Exception:
             self.log.exception("Could not delete image %s", snap_image_id)
         finally:

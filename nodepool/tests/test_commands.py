@@ -106,7 +106,6 @@ class TestNodepoolCMD(tests.DBTestCase):
 
         self.patch_argv("-c", configfile, "image-delete", '1')
         nodepoolcmd.main()
-        self.wait_for_threads()
         self.assert_images_listed(configfile, 0)
 
     def test_alien_list_fail(self):
@@ -118,7 +117,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "alien-list")
         nodepoolcmd.main()
-        self.wait_for_threads()
 
     def test_alien_image_list_fail(self):
         def fail_list(self):
@@ -129,7 +127,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
-        self.wait_for_threads()
 
     def test_list_nodes(self):
         configfile = self.setup_config('node.yaml')
@@ -165,7 +162,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Delete the image
         self.patch_argv('-c', configfile, 'dib-image-delete', '1')
         nodepoolcmd.main()
-        self.wait_for_threads()
         # Check the the image is no longer listed
         self.assert_listed(configfile, ['dib-image-list'], 0, 1, 0)
 
