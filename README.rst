@@ -13,7 +13,8 @@ Install dependencies:
 
     sudo apt-get update
     sudo apt-get -qy install git mysql-server libmysqlclient-dev g++\
-                     python-dev python-pip libffi-dev libssl-dev qemu-utils
+                     python-dev python-pip libffi-dev libssl-dev qemu-utils\
+                     libxml2-dev libxslt1-dev python-lxml
     mkdir src
     cd ~/src
     git clone git://git.openstack.org/openstack-infra/system-config
