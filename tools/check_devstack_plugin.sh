@@ -1,8 +1,5 @@
 #!/bin/bash -x
 
-# Do this so that the nodepool commands below can find the
-# clouds.yaml file
-export OS_CLIENT_CONFIG_FILE=${OS_CLIENT_CONFIG_FILE:-/opt/stack/new/.config/openstack/clouds.yaml}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
 NODEPOOL_SECURE=${NODEPOOL_SECURE:-/etc/nodepool/secure.conf}
 NODEPOOL="nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE"
