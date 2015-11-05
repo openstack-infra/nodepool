@@ -17,7 +17,7 @@ import os
 
 import fixtures
 
-from nodepool import builder, tests
+from nodepool import builder, exceptions, tests
 
 
 class TestNodepoolBuilderDibImage(tests.BaseTestCase):
@@ -82,4 +82,4 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
                          '/imagedir/myid1234')
 
         image = builder.DibImageFile('myid1234')
-        self.assertRaises(ValueError, image.to_path, '/imagedir/')
+        self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')

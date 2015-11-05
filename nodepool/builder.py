@@ -27,6 +27,7 @@ import shlex
 from stats import statsd
 
 from config import loadConfig
+import exceptions
 
 MINS = 60
 HOURS = 60 * MINS
@@ -65,7 +66,9 @@ class DibImageFile(object):
         my_path = os.path.join(images_dir, self.image_id)
         if with_extension:
             if self.extension is None:
-                raise ValueError('Cannot specify image extension of None')
+                raise exceptions.BuilderError(
+                    'Cannot specify image extension of None'
+                )
             my_path += '.' + self.extension
         return my_path
 
@@ -91,7 +94,7 @@ class NodePoolBuilder(object):
 
         with self._start_lock:
             if self._running:
-                raise RuntimeError('Cannot start, already running.')
+                raise exceptions.BuilderError('Cannot start, already running.')
             self._running = True
 
             self._gearman_worker = self._initializeGearmanWorker(
@@ -188,12 +191,14 @@ class NodePoolBuilder(object):
                 args = json.loads(job.arguments)
                 image_id = args['image-id']
                 if '/' in image_id:
-                    raise RuntimeError('Invalid image-id specified')
+                    raise exceptions.BuilderInvalidCommandError(
+                        'Invalid image-id specified'
+                    )
 
                 image_name = job.name.split(':', 1)[1]
                 try:
                     self._buildImage(image_name, image_id)
-                except RuntimeError:
+                except exceptions.BuilderError:
                     self.log.exception('Error building image')
                     job.sendWorkFail()
                 else:
@@ -204,10 +209,17 @@ class NodePoolBuilder(object):
                 args = json.loads(job.arguments)
                 image_name = args['image-name']
                 image_id = job.name.split(':')[1]
-                external_id = self._uploadImage(image_id,
-                                                args['provider'],
-                                                image_name)
-                job.sendWorkComplete(json.dumps({'external-id': external_id}))
+                try:
+                    external_id = self._uploadImage(image_id,
+                                                    args['provider'],
+                                                    image_name)
+                except exceptions.BuilderError:
+                    self.log.exception('Error uploading image')
+                    job.sendWorkFail()
+                else:
+                    job.sendWorkComplete(
+                        json.dumps({'external-id': external_id})
+                    )
             elif self._canHandleImageidJob(job, 'image-delete'):
                 image_id = job.name.split(':')[1]
                 self._deleteImage(image_id)
@@ -245,12 +257,14 @@ class NodePoolBuilder(object):
                                                  image_id)
         image_files = filter(lambda x: x.extension == image_type, image_files)
         if len(image_files) == 0:
-            self.log.error("Unable to find image file for id %s to upload",
-                           image_id)
-            return
+            raise exceptions.BuilderInvalidCommandError(
+                "Unable to find image file for id %s to upload" % image_id
+            )
         if len(image_files) > 1:
-            self.log.error("Found more than one image for id %s. This should "
-                           "never happen.", image_id)
+            raise exceptions.BuilderError(
+                "Found more than one image for id %s. This should never "
+                "happen.", image_id
+            )
 
         image_file = image_files[0]
         filename = image_file.to_path(self._config.imagesdir,
@@ -267,9 +281,9 @@ class NodePoolBuilder(object):
         try:
             provider_image = provider.images[image_name]
         except KeyError:
-            self.log.error("Could not find matching provider image for %s",
-                           image_name)
-            return
+            raise exceptions.BuilderInvalidCommandError(
+                "Could not find matching provider image for %s", image_name
+            )
         image_meta = provider_image.meta
         external_id = manager.uploadImage(ext_image_name, filename,
                                           image_file.extension, 'bare',
@@ -334,8 +348,9 @@ class NodePoolBuilder(object):
                 stderr=subprocess.STDOUT,
                 env=env)
         except OSError as e:
-            raise Exception("Failed to exec '%s'. Error: '%s'" %
-                            (cmd, e.strerror))
+            raise exceptions.BuilderError(
+                "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
+            )
 
         while True:
             ln = p.stdout.readline()
@@ -346,7 +361,9 @@ class NodePoolBuilder(object):
         p.wait()
         ret = p.returncode
         if ret:
-            raise Exception("DIB failed creating %s" % (filename,))
+            raise exceptions.DibFailedError(
+                "DIB failed creating %s" % filename
+            )
 
     def _getDiskimageByName(self, name):
         for image in self._config.diskimages.values():
@@ -357,8 +374,9 @@ class NodePoolBuilder(object):
     def _buildImage(self, image_name, image_id):
         diskimage = self._getDiskimageByName(image_name)
         if diskimage is None:
-            raise RuntimeError('Could not find matching image in config for '
-                               '%s', image_name)
+            raise exceptions.BuilderInvalidCommandError(
+                'Could not find matching image in config for %s', image_name
+            )
 
         start_time = time.time()
         image_file = DibImageFile(image_id)
