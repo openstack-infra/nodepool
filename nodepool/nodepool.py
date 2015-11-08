@@ -1555,29 +1555,29 @@ class NodePool(threading.Thread):
                     provider_manager.ProviderManager(p)
                 config.provider_managers[p.name].start()
 
+        for t in config.targets.values():
+            oldmanager = None
+            if self.config:
+                oldmanager = self.config.jenkins_managers.get(t.name)
+            if oldmanager:
+                if (t.jenkins_url != oldmanager.target.jenkins_url or
+                    t.jenkins_user != oldmanager.target.jenkins_user or
+                    t.jenkins_apikey != oldmanager.target.jenkins_apikey):
+                    stop_managers.append(oldmanager)
+                    oldmanager = None
+            if oldmanager:
+                config.jenkins_managers[t.name] = oldmanager
+            elif t.jenkins_url:
+                self.log.debug("Creating new JenkinsManager object "
+                               "for %s" % t.name)
+                config.jenkins_managers[t.name] = \
+                    jenkins_manager.JenkinsManager(t)
+                config.jenkins_managers[t.name].start()
+        for oldmanager in stop_managers:
+            oldmanager.stop()
+
         # only do it if we need to check for targets
         if check_targets:
-            for t in config.targets.values():
-                oldmanager = None
-                if self.config:
-                    oldmanager = self.config.jenkins_managers.get(t.name)
-                if oldmanager:
-                    if (t.jenkins_url != oldmanager.target.jenkins_url or
-                        t.jenkins_user != oldmanager.target.jenkins_user or
-                        t.jenkins_apikey != oldmanager.target.jenkins_apikey):
-                        stop_managers.append(oldmanager)
-                        oldmanager = None
-                if oldmanager:
-                    config.jenkins_managers[t.name] = oldmanager
-                elif t.jenkins_url:
-                    self.log.debug("Creating new JenkinsManager object "
-                                   "for %s" % t.name)
-                    config.jenkins_managers[t.name] = \
-                        jenkins_manager.JenkinsManager(t)
-                    config.jenkins_managers[t.name].start()
-            for oldmanager in stop_managers:
-                oldmanager.stop()
-
             for t in config.targets.values():
                 if t.jenkins_url:
                     try:
