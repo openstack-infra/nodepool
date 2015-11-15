@@ -2,7 +2,7 @@ pbr>=0.6,!=0.7,<1.0
 
 gear
 PyYAML
-python-jenkins>=0.4.8
+python-jenkins
 paramiko>1.9.0
 python-daemon>=2.0.4
 extras
