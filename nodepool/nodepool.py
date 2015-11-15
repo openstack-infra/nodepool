@@ -1219,7 +1219,8 @@ class SnapshotImageUpdater(ImageUpdater):
                        "/usr/local/sbin:/sbin:/usr/sbin:" \
                        "/usr/local/bin:/bin:/usr/bin"
             host.ssh("run setup script",
-                     "%s; cd /opt/nodepool-scripts && %s ./%s %s" %
+                     "%s; cd /opt/nodepool-scripts "
+                     "&& %s ./%s %s && sync && sleep 5" %
                      (set_path, env_vars, self.image.setup, server['name']))
 
 
