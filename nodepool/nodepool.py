@@ -2624,39 +2624,36 @@ class NodePool(threading.Thread):
 
         states = {}
 
-        #nodepool.target.TARGET.LABEL.min_ready
-        #nodepool.target.TARGET.LABEL.PROVIDER.STATE
-        #nodepool.target.STATE
-        base_key = 'nodepool.target'
-        for target in self.config.targets.values():
-            target_key = '%s.%s' % (base_key, target.name)
+        #nodepool.nodes.STATE
+        #nodepool.target.TARGET.nodes.STATE
+        #nodepool.label.LABEL.nodes.STATE
+
+        for state in nodedb.STATE_NAMES.values():
+            key = 'nodepool.nodes.%s' % state
+            states[key] = 0
+            for target in self.config.targets.values():
+                key = 'nodepool.target.%s.nodes.%s' % (
+                    target.name, state)
+                states[key] = 0
             for label in self.config.labels.values():
-                label_key = '%s.%s' % (target_key, label.name)
-                key = '%s.min_ready' % label_key
-                statsd.gauge(key, label.min_ready)
-                for provider in label.providers.values():
-                    provider_key = '%s.%s' % (label_key, provider.name)
-                    for state in nodedb.STATE_NAMES.values():
-                        base_state_key = '%s.%s' % (base_key, state)
-                        provider_state_key = '%s.%s' % (provider_key, state)
-                        for key in [base_state_key, provider_state_key]:
-                            states[key] = 0
+                key = 'nodepool.label.%s.nodes.%s' % (
+                    label.name, state)
+                states[key] = 0
 
         for node in session.getNodes():
             if node.state not in nodedb.STATE_NAMES:
                 continue
             state = nodedb.STATE_NAMES[node.state]
-            target_key = '%s.%s' % (base_key, node.target_name)
-            label_key = '%s.%s' % (target_key, node.label_name)
-            provider_key = '%s.%s' % (label_key, node.provider_name)
+            key = 'nodepool.nodes.%s' % state
+            states[key] += 1
 
-            base_state_key = '%s.%s' % (base_key, state)
-            provider_state_key = '%s.%s' % (provider_key, state)
+            key = 'nodepool.target.%s.nodes.%s' % (
+                node.target_name, state)
+            states[key] += 1
 
-            for key in [base_state_key, provider_state_key]:
-                if key not in states:
-                    states[key] = 0
-                states[key] += 1
+            key = 'nodepool.label.%s.nodes.%s' % (
+                node.label_name, state)
+            states[key] += 1
 
         for key, count in states.items():
             statsd.gauge(key, count)
