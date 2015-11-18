@@ -317,41 +317,9 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(ready_nodes), 1)
             self.assertNotEqual(node_id, ready_nodes[0].id)
 
-            # Make sure our old node was deleted
+            # Make sure our old node is in delete state
             self.assertEqual(len(deleted_nodes), 1)
             self.assertEqual(node_id, deleted_nodes[0].id)
-
-    def test_node_delete_invalid(self):
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        node_id = -1
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-            node_id = nodes[0].id
-
-        # remove target and provider
-        pool.config.targets = {}
-        pool.config.providers = {}
-
-        pool.deleteNode(node_id)
-        self.wait_for_threads()
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            deleted_nodes = session.getNodes(provider_name='fake-provider',
-                                             label_name='fake-label',
-                                             target_name='fake-target',
-                                             state=nodedb.DELETE)
-
-            # Make sure our old node was deleted
-            self.assertEqual(len(deleted_nodes), 1)
 
     def test_proxy_timeout(self):
         """Test that we re-run a task after a ProxyError"""
