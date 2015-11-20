@@ -146,3 +146,18 @@ alien-image-list
 ^^^^^^^^^^^^^^^^
 .. program-output:: nodepool alien-image-list --help
    :nostderr:
+
+Removing a Provider
+===================
+
+To remove a provider set that providers max-servers to -1. This will
+prevent nodepool from booting new nodes and building new images on that
+provider. You can then let the nodes do their normal ready -> used ->
+delete -> deleted lifecycle. Once all nodes are gone you can then
+image-delete the remaining images and remove the config from nodepool
+for that provider entirely (though leaving it in this state is effectively
+the same and makes it easy to turn the provider back on).
+
+If urgency is required you can delete the nodes directly instead of
+waiting for them to go through their normal lifecycle but the effect is
+the same.
