@@ -2621,14 +2621,12 @@ class NodePool(threading.Thread):
         if provider_name not in self.config.providers:
             return
 
-        provider = self.config.providers[provider_name]
-
         states = {}
 
         #nodepool.nodes.STATE
         #nodepool.target.TARGET.nodes.STATE
         #nodepool.label.LABEL.nodes.STATE
-
+        #nodepool.provider.PROVIDER.nodes.STATE
         for state in nodedb.STATE_NAMES.values():
             key = 'nodepool.nodes.%s' % state
             states[key] = 0
@@ -2639,6 +2637,10 @@ class NodePool(threading.Thread):
             for label in self.config.labels.values():
                 key = 'nodepool.label.%s.nodes.%s' % (
                     label.name, state)
+                states[key] = 0
+            for provider in self.config.providers.values():
+                key = 'nodepool.provider.%s.nodes.%s' % (
+                    provider.name, state)
                 states[key] = 0
 
         for node in session.getNodes():
@@ -2654,6 +2656,10 @@ class NodePool(threading.Thread):
 
             key = 'nodepool.label.%s.nodes.%s' % (
                 node.label_name, state)
+            states[key] += 1
+
+            key = 'nodepool.provider.%s.nodes.%s' % (
+                node.provider_name, state)
             states[key] += 1
 
         for key, count in states.items():
