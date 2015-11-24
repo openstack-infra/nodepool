@@ -1226,7 +1226,11 @@ class SnapshotImageUpdater(ImageUpdater):
 
 
 class ConfigValue(object):
-    pass
+    def __eq__(self, other):
+        if isinstance(other, ConfigValue):
+            if other.__dict__ == self.__dict__:
+                return True
+        return False
 
 
 class Config(ConfigValue):
@@ -1266,6 +1270,10 @@ class GearmanServer(ConfigValue):
 
 
 class DiskImage(ConfigValue):
+    pass
+
+
+class Network(ConfigValue):
     pass
 
 
@@ -1371,7 +1379,20 @@ class NodePool(threading.Thread):
             p.boot_timeout = provider.get('boot-timeout', 60)
             p.launch_timeout = provider.get('launch-timeout', 3600)
             p.use_neutron = bool(provider.get('networks', ()))
-            p.networks = provider.get('networks')
+            p.networks = []
+            for network in provider.get('networks', []):
+                n = Network()
+                p.networks.append(n)
+                if 'net-id' in network:
+                    n.id = network['net-id']
+                    n.name = None
+                elif 'net-label' in network:
+                    n.name = network['net-label']
+                    n.id = None
+                else:
+                    n.name = network.get('name')
+                    n.id = None
+                n.public = network.get('public', False)
             p.ipv6_preferred = provider.get('ipv6-preferred')
             p.azs = provider.get('availability-zones')
             p.template_hostname = provider.get(

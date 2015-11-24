@@ -288,8 +288,8 @@ provider, the Nodepool image types are also defined (see
       image-type: qcow2
       ipv6-preferred: False
       networks:
-        - net-id: 'some-uuid'
-        - net-label: 'some-network-name'
+        - name: 'some-network-name'
+          public: True
       images:
         - name: trusty
           base-image: 'Trusty'
@@ -393,11 +393,10 @@ provider, the Nodepool image types are also defined (see
     Default None
 
   ``networks`` (dict)
-    Specify custom Neutron networks that get attached to each node. You can
-    specify Neutron networks using either the ``net-id`` or ``net-label``. If
-    only the ``net-label`` is specified the network UUID is automatically
-    queried via the Nova os-tenant-networks API extension (this requires that
-    the cloud provider has deployed this extension).
+    Specify custom Neutron networks that get attached to each
+    node. Specify the ``name`` of the network (a string) and if the
+    network routes to the Internet, set the boolean ``public`` to
+    true.
 
   ``ipv6_preferred``
     If it is set to True, nodepool will try to find ipv6 in public net first

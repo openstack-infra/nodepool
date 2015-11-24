@@ -190,6 +190,19 @@ class FakeGlanceClient(object):
         self.images = images
 
 
+class FakeNeutronClient(object):
+    def __init__(self, networks=None):
+        if networks is None:
+            networks = [dict(id='fake-public-network-uuid',
+                             name='fake-public-network-name'),
+                        dict(id='fake-private-network-uuid',
+                             name='fake-private-network-name')]
+        self.networks = networks
+
+    def list_networks(self):
+        return dict(networks=self.networks)
+
+
 class FakeOpenStackCloud(object):
     def __init__(self, images=None):
         if images is None:
@@ -200,6 +213,7 @@ class FakeOpenStackCloud(object):
                                      metadata={})])
         self.nova_client = FakeClient(images)
         self._glance_client = FakeGlanceClient(images)
+        self.neutron_client = FakeNeutronClient()
 
     def create_image(self, **kwargs):
         image = self._glance_client.images.create(**kwargs)

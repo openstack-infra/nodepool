@@ -43,6 +43,16 @@ class ConfigValidator:
             'config-drive': bool,
         }
 
+        old_network = {
+            'net-id': str,
+            'net-label': str,
+        }
+
+        network = {
+            'name': v.Required(str),
+            'public': bool,
+        }
+
         providers = {
             'name': str,
             'region-name': str,
@@ -59,10 +69,7 @@ class ConfigValidator:
             'max-servers': int,
             'pool': str,
             'image-type': str,
-            'networks': [{
-                'net-id': str,
-                'net-label': str,
-            }],
+            'networks': [v.Any(old_network, network)],
             'boot-timeout': int,
             'api-timeout': int,
             'rate': float,
