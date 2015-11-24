@@ -36,7 +36,7 @@ SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 
 
-def get_public_ip(server, version=4):
+def get_public_ip(server, provider, version=4):
     for addr in server.addresses.get('public', []):
         if type(addr) == type(u''):  # Rackspace/openstack 1.0
             return addr
@@ -56,6 +56,12 @@ def get_public_ip(server, version=4):
     for addr in server.addresses.get('Ext-Net', []):
         if addr['version'] == version:  # OVH
             return addr['addr']
+    if provider.use_neutron:  # Internap
+        for network in provider.networks:
+            if 'net-label' in network:
+                for addr in server.addresses.get(network['net-label'], []):
+                    if addr['version'] == version:
+                        return addr['addr']
     return None
 
 
@@ -83,7 +89,7 @@ def get_private_ip(server):
     return ret[0]
 
 
-def make_server_dict(server):
+def make_server_dict(server, provider):
     d = dict(id=str(server.id),
              name=server.name,
              status=server.status,
@@ -96,9 +102,9 @@ def make_server_dict(server):
         d['progress'] = server.progress
     if hasattr(server, 'metadata'):
         d['metadata'] = server.metadata
-    d['public_v4'] = get_public_ip(server)
+    d['public_v4'] = get_public_ip(server, provider)
     d['private_v4'] = get_private_ip(server)
-    d['public_v6'] = get_public_ip(server, version=6)
+    d['public_v6'] = get_public_ip(server, provider, version=6)
     return d
 
 
@@ -122,11 +128,12 @@ class CreateServerTask(Task):
 
 class GetServerTask(Task):
     def main(self, client):
+        provider = self.args.pop('_nodepool_provider')
         try:
             server = client.nova_client.servers.get(self.args['server_id'])
         except novaclient.exceptions.NotFound:
             raise NotFound()
-        return make_server_dict(server)
+        return make_server_dict(server, provider)
 
 
 class DeleteServerTask(Task):
@@ -136,8 +143,10 @@ class DeleteServerTask(Task):
 
 class ListServersTask(Task):
     def main(self, client):
+        provider = self.args.pop('_nodepool_provider')
         servers = client.nova_client.servers.list()
-        return [make_server_dict(server) for server in servers]
+        return [make_server_dict(server, provider)
+                for server in servers]
 
 
 class AddKeypairTask(Task):
@@ -412,7 +421,8 @@ class ProviderManager(TaskManager):
         return self.submitTask(CreateServerTask(**create_args))
 
     def getServer(self, server_id):
-        return self.submitTask(GetServerTask(server_id=server_id))
+        return self.submitTask(GetServerTask(server_id=server_id,
+                                             _nodepool_provider=self.provider))
 
     def getFloatingIP(self, ip_id):
         return self.submitTask(GetFloatingIPTask(ip_id=ip_id))
@@ -571,7 +581,8 @@ class ProviderManager(TaskManager):
             # data until it succeeds.
             if self._servers_lock.acquire(False):
                 try:
-                    self._servers = self.submitTask(ListServersTask())
+                    self._servers = self.submitTask(ListServersTask(
+                        _nodepool_provider=self.provider))
                     self._servers_time = time.time()
                 finally:
                     self._servers_lock.release()
