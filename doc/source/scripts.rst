@@ -66,6 +66,8 @@ Those files include:
 
   **NODEPOOL_PROVIDER**
     The name of the provider
+  **NODEPOOL_CLOUD**
+    The name of the cloud
   **NODEPOOL_REGION**
     The name of the region
   **NODEPOOL_AZ**
