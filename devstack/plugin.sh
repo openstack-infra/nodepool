@@ -110,6 +110,7 @@ handlers=console
 level=DEBUG
 handlers=console
 qualname=nodepool
+propagate=0
 
 [handler_console]
 level=DEBUG
