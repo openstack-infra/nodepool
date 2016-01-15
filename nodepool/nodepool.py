@@ -35,8 +35,7 @@ import jenkins_manager
 import nodedb
 import nodeutils as utils
 import provider_manager
-from stats import statsd
-
+import stats
 import config as nodepool_config
 
 
@@ -83,6 +82,7 @@ class NodeCompleteThread(threading.Thread):
         self.jobname = jobname
         self.result = result
         self.branch = branch
+        self.statsd = stats.get_client()
 
     def run(self):
         try:
@@ -122,29 +122,29 @@ class NodeCompleteThread(threading.Thread):
             self.log.info("Node id: %s failed acceptance test, deleting" %
                           node.id)
 
-        if statsd and self.result == 'SUCCESS':
+        if self.statsd and self.result == 'SUCCESS':
             start = node.state_time
             dt = int((time.time() - start) * 1000)
 
             # nodepool.job.tempest
             key = 'nodepool.job.%s' % self.jobname
-            statsd.timing(key + '.runtime', dt)
-            statsd.incr(key + '.builds')
+            self.statsd.timing(key + '.runtime', dt)
+            self.statsd.incr(key + '.builds')
 
             # nodepool.job.tempest.master
             key += '.%s' % self.branch
-            statsd.timing(key + '.runtime', dt)
-            statsd.incr(key + '.builds')
+            self.statsd.timing(key + '.runtime', dt)
+            self.statsd.incr(key + '.builds')
 
             # nodepool.job.tempest.master.devstack-precise
             key += '.%s' % node.label_name
-            statsd.timing(key + '.runtime', dt)
-            statsd.incr(key + '.builds')
+            self.statsd.timing(key + '.runtime', dt)
+            self.statsd.incr(key + '.builds')
 
             # nodepool.job.tempest.master.devstack-precise.rax-ord
             key += '.%s' % node.provider_name
-            statsd.timing(key + '.runtime', dt)
-            statsd.incr(key + '.builds')
+            self.statsd.timing(key + '.runtime', dt)
+            self.statsd.incr(key + '.builds')
 
         time.sleep(DELETE_DELAY)
         self.nodepool.deleteNode(node.id)
@@ -843,6 +843,7 @@ class ImageUpdater(threading.Thread):
         self.scriptdir = self.nodepool.config.scriptdir
         self.elementsdir = self.nodepool.config.elementsdir
         self.imagesdir = self.nodepool.config.imagesdir
+        self.statsd = stats.get_client()
 
     def run(self):
         try:
@@ -970,12 +971,12 @@ class SnapshotImageUpdater(ImageUpdater):
             raise Exception("Image %s for image id: %s status: %s" %
                             (image_id, self.snap_image.id, image['status']))
 
-        if statsd:
+        if self.statsd:
             dt = int((time.time() - start_time) * 1000)
             key = 'nodepool.image_update.%s.%s' % (self.image.name,
                                                    self.provider.name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)
 
         self.snap_image.state = nodedb.READY
         session.commit()
@@ -1073,6 +1074,7 @@ class NodePool(threading.Thread):
         self.zmq_context = None
         self.gearman_client = None
         self.apsched = None
+        self.statsd = stats.get_client()
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
         self._image_delete_threads = {}
@@ -1855,13 +1857,13 @@ class NodePool(threading.Thread):
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
 
-        if statsd:
+        if self.statsd:
             dt = int((time.time() - node.state_time) * 1000)
             key = 'nodepool.delete.%s.%s.%s' % (image_name,
                                                 node.provider_name,
                                                 node.target_name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)
         self.updateStats(session, node.provider_name)
 
     def deleteImage(self, snap_image_id):
@@ -2193,7 +2195,7 @@ class NodePool(threading.Thread):
         self.log.debug("Finished periodic check")
 
     def updateStats(self, session, provider_name):
-        if not statsd:
+        if not self.statsd:
             return
         # This may be called outside of the main thread.
 
@@ -2239,16 +2241,16 @@ class NodePool(threading.Thread):
             states[key] += 1
 
         for key, count in states.items():
-            statsd.gauge(key, count)
+            self.statsd.gauge(key, count)
 
         #nodepool.provider.PROVIDER.max_servers
         for provider in self.config.providers.values():
             key = 'nodepool.provider.%s.max_servers' % provider.name
-            statsd.gauge(key, provider.max_servers)
+            self.statsd.gauge(key, provider.max_servers)
 
     def launchStats(self, subkey, dt, image_name,
                     provider_name, target_name, node_az):
-        if not statsd:
+        if not self.statsd:
             return
         #nodepool.launch.provider.PROVIDER.subkey
         #nodepool.launch.image.IMAGE.subkey
@@ -2265,5 +2267,5 @@ class NodePool(threading.Thread):
             keys.append('nodepool.launch.provider.%s.%s.%s' %
                         (provider_name, node_az, subkey))
         for key in keys:
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)

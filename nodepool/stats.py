@@ -13,22 +13,28 @@
 # under the License.
 
 """
-Import and set `statsd` if STATSD_HOST is present in the
-environment, else set it to None.  This mirrors the behaviour of old
-releases of upstream statsd and avoids us having to change anything
-else.
+Helper to create a statsd client from environment variables
 """
 
 import os
 import logging
+import statsd
 
 log = logging.getLogger("nodepool.stats")
 
-if os.getenv('STATSD_HOST', None):
-    from statsd.defaults.env import statsd
-    log.info("Statsd reporting to %s:%s" %
-             (os.getenv('STATSD_HOST'),
-              os.getenv('STATSD_PORT', '8125')))
-else:
-    log.info("Statsd reporting disabled")
-    statsd = None
+def get_client():
+    """Return a statsd client object setup from environment variables; or
+    None if they are not set
+    """
+
+    # note we're just being careful to let the default values fall
+    # through to StatsClient()
+    statsd_args = {}
+    if os.getenv('STATSD_HOST', None):
+        statsd_args['host'] = os.environ['STATSD_HOST']
+    if os.getenv('STATSD_PORT', None):
+        statsd_args['port'] = os.environ['STATSD_PORT']
+    if statsd_args:
+        return statsd.StatsClient(**statsd_args)
+    else:
+        return None
