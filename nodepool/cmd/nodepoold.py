@@ -30,12 +30,9 @@ import signal
 import traceback
 import threading
 
-import nodepool.cmd
 import nodepool.builder
-
-# No nodepool imports here because they pull in paramiko which must not be
-# imported until after the daemonization.
-# https://github.com/paramiko/paramiko/issues/59
+import nodepool.cmd
+import nodepool.nodepool
 
 
 def stack_dump_handler(signum, frame):
@@ -112,7 +109,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         os._exit(0)
 
     def main(self):
-        import nodepool.nodepool
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
                                                self.args.config)
