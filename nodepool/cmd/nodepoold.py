@@ -31,6 +31,7 @@ import traceback
 import threading
 
 import nodepool.cmd
+import nodepool.builder
 
 # No nodepool imports here because they pull in paramiko which must not be
 # imported until after the daemonization.
@@ -111,14 +112,11 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         os._exit(0)
 
     def main(self):
-        # Imports happen late to accomodate statsd's import time operations
-        # which set up statsd.
         import nodepool.nodepool
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
                                                self.args.config)
         if self.args.builder:
-            import nodepool.builder
             self.builder = nodepool.builder.NodePoolBuilder(self.args.config)
 
         signal.signal(signal.SIGINT, self.exit_handler)
