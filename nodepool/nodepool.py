@@ -231,17 +231,29 @@ class WatchableJob(gear.Job):
     def __init__(self, *args, **kwargs):
         super(WatchableJob, self).__init__(*args, **kwargs)
         self._completion_handlers = []
+        self._failure_handlers = []
         self._event = threading.Event()
         self._completed = False
+        self._failed = False
 
     def addCompletionHandler(self, handler, *args, **kwargs):
         self._completion_handlers.append((handler, args, kwargs))
+
+    def addFailureHandler(self, handler, *args, **kwargs):
+        self._failure_handlers.append((handler, args, kwargs))
 
     def onCompleted(self):
         for handler, args, kwargs in self._completion_handlers:
             handler(self, *args, **kwargs)
 
         self._completed = True
+        self._event.set()
+
+    def onFailed(self):
+        for handler, args, kwargs in self._failure_handlers:
+            handler(self, *args, **kwargs)
+
+        self._failed = True
         self._event.set()
 
     def waitForCompletion(self, timeout=None):
@@ -334,6 +346,11 @@ class GearmanClient(gear.Client):
     def handleWorkComplete(self, packet):
         job = super(GearmanClient, self).handleWorkComplete(packet)
         job.onCompleted()
+
+    def handleWorkFail(self, packet):
+        job = super(GearmanClient, self).handleWorkFail(packet)
+        job.onFailed()
+
 
 class InstanceDeleter(threading.Thread):
     log = logging.getLogger("nodepool.InstanceDeleter")
@@ -1649,6 +1666,8 @@ class NodePool(threading.Thread):
                     self._image_build_jobs.addJob(gearman_job)
                     gearman_job.addCompletionHandler(
                         self.handleImageBuildComplete, image_id=dib_image.id)
+                    gearman_job.addFailureHandler(
+                        self.handleImageBuildFailed, image_id=dib_image.id)
 
                     self.gearman_client.submitJob(gearman_job)
                     self.log.debug("Queued image building task for %s" %
@@ -1726,6 +1745,13 @@ class NodePool(threading.Thread):
             session.commit()
             self.log.debug('DIB Image %s (id %d) is ready',
                            job.name.split(':', 1)[0], image_id)
+
+    def handleImageBuildFailed(self, job, image_id):
+        with self.getDB().getSession() as session:
+            self.log.debug('DIB Image %s (id %d) failed to build. Deleting.',
+                           job.name.split(':', 1)[0], image_id)
+            dib_image = session.getDibImage(image_id)
+            dib_image.delete()
 
     def handleImageDeleteComplete(self, job, image_id):
         with self.getDB().getSession() as session:

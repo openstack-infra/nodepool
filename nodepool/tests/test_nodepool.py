@@ -172,6 +172,15 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(self.subprocesses[0].returncode, 127)
         self.assertEqual(self.subprocesses[-1].returncode, 127)
 
+        with pool.getDB().getSession() as session:
+            while True:
+                dib_images = session.getDibImages()
+                images = filter(lambda x: x.image_name == 'fake-dib-image',
+                                dib_images)
+                if len(images) == 0:
+                    break
+                time.sleep(.2)
+
     def test_dib_upload_fail(self):
         """Test that a dib and snap image upload failure is contained."""
         configfile = self.setup_config('node_dib_and_snap_upload_fail.yaml')
