@@ -24,11 +24,11 @@ import traceback
 
 import gear
 import shlex
-from stats import statsd
 
 import config as nodepool_config
 import exceptions
 import provider_manager
+import stats
 
 MINS = 60
 HOURS = 60 * MINS
@@ -85,6 +85,7 @@ class NodePoolBuilder(object):
         self._start_lock = threading.Lock()
         self._gearman_worker = None
         self._config = None
+        self.statsd = stats.get_client()
 
     @property
     def running(self):
@@ -306,12 +307,12 @@ class NodePoolBuilder(object):
         # It can take a _very_ long time for Rackspace 1.0 to save an image
         manager.waitForImage(external_id, IMAGE_TIMEOUT)
 
-        if statsd:
+        if self.statsd:
             dt = int((time.time() - start_time) * 1000)
             key = 'nodepool.image_update.%s.%s' % (image_name,
                                                    provider.name)
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)
 
         self.log.info("Image %s in %s is ready" % (image_id,
                                                    provider.name))
@@ -403,8 +404,8 @@ class NodePoolBuilder(object):
         self.log.info("DIB image %s with file %s is built" % (
             image_name, filename))
 
-        if statsd:
+        if self.statsd:
             dt = int((time.time() - start_time) * 1000)
             key = 'nodepool.dib_image_build.%s' % diskimage.name
-            statsd.timing(key, dt)
-            statsd.incr(key)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)
