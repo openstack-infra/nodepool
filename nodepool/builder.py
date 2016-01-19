@@ -179,14 +179,14 @@ class NodePoolBuilder(object):
             self._registerImageId(image.image_id)
 
     def _registerImageId(self, image_id):
-        self.log.debug('registering image %s', image_id)
+        self.log.info('Registering image id: %s', image_id)
         self._gearman_worker.registerFunction('image-upload:%s' % image_id)
         self._gearman_worker.registerFunction('image-delete:%s' % image_id)
         self._built_image_ids.add(image_id)
 
     def _unregisterImageId(self, worker, image_id):
         if image_id in self._built_image_ids:
-            self.log.debug('unregistering image %s', image_id)
+            self.log.info('Unregistering image id: %s', image_id)
             worker.unRegisterFunction('image-upload:%s' % image_id)
             self._built_image_ids.remove(image_id)
         else:
@@ -199,7 +199,7 @@ class NodePoolBuilder(object):
 
     def _handleJob(self, job):
         try:
-            self.log.debug('got job %s with data %s',
+            self.log.debug('Got job %s with data %s',
                            job.name, job.arguments)
             if job.name.startswith('image-build:'):
                 args = json.loads(job.arguments)
@@ -213,7 +213,7 @@ class NodePoolBuilder(object):
                 try:
                     self._buildImage(image_name, image_id)
                 except exceptions.BuilderError:
-                    self.log.exception('Error building image')
+                    self.log.exception('Exception while building image')
                     job.sendWorkFail()
                 else:
                     # We can now upload this image
@@ -228,7 +228,7 @@ class NodePoolBuilder(object):
                                                     args['provider'],
                                                     image_name)
                 except exceptions.BuilderError:
-                    self.log.exception('Error uploading image')
+                    self.log.exception('Exception while uploading image')
                     job.sendWorkFail()
                 else:
                     job.sendWorkComplete(
@@ -302,7 +302,8 @@ class NodePoolBuilder(object):
         external_id = manager.uploadImage(ext_image_name, filename,
                                           image_file.extension, 'bare',
                                           image_meta)
-        self.log.debug("Saving image id: %s", external_id)
+        self.log.info("Saving image id: %s with external id %s" %
+                      (image_id, external_id))
         # It can take a _very_ long time for Rackspace 1.0 to save an image
         manager.waitForImage(external_id, IMAGE_TIMEOUT)
 
@@ -313,8 +314,8 @@ class NodePoolBuilder(object):
             statsd.timing(key, dt)
             statsd.incr(key)
 
-        self.log.info("Image %s in %s is ready" % (image_id,
-                                                   provider.name))
+        self.log.info("Image id: %s in %s is ready" % (image_id,
+                                                       provider.name))
         return external_id
 
     def _runDibForImage(self, image, filename):
@@ -396,11 +397,11 @@ class NodePoolBuilder(object):
         image_file = DibImageFile(image_id)
         filename = image_file.to_path(self._config.imagesdir, False)
 
-        self.log.info("Creating image: %s with filename %s" %
+        self.log.info("Creating image %s with filename %s" %
                       (diskimage.name, filename))
         self._runDibForImage(diskimage, filename)
 
-        self.log.info("DIB image %s with file %s is built" % (
+        self.log.info("DIB image %s with filename %s is built" % (
             image_name, filename))
 
         if statsd:
