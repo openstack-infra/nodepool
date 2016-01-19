@@ -233,8 +233,6 @@ class WatchableJob(gear.Job):
         self._completion_handlers = []
         self._failure_handlers = []
         self._event = threading.Event()
-        self._completed = False
-        self._failed = False
 
     def addCompletionHandler(self, handler, *args, **kwargs):
         self._completion_handlers.append((handler, args, kwargs))
@@ -246,14 +244,12 @@ class WatchableJob(gear.Job):
         for handler, args, kwargs in self._completion_handlers:
             handler(self, *args, **kwargs)
 
-        self._completed = True
         self._event.set()
 
     def onFailed(self):
         for handler, args, kwargs in self._failure_handlers:
             handler(self, *args, **kwargs)
 
-        self._failed = True
         self._event.set()
 
     def waitForCompletion(self, timeout=None):
@@ -349,6 +345,10 @@ class GearmanClient(gear.Client):
 
     def handleWorkFail(self, packet):
         job = super(GearmanClient, self).handleWorkFail(packet)
+        job.onFailed()
+
+    def handleWorkException(self, packet):
+        job = super(GearmanClient, self).handleWorkException(packet)
         job.onFailed()
 
 
