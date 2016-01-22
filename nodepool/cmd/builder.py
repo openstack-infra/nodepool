@@ -41,7 +41,8 @@ class NodePoolBuilder(nodepool.cmd.NodepoolApp):
                             help='path to log config file')
         parser.add_argument('-p', dest='pidfile',
                             help='path to pid file',
-                            default='/var/run/nodepool/nodepool.pid')
+                            default='/var/run/nodepool-builder/'
+                                    'nodepool-builder.pid')
         parser.add_argument('-d', dest='nodaemon', action='store_true',
                             help='do not run as a daemon')
         self.args = parser.parse_args()
