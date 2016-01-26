@@ -18,8 +18,8 @@ import threading
 import time
 
 import fixtures
-import testtools
 
+from nodepool import jobs
 from nodepool import tests
 from nodepool import nodedb
 import nodepool.fakeprovider
@@ -486,9 +486,9 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(nodes), 1)
 
 
-class TestWatchableJob(testtools.TestCase):
+class TestGearClient(tests.DBTestCase):
     def test_wait_for_completion(self):
-        wj = nodepool.nodepool.WatchableJob('test', 'test', 'test')
+        wj = jobs.WatchableJob('test', 'test', 'test')
 
         def call_on_completed():
             time.sleep(.2)
@@ -497,3 +497,24 @@ class TestWatchableJob(testtools.TestCase):
         t = threading.Thread(target=call_on_completed)
         t.start()
         wj.waitForCompletion()
+
+    def test_handle_disconnect(self):
+        class MyJob(jobs.WatchableJob):
+            def __init__(self, *args, **kwargs):
+                super(MyJob, self).__init__(*args, **kwargs)
+                self.disconnect_called = False
+
+            def onDisconnect(self):
+                super(MyJob, self).onDisconnect()
+                self.disconnect_called = True
+
+        client = nodepool.nodepool.GearmanClient()
+        client.addServer('localhost', self.gearman_server.port)
+        client.waitForServer()
+
+        job = MyJob('test-job', '', '')
+        client.submitJob(job)
+
+        self.gearman_server.shutdown()
+        job.waitForCompletion()
+        self.assertEqual(job.disconnect_called, True)

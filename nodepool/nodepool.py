@@ -39,6 +39,7 @@ import provider_manager
 import stats
 import config as nodepool_config
 
+import jobs
 
 MINS = 60
 HOURS = 60 * MINS
@@ -228,35 +229,6 @@ class NodeUpdateListener(threading.Thread):
         t.start()
 
 
-class WatchableJob(gear.Job):
-    def __init__(self, *args, **kwargs):
-        super(WatchableJob, self).__init__(*args, **kwargs)
-        self._completion_handlers = []
-        self._failure_handlers = []
-        self._event = threading.Event()
-
-    def addCompletionHandler(self, handler, *args, **kwargs):
-        self._completion_handlers.append((handler, args, kwargs))
-
-    def addFailureHandler(self, handler, *args, **kwargs):
-        self._failure_handlers.append((handler, args, kwargs))
-
-    def onCompleted(self):
-        for handler, args, kwargs in self._completion_handlers:
-            handler(self, *args, **kwargs)
-
-        self._event.set()
-
-    def onFailed(self):
-        for handler, args, kwargs in self._failure_handlers:
-            handler(self, *args, **kwargs)
-
-        self._event.set()
-
-    def waitForCompletion(self, timeout=None):
-        return self._event.wait(timeout)
-
-
 class JobTracker(object):
     def __init__(self):
         self._running_jobs = set()
@@ -351,6 +323,14 @@ class GearmanClient(gear.Client):
     def handleWorkException(self, packet):
         job = super(GearmanClient, self).handleWorkException(packet)
         job.onFailed()
+
+    def handleDisconnect(self, job):
+        super(GearmanClient, self).handleDisconnect(job)
+        job.onDisconnect()
+
+    def handleWorkStatus(self, packet):
+        job = super(GearmanClient, self).handleWorkStatus(packet)
+        job.onWorkStatus()
 
 
 class InstanceDeleter(threading.Thread):
@@ -1100,7 +1080,6 @@ class NodePool(threading.Thread):
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
         self._image_build_jobs = JobTracker()
-        self._image_upload_jobs = JobTracker()
 
     def stop(self):
         self._stopped = True
@@ -1115,8 +1094,8 @@ class NodePool(threading.Thread):
 
     def waitForBuiltImages(self):
         self.log.debug("Waiting for images to complete building.")
-        while len(self._image_build_jobs.running_jobs) > 0:
-            time.sleep(.5)
+        for job in self._image_build_jobs.running_jobs:
+            job.waitForCompletion()
         self.log.debug("Done waiting for images to complete building.")
 
     def loadConfig(self):
@@ -1633,8 +1612,6 @@ class NodePool(threading.Thread):
         return t
 
     def buildImage(self, image):
-        gearman_job = None
-
         # check if we already have this item in the queue
         with self.getDB().getSession() as session:
             queued_images = session.getBuildingDibImagesByName(image.name)
@@ -1650,8 +1627,6 @@ class NodePool(threading.Thread):
                     filename = os.path.join(self.config.imagesdir,
                                             '%s-%s' %
                                             (image.name, str(timestamp)))
-                    job_uuid = str(uuid4().hex)
-
                     dib_image = session.createDibImage(image_name=image.name,
                                                        filename=filename,
                                                        version=timestamp)
@@ -1659,17 +1634,9 @@ class NodePool(threading.Thread):
                                    dib_image.image_name, dib_image.state)
 
                     # Submit image-build job
-                    job_data = json.dumps({
-                        'image-id': str(dib_image.id)
-                    })
-                    gearman_job = WatchableJob(
-                        'image-build:%s' % image.name, job_data, job_uuid)
+                    gearman_job = jobs.ImageBuildJob(image.name, dib_image.id,
+                                                     self)
                     self._image_build_jobs.addJob(gearman_job)
-                    gearman_job.addCompletionHandler(
-                        self.handleImageBuildComplete, image_id=dib_image.id)
-                    gearman_job.addFailureHandler(
-                        self.handleImageBuildFailed, image_id=dib_image.id)
-
                     self.gearman_client.submitJob(gearman_job, timeout=300)
                     self.log.debug("Queued image building task for %s" %
                                    image.name)
@@ -1698,71 +1665,16 @@ class NodePool(threading.Thread):
             session.commit()
 
             # Submit image-upload job
-            gearman_job = WatchableJob(
-                'image-upload:%s' % image_id,
-                json.dumps({
-                    'provider': provider,
-                    'image-name': image_name
-                }),
-                job_uuid)
-            self._image_upload_jobs.addJob(gearman_job)
-            gearman_job.addCompletionHandler(self.handleImageUploadComplete,
-                                             snap_image_id=snap_image.id)
+            gearman_job = jobs.ImageUploadJob(image_id, provider, image_name,
+                                              snap_image.id, self)
             self.log.debug('Submitting image-upload job uuid: %s' %
-                           (job_uuid,))
+                           (gearman_job.unique,))
             self.gearman_client.submitJob(gearman_job, timeout=300)
 
             return gearman_job
         except Exception:
             self.log.exception(
                 "Could not upload image %s on %s", image_name, provider)
-
-    def handleImageUploadComplete(self, job, snap_image_id):
-        job_uuid = job.unique
-        job_data = json.loads(job.data[0])
-        external_id = job_data['external-id']
-
-        with self.getDB().getSession() as session:
-            snap_image = session.getSnapshotImage(snap_image_id)
-            if snap_image is None:
-                self.log.error(
-                    'Unable to find matching snap_image for job_id %s',
-                    job_uuid)
-                return
-
-            snap_image.external_id = external_id
-            snap_image.state = nodedb.READY
-            session.commit()
-            self.log.debug('Image %s is ready with external_id %s',
-                           snap_image_id, external_id)
-
-    def handleImageBuildComplete(self, job, image_id):
-        with self.getDB().getSession() as session:
-            dib_image = session.getDibImage(image_id)
-            if dib_image is None:
-                self.log.error(
-                    'Unable to find matching dib_image for image_id %s',
-                    image_id)
-                return
-            dib_image.state = nodedb.READY
-            session.commit()
-            self.log.debug('DIB Image %s (id %d) is ready',
-                           job.name.split(':', 1)[0], image_id)
-
-    def handleImageBuildFailed(self, job, image_id):
-        with self.getDB().getSession() as session:
-            self.log.debug('DIB Image %s (id %d) failed to build. Deleting.',
-                           job.name.split(':', 1)[0], image_id)
-            dib_image = session.getDibImage(image_id)
-            dib_image.delete()
-
-    def handleImageDeleteComplete(self, job, image_id):
-        with self.getDB().getSession() as session:
-            dib_image = session.getDibImage(image_id)
-
-            # Remove image from the nodedb
-            dib_image.state = nodedb.DELETE
-            dib_image.delete()
 
     def launchNode(self, session, provider, label, target):
         try:
@@ -1948,14 +1860,9 @@ class NodePool(threading.Thread):
     def deleteDibImage(self, dib_image):
         try:
             # Submit image-delete job
-            job_uuid = str(uuid4().hex)
-            gearman_job = WatchableJob(
-                'image-delete:%s' % dib_image.id,
-                '', job_uuid
-            )
-            gearman_job.addCompletionHandler(self.handleImageDeleteComplete,
-                                             image_id=dib_image.id)
+            gearman_job = jobs.ImageDeleteJob(dib_image.id, self)
             self.gearman_client.submitJob(gearman_job, timeout=300)
+            dib_image.delete()
             return gearman_job
         except Exception:
             self.log.exception('Could not submit delete job for image id %s',

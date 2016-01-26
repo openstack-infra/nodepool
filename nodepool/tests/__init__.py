@@ -15,6 +15,7 @@
 
 """Common utilities used in testing"""
 
+import errno
 import logging
 import os
 import pymysql
@@ -95,7 +96,14 @@ class GearmanServerFixture(fixtures.Fixture):
         self.addCleanup(self.shutdownGearman)
 
     def shutdownGearman(self):
-        self.gearman_server.shutdown()
+        #TODO:greghaynes remove try once gear client protects against this
+        try:
+            self.gearman_server.shutdown()
+        except OSError as e:
+            if e.errno == errno.EBADF:
+                pass
+            else:
+                raise
 
 
 class GearmanClient(gear.Client):
