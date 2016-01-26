@@ -270,10 +270,14 @@ class NodePoolBuilder(object):
 
         image_files = DibImageFile.from_image_id(self._config.imagesdir,
                                                  image_id)
+        for f in image_files:
+            self.log.debug("Found image file of type %s for image id: %s" %
+                           (f.extension, f.image_id))
         image_files = filter(lambda x: x.extension == image_type, image_files)
         if len(image_files) == 0:
             raise exceptions.BuilderInvalidCommandError(
-                "Unable to find image file for id %s to upload" % image_id
+                "Unable to find image file of type %s for id %s to upload" %
+                (image_type, image_id)
             )
         if len(image_files) > 1:
             raise exceptions.BuilderError(
