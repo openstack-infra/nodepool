@@ -1841,7 +1841,7 @@ class NodePool(threading.Thread):
         provider = self.config.providers[node.provider_name]
         target = self.config.targets[node.target_name]
         label = self.config.labels.get(node.label_name, None)
-        if label:
+        if label and label.image in provider.images:
             image_name = provider.images[label.image].name
         else:
             image_name = None
