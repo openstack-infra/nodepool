@@ -2191,7 +2191,7 @@ class NodePool(threading.Thread):
             with self.getDB().getSession() as session:
                 self.periodicCheck(session)
         except Exception:
-            self.log.exception("Exception in periodic chack:")
+            self.log.exception("Exception in periodic check:")
 
     def periodicCheck(self, session):
         # This function should be run periodically to make sure we can
