@@ -60,4 +60,7 @@ else
     done
 fi
 
+# Emulate manifest creation
+mkdir $outfile.d
+
 echo "*** fake-image-create: done"

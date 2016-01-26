@@ -54,9 +54,10 @@ class DibImageFile(object):
     def from_image_id(images_dir, image_id):
         images = []
         for image_filename in os.listdir(images_dir):
-            image = DibImageFile.from_path(image_filename)
-            if image.image_id == image_id:
-                images.append(image)
+            if os.path.isfile(os.path.join(images_dir, image_filename)):
+                image = DibImageFile.from_path(image_filename)
+                if image.image_id == image_id:
+                        images.append(image)
         return images
 
     @staticmethod
