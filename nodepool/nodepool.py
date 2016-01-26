@@ -1688,7 +1688,9 @@ class NodePool(threading.Thread):
 
             snap_image = session.createSnapshotImage(
                 provider_name=provider, image_name=provider_image.name)
-            self.log.debug('Created snap_image with job_id %s', job_uuid)
+            self.log.debug('Created snapshot image id: %s for upload of '
+                           'DIB image id: %s with job uuid: %s ' %
+                           (snap_image.id, image_id, job_uuid))
 
             # TODO(mordred) abusing the hostname field
             snap_image.hostname = image_name
@@ -1706,8 +1708,8 @@ class NodePool(threading.Thread):
             self._image_upload_jobs.addJob(gearman_job)
             gearman_job.addCompletionHandler(self.handleImageUploadComplete,
                                              snap_image_id=snap_image.id)
-            self.log.debug('Submitting image-upload job for image id %s',
-                           image_id,)
+            self.log.debug('Submitting image-upload job uuid: %s' %
+                           (job_uuid,))
             self.gearman_client.submitJob(gearman_job)
 
             return gearman_job
