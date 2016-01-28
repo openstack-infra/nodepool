@@ -73,13 +73,14 @@ class ImageBuildJob(NodepoolJob):
 
     def _deleteImage(self, record_only=False):
         with self.getDbSession() as session:
-            self.log.debug('DIB Image %s (id %d) failed to build. Deleting.',
+            self.log.debug('Deleting Image %s (id %d).',
                            self.name.split(':', 1)[0], self.image_id)
             dib_image = session.getDibImage(self.image_id)
-            # TODO:greghaynes remove this check and only call deleteDibImage
-            # when it is smart enough that it doesn't submit a delete job
+            # We soft delete the dib image here because we are currently in
+            # a gear thread and therefore cannot submit a gear delete job
+            # without racing the gear poll loop processing
             if not record_only:
-                self.nodepool.deleteDibImage(dib_image)
+                dib_image.state = nodedb.DELETE
             else:
                 dib_image.delete()
 

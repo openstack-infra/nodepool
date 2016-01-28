@@ -42,9 +42,9 @@ class LoggingPopen(subprocess.Popen):
 
 
 class FakeGearmanServer(gear.Server):
-    def __init__(self):
+    def __init__(self, port=0):
         self.hold_jobs_in_queue = False
-        super(FakeGearmanServer, self).__init__(0)
+        super(FakeGearmanServer, self).__init__(port)
 
     def getJobForConnection(self, connection, peek=False):
         for queue in [self.high_queue, self.normal_queue, self.low_queue]:
@@ -90,9 +90,12 @@ class FakeGearmanServer(gear.Server):
 
 
 class GearmanServerFixture(fixtures.Fixture):
+    def __init__(self, port=0):
+        self._port = port
+
     def setUp(self):
         super(GearmanServerFixture, self).setUp()
-        self.gearman_server = FakeGearmanServer()
+        self.gearman_server = FakeGearmanServer(self._port)
         self.addCleanup(self.shutdownGearman)
 
     def shutdownGearman(self):

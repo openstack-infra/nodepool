@@ -1642,9 +1642,19 @@ class NodePool(threading.Thread):
                     gearman_job = jobs.ImageBuildJob(image.name, dib_image.id,
                                                      self)
                     self._image_build_jobs.addJob(gearman_job)
-                    self.gearman_client.submitJob(gearman_job, timeout=300)
-                    self.log.debug("Queued image building task for %s" %
-                                   image.name)
+
+                    try:
+                        self.gearman_client.submitJob(gearman_job, timeout=300)
+                    except Exception:
+                        self.log.warning("Failed to submit build job for "
+                                         "DibImage record %s with id %d",
+                                         dib_image.image_name, dib_image.id)
+                        # Remove job from _image_build_jobs
+                        gearman_job.onFailed()
+                        raise
+                    else:
+                        self.log.debug("Queued image building task for %s" %
+                                       image.name)
                 except Exception:
                     self.log.exception(
                         "Could not build image %s", image.name)
@@ -2096,6 +2106,8 @@ class NodePool(threading.Thread):
                               "%s hours old" %
                               (image.id,
                                (now - image.state_time) / (60 * 60)))
+                delete = True
+            if image.state == nodedb.DELETE:
                 delete = True
         if delete:
             try:
