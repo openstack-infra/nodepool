@@ -300,6 +300,7 @@ class NodePoolBuilder(object):
             self.log.info('Unregistering image id: %s', image_id)
             for worker in self.upload_workers:
                 worker.unRegisterFunction('image-upload:%s' % image_id)
+                worker.unRegisterFunction('image-delete:%s' % image_id)
             self._built_image_ids.remove(image_id)
         else:
             self.log.warning('Attempting to remove image %d but image not '
