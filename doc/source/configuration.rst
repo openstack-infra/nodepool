@@ -398,7 +398,7 @@ provider, the Nodepool image types are also defined (see
     network routes to the Internet, set the boolean ``public`` to
     true.
 
-  ``ipv6_preferred``
+  ``ipv6-preferred``
     If it is set to True, nodepool will try to find ipv6 in public net first
     as the ip address for ssh connection to build snapshot images and create
     jenkins slave definition. If ipv6 is not found or the key is not
@@ -408,7 +408,7 @@ provider, the Nodepool image types are also defined (see
     Specify a floating ip pool in cases where the 'public' pool is unavailable
     or undesirable.
 
-  ``api_timeout``
+  ``api-timeout``
     Timeout for the Nova client in seconds.
 
   ``service-type``

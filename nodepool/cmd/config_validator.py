@@ -70,6 +70,7 @@ class ConfigValidator:
             'pool': str,
             'image-type': str,
             'networks': [v.Any(old_network, network)],
+            'ipv6-preferred': bool,
             'boot-timeout': int,
             'api-timeout': int,
             'rate': float,
