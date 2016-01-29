@@ -38,6 +38,10 @@ IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
 # so just hardcode it for all qcow2 building
 DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
 
+# TODO: make this configurable
+BUILD_WORKERS = 1
+UPLOAD_WORKERS = 4
+
 
 class DibImageFile(object):
     def __init__(self, image_id, extension=None):
@@ -75,6 +79,97 @@ class DibImageFile(object):
         return my_path
 
 
+class BaseWorker(gear.Worker):
+    nplog = logging.getLogger("nodepool.builder.BaseWorker")
+
+    def __init__(self, *args, **kw):
+        self.builder = kw.pop('builder')
+        self.running = True
+        super(BaseWorker, self).__init__(*args, **kw)
+
+    def stop(self):
+        self.running = False
+        self.stopWaitingForJobs()
+
+    def run(self):
+        while self.running:
+            try:
+                job = self.getJob()
+                self._handleJob(job)
+            except gear.InterruptedError:
+                pass
+            except Exception:
+                self.nplog.exception('Exception while getting job')
+
+
+class BuildWorker(BaseWorker):
+    nplog = logging.getLogger("nodepool.builder.BuildWorker")
+
+    def _handleJob(self, job):
+        try:
+            self.nplog.debug('Got job %s with data %s',
+                             job.name, job.arguments)
+            if job.name.startswith('image-build:'):
+                args = json.loads(job.arguments)
+                image_id = args['image-id']
+                if '/' in image_id:
+                    raise exceptions.BuilderInvalidCommandError(
+                        'Invalid image-id specified'
+                    )
+
+                image_name = job.name.split(':', 1)[1]
+                try:
+                    self.builder.buildImage(image_name, image_id)
+                except exceptions.BuilderError:
+                    self.nplog.exception('Exception while building image')
+                    job.sendWorkFail()
+                else:
+                    # We can now upload this image
+                    self.builder.registerImageId(image_id)
+                    job.sendWorkComplete(json.dumps({'image-id': image_id}))
+            else:
+                self.nplog.error('Unable to handle job %s', job.name)
+                job.sendWorkFail()
+        except Exception:
+            self.nplog.exception('Exception while running job')
+            job.sendWorkException(traceback.format_exc())
+
+
+class UploadWorker(BaseWorker):
+    nplog = logging.getLogger("nodepool.builder.UploadWorker")
+
+    def _handleJob(self, job):
+        try:
+            self.nplog.debug('Got job %s with data %s',
+                             job.name, job.arguments)
+            if self.builder.canHandleImageIdJob(job, 'image-upload'):
+                args = json.loads(job.arguments)
+                image_name = args['image-name']
+                image_id = job.name.split(':')[1]
+                try:
+                    external_id = self.builder.uploadImage(image_id,
+                                                           args['provider'],
+                                                           image_name)
+                except exceptions.BuilderError:
+                    self.nplog.exception('Exception while uploading image')
+                    job.sendWorkFail()
+                else:
+                    job.sendWorkComplete(
+                        json.dumps({'external-id': external_id})
+                    )
+            elif self.builder.canHandleImageIdJob(job, 'image-delete'):
+                image_id = job.name.split(':')[1]
+                self.builder.deleteImage(image_id)
+                self.builder.unregisterImageId(image_id)
+                job.sendWorkComplete()
+            else:
+                self.nplog.error('Unable to handle job %s', job.name)
+                job.sendWorkFail()
+        except Exception:
+            self.nplog.exception('Exception while running job')
+            job.sendWorkException(traceback.format_exc())
+
+
 class NodePoolBuilder(object):
     log = logging.getLogger("nodepool.builder")
 
@@ -84,7 +179,6 @@ class NodePoolBuilder(object):
         self._stop_running = True
         self._built_image_ids = set()
         self._start_lock = threading.Lock()
-        self._gearman_worker = None
         self._config = None
         self.statsd = stats.get_client()
 
@@ -100,25 +194,38 @@ class NodePoolBuilder(object):
             self.load_config(self._config_path)
             self._validate_config()
 
-            self._gearman_worker = self._initializeGearmanWorker(
-                self._config.gearman_servers.values())
+            self.build_workers = []
+            self.upload_workers = []
+            for i in range(BUILD_WORKERS):
+                w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
+                                builder=self)
+                self._initializeGearmanWorker(w,
+                    self._config.gearman_servers.values())
+                self.build_workers.append(w)
+            for i in range(UPLOAD_WORKERS):
+                w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
+                                 builder=self)
+                self._initializeGearmanWorker(w,
+                    self._config.gearman_servers.values())
+                self.upload_workers.append(w)
 
             self._registerGearmanFunctions(self._config.diskimages.values())
             self._registerExistingImageUploads()
 
+            self.log.debug('Starting listener for build jobs')
+
+            self.threads = []
+            for worker in self.build_workers + self.upload_workers:
+                t = threading.Thread(target=worker.run)
+                t.daemon = True
+                t.start()
+                self.threads.append(t)
+
             self._stop_running = False
             self._running = True
 
-        self.log.debug('Starting listener for build jobs')
-
-        while not self._stop_running:
-            try:
-                job = self._gearman_worker.getJob()
-                self._handleJob(job)
-            except gear.InterruptedError:
-                pass
-            except Exception:
-                self.log.exception('Exception while getting job')
+        for t in self.threads:
+            t.join()
 
         self._running = False
 
@@ -131,21 +238,23 @@ class NodePoolBuilder(object):
 
             self._stop_running = True
 
-            self._gearman_worker.stopWaitingForJobs()
+            for worker in self.build_workers + self.upload_workers:
+                worker.stop()
 
             # Wait for the builder to complete any currently running jobs
             while self._running:
                 time.sleep(1)
 
-            try:
-                self._gearman_worker.shutdown()
-            except OSError as e:
-                if e.errno == errno.EBADF:
-                    # The connection has been lost already
-                    self.log.debug("Gearman connection lost when "
-                                   "attempting to shutdown. Ignoring.")
-                else:
-                    raise
+            for worker in self.build_workers + self.upload_workers:
+                try:
+                    worker.shutdown()
+                except OSError as e:
+                    if e.errno == errno.EBADF:
+                        # The connection has been lost already
+                        self.log.debug("Gearman connection lost when "
+                                       "attempting to shutdown. Ignoring.")
+                    else:
+                        raise
 
     def load_config(self, config_path):
         config = nodepool_config.loadConfig(config_path)
@@ -160,95 +269,47 @@ class NodePoolBuilder(object):
         if not self._config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
 
-    def _initializeGearmanWorker(self, servers):
-        worker = gear.Worker('Nodepool Builder')
+    def _initializeGearmanWorker(self, worker, servers):
         for server in servers:
             worker.addServer(server.host, server.port)
 
         self.log.debug('Waiting for gearman server')
         worker.waitForServer()
-        return worker
 
     def _registerGearmanFunctions(self, images):
         self.log.debug('Registering gearman functions')
-        for image in images:
-            self._gearman_worker.registerFunction(
-                'image-build:%s' % image.name)
+        for worker in self.build_workers:
+            for image in images:
+                worker.registerFunction(
+                    'image-build:%s' % image.name)
 
     def _registerExistingImageUploads(self):
         images = DibImageFile.from_images_dir(self._config.imagesdir)
         for image in images:
-            self._registerImageId(image.image_id)
+            self.registerImageId(image.image_id)
 
-    def _registerImageId(self, image_id):
+    def registerImageId(self, image_id):
         self.log.info('Registering image id: %s', image_id)
-        self._gearman_worker.registerFunction('image-upload:%s' % image_id)
-        self._gearman_worker.registerFunction('image-delete:%s' % image_id)
+        for worker in self.upload_workers:
+            worker.registerFunction('image-upload:%s' % image_id)
+            worker.registerFunction('image-delete:%s' % image_id)
         self._built_image_ids.add(image_id)
 
-    def _unregisterImageId(self, worker, image_id):
+    def unregisterImageId(self, image_id):
         if image_id in self._built_image_ids:
             self.log.info('Unregistering image id: %s', image_id)
-            worker.unRegisterFunction('image-upload:%s' % image_id)
+            for worker in self.upload_workers:
+                worker.unRegisterFunction('image-upload:%s' % image_id)
             self._built_image_ids.remove(image_id)
         else:
             self.log.warning('Attempting to remove image %d but image not '
                              'found', image_id)
 
-    def _canHandleImageidJob(self, job, image_op):
+    def canHandleImageIdJob(self, job, image_op):
         return (job.name.startswith(image_op + ':') and
                 job.name.split(':')[1]) in self._built_image_ids
 
-    def _handleJob(self, job):
-        try:
-            self.log.debug('Got job %s with data %s',
-                           job.name, job.arguments)
-            if job.name.startswith('image-build:'):
-                args = json.loads(job.arguments)
-                image_id = args['image-id']
-                if '/' in image_id:
-                    raise exceptions.BuilderInvalidCommandError(
-                        'Invalid image-id specified'
-                    )
-
-                image_name = job.name.split(':', 1)[1]
-                try:
-                    self._buildImage(image_name, image_id)
-                except exceptions.BuilderError:
-                    self.log.exception('Exception while building image')
-                    job.sendWorkFail()
-                else:
-                    # We can now upload this image
-                    self._registerImageId(image_id)
-                    job.sendWorkComplete(json.dumps({'image-id': image_id}))
-            elif self._canHandleImageidJob(job, 'image-upload'):
-                args = json.loads(job.arguments)
-                image_name = args['image-name']
-                image_id = job.name.split(':')[1]
-                try:
-                    external_id = self._uploadImage(image_id,
-                                                    args['provider'],
-                                                    image_name)
-                except exceptions.BuilderError:
-                    self.log.exception('Exception while uploading image')
-                    job.sendWorkFail()
-                else:
-                    job.sendWorkComplete(
-                        json.dumps({'external-id': external_id})
-                    )
-            elif self._canHandleImageidJob(job, 'image-delete'):
-                image_id = job.name.split(':')[1]
-                self._deleteImage(image_id)
-                self._unregisterImageId(self._gearman_worker, image_id)
-                job.sendWorkComplete()
-            else:
-                self.log.error('Unable to handle job %s', job.name)
-                job.sendWorkFail()
-        except Exception:
-            self.log.exception('Exception while running job')
-            job.sendWorkException(traceback.format_exc())
-
-    def _deleteImage(self, image_id):
+    def deleteImage(self, image_id):
         image_files = DibImageFile.from_image_id(self._config.imagesdir,
                                                  image_id)
 
@@ -262,7 +323,7 @@ class NodePoolBuilder(object):
                 self.log.debug('No filename %s found to remove', img_path)
         self.log.info("Deleted dib image id: %s" % image_id)
 
-    def _uploadImage(self, image_id, provider_name, image_name):
+    def uploadImage(self, image_id, provider_name, image_name):
         start_time = time.time()
         timestamp = int(start_time)
 
@@ -392,7 +453,7 @@ class NodePoolBuilder(object):
                 return image
         return None
 
-    def _buildImage(self, image_name, image_id):
+    def buildImage(self, image_name, image_id):
         diskimage = self._getDiskimageByName(image_name)
         if diskimage is None:
             raise exceptions.BuilderInvalidCommandError(
