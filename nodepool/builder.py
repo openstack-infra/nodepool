@@ -176,7 +176,6 @@ class NodePoolBuilder(object):
     def __init__(self, config_path):
         self._config_path = config_path
         self._running = False
-        self._stop_running = True
         self._built_image_ids = set()
         self._start_lock = threading.Lock()
         self._config = None
@@ -221,7 +220,6 @@ class NodePoolBuilder(object):
                 t.start()
                 self.threads.append(t)
 
-            self._stop_running = False
             self._running = True
 
         for t in self.threads:
@@ -236,7 +234,6 @@ class NodePoolBuilder(object):
                 self.log.warning("Stop called when we are already stopped.")
                 return
 
-            self._stop_running = True
 
             for worker in self.build_workers + self.upload_workers:
                 worker.stop()
