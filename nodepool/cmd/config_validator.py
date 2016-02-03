@@ -72,6 +72,7 @@ class ConfigValidator:
             'networks': [v.Any(old_network, network)],
             'boot-timeout': int,
             'api-timeout': int,
+            'launch-timeout': int,
             'rate': float,
             'images': [images],
             'template-hostname': str

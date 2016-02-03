@@ -185,6 +185,7 @@ providers:
     api-timeout: 60
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
+    launch-timeout: 900
     max-servers: 2
     rate: 0.25
     images:
