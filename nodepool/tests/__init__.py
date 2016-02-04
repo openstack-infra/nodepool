@@ -309,10 +309,11 @@ class DBTestCase(BaseTestCase):
         self.useFixture(images_dir)
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
-        config = open(configfile).read()
         (fd, path) = tempfile.mkstemp()
-        os.write(fd, config.format(images_dir=images_dir.path,
-                                   gearman_port=self.gearman_server.port))
+        with open(configfile) as conf_fd:
+            config = conf_fd.read()
+            os.write(fd, config.format(images_dir=images_dir.path,
+                                       gearman_port=self.gearman_server.port))
         os.close(fd)
         return path
 
@@ -320,9 +321,10 @@ class DBTestCase(BaseTestCase):
         # replace entries in secure.conf
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', 'secure.conf')
-        config = open(configfile).read()
         (fd, path) = tempfile.mkstemp()
-        os.write(fd, config.format(dburi=self.dburi))
+        with open(configfile) as conf_fd:
+            config = conf_fd.read()
+            os.write(fd, config.format(dburi=self.dburi))
         os.close(fd)
         return path
 
