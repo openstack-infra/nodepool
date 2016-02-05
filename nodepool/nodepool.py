@@ -282,7 +282,7 @@ class GearmanClient(gear.Client):
         for connection in self.active_connections:
             try:
                 req = gear.StatusAdminRequest()
-                connection.sendAdminRequest(req)
+                connection.sendAdminRequest(req, timeout=300)
             except Exception:
                 self.__log.exception("Exception while listing functions")
                 self._lostConnection(connection)
@@ -1670,7 +1670,7 @@ class NodePool(threading.Thread):
                     gearman_job.addFailureHandler(
                         self.handleImageBuildFailed, image_id=dib_image.id)
 
-                    self.gearman_client.submitJob(gearman_job)
+                    self.gearman_client.submitJob(gearman_job, timeout=300)
                     self.log.debug("Queued image building task for %s" %
                                    image.name)
                 except Exception:
@@ -1710,7 +1710,7 @@ class NodePool(threading.Thread):
                                              snap_image_id=snap_image.id)
             self.log.debug('Submitting image-upload job uuid: %s' %
                            (job_uuid,))
-            self.gearman_client.submitJob(gearman_job)
+            self.gearman_client.submitJob(gearman_job, timeout=300)
 
             return gearman_job
         except Exception:
@@ -1955,7 +1955,7 @@ class NodePool(threading.Thread):
             )
             gearman_job.addCompletionHandler(self.handleImageDeleteComplete,
                                              image_id=dib_image.id)
-            self.gearman_client.submitJob(gearman_job)
+            self.gearman_client.submitJob(gearman_job, timeout=300)
             return gearman_job
         except Exception:
             self.log.exception('Could not submit delete job for image id %s',
