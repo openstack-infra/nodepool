@@ -150,6 +150,14 @@ class ImageUploadJob(NodepoolJob):
         finally:
             super(ImageUploadJob, self).onCompleted()
 
+    def onFailed(self):
+        try:
+            self.log.error('Image %s failed to upload.',
+                           self.snap_image_id)
+            self.nodepool.deleteImage(self.snap_image_id)
+        finally:
+            super(ImageUploadJob, self).onFailed()
+
     def onDisconnect(self):
         try:
             self.log.error('Image %s failed to upload due to gear disconnect.',

@@ -22,6 +22,7 @@ import threading
 import time
 import uuid
 
+import exceptions
 from jenkins import JenkinsException
 import shade
 
@@ -219,6 +220,11 @@ class FakeOpenStackCloud(object):
         image = self._glance_client.images.create(**kwargs)
         image.update('fake data')
         return image
+
+
+class FakeUploadFailCloud(FakeOpenStackCloud):
+    def create_image(self, **kwargs):
+        raise exceptions.BuilderError("Test fail image upload.")
 
 
 class FakeFile(StringIO.StringIO):
