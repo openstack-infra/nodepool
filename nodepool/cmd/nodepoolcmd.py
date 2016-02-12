@@ -380,7 +380,10 @@ class NodePoolCmd(object):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        self.pool.reconfigureGearmanClient(config)
+        if self.args.command in ('dib-image-delete', 'dib-image-list',
+                                 'image-build', 'image-delete',
+                                 'image-upload', 'image-update'):
+            self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
         self.args.func()
