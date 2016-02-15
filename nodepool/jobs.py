@@ -93,7 +93,6 @@ class ImageBuildJob(NodepoolJob):
                         self.image_id)
                     return
                 dib_image.state = nodedb.READY
-                session.commit()
                 self.log.debug('DIB Image %s (id %d) is ready',
                                self.name.split(':', 1)[0], self.image_id)
         finally:
