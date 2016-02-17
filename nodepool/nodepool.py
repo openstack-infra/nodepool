@@ -1423,14 +1423,19 @@ class NodePool(threading.Thread):
     def startup(self):
         self.updateConfig()
 
-        # Currently nodepool can not resume building a node after a
-        # restart.  To clean up, mark all building nodes for deletion
-        # when the daemon starts.
+        # Currently nodepool can not resume building a node or image
+        # after a restart.  To clean up, mark all building node and
+        # images for deletion when the daemon starts.
         with self.getDB().getSession() as session:
             for node in session.getNodes(state=nodedb.BUILDING):
                 self.log.info("Setting building node id: %s to delete "
                               "on startup" % node.id)
                 node.state = nodedb.DELETE
+
+            for image in session.getSnapshotImages(state=nodedb.BUILDING):
+                self.log.info("Setting building image id: %s to delete "
+                              "on startup" % image.id)
+                image.state = nodedb.DELETE
 
     def run(self):
         try:
@@ -2044,6 +2049,10 @@ class NodePool(threading.Thread):
             delete = True
             self.log.info("Deleting image id: %s which has no current "
                           "base image" % image.id)
+        elif (image.state == nodedb.DELETE):
+            delete = True
+            self.log.info("Deleting image id: %s which is in delete state "
+                          % image.id)
         else:
             images = session.getOrderedReadySnapshotImages(
                 image.provider_name, image.image_name)
