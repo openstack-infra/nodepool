@@ -483,6 +483,12 @@ class ProviderManager(TaskManager):
                         provider=self.provider.name,
                         id=resource_id,
                         status=status))
+                if status == 'ERROR' and 'fault' in resource:
+                    self.log.debug(
+                        'ERROR in {provider} on {id}: {resason}'.format(
+                            provider=self.provider.name,
+                            id=resource_id,
+                            resason=resource['fault']['message']))
             last_status = status
             if status in ['ACTIVE', 'ERROR']:
                 return resource
