@@ -28,12 +28,21 @@ import sys
 import shade
 import novaclient
 
+import exceptions
 from nodeutils import iterate_timeout
 from task_manager import Task, TaskManager, ManagerStoppedException
 
 
 SERVER_LIST_AGE = 5   # How long to keep a cached copy of the server list
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
+
+
+class ServerCreateException(exceptions.TimeoutException):
+    statsd_key = 'error.servertimeout'
+
+
+class ImageCreateException(exceptions.TimeoutException):
+    statsd_key = 'error.imagetimeout'
 
 
 def get_public_ip(server, provider, version=4):
@@ -456,10 +465,12 @@ class ProviderManager(TaskManager):
 
     def _waitForResource(self, resource_type, resource_id, timeout):
         last_status = None
-        for count in iterate_timeout(timeout,
-                                     "%s %s in %s" % (resource_type,
-                                                      resource_id,
-                                                      self.provider.name)):
+        if resource_type == 'server':
+            exc = ServerCreateException
+        elif resource_type == 'image':
+            exc = ImageCreateException
+        for count in iterate_timeout(timeout, exc,
+                                     "%s creation" % resource_type):
             try:
                 if resource_type == 'server':
                     resource = self.getServerFromList(resource_id)
@@ -497,8 +508,9 @@ class ProviderManager(TaskManager):
         return self._waitForResource('server', server_id, timeout)
 
     def waitForServerDeletion(self, server_id, timeout=600):
-        for count in iterate_timeout(600, "server %s deletion in %s" %
-                                     (server_id, self.provider.name)):
+        for count in iterate_timeout(600,
+                                     exceptions.ServerDeleteException,
+                                     "server %s deletion " % server_id):
             try:
                 self.getServerFromList(server_id)
             except NotFound:
@@ -528,8 +540,9 @@ class ProviderManager(TaskManager):
             # from removing this IP.
             self.deleteFloatingIP(ip['id'])
             raise
-        for count in iterate_timeout(600, "ip to be added to %s in %s" %
-                                     (server_id, self.provider.name)):
+        for count in iterate_timeout(600,
+                                     exceptions.IPAddTimeoutException,
+                                     "ip to be added to %s" % server_id):
             try:
                 newip = self.getFloatingIP(ip['id'])
             except ManagerStoppedException:

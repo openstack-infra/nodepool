@@ -34,6 +34,7 @@ import zmq
 import allocation
 import jenkins_manager
 import nodedb
+import exceptions
 import nodeutils as utils
 import provider_manager
 import stats
@@ -407,6 +408,19 @@ class NodeLauncher(threading.Thread):
                 dt = self.launchNode(session)
                 failed = False
                 statsd_key = 'ready'
+                self.log.debug('Node %s ready in provider: %s' %
+                               (self.node_id, self.provider.name))
+            except exceptions.TimeoutException as e:
+                # Don't log exception for timeouts. Each one has
+                # a specific Exception, and we know it's a timeout, so
+                # the traceback in the log is just noise
+                self.log.error("Timeout launching node id: %s "
+                                   "in provider: %s error: %s" %
+                                   (self.node_id, self.provider.name,
+                                    str(e)))
+                dt = int((time.time() - start_time) * 1000)
+                failed = True
+                statsd_key = e.statsd_key
             except Exception as e:
                 self.log.exception("%s launching node id: %s "
                                    "in provider: %s error:" %

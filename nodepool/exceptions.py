@@ -23,3 +23,19 @@ class BuilderInvalidCommandError(BuilderError):
 
 class DibFailedError(BuilderError):
     pass
+
+
+class TimeoutException(Exception):
+    pass
+
+
+class SSHTimeoutException(TimeoutException):
+    statsd_key = 'error.ssh'
+
+
+class IPAddTimeoutException(TimeoutException):
+    statsd_key = 'error.ipadd'
+
+
+class ServerDeleteException(TimeoutException):
+    statsd_key = 'error.serverdelete'
