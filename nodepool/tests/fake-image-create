@@ -41,13 +41,23 @@ fi
 outfile=
 outtypes=("qcow2")
 
-TEMP=$(getopt -o o:t: -- "$@")
+TEMP=$(getopt -o xo:t: --long qemu-img-options:,no-tmpfs -- "$@")
+if [ $? -ne 0 ]; then
+    echo "Invalid option"
+    exit 1
+fi
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
+        --no-tmpfs)
+            echo " -> set --no-tmpfs"; shift 1;;
+        --qemu-img-options)
+            echo " -> qemu-img-options: $2"; shift 2;;
         -o) outfile=$2; shift 2;;
         -t) IFS="," read -a outtypes <<< "$2"; shift 2;;
+        -x) echo " -> debugging enabled"; shift;;
         --) shift ; break ;;
+        *) echo "Unknown option : $1"; exit 1;;
     esac
 done
 
