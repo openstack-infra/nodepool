@@ -18,6 +18,7 @@ import time
 import threading
 
 import fixtures
+import kazoo.client
 
 from nodepool import builder, exceptions, fakeprovider, tests
 
@@ -147,3 +148,9 @@ class TestNodepoolBuilder(tests.DBTestCase):
                     # We failed to upload first_fail_id and have
                     # moved onto another upload that will fail.
                     break
+
+class TestZookeeper(tests.ZKTestCase):
+    def test_zk(self):
+        zk = kazoo.client.KazooClient(hosts='127.0.0.1:%s' % self.zookeeper_port)
+        zk.start()
+        zk.get('/')

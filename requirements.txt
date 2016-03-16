@@ -19,3 +19,4 @@ os-client-config>=1.2.0
 shade>=0.12.0
 diskimage-builder
 voluptuous
+kazoo
