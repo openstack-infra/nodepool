@@ -33,6 +33,7 @@ import threading
 import nodepool.builder
 import nodepool.cmd
 import nodepool.nodepool
+import nodepool.webapp
 
 
 def stack_dump_handler(signum, frame):
@@ -110,6 +111,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.pool.stop()
         if self.args.builder:
             self.builder.stop()
+        self.webapp.stop()
         sys.exit(0)
 
     def term_handler(self, signum, frame):
@@ -124,6 +126,8 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
                 self.args.config, self.args.build_workers,
                 self.args.upload_workers)
 
+        self.webapp = nodepool.webapp.WebApp(self.pool)
+
         signal.signal(signal.SIGINT, self.exit_handler)
         # For back compatibility:
         signal.signal(signal.SIGUSR1, self.exit_handler)
@@ -135,6 +139,8 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         if self.args.builder:
             nb_thread = threading.Thread(target=self.builder.runForever)
             nb_thread.start()
+
+        self.webapp.start()
 
         while True:
             signal.pause()

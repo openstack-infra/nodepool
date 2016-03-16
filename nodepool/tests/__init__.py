@@ -34,7 +34,7 @@ import kazoo.client
 import testresources
 import testtools
 
-from nodepool import allocation, builder, fakeprovider, nodepool, nodedb
+from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -338,6 +338,9 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
                 if t.name.startswith("Thread-"):
                     # apscheduler thread pool
                     continue
+                if t.name.startswith("worker "):
+                    # paste web server
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
@@ -515,6 +518,11 @@ class DBTestCase(BaseTestCase):
         pool = nodepool.NodePool(*args, **kwargs)
         self.addCleanup(pool.stop)
         return pool
+
+    def useWebApp(self, *args, **kwargs):
+        app = webapp.WebApp(*args, **kwargs)
+        self.addCleanup(app.stop)
+        return app
 
     def _useBuilder(self, configfile):
         self.useFixture(BuilderFixture(configfile))

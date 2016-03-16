@@ -21,6 +21,7 @@ import time
 
 from nodepool import nodedb
 from nodepool import nodepool
+from nodepool import status
 from nodepool.cmd import NodepoolApp
 from nodepool.version import version_info as npc_version_info
 from config_validator import ConfigValidator
@@ -177,47 +178,13 @@ class NodePoolCmd(NodepoolApp):
                                        '%(message)s')
 
     def list(self, node_id=None):
-        t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Manager",
-                         "Hostname", "NodeName", "Server ID", "IP", "State",
-                         "Age", "Comment"])
-        t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for node in session.getNodes():
-                if node_id and node.id != node_id:
-                    continue
-                t.add_row([node.id, node.provider_name, node.az,
-                           node.label_name, node.target_name,
-                           node.manager_name, node.hostname,
-                           node.nodename, node.external_id, node.ip,
-                           nodedb.STATE_NAMES[node.state],
-                           NodePoolCmd._age(node.state_time),
-                           node.comment])
-            print t
+        print status.node_list(self.pool.getDB(), node_id)
 
     def dib_image_list(self):
-        t = PrettyTable(["ID", "Image", "Filename", "Version",
-                         "State", "Age"])
-        t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for image in session.getDibImages():
-                t.add_row([image.id, image.image_name,
-                           image.filename, image.version,
-                           nodedb.STATE_NAMES[image.state],
-                           NodePoolCmd._age(image.state_time)])
-            print t
+        print status.dib_image_list(self.pool.getDB())
 
     def image_list(self):
-        t = PrettyTable(["ID", "Provider", "Image", "Hostname", "Version",
-                         "Image ID", "Server ID", "State", "Age"])
-        t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for image in session.getSnapshotImages():
-                t.add_row([image.id, image.provider_name, image.image_name,
-                           image.hostname, image.version,
-                           image.external_id, image.server_external_id,
-                           nodedb.STATE_NAMES[image.state],
-                           NodePoolCmd._age(image.state_time)])
-            print t
+        print status.image_list(self.pool.getDB())
 
     def image_update(self):
         threads = []

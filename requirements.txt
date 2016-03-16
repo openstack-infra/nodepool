@@ -19,3 +19,5 @@ shade>=1.8.0
 diskimage-builder
 voluptuous
 kazoo
+Paste
+WebOb>=1.2.3
