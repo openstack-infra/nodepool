@@ -84,12 +84,7 @@ class BaseWorker(gear.Worker):
 
     def __init__(self, *args, **kw):
         self.builder = kw.pop('builder')
-        self.running = True
         super(BaseWorker, self).__init__(*args, **kw)
-
-    def stop(self):
-        self.running = False
-        self.stopWaitingForJobs()
 
     def run(self):
         while self.running:
@@ -229,18 +224,10 @@ class NodePoolBuilder(object):
 
     def stop(self):
         with self._start_lock:
-            self.log.debug('Stopping')
+            self.log.debug('Stopping.')
             if not self._running:
-                self.log.warning("Stop called when we are already stopped.")
+                self.log.warning("Stop called when already stopped")
                 return
-
-
-            for worker in self.build_workers + self.upload_workers:
-                worker.stop()
-
-            # Wait for the builder to complete any currently running jobs
-            while self._running:
-                time.sleep(1)
 
             for worker in self.build_workers + self.upload_workers:
                 try:
@@ -249,9 +236,18 @@ class NodePoolBuilder(object):
                     if e.errno == errno.EBADF:
                         # The connection has been lost already
                         self.log.debug("Gearman connection lost when "
-                                       "attempting to shutdown. Ignoring.")
+                                       "attempting to shutdown; ignoring")
                     else:
                         raise
+
+            self.log.debug('Waiting for jobs to complete')
+            # Wait for the builder to complete any currently running jobs
+            while self._running:
+                time.sleep(1)
+
+            self.log.debug('Stopping providers')
+            provider_manager.ProviderManager.stopProviders(self._config)
+            self.log.debug('Finished stopping')
 
     def load_config(self, config_path):
         config = nodepool_config.loadConfig(config_path)

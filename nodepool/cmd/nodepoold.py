@@ -104,6 +104,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.pool.stop()
         if self.args.builder:
             self.builder.stop()
+        sys.exit(0)
 
     def term_handler(self, signum, frame):
         os._exit(0)

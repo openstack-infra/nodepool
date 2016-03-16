@@ -1100,17 +1100,25 @@ class NodePool(threading.Thread):
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
         self._image_build_jobs = JobTracker()
+        self._wake_condition = threading.Condition()
 
     def stop(self):
         self._stopped = True
+        self._wake_condition.acquire()
+        self._wake_condition.notify()
+        self._wake_condition.release()
         if self.config:
             for z in self.config.zmq_publishers.values():
                 z.listener.stop()
                 z.listener.join()
+            provider_manager.ProviderManager.stopProviders(self.config)
         if self.zmq_context:
             self.zmq_context.destroy()
         if self.apsched and self.apsched.running:
             self.apsched.shutdown()
+        if self.gearman_client:
+            self.gearman_client.shutdown()
+        self.log.debug("finished stopping")
 
     def waitForBuiltImages(self):
         self.log.debug("Waiting for images to complete building.")
@@ -1475,7 +1483,9 @@ class NodePool(threading.Thread):
                     self._run(session, allocation_history)
             except Exception:
                 self.log.exception("Exception in main loop:")
-            time.sleep(self.watermark_sleep)
+            self._wake_condition.acquire()
+            self._wake_condition.wait(self.watermark_sleep)
+            self._wake_condition.release()
 
     def _run(self, session, allocation_history):
         self.checkForMissingImages(session)

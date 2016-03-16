@@ -85,6 +85,12 @@ class ProviderManager(TaskManager):
         for stop_manager in stop_managers:
             stop_manager.stop()
 
+    @staticmethod
+    def stopProviders(config):
+        for m in config.provider_managers.values():
+            m.stop()
+            m.join()
+
     def __init__(self, provider):
         super(ProviderManager, self).__init__(None, provider.name,
                                               provider.rate)
