@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import os
 import os.path
@@ -1057,15 +1056,15 @@ class NodeCleanupWorker(threading.Thread):
             known = set([n.external_id for n in zk_conn.nodeIterator() if n.provider == provider.name])
 
             for server in servers:
-                meta = server.get('metadata', {}).get('nodepool')
-                if not meta:
+                meta = server.get('metadata', {})
+
+                if 'nodepool_provider_name' not in meta:
                     self.log.debug(
-                        "Instance %s (%s) in %s has no nodepool metadata",
+                        "Instance %s (%s) in %s has no nodepool_provider_name",
                         server.name, server.id, provider.name)
                     continue
 
-                meta = json.loads(meta)
-                if meta['provider_name'] != provider.name:
+                if meta['nodepool_provider_name'] != provider.name:
                     # Another launcher, sharing this provider but configured
                     # with a different name, owns this.
                     continue
