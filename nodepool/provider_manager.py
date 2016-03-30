@@ -31,59 +31,6 @@ from task_manager import TaskManager, ManagerStoppedException
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 
 
-def get_public_ip(server, provider, version=4):
-    for addr in server.addresses.get('public', []):
-        if type(addr) == type(u''):  # Rackspace/openstack 1.0
-            return addr
-        if addr['version'] == version:  # Rackspace/openstack 1.1
-            return addr['addr']
-    for addr in server.addresses.get('private', []):
-        # HPcloud
-        if (addr['version'] == version and version == 4):
-            quad = map(int, addr['addr'].split('.'))
-            if quad[0] == 10:
-                continue
-            if quad[0] == 192 and quad[1] == 168:
-                continue
-            if quad[0] == 172 and (16 <= quad[1] <= 31):
-                continue
-            return addr['addr']
-    for addr in server.addresses.get('Ext-Net', []):
-        if addr['version'] == version:  # OVH
-            return addr['addr']
-    if provider.use_neutron:  # Internap
-        for network in provider.networks:
-            if network.public and network.name:
-                for addr in server.addresses.get(network.name, []):
-                    if addr['version'] == version:
-                        return addr['addr']
-    return None
-
-
-def get_private_ip(server):
-    ret = []
-    for (name, network) in server.addresses.iteritems():
-        if name == 'private':
-            ret.extend([addrs['addr']
-                        for addrs in network if addrs['version'] == 4])
-        else:
-            for interface_spec in network:
-                if interface_spec['version'] != 4:
-                    continue
-                if ('OS-EXT-IPS:type' in interface_spec
-                        and interface_spec['OS-EXT-IPS:type'] == 'fixed'):
-                    ret.append(interface_spec['addr'])
-    if not ret:
-        if server.status == 'ACTIVE':
-            # Server expected to have at least one address in ACTIVE status
-            # TODO: uncomment this code when all nodes have private IPs
-            # raise KeyError('No private ip found for server')
-            return None
-        else:
-            return None
-    return ret[0]
-
-
 def make_image_dict(image):
     d = dict(id=str(image.id), name=image.name, status=image.status,
              metadata=image.metadata)
