@@ -409,7 +409,8 @@ provider, the Nodepool image types are also defined (see
     Specify custom Neutron networks that get attached to each
     node. Specify the ``name`` of the network (a string) and if the
     network routes to the Internet, set the boolean ``public`` to
-    true.
+    true. If the network should be the target of floating IP NAT, set
+    ``nat_destination`` to true.
 
   ``ipv6-preferred``
     If it is set to True, nodepool will try to find ipv6 in public net first
