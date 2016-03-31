@@ -234,6 +234,10 @@ EOF
     cp /etc/openstack/clouds.yaml /tmp
     cat >>/tmp/clouds.yaml <<EOF
 cache:
+  max_age: 3600
+  class: dogpile.cache.dbm
+  arguments:
+    filename: $HOME/.cache/openstack/shade.dbm
   expiration:
     server: 5
     port: 5
