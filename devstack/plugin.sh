@@ -231,6 +231,15 @@ diskimages:
 EOF
 
     sudo mv /tmp/nodepool.yaml $NODEPOOL_CONFIG
+    cp /etc/openstack/clouds.yaml /tmp
+    cat >>/tmp/clouds.yaml <<EOF
+cache:
+  expiration:
+    server: 5
+    port: 5
+EOF
+    sudo mv /tmp/clouds.yaml /etc/openstack/clouds.yaml
+    mkdir -p $HOME/.cache/openstack/
 }
 
 # Initialize database
