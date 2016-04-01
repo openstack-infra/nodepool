@@ -311,9 +311,12 @@ class NodeDatabaseSession(object):
             self.session().query(SnapshotImage).distinct(
                 snapshot_image_table.c.provider_name).all()]
 
-    def getDibImages(self):
-        return self.session().query(DibImage).order_by(
-            dib_image_table.c.image_name).all()
+    def getDibImages(self, state=None):
+        exp = self.session().query(DibImage).order_by(
+            dib_image_table.c.image_name)
+        if state:
+            exp = exp.filter(dib_image_table.c.state == state)
+        return exp.all()
 
     def getImages(self, provider_name):
         return [
