@@ -320,8 +320,10 @@ class ProviderManager(TaskManager):
         if not server:
             raise NotFound()
 
-        with shade_inner_exceptions():
-            self._client.delete_keypair(name=server['key_name'])
+        key_name = server.get('key_name')
+        if key_name and key_name != self.provider.keypair:
+            with shade_inner_exceptions():
+                self._client.delete_keypair(name=server['key_name'])
 
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
