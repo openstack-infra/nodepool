@@ -154,7 +154,8 @@ class ImageUploadJob(NodepoolJob):
         try:
             self.log.error('Image %s failed to upload.',
                            self.snap_image_id)
-            self.nodepool.deleteImage(self.snap_image_id)
+            t = self.nodepool.deleteImage(self.snap_image_id)
+            t.join()
         finally:
             super(ImageUploadJob, self).onFailed()
 
