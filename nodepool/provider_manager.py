@@ -176,18 +176,17 @@ class ProviderManager(TaskManager):
             create_args['key_name'] = key_name
         if az:
             create_args['availability_zone'] = az
-        if self.provider.use_neutron:
-            nics = []
-            for network in self.provider.networks:
-                if network.id:
-                    nics.append({'net-id': network.id})
-                elif network.name:
-                    net_id = self.findNetwork(network.name)['id']
-                    nics.append({'net-id': net_id})
-                else:
-                    raise Exception("Invalid 'networks' configuration.")
-            if nics:
-                create_args['nics'] = nics
+        nics = []
+        for network in self.provider.networks:
+            if network.id:
+                nics.append({'net-id': network.id})
+            elif network.name:
+                net_id = self.findNetwork(network.name)['id']
+                nics.append({'net-id': net_id})
+            else:
+                raise Exception("Invalid 'networks' configuration.")
+        if nics:
+            create_args['nics'] = nics
         # Put provider.name and image_name in as groups so that ansible
         # inventory can auto-create groups for us based on each of those
         # qualities

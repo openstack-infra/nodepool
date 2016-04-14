@@ -25,7 +25,6 @@ class Provider(ConfigValue):
             other.api_timeout != self.api_timeout or
             other.boot_timeout != self.boot_timeout or
             other.launch_timeout != self.launch_timeout or
-            other.use_neutron != self.use_neutron or
             other.networks != self.networks or
             other.ipv6_preferred != self.ipv6_preferred or
             other.azs != self.azs):
@@ -150,7 +149,6 @@ def loadConfig(config_path):
         p.api_timeout = provider.get('api-timeout')
         p.boot_timeout = provider.get('boot-timeout', 60)
         p.launch_timeout = provider.get('launch-timeout', 3600)
-        p.use_neutron = bool(provider.get('networks', ()))
         p.networks = []
         for network in provider.get('networks', []):
             n = Network()
@@ -165,6 +163,7 @@ def loadConfig(config_path):
                 n.name = network.get('name')
                 n.id = None
             n.public = network.get('public', False)
+            n.nat_destination = network.get('nat_destination', False)
         p.ipv6_preferred = provider.get('ipv6-preferred')
         p.azs = provider.get('availability-zones')
         p.template_hostname = provider.get(
@@ -312,6 +311,22 @@ def _cloudKwargsFromProvider(provider):
         cloud_kwargs['compute-service-type'] = provider['service-type']
     if 'service-name' in provider:
         cloud_kwargs['compute-service-name'] = provider['service-name']
+
+    if 'networks' in provider:
+        networks = []
+        for network in provider.get('networks', []):
+            if 'net-id' in network:
+                name_or_id = network['net-id']
+            elif 'net-label' in network:
+                name_or_id = network['net-label']
+            else:
+                name_or_id = network.get('name')
+            external = network.get('public', False)
+            nat_destination = network.get('nat_destination', False)
+            networks.append(dict(
+                name=name_or_id, routes_externally=external,
+                nat_destination=nat_destination))
+        cloud_kwargs['networks'] = networks
 
     auth_kwargs = {}
     for auth_key in (
