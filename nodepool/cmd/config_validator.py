@@ -51,7 +51,6 @@ class ConfigValidator:
         network = {
             'name': v.Required(str),
             'public': bool,
-            'nat_destination': bool,
         }
 
         providers = {
