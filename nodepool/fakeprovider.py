@@ -190,7 +190,7 @@ class FakeOpenStackCloud(object):
             self._image_list, instance_type=Dummy.IMAGE,
             name=image_name, **metadata)
 
-    def list_flavors(self):
+    def list_flavors(self, get_extra=False):
         return self._flavor_list
 
     def create_keypair(self, name, public_key):

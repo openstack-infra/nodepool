@@ -303,7 +303,7 @@ class ProviderManager(TaskManager):
 
     def listFlavors(self):
         with shade_inner_exceptions():
-            return self._client.list_flavors()
+            return self._client.list_flavors(get_extra=False)
 
     def listServers(self):
         # shade list_servers carries the nodepool server list caching logic
