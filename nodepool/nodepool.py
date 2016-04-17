@@ -504,6 +504,11 @@ class NodeLauncher(threading.Thread):
             raise LaunchNetworkException("Unable to find public IP of server")
 
         self.node.ip_private = server.get('private_v4')
+        # devstack-gate multi-node depends on private_v4 being populated
+        # with something. On clouds that don't have a private address, use
+        # the public.
+        if not self.node.ip_private:
+            self.node.ip_private = server.get('public_v4')
         self.node.ip = ip
         self.log.debug("Node id: %s is running, ipv4: %s, ipv6: %s" %
                        (self.node.id, server.get('public_v4'),
@@ -794,6 +799,11 @@ class SubNodeLauncher(threading.Thread):
             raise LaunchNetworkException("Unable to find public IP of server")
 
         self.subnode.ip_private = server.get('private_v4')
+        # devstack-gate multi-node depends on private_v4 being populated
+        # with something. On clouds that don't have a private address, use
+        # the public.
+        if not self.subnode.ip_private:
+            self.subnode.ip_private = server.get('public_v4')
         self.subnode.ip = ip
         self.log.debug("Subnode id: %s for node id: %s is running, "
                        "ipv4: %s, ipv6: %s" %
