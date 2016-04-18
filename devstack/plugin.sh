@@ -162,6 +162,7 @@ zmq-publishers: []
 # this does not need to be a jenkins target.
 targets:
   - name: dummy
+    assign-via-gearman: True
 
 cron:
   cleanup: '*/1 * * * *'

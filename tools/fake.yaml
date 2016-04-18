@@ -49,4 +49,5 @@ providers:
         setup: prepare_node_devstack.sh
 
 targets:
-  - name: fake-jenkins
+  - name: zuul
+    assign-via-gearman: True

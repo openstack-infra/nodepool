@@ -561,6 +561,10 @@ class NodeLauncher(threading.Thread):
             self.createJenkinsNode()
             self.log.info("Node id: %s added to jenkins" % self.node.id)
 
+        if self.target.assign_via_gearman:
+            self.log.info("Node id: %s assigning via gearman" % self.node.id)
+            self.assignViaGearman()
+
         return dt
 
     def createJenkinsNode(self):
@@ -584,6 +588,24 @@ class NodeLauncher(threading.Thread):
         if self.target.jenkins_test_job:
             params = dict(NODE=self.node.nodename)
             jenkins.startBuild(self.target.jenkins_test_job, params)
+
+    def assignViaGearman(self):
+        args = dict(name=self.node.nodename,
+                    host=self.node.ip,
+                    description='Dynamic single use %s node' % self.label.name,
+                    labels=self.label.name,
+                    root=self.image.user_home)
+        job = jobs.NodeAssignmentJob(self.node.id, self.node.target_name,
+                                     args, self.nodepool)
+        self.nodepool.gearman_client.submitJob(job, timeout=300)
+        job.waitForCompletion()
+        self.log.info("Node id: %s received %s from assignment" % (
+            self.node.id, job.data))
+        if job.failure:
+            raise Exception("Node id: %s received job failure on assignment" %
+                            self.node.id)
+        data = json.loads(job.data[-1])
+        self.node.manager_name = data['manager']
 
     def writeNodepoolInfo(self, nodelist):
         key = paramiko.RSAKey.generate(2048)

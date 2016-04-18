@@ -155,8 +155,8 @@ class NodePoolCmd(object):
                                        '%(message)s')
 
     def list(self, node_id=None):
-        t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Hostname",
-                         "NodeName", "Server ID", "IP", "State",
+        t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target", "Manager",
+                         "Hostname", "NodeName", "Server ID", "IP", "State",
                          "Age"])
         t.align = 'l'
         with self.pool.getDB().getSession() as session:
@@ -164,7 +164,8 @@ class NodePoolCmd(object):
                 if node_id and node.id != node_id:
                     continue
                 t.add_row([node.id, node.provider_name, node.az,
-                           node.label_name, node.target_name, node.hostname,
+                           node.label_name, node.target_name,
+                           node.manager_name, node.hostname,
                            node.nodename, node.external_id, node.ip,
                            nodedb.STATE_NAMES[node.state],
                            NodePoolCmd._age(node.state_time)])

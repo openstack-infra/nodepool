@@ -175,3 +175,12 @@ class ImageDeleteJob(NodepoolJob):
         self.image_id = image_id
         job_name = 'image-delete:%s' % image_id
         super(ImageDeleteJob, self).__init__(job_name, '', nodepool)
+
+
+class NodeAssignmentJob(NodepoolJob):
+    log = logging.getLogger("jobs.NodeAssignmentJob")
+
+    def __init__(self, node_id, target_name, data, nodepool):
+        self.node_id = node_id
+        job_name = 'node-assign:%s' % target_name
+        super(NodeAssignmentJob, self).__init__(job_name, data, nodepool)

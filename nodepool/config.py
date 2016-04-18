@@ -278,6 +278,8 @@ def loadConfig(config_path):
         t.jenkins_apikey = None
         t.jenkins_credentials_id = None
 
+        t.assign_via_gearman = target.get('assign-via-gearman', False)
+
         t.hostname = target.get(
             'hostname',
             '{label.name}-{provider.name}-{node_id}'

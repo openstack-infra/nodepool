@@ -87,6 +87,7 @@ node_table = Table(
     Column('provider_name', String(255), index=True, nullable=False),
     Column('label_name', String(255), index=True, nullable=False),
     Column('target_name', String(255), index=True, nullable=False),
+    Column('manager_name', String(255)),
     # Machine name
     Column('hostname', String(255), index=True),
     # Eg, jenkins node name
@@ -183,10 +184,11 @@ class SnapshotImage(object):
 class Node(object):
     def __init__(self, provider_name, label_name, target_name, az,
                  hostname=None, external_id=None, ip=None, ip_private=None,
-                 state=BUILDING):
+                 manager_name=None, state=BUILDING):
         self.provider_name = provider_name
         self.label_name = label_name
         self.target_name = target_name
+        self.manager_name = manager_name
         self.external_id = external_id
         self.az = az
         self.ip = ip
