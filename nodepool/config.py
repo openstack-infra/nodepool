@@ -47,6 +47,7 @@ class Provider(ConfigValue):
             other.launch_timeout != self.launch_timeout or
             other.networks != self.networks or
             other.ipv6_preferred != self.ipv6_preferred or
+            other.clean_floating_ips != self.clean_floating_ips or
             other.azs != self.azs):
             return False
         new_images = other.images
@@ -184,6 +185,7 @@ def loadConfig(config_path):
                 n.id = None
             n.public = network.get('public', False)
         p.ipv6_preferred = provider.get('ipv6-preferred')
+        p.clean_floating_ips = provider.get('clean_floating_ips')
         p.azs = provider.get('availability-zones')
         p.template_hostname = provider.get(
             'template-hostname',

@@ -342,6 +342,10 @@ class ProviderManager(TaskManager):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
+    def cleanupLeakedFloaters(self):
+        with shade_inner_exceptions():
+            self._client.delete_unattached_floating_ips()
+
 
 class FakeProviderManager(ProviderManager):
     def __init__(self, provider):

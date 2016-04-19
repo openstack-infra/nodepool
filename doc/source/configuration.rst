@@ -440,6 +440,11 @@ provider, the Nodepool image types are also defined (see
   ``rate``
     In seconds. Default 1.0.
 
+  ``clean-floating-ips``
+    If it is set to True, nodepool will assume it is the only user of the
+    OpenStack project and will attempt to clean unattached floating ips that
+    may have leaked around restarts.
+
 .. _images:
 
 images
