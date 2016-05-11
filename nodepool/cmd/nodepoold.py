@@ -96,6 +96,10 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
                             default='/var/run/nodepool/nodepool.pid')
         parser.add_argument('--no-builder', dest='builder',
                             action='store_false')
+        parser.add_argument('--build-workers', dest='build_workers',
+                            default=1, help='number of build workers')
+        parser.add_argument('--upload-workers', dest='upload_workers',
+                            default=4, help='number of upload workers')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
         self.args = parser.parse_args()
@@ -114,7 +118,9 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
                                                self.args.config)
         if self.args.builder:
-            self.builder = nodepool.builder.NodePoolBuilder(self.args.config)
+            self.builder = nodepool.builder.NodePoolBuilder(
+                self.args.config, self.args.build_workers,
+                self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.exit_handler)
         # For back compatibility:

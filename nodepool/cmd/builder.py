@@ -47,11 +47,17 @@ class NodePoolBuilder(nodepool.cmd.NodepoolApp):
                                     'nodepool-builder.pid')
         parser.add_argument('-d', dest='nodaemon', action='store_true',
                             help='do not run as a daemon')
+        parser.add_argument('--build-workers', dest='build_workers',
+                            default=1, help='number of build workers')
+        parser.add_argument('--upload-workers', dest='upload_workers',
+                            default=4, help='number of upload workers')
         self.args = parser.parse_args()
 
     def main(self):
         self.setup_logging()
-        self.nb = builder.NodePoolBuilder(self.args.config)
+        self.nb = builder.NodePoolBuilder(
+            self.args.config, self.args.build_workers,
+            self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
 
