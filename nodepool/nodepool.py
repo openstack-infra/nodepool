@@ -2083,6 +2083,8 @@ class NodePool(threading.Thread):
                                              server['name'], server['id'],
                                              provider.name))
                         continue
+            if provider.clean_floating_ips:
+                manager.cleanupLeakedFloaters()
 
     def cleanupOneNode(self, session, node):
         now = time.time()
