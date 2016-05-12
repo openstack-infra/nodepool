@@ -97,9 +97,11 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('--no-builder', dest='builder',
                             action='store_false')
         parser.add_argument('--build-workers', dest='build_workers',
-                            default=1, help='number of build workers')
+                            default=1, help='number of build workers',
+                            type=int)
         parser.add_argument('--upload-workers', dest='upload_workers',
-                            default=4, help='number of upload workers')
+                            default=4, help='number of upload workers',
+                            type=int)
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
         self.args = parser.parse_args()

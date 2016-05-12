@@ -48,9 +48,11 @@ class NodePoolBuilder(nodepool.cmd.NodepoolApp):
         parser.add_argument('-d', dest='nodaemon', action='store_true',
                             help='do not run as a daemon')
         parser.add_argument('--build-workers', dest='build_workers',
-                            default=1, help='number of build workers')
+                            default=1, help='number of build workers',
+                            type=int)
         parser.add_argument('--upload-workers', dest='upload_workers',
-                            default=4, help='number of upload workers')
+                            default=4, help='number of upload workers',
+                            type=int)
         self.args = parser.parse_args()
 
     def main(self):
