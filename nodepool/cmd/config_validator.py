@@ -76,7 +76,8 @@ class ConfigValidator:
             'launch-timeout': int,
             'rate': float,
             'images': [images],
-            'template-hostname': str
+            'template-hostname': str,
+            'clean-floating-ips': bool,
         }
 
         labels = {

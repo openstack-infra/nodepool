@@ -432,6 +432,7 @@ providers:
     boot-timeout: 120
     max-servers: 0
     rate: 0.1
+    clean-floating-ips: true
     images:
       - name: devstack-precise-check
         base-image: 'Ubuntu Server 12.04.5 LTS (amd64 20150127) - Partner Image'
