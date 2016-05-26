@@ -95,6 +95,7 @@ class ConfigValidator:
             'name': str,
             'hostname': str,
             'subnode-hostname': str,
+            'assign-via-gearman': bool,
             'jenkins': {
                 'url': str,
                 'user': str,

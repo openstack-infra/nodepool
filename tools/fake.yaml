@@ -42,7 +42,6 @@ providers:
         name-filter: 'Fake'
         setup: prepare_node_devstack.sh
       - name: multi-fake
-        subnodes: 2
         base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
