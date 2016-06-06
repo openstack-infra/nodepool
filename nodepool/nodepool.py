@@ -434,10 +434,12 @@ class NodeLauncher(threading.Thread):
                     statsd_key = 'error.unknown'
 
             try:
+
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
                                           self.provider.name,
                                           self.target.name,
-                                          self.node.az)
+                                          self.node.az,
+                                          self.node.manager_name)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
@@ -698,7 +700,8 @@ class SubNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.SubNodeLauncher")
 
     def __init__(self, nodepool, provider, label, subnode_id,
-                 node_id, node_target_name, timeout, launch_timeout, node_az):
+                 node_id, node_target_name, timeout, launch_timeout, node_az,
+                 manager_name):
         threading.Thread.__init__(self, name='SubNodeLauncher for %s'
                                   % subnode_id)
         self.provider = provider
@@ -711,6 +714,7 @@ class SubNodeLauncher(threading.Thread):
         self.nodepool = nodepool
         self.launch_timeout = launch_timeout
         self.node_az = node_az
+        self.manager_name = manager_name
 
     def run(self):
         try:
@@ -752,7 +756,8 @@ class SubNodeLauncher(threading.Thread):
                 self.nodepool.launchStats(statsd_key, dt, self.image.name,
                                           self.provider.name,
                                           self.node_target_name,
-                                          self.node_az)
+                                          self.node_az,
+                                          self.manager_name)
             except Exception:
                 self.log.exception("Exception reporting launch stats:")
 
@@ -1783,7 +1788,7 @@ class NodePool(threading.Thread):
         subnode = session.createSubNode(node)
         t = SubNodeLauncher(self, provider, label, subnode.id,
                             node.id, node.target_name, timeout, launch_timeout,
-                            node_az=node.az)
+                            node_az=node.az, manager_name=node.manager_name)
         t.start()
 
     def deleteSubNode(self, subnode, manager):
@@ -2266,23 +2271,33 @@ class NodePool(threading.Thread):
             self.statsd.gauge(key, provider.max_servers)
 
     def launchStats(self, subkey, dt, image_name,
-                    provider_name, target_name, node_az):
+                    provider_name, target_name, node_az, manager_name):
         if not self.statsd:
             return
         #nodepool.launch.provider.PROVIDER.subkey
         #nodepool.launch.image.IMAGE.subkey
-        #nodepool.launch.target.TARGET.subkey
         #nodepool.launch.subkey
         keys = [
             'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
             'nodepool.launch.image.%s.%s' % (image_name, subkey),
-            'nodepool.launch.target.%s.%s' % (target_name, subkey),
             'nodepool.launch.%s' % (subkey,),
             ]
         if node_az:
             #nodepool.launch.provider.PROVIDER.AZ.subkey
             keys.append('nodepool.launch.provider.%s.%s.%s' %
                         (provider_name, node_az, subkey))
+
+        if manager_name:
+            # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use
+            # the manager name.
+            #nodepool.launch.manager.MANAGER.subkey
+            keys.append('nodepool.launch.manager.%s.%s' %
+                        (manager_name, subkey))
+        else:
+            #nodepool.launch.target.TARGET.subkey
+            keys.append('nodepool.launch.target.%s.%s' %
+                        (target_name, subkey))
+
         for key in keys:
             self.statsd.timing(key, dt)
             self.statsd.incr(key)
