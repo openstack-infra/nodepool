@@ -2250,8 +2250,17 @@ class NodePool(threading.Thread):
             key = 'nodepool.nodes.%s' % state
             states[key] += 1
 
-            key = 'nodepool.target.%s.nodes.%s' % (
-                node.target_name, state)
+            # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use
+            # the manager name.
+            #nodepool.manager.MANAGER.nodes.STATE
+            if node.manager_name:
+                key = 'nodepool.manager.%s.nodes.%s' % (
+                    node.manager_name, state)
+                if key not in states:
+                    states[key] = 0
+            else:
+                key = 'nodepool.target.%s.nodes.%s' % (
+                    node.target_name, state)
             states[key] += 1
 
             key = 'nodepool.label.%s.nodes.%s' % (
