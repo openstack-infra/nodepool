@@ -2243,6 +2243,8 @@ class NodePool(threading.Thread):
                     provider.name, state)
                 states[key] = 0
 
+        managers = set()
+
         for node in session.getNodes():
             if node.state not in nodedb.STATE_NAMES:
                 continue
@@ -2258,6 +2260,7 @@ class NodePool(threading.Thread):
                     node.manager_name, state)
                 if key not in states:
                     states[key] = 0
+                managers.add(node.manager_name)
             else:
                 key = 'nodepool.target.%s.nodes.%s' % (
                     node.target_name, state)
@@ -2270,6 +2273,16 @@ class NodePool(threading.Thread):
             key = 'nodepool.provider.%s.nodes.%s' % (
                 node.provider_name, state)
             states[key] += 1
+
+        # NOTE(pabelanger): Initialize other state values to zero if missed
+        # above.
+        #nodepool.manager.MANAGER.nodes.STATE
+        for state in nodedb.STATE_NAMES.values():
+            for manager_name in managers:
+                key = 'nodepool.manager.%s.nodes.%s' % (
+                    manager_name, state)
+                if key not in states:
+                    states[key] = 0
 
         for key, count in states.items():
             self.statsd.gauge(key, count)
