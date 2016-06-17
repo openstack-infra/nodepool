@@ -184,3 +184,12 @@ class NodeAssignmentJob(NodepoolJob):
         self.node_id = node_id
         job_name = 'node_assign:%s' % target_name
         super(NodeAssignmentJob, self).__init__(job_name, data, nodepool)
+
+
+class NodeRevokeJob(NodepoolJob):
+    log = logging.getLogger("jobs.NodeRevokeJob")
+
+    def __init__(self, node_id, manager_name, data, nodepool):
+        self.node_id = node_id
+        job_name = 'node_revoke:%s' % manager_name
+        super(NodeRevokeJob, self).__init__(job_name, data, nodepool)

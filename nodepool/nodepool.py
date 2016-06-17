@@ -1819,6 +1819,13 @@ class NodePool(threading.Thread):
         finally:
             self._delete_threads_lock.release()
 
+    def revokeAssignedNode(self, node):
+        args = dict(name=node.nodename)
+        job = jobs.NodeRevokeJob(node.id, node.manager_name,
+                                 args, self)
+        self.gearman_client.submitJob(job, timeout=300)
+        # Do not wait for completion in case the manager is offline
+
     def _deleteNode(self, session, node):
         self.log.debug("Deleting node id: %s which has been in %s "
                        "state for %s hours" %
@@ -1844,6 +1851,13 @@ class NodePool(threading.Thread):
             if jenkins.nodeExists(jenkins_name):
                 jenkins.deleteNode(jenkins_name)
             self.log.info("Deleted jenkins node id: %s" % node.id)
+
+        if node.manager_name is not None:
+            try:
+                self.revokeAssignedNode(node)
+            except Exception:
+                self.log.exception("Exception revoking node id: %s" %
+                                   node.id)
 
         for subnode in node.subnodes:
             if subnode.external_id:
