@@ -107,6 +107,24 @@ class NodeCompleteThread(threading.Thread):
                           node.id)
             return
 
+        nodepool_job = session.getJobByName(self.jobname)
+        if (nodepool_job and nodepool_job.hold_on_failure and
+            self.result != 'SUCCESS'):
+            held_nodes = session.getNodes(state=nodedb.HOLD)
+            held_nodes = [n for n in held_nodes if self.jobname in n.comment]
+            if len(held_nodes) >= nodepool_job.hold_on_failure:
+                self.log.info("Node id: %s has failed %s but %s nodes "
+                              "are already held for that job" % (
+                                  node.id, self.jobname, len(held_nodes)))
+            else:
+                node.state = nodedb.HOLD
+                node.comment = "Automatically held after failing %s" % (
+                    self.jobname,)
+                self.log.info("Node id: %s failed %s, automatically holding" % (
+                    node.id, self.jobname))
+                self.nodepool.updateStats(session, node.provider_name)
+                return
+
         target = self.nodepool.config.targets[node.target_name]
         if self.jobname == target.jenkins_test_job:
             self.log.debug("Test job for node id: %s complete, result: %s" %

@@ -257,3 +257,20 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "image-build", "fake-dib-diskimage")
         nodepoolcmd.main()
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
+
+    def test_job_create(self):
+        configfile = self.setup_config('node.yaml')
+        self.patch_argv("-c", configfile, "job-create", "fake-job",
+                        "--hold-on-failure", "1")
+        nodepoolcmd.main()
+        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
+
+    def test_job_delete(self):
+        configfile = self.setup_config('node.yaml')
+        self.patch_argv("-c", configfile, "job-create", "fake-job",
+                        "--hold-on-failure", "1")
+        nodepoolcmd.main()
+        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
+        self.patch_argv("-c", configfile, "job-delete", "1")
+        nodepoolcmd.main()
+        self.assert_listed(configfile, ['job-list'], 0, 1, 0)

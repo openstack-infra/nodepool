@@ -147,6 +147,28 @@ alien-image-list
 .. program-output:: nodepool alien-image-list --help
    :nostderr:
 
+In the case that a job is randomly failing for an unknown cause, it
+may be necessary to instruct nodepool to automatically hold a node on
+which that job has failed.  To do so, use the the ``job-create``
+command to specify the job name and how many failed nodes should be
+held.  When debugging is complete, use ''job-delete'' to disable the
+feature.
+
+job-create
+^^^^^^^^^^
+.. program-output:: nodepool job-create --help
+   :nostderr:
+
+job-list
+^^^^^^^^
+.. program-output:: nodepool job-list --help
+   :nostderr:
+
+job-delete
+^^^^^^^^^^
+.. program-output:: nodepool job-delete --help
+   :nostderr:
+
 Removing a Provider
 ===================
 

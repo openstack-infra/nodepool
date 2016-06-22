@@ -126,6 +126,15 @@ subnode_table = Table(
     Column('state_time', Integer),
     mysql_engine='InnoDB',
     )
+job_table = Table(
+    'job', metadata,
+    Column('id', Integer, primary_key=True),
+    # The name of the job
+    Column('name', String(255), index=True),
+    # Automatically hold up to this number of nodes that fail this job
+    Column('hold_on_failure', Integer),
+    mysql_engine='InnoDB',
+    )
 
 
 class DibImage(object):
@@ -247,6 +256,20 @@ class SubNode(object):
         session = Session.object_session(self)
         if session:
             session.commit()
+
+
+class Job(object):
+    def __init__(self, name=None, hold_on_failure=0):
+        self.name = name
+        self.hold_on_failure = hold_on_failure
+
+    def delete(self):
+        session = Session.object_session(self)
+        session.delete(self)
+        session.commit()
+
+
+mapper(Job, job_table)
 
 
 mapper(SubNode, subnode_table,
@@ -460,3 +483,24 @@ class NodeDatabaseSession(object):
         if not nodes:
             return None
         return nodes[0]
+
+    def getJob(self, id):
+        jobs = self.session().query(Job).filter_by(id=id).all()
+        if not jobs:
+            return None
+        return jobs[0]
+
+    def getJobByName(self, name):
+        jobs = self.session().query(Job).filter_by(name=name).all()
+        if not jobs:
+            return None
+        return jobs[0]
+
+    def getJobs(self):
+        return self.session().query(Job).all()
+
+    def createJob(self, *args, **kwargs):
+        new = Job(*args, **kwargs)
+        self.session().add(new)
+        self.commit()
+        return new

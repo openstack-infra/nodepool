@@ -144,6 +144,23 @@ class NodePoolCmd(object):
             help='Validate configuration file')
         cmd_config_validate.set_defaults(func=self.config_validate)
 
+        cmd_job_list = subparsers.add_parser('job-list', help='list jobs')
+        cmd_job_list.set_defaults(func=self.job_list)
+
+        cmd_job_create = subparsers.add_parser('job-create', help='create job')
+        cmd_job_create.add_argument(
+            'name',
+            help='job name')
+        cmd_job_create.add_argument('--hold-on-failure',
+                                    help='number of nodes to hold when this job fails')
+        cmd_job_create.set_defaults(func=self.job_create)
+
+        cmd_job_delete = subparsers.add_parser(
+            'job-delete',
+            help='delete job')
+        cmd_job_delete.set_defaults(func=self.job_delete)
+        cmd_job_delete.add_argument('id', help='job id')
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -373,6 +390,28 @@ class NodePoolCmd(object):
         validator.validate()
         log.info("Configuation validation complete")
         #TODO(asselin,yolanda): add validation of secure.conf
+
+    def job_list(self):
+        t = PrettyTable(["ID", "Name", "Hold on Failure"])
+        t.align = 'l'
+        with self.pool.getDB().getSession() as session:
+            for job in session.getJobs():
+                t.add_row([job.id, job.name, job.hold_on_failure])
+            print t
+
+    def job_create(self):
+        with self.pool.getDB().getSession() as session:
+            session.createJob(self.args.name,
+                              hold_on_failure=self.args.hold_on_failure)
+        self.job_list()
+
+    def job_delete(self):
+        with self.pool.getDB().getSession() as session:
+            job = session.getJob(self.args.id)
+            if not job:
+                print "Job %s not found." % self.args.id
+            else:
+                job.delete()
 
     def _wait_for_threads(self, threads):
         for t in threads:
