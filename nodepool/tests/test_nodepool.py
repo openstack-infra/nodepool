@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gear
 import json
 import logging
 import threading
@@ -691,6 +692,81 @@ class TestNodepool(tests.DBTestCase):
         with pool.getDB().getSession() as session:
             node = session.getNode(2)
             self.assertEqual(node, None)
+
+    def test_no_label_gearman_demand(self):
+        """Test that labelless demand is calculated properly"""
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            nodename = nodes[0].nodename
+
+        worker = gear.Worker(nodename)
+        worker.addServer('localhost', self.gearman_server.port)
+        worker.registerFunction('build:foo')
+        client = gear.Client()
+        client.addServer('localhost', self.gearman_server.port)
+        client.waitForServer()
+        job1 = gear.Job('build:foo', '1')
+        job2 = gear.Job('build:foo', '2')
+        # Create 2 demand for fake-label via job foo registration
+        client.submitJob(job1)
+        client.submitJob(job2)
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            # 1 (min ready) + 2 (demand)
+            self.assertEqual(len(nodes), 3)
+        client.shutdown()
+
+    def test_label_gearman_demand(self):
+        """Test that labeled demand is calculated properly"""
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            nodename = nodes[0].nodename
+
+        worker = gear.Worker(nodename)
+        worker.addServer('localhost', self.gearman_server.port)
+        worker.registerFunction('build:foo')
+        worker.registerFunction('build:foo:fake-label')
+        client = gear.Client()
+        client.addServer('localhost', self.gearman_server.port)
+        client.waitForServer()
+        job1 = gear.Job('build:foo:fake-label', '1')
+        job2 = gear.Job('build:foo:fake-label', '2')
+        # Create 2 demand for fake-label via job foo registration
+        client.submitJob(job1)
+        client.submitJob(job2)
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            # 1 (min ready) + 2 (demand)
+            self.assertEqual(len(nodes), 3)
+        client.shutdown()
 
 
 class TestGearClient(tests.DBTestCase):
