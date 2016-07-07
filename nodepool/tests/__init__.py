@@ -26,6 +26,7 @@ import subprocess
 import threading
 import tempfile
 import time
+import uuid
 
 import fixtures
 import gear
@@ -377,17 +378,21 @@ class MySQLSchemaFixture(fixtures.Fixture):
                                             string.ascii_uppercase)
                               for x in range(8))
         self.name = '%s_%s' % (random_bits, os.getpid())
+        self.passwd = uuid.uuid4().hex
         db = pymysql.connect(host="localhost",
                              user="openstack_citest",
                              passwd="openstack_citest",
                              db="openstack_citest")
         cur = db.cursor()
         cur.execute("create database %s" % self.name)
-        cur.execute("grant all on %s.* to '%s'@'localhost'" %
-                    (self.name, self.name))
+        cur.execute(
+            "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
+            (self.name, self.name, self.passwd))
         cur.execute("flush privileges")
 
-        self.dburi = 'mysql+pymysql://%s@localhost/%s' % (self.name, self.name)
+        self.dburi = 'mysql+pymysql://%s:%s@localhost/%s' % (self.name,
+                                                             self.passwd,
+                                                             self.name)
         self.addDetail('dburi', testtools.content.text_content(self.dburi))
         self.addCleanup(self.cleanup)
 
@@ -398,6 +403,8 @@ class MySQLSchemaFixture(fixtures.Fixture):
                              db="openstack_citest")
         cur = db.cursor()
         cur.execute("drop database %s" % self.name)
+        cur.execute("drop user '%s'@'localhost'" % self.name)
+        cur.execute("flush privileges")
 
 
 class BuilderFixture(fixtures.Fixture):
