@@ -18,7 +18,6 @@ import time
 import threading
 
 import fixtures
-import kazoo.client
 
 from nodepool import builder, exceptions, fakeprovider, tests
 
@@ -151,6 +150,4 @@ class TestNodepoolBuilder(tests.DBTestCase):
 
 class TestZookeeper(tests.ZKTestCase):
     def test_zk(self):
-        zk = kazoo.client.KazooClient(hosts='127.0.0.1:%s' % self.zookeeper_port)
-        zk.start()
-        zk.get('/')
+        self.zkclient.get('/')

@@ -29,6 +29,7 @@ import time
 
 import fixtures
 import gear
+import kazoo.client
 import testresources
 import testtools
 
@@ -115,6 +116,24 @@ class ZookeeperServerFixture(fixtures.Fixture):
 
     def setUp(self):
         super(ZookeeperServerFixture, self).setUp()
+
+        if 'NODEPOOL_ZK_HOST' in os.environ:
+           if ':' in os.environ['NODEPOOL_ZK_HOST']:
+               host, port = os.environ['NODEPOOL_ZK_HOST'].split(':')
+           else:
+               host = os.environ['NODEPOOL_ZK_HOST']
+               port = None
+
+           self.zookeeper_host = host
+
+           if not port:
+               self.zookeeper_port = 2181
+           else:
+               self.zookeeper_port = int(port)
+
+           return
+
+        self.zookeeper_host = '127.0.0.1'
 
         # Get the local port range, we're going to pick one at a time
         # at random to try.
@@ -500,4 +519,38 @@ class ZKTestCase(BaseTestCase):
         super(ZKTestCase, self).setUp()
         f = ZookeeperServerFixture()
         self.useFixture(f)
+        self.zookeeper_host = f.zookeeper_host
         self.zookeeper_port = f.zookeeper_port
+        self.chroot_path = "/nodepool_test/%s" % self.getUniqueInteger()
+
+        # Ensure the chroot path exists and clean up an pre-existing znodes
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+        _tmp_client.start()
+
+        if _tmp_client.exists(self.chroot_path):
+            _tmp_client.delete(self.chroot_path, recursive=True)
+
+        _tmp_client.ensure_path(self.chroot_path)
+        _tmp_client.stop()
+
+        # Create a chroot'ed client
+        self.zkclient = kazoo.client.KazooClient(
+            hosts='%s:%s%s' % (self.zookeeper_host,
+                               self.zookeeper_port,
+                               self.chroot_path)
+        )
+        self.zkclient.start()
+
+        self.addCleanup(self._cleanup)
+
+    def _cleanup(self):
+        '''Stop the client and remove the chroot path.'''
+        self.zkclient.stop()
+
+        # Need a non-chroot'ed client to remove the chroot path
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+        _tmp_client.start()
+        _tmp_client.delete(self.chroot_path, recursive=True)
+        _tmp_client.stop()
