@@ -521,7 +521,12 @@ class ZKTestCase(BaseTestCase):
         self.useFixture(f)
         self.zookeeper_host = f.zookeeper_host
         self.zookeeper_port = f.zookeeper_port
-        self.chroot_path = "/nodepool_test/%s" % self.getUniqueInteger()
+        # Make sure the test chroot paths do not conflict
+        random_bits = ''.join(random.choice(string.ascii_lowercase +
+                                            string.ascii_uppercase)
+                              for x in range(8))
+        rand_test_path = '%s_%s' % (random_bits, os.getpid())
+        self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
         # Ensure the chroot path exists and clean up an pre-existing znodes
         _tmp_client = kazoo.client.KazooClient(
