@@ -213,7 +213,7 @@ class ZookeeperServerFixture(fixtures.Fixture):
             return None
         with open(path) as f:
             for line in f:
-                if 'Snapshotting:' in line:
+                if 'binding to port' in line:
                     return True
                 if 'Address already in use' in line:
                     return False
