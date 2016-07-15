@@ -389,6 +389,10 @@ class NodePoolBuilder(object):
         if self._config.scriptdir:
             env['NODEPOOL_SCRIPTDIR'] = self._config.scriptdir
 
+        # this puts a disk-usage report in the logs so we can see if
+        # something blows up the image size.
+        env['DIB_SHOW_IMAGE_USAGE'] = '1'
+
         # send additional env vars if needed
         for k, v in image.env_vars.items():
             env[k] = v
@@ -436,6 +440,20 @@ class NodePoolBuilder(object):
             raise exceptions.DibFailedError(
                 "DIB failed creating %s" % filename
             )
+
+        if self.statsd:
+            # record stats on the size of each image we create
+            for ext in img_types.split(','):
+                key = 'nodepool.dib_image_build.%s.%s.size' % (image.name, ext)
+                # A bit tricky because these image files may be sparse
+                # files; we only want the true size of the file for
+                # purposes of watching if we've added too much stuff
+                # into the image.  Note that st_blocks is defined as
+                # 512-byte blocks by stat(2)
+                size = os.stat("%s.%s" % (filename, ext)).st_blocks * 512
+                self.log.debug("%s created image %s.%s (size: %d) " %
+                               (image.name, filename, ext, size))
+                self.statsd.gauge(key, size)
 
     def _getDiskimageByName(self, name):
         for image in self._config.diskimages.values():
