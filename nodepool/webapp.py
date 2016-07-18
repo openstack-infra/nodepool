@@ -54,7 +54,7 @@ class Cache(object):
 class WebApp(threading.Thread):
     log = logging.getLogger("nodepool.WebApp")
 
-    def __init__(self, nodepool, port=8001, cache_expiry=1):
+    def __init__(self, nodepool, port=8005, cache_expiry=1):
         threading.Thread.__init__(self)
         self.nodepool = nodepool
         self.port = port
