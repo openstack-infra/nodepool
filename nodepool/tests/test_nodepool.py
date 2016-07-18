@@ -791,7 +791,7 @@ class TestGearClient(tests.DBTestCase):
                 self.disconnect_called = True
                 super(MyJob, self).onDisconnect()
 
-        client = nodepool.nodepool.GearmanClient()
+        client = nodepool.nodepool.GearmanClient(worker_map_ttl=86400)
         client.addServer('localhost', self.gearman_server.port)
         client.waitForServer()
 
