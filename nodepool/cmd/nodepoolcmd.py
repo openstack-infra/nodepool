@@ -17,7 +17,6 @@
 import argparse
 import logging.config
 import sys
-import time
 
 from nodepool import nodedb
 from nodepool import nodepool
@@ -31,15 +30,6 @@ log = logging.getLogger(__name__)
 
 
 class NodePoolCmd(NodepoolApp):
-
-    @staticmethod
-    def _age(timestamp):
-        now = time.time()
-        dt = now - timestamp
-        m, s = divmod(dt, 60)
-        h, m = divmod(m, 60)
-        d, h = divmod(h, 24)
-        return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
     def parse_arguments(self):
         parser = argparse.ArgumentParser(description='Node pool.')
