@@ -262,47 +262,43 @@ class JobTracker(object):
 
 
 class GearmanClient(gear.Client):
-    def __init__(self, worker_map_ttl):
+    def __init__(self):
         super(GearmanClient, self).__init__(client_id='nodepool')
         self.__log = logging.getLogger("nodepool.GearmanClient")
-        self.function_worker_map = {}
-        self.worker_map_ttl = worker_map_ttl
-        self.next_worker_update = -1
-
-    def _mapFuncsToWorkers(self, connection, session):
-        try:
-            req = gear.WorkersAdminRequest()
-            connection.sendAdminRequest(req, timeout=300)
-        except Exception:
-            self.__log.exception("Exception while listing workers")
-            self._lostConnection(connection)
-            return
-        # Populate function_worker_map here
-        for line in req.response.split('\n'):
-            parts = [x.strip() for x in line.split(':', 1)]
-            # parts[0] - Connection details
-            # parts[1] - Functions that remote connection can execute
-            if len(parts) < 2 or not parts[0] or parts[0] == '.':
-                # Skip if end of response or if no functions list.
-                continue
-            (conn_fd, remote_ip, nodename) = parts[0].split(None, 2)
-            # Not every worker reg has build: functions so filter
-            # and only handle those entries.
-            functions = [x[len('build:'):]
-                         for x in parts[1].split()
-                         if x.startswith('build:')]
-            if functions:
-                node = session.getNodeByNodename(nodename)
-                if node:
-                    worker = node.label_name
-                    for function in functions:
-                        workers = self.function_worker_map.setdefault(function,
-                                                                      set())
-                        workers.add(worker)
 
     def getNeededWorkers(self, session):
         needed_workers = {}
+        function_worker_map = {}
         for connection in self.active_connections:
+            try:
+                req = gear.WorkersAdminRequest()
+                connection.sendAdminRequest(req, timeout=300)
+            except Exception:
+                self.__log.exception("Exception while listing workers")
+                self._lostConnection(connection)
+                continue
+            # Populate function_worker_map here
+            for line in req.response.split('\n'):
+                parts = [x.strip() for x in line.split(':', 1)]
+                # parts[0] - Connection details
+                # parts[1] - Functions that remote connection can execute
+                if len(parts) < 2 or not parts[0] or parts[0] == '.':
+                    # Skip if end of response or if no functions list.
+                    continue
+                (conn_fd, remote_ip, nodename) = parts[0].split(None, 2)
+                # Not every worker reg has build: functions so filter
+                # and only handle those entries.
+                functions = [x[len('build:'):]
+                             for x in parts[1].split()
+                             if x.startswith('build:')]
+                if functions:
+                    node = session.getNodeByNodename(nodename)
+                    if node:
+                        worker = node.label_name
+                        for function in functions:
+                            workers = function_worker_map.setdefault(function,
+                                                                     set())
+                            workers.add(worker)
             try:
                 req = gear.StatusAdminRequest()
                 connection.sendAdminRequest(req, timeout=300)
@@ -338,20 +334,11 @@ class GearmanClient(gear.Client):
                 if queued > 0:
                     self.__log.debug("Function: %s queued: %s" % (function,
                                                                   queued))
-                workers = self.function_worker_map.get(function)
-                # If we don't know what workers are required to handle this
-                # function reload our mapping. Also update the values if
-                # the TTL has been exceeded.
-                time_now = time.time()
-                if not workers or time_now > self.next_worker_update:
-                    self._mapFuncsToWorkers(connection, session)
-                    self.next_worker_update = \
-                        time_now + self.worker_map_ttl
-                    workers = self.function_worker_map.get(function)
-                    # We assume worker was populated by function_worker_map
-                    # fillout above if not try again later.
-                    if not workers:
-                        continue
+                workers = function_worker_map.get(function)
+                # We assume worker was populated by function_worker_map
+                # fillout above in the workers status parsing.
+                if not workers:
+                    continue
                 # Get worker for use in populating needed_workers.
                 # Set pop removes entries so we add it back in after popping.
                 worker = workers.pop()
@@ -1324,7 +1311,7 @@ class NodePool(threading.Thread):
             self.gearman_client.shutdown()
             self.gearman_client = None
         if configured:
-            self.gearman_client = GearmanClient(config.worker_map_ttl)
+            self.gearman_client = GearmanClient()
             for g in config.gearman_servers.values():
                 self.log.debug("Adding gearman server %s" % g.name)
                 self.gearman_client.addServer(g.host, g.port)

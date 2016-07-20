@@ -139,21 +139,6 @@ or are complete and nodes may be deleted.  Example::
     - tcp://jenkins1.example.com:8888
     - tcp://jenkins2.example.com:8888
 
-worker-map-ttl
---------------
-
-We keep track of which gearman functions map onto which gearman workers
-(which happen to be instances of nodepool labels). We do this in order to
-determine the demand for specific labels. Retrieving this data can be
-costly in large installations so by default the data is cached with a ttl
-of one day. You can tweak this ttl here. Values expected are seconds
-between mapping updates. Negative values are not recommended but can
-be used to disable caching.
-
-Example::
-
-  worker-map-ttl: 3600
-
 gearman-servers
 ---------------
 Lists the Zuul Gearman servers that should be consulted for real-time

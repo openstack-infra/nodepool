@@ -123,7 +123,6 @@ def loadConfig(config_path):
     newconfig.scriptdir = config.get('script-dir')
     newconfig.elementsdir = config.get('elements-dir')
     newconfig.imagesdir = config.get('images-dir')
-    newconfig.worker_map_ttl = int(config.get('worker-map-ttl', 86400))
     newconfig.dburi = None
     newconfig.provider_managers = {}
     newconfig.jenkins_managers = {}
