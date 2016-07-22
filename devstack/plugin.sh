@@ -29,11 +29,21 @@ function install_shade {
     fi
 }
 
+function install_diskimage_builder {
+    if use_library_from_git "diskimage-builder"; then
+        GITREPO["diskimage-builder"]=$DISKIMAGE_BUILDER_REPO_URL
+        GITDIR["diskimage-builder"]=$DEST/diskimage-builder
+        GITBRANCH["diskimage-builder"]=$DISKIMAGE_BUILDER_REPO_REF
+        git_clone_by_name "diskimage-builder"
+        setup_dev_lib "diskimage-builder"
+    fi
+}
+
 # Install nodepool code
 function install_nodepool {
-    # This function is currently blank because just installing a git
-    # tree does not require any additional code
     install_shade
+    install_diskimage_builder
+
     setup_develop $DEST/nodepool
 }
 
