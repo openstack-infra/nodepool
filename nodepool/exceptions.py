@@ -43,3 +43,9 @@ class ServerDeleteException(TimeoutException):
 
 class ImageCreateException(TimeoutException):
     statsd_key = 'error.imagetimeout'
+
+class ZKException(Exception):
+    pass
+
+class ZKLockException(ZKException):
+    pass
