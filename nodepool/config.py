@@ -207,7 +207,7 @@ def loadConfig(config_path):
             i.user_home = image.get('user-home', '/home/jenkins')
             i.private_key = image.get('private-key',
                                       '/var/lib/jenkins/.ssh/id_rsa')
-            i.config_drive = image.get('config-drive', None)
+            i.config_drive = image.get('config-drive', True)
 
             # note this does "double-duty" -- for
             # SnapshotImageUpdater the meta-data dict is passed to
