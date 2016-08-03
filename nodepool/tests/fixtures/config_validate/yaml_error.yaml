@@ -19,6 +19,9 @@ zmq-publishers:
 gearman-servers:
   - host: zuul.openstack.org
 
+zookeeper-servers:
+  - host: zk1.openstack.org
+
 labels:
   - name: devstack-precise
     image: devstack-precise

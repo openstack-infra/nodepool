@@ -147,7 +147,3 @@ class TestNodepoolBuilder(tests.DBTestCase):
                     # We failed to upload first_fail_id and have
                     # moved onto another upload that will fail.
                     break
-
-class TestZookeeper(tests.ZKTestCase):
-    def test_zk(self):
-        self.zkclient.get('/')

@@ -102,6 +102,10 @@ class GearmanServer(ConfigValue):
     pass
 
 
+class ZooKeeperServer(ConfigValue):
+    pass
+
+
 class DiskImage(ConfigValue):
     pass
 
@@ -128,6 +132,7 @@ def loadConfig(config_path):
     newconfig.jenkins_managers = {}
     newconfig.zmq_publishers = {}
     newconfig.gearman_servers = {}
+    newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}
     newconfig.crons = {}
 
@@ -154,6 +159,14 @@ def loadConfig(config_path):
         g.port = server.get('port', 4730)
         g.name = g.host + '_' + str(g.port)
         newconfig.gearman_servers[g.name] = g
+
+    for server in config.get('zookeeper-servers', []):
+        z = ZooKeeperServer()
+        z.host = server['host']
+        z.port = server.get('port', 2181)
+        z.chroot = server.get('chroot', '')
+        z.name = z.host + '_' + str(z.port)
+        newconfig.zookeeper_servers[z.name] = z
 
     for provider in config.get('providers', []):
         p = Provider()

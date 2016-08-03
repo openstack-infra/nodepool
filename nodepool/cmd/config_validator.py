@@ -122,6 +122,11 @@ class ConfigValidator:
                 'host': str,
                 'port': int,
             }],
+            'zookeeper-servers': [{
+                'host': str,
+                'port': int,
+                'chroot': str,
+            }],
             'cron': cron,
             'providers': [providers],
             'labels': [labels],

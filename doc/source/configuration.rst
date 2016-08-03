@@ -152,6 +152,21 @@ Example::
 
 The ``port`` key is optional (default: 4730).
 
+zookeeper-servers
+-----------------
+Lists the ZooKeeper servers uses for coordinating information between
+nodepool workers. Example::
+
+  zookeeper-servers:
+    - host: zk1.example.com
+      port: 2181
+      chroot: /nodepool
+
+The ``port`` key is optional (default: 2181).
+
+The ``chroot`` key, used for interpreting ZooKeeper paths relative to
+the supplied root path, is also optional and has no default.
+
 .. _labels:
 
 labels

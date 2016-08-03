@@ -19,6 +19,11 @@ zmq-publishers:
 gearman-servers:
   - host: zuul.openstack.org
 
+zookeeper-servers:
+  - host: zk1.openstack.org
+    port: 2181
+    chroot: /test
+
 labels:
   - name: devstack-precise
     image: devstack-precise
