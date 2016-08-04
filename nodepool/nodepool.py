@@ -2282,7 +2282,8 @@ class NodePool(threading.Thread):
                 continue
             state = nodedb.STATE_NAMES[node.state]
             key = 'nodepool.nodes.%s' % state
-            states[key] += 1
+            total_nodes = self.config.labels[node.label_name].subnodes + 1
+            states[key] += total_nodes
 
             # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use
             # the manager name.
@@ -2296,15 +2297,15 @@ class NodePool(threading.Thread):
             else:
                 key = 'nodepool.target.%s.nodes.%s' % (
                     node.target_name, state)
-            states[key] += 1
+            states[key] += total_nodes
 
             key = 'nodepool.label.%s.nodes.%s' % (
                 node.label_name, state)
-            states[key] += 1
+            states[key] += total_nodes
 
             key = 'nodepool.provider.%s.nodes.%s' % (
                 node.provider_name, state)
-            states[key] += 1
+            states[key] += total_nodes
 
         # NOTE(pabelanger): Initialize other state values to zero if missed
         # above.
