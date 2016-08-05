@@ -547,9 +547,13 @@ class ZKTestCase(BaseTestCase):
         rand_test_path = '%s_%s' % (random_bits, os.getpid())
         self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
-        # Ensure the chroot path exists and clean up an pre-existing znodes
+        # Ensure the chroot path exists and clean up an pre-existing znodes.
+        # Allow extra time for the very first connection because we might
+        # be waiting for the ZooKeeper server to be started from the
+        # ZookeeperServerFixture fixture.
         _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port),
+            timeout=60)
         _tmp_client.start()
 
         if _tmp_client.exists(self.chroot_path):
