@@ -63,7 +63,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
         signal.signal(signal.SIGINT, self.sigint_handler)
 
-        nb_thread = threading.Thread(target=self.nb.runForever)
+        nb_thread = threading.Thread(target=self.nb.run)
         nb_thread.start()
 
         while True:

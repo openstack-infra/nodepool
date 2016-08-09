@@ -13,7 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import errno
 import json
 import logging
 import os
@@ -22,13 +21,13 @@ import threading
 import time
 import traceback
 
-import gear
 import shlex
 
 import config as nodepool_config
 import exceptions
 import provider_manager
 import stats
+
 
 MINS = 60
 HOURS = 60 * MINS
@@ -75,26 +74,30 @@ class DibImageFile(object):
         return my_path
 
 
-class BaseWorker(gear.Worker):
+class BaseWorker(object):
     nplog = logging.getLogger("nodepool.builder.BaseWorker")
 
     def __init__(self, *args, **kw):
+        super(BaseWorker, self).__init__()
         self.builder = kw.pop('builder')
-        super(BaseWorker, self).__init__(*args, **kw)
+        self.images = []
+        self._running = False
 
     def run(self):
-        while self.running:
-            try:
-                job = self.getJob()
-                self._handleJob(job)
-            except gear.InterruptedError:
-                pass
-            except Exception:
-                self.nplog.exception('Exception while getting job')
+        self._running = True
+        while self._running:
+            self.work()
+
+    def shutdown(self):
+        self._running = False
 
 
 class BuildWorker(BaseWorker):
     nplog = logging.getLogger("nodepool.builder.BuildWorker")
+
+    def work(self):
+        #TODO: Actually do something useful
+        time.sleep(5)
 
     def _handleJob(self, job):
         try:
@@ -129,6 +132,10 @@ class BuildWorker(BaseWorker):
 class UploadWorker(BaseWorker):
     nplog = logging.getLogger("nodepool.builder.UploadWorker")
 
+    def work(self):
+        #TODO: Actually do something useful
+        time.sleep(5)
+
     def _handleJob(self, job):
         try:
             self.nplog.debug('Got job %s with data %s',
@@ -161,8 +168,77 @@ class UploadWorker(BaseWorker):
             job.sendWorkException(traceback.format_exc())
 
 
+class BuilderScheduler(object):
+    '''
+    Class used for thread of execution for the builder scheduler.
+
+    The builder scheduler has the responsibility to:
+
+        * Handle the image updating process as scheduled via the image-update
+          cron job defined within the `cron` config section.
+        * Register to receive all watch events from ZooKeeper and assign
+          workers for those events.
+        * Start and maintain the working state of each worker thread.
+    '''
+    log = logging.getLogger("nodepool.builder.BuilderScheduler")
+
+    def __init__(self, config, num_builders, num_uploaders):
+        self.config = config
+        self.num_builders = num_builders
+        self.build_workers = []
+        self.num_uploaders = num_uploaders
+        self.upload_workers = []
+        self.threads = []
+
+    def run(self):
+        # Create build and upload worker objects
+        for i in range(self.num_builders):
+            w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
+                            builder=self)
+            self.build_workers.append(w)
+
+        for i in range(self.num_uploaders):
+            w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
+                             builder=self)
+            self.upload_workers.append(w)
+
+        self.log.debug('Starting listener for build jobs')
+
+        for thd in (self.build_workers + self.upload_workers):
+            t = threading.Thread(target=thd.run)
+            t.daemon = True
+            t.start()
+            self.threads.append(t)
+
+        self._running = True
+
+        # Start our watch thread to handle ZK watch notifications
+        watch_thread = threading.Thread(target=self.registerWatches)
+        watch_thread.daemon = True
+        watch_thread.start()
+        self.threads.append(watch_thread)
+
+        # Do not exit until all of our owned threads exit, which will only
+        # happen when BuildScheduler.stop() is called.
+        for thd in self.threads:
+            thd.join()
+
+    def stop(self):
+        self.log.debug("BuilderScheduler shutting down workers")
+        for worker in (self.build_workers + self.upload_workers):
+            worker.shutdown()
+        self._running = False
+
+    def registerWatches(self):
+        while self._running:
+            time.sleep(5)
+
+
 class NodePoolBuilder(object):
-    log = logging.getLogger("nodepool.builder")
+    '''
+    Class used to control the builder functionality.
+    '''
+    log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
     def __init__(self, config_path, build_workers=1, upload_workers=4):
         self._config_path = config_path
@@ -178,7 +254,14 @@ class NodePoolBuilder(object):
     def running(self):
         return self._running
 
-    def runForever(self):
+    def run(self):
+        '''
+        Start the builder.
+
+        The builder functionality is encapsulated within the BuilderScheduler
+        code. This starts the main scheduler thread, which will run forever
+        until we tell it to stop.
+        '''
         with self._start_lock:
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
@@ -186,66 +269,43 @@ class NodePoolBuilder(object):
             self.load_config(self._config_path)
             self._validate_config()
 
-            self.build_workers = []
-            self.upload_workers = []
-            for i in range(self._build_workers):
-                w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
-                                builder=self)
-                self._initializeGearmanWorker(w,
-                    self._config.gearman_servers.values())
-                self.build_workers.append(w)
-            for i in range(self._upload_workers):
-                w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
-                                 builder=self)
-                self._initializeGearmanWorker(w,
-                    self._config.gearman_servers.values())
-                self.upload_workers.append(w)
+            self.scheduler = BuilderScheduler(self._config,
+                                              self._build_workers,
+                                              self._upload_workers)
 
-            self._registerGearmanFunctions(self._config.diskimages.values())
-            self._registerExistingImageUploads()
-
-            self.log.debug('Starting listener for build jobs')
-
-            self.threads = []
-            for worker in self.build_workers + self.upload_workers:
-                t = threading.Thread(target=worker.run)
-                t.daemon = True
-                t.start()
-                self.threads.append(t)
-
+            self.scheduler_thread = threading.Thread(target=self.scheduler.run)
+            self.scheduler_thread.daemon = True
+            self.scheduler_thread.start()
             self._running = True
 
-        for t in self.threads:
-            t.join()
-
-        self._running = False
-
     def stop(self):
+        '''
+        Stop the builder.
+
+        Signal the scheduler thread to begin the shutdown process. We don't
+        want this method to return until the scheduler has successfully
+        stopped all of its own threads. Since we haven't yet joined to that
+        thread, do it here.
+        '''
         with self._start_lock:
             self.log.debug('Stopping.')
             if not self._running:
                 self.log.warning("Stop called when already stopped")
                 return
 
-            for worker in self.build_workers + self.upload_workers:
-                try:
-                    worker.shutdown()
-                except OSError as e:
-                    if e.errno == errno.EBADF:
-                        # The connection has been lost already
-                        self.log.debug("Gearman connection lost when "
-                                       "attempting to shutdown; ignoring")
-                    else:
-                        raise
+            self.scheduler.stop()
 
-            self.log.debug('Waiting for jobs to complete')
             # Wait for the builder to complete any currently running jobs
-            while self._running:
-                time.sleep(1)
+            # by joining with the main scheduler thread which should return
+            # when all of its worker threads are done.
+            self.log.debug('Waiting for jobs to complete')
+            self.scheduler_thread.join()
 
             self.log.debug('Stopping providers')
             provider_manager.ProviderManager.stopProviders(self._config)
             self.log.debug('Finished stopping')
+
+            self._running = False
 
     def load_config(self, config_path):
         config = nodepool_config.loadConfig(config_path)
@@ -254,48 +314,11 @@ class NodePoolBuilder(object):
         self._config = config
 
     def _validate_config(self):
-        if not self._config.gearman_servers.values():
-            raise RuntimeError('No gearman servers specified in config.')
+        if not self._config.zookeeper_servers.values():
+            raise RuntimeError('No ZooKeeper servers specified in config.')
 
         if not self._config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
-
-    def _initializeGearmanWorker(self, worker, servers):
-        for server in servers:
-            worker.addServer(server.host, server.port)
-
-        self.log.debug('Waiting for gearman server')
-        worker.waitForServer()
-
-    def _registerGearmanFunctions(self, images):
-        self.log.debug('Registering gearman functions')
-        for worker in self.build_workers:
-            for image in images:
-                worker.registerFunction(
-                    'image-build:%s' % image.name)
-
-    def _registerExistingImageUploads(self):
-        images = DibImageFile.from_images_dir(self._config.imagesdir)
-        for image in images:
-            self.registerImageId(image.image_id)
-
-    def registerImageId(self, image_id):
-        self.log.info('Registering image id: %s', image_id)
-        for worker in self.upload_workers:
-            worker.registerFunction('image-upload:%s' % image_id)
-            worker.registerFunction('image-delete:%s' % image_id)
-        self._built_image_ids.add(image_id)
-
-    def unregisterImageId(self, image_id):
-        if image_id in self._built_image_ids:
-            self.log.info('Unregistering image id: %s', image_id)
-            for worker in self.upload_workers:
-                worker.unRegisterFunction('image-upload:%s' % image_id)
-                worker.unRegisterFunction('image-delete:%s' % image_id)
-            self._built_image_ids.remove(image_id)
-        else:
-            self.log.warning('Attempting to remove image %d but image not '
-                             'found', image_id)
 
     def canHandleImageIdJob(self, job, image_op):
         return (job.name.startswith(image_op + ':') and

@@ -24,6 +24,10 @@ from nodepool import tests
 
 
 class TestNodepoolCMD(tests.DBTestCase):
+    def setUp(self):
+        super(TestNodepoolCMD, self).setUp()
+        self.skip("Skipping until ZooKeeper is enabled")
+
     def patch_argv(self, *args):
         argv = ["nodepool", "-s", self.secure_conf]
         argv.extend(args)

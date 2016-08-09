@@ -137,7 +137,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
 
         self.pool.start()
         if self.args.builder:
-            nb_thread = threading.Thread(target=self.builder.runForever)
+            nb_thread = threading.Thread(target=self.builder.run)
             nb_thread.start()
 
         self.webapp.start()
