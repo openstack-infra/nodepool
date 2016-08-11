@@ -31,7 +31,6 @@ import uuid
 import fixtures
 import gear
 import kazoo.client
-import testresources
 import testtools
 
 from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
@@ -275,7 +274,7 @@ class GearmanClient(gear.Client):
         return queued
 
 
-class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
+class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
         test_timeout = os.environ.get('OS_TEST_TIMEOUT', 60)

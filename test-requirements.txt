@@ -8,6 +8,5 @@ fixtures>=0.3.12
 mock>=1.0
 python-subunit
 testrepository>=0.0.13
-testresources
 testscenarios
 testtools>=0.9.27
