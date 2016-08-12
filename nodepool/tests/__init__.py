@@ -527,6 +527,7 @@ class DBTestCase(BaseTestCase):
 
         while client.get_queued_image_jobs() > 0:
             time.sleep(.2)
+        client.shutdown()
 
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args
