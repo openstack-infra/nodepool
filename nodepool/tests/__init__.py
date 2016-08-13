@@ -114,6 +114,7 @@ class GearmanServerFixture(fixtures.Fixture):
 class ZookeeperServerFixture(fixtures.Fixture):
     def __init__(self, port=0):
         self._port = port
+        self.log = logging.getLogger("tests.ZookeeperServerFixture")
 
     def _setUp(self):
         if 'NODEPOOL_ZK_HOST' in os.environ:
@@ -182,6 +183,7 @@ class ZookeeperServerFixture(fixtures.Fixture):
         while not found_port:
             port = random.randrange(begin, end)
 
+            self.log.debug("Starting ZK on port %s", port)
             # Write a config file with this port.
             with open(os.path.join(zookeeper_fixtures, 'zoo.cfg')) as i:
                 with open(config_path, 'w') as o:
@@ -192,6 +194,7 @@ class ZookeeperServerFixture(fixtures.Fixture):
             p = subprocess.Popen(args)
             self.zookeeper_port = port
             self.zookeeper_process = p
+            self.zookeeper_log_path = log_path
 
             # Wait up to 30 seconds to figure out if it has started.
             for x in range(30):
@@ -212,13 +215,19 @@ class ZookeeperServerFixture(fixtures.Fixture):
     def _checkZKLog(self, path):
         if not os.path.exists(path):
             return None
+        # Our return value starts as indeterminate.
+        bound = None
         with open(path) as f:
             for line in f:
+                # Note: success appears as "binding to port" when
+                # *not* followed by "Address already in use".  That
+                # makes this a little racy, but failure is generally
+                # fast, and this is called at 1 second intervals.
                 if 'binding to port' in line:
-                    return True
+                    bound = True
                 if 'Address already in use' in line:
                     return False
-        return None
+        return bound
 
     def shutdownZookeeper(self):
         if self.zookeeper_process:
@@ -226,7 +235,13 @@ class ZookeeperServerFixture(fixtures.Fixture):
                 self.zookeeper_process.kill()
                 self.zookeeper_process.wait()
             except OSError:
+                self.log.exception("Error stopping ZK (ignored)")
                 pass
+        if os.path.exists(self.zookeeper_log_path):
+            self.log.debug("Zookeeper log file:")
+            with open(self.zookeeper_log_path) as f:
+                for line in f:
+                    self.log.debug(line.strip())
 
 
 class GearmanClient(gear.Client):
