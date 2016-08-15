@@ -14,7 +14,8 @@
 
 from contextlib import contextmanager
 import json
-from kazoo.client import KazooClient
+import logging
+from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
 from kazoo.recipe.lock import Lock
 
@@ -67,6 +68,8 @@ class ZooKeeper(object):
     If you will have multiple threads needing this API, each thread should
     instantiate their own ZooKeeper object. It should not be shared.
     '''
+
+    log = logging.getLogger("nodepool.zk.ZooKeeper")
 
     IMAGE_ROOT = "/nodepool/image"
 
@@ -134,6 +137,20 @@ class ZooKeeper(object):
 
         return build_number
 
+    def _connection_listener(self, state):
+        '''
+        Listener method for Kazoo connection state changes.
+
+        .. warning:: This method must not block.
+        '''
+        if state == KazooState.LOST:
+            self.log.debug("ZooKeeper connection: LOST")
+        elif state == KazooState.SUSPENDED:
+            self.log.debug("ZooKeeper connection: SUSPENDED")
+        else:
+            self.log.debug("ZooKeeper connection: CONNECTED")
+
+
     #========================================================================
     # Public Methods
     #========================================================================
@@ -153,6 +170,7 @@ class ZooKeeper(object):
         if not self.client:
             hosts = buildZooKeeperHosts(host_list)
             self.client = KazooClient(hosts=hosts, read_only=read_only)
+            self.client.add_listener(self._connection_listener)
             self.client.start()
 
     def disconnect(self):
