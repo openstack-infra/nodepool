@@ -28,7 +28,7 @@ import nodepool.cmd
 # instead it depends on lockfile-0.9.1 which uses pidfile.
 pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
 
-class NodePoolBuilder(nodepool.cmd.NodepoolApp):
+class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
     def sigint_handler(self, signal, frame):
         self.nb.stop()
@@ -71,15 +71,15 @@ class NodePoolBuilder(nodepool.cmd.NodepoolApp):
 
 
 def main():
-    nb = NodePoolBuilder()
-    nb.parse_arguments()
+    app = NodePoolBuilderApp()
+    app.parse_arguments()
 
-    if nb.args.nodaemon:
-        nb.main()
+    if app.args.nodaemon:
+        app.main()
     else:
-        pid = pid_file_module.TimeoutPIDLockFile(nb.args.pidfile, 10)
+        pid = pid_file_module.TimeoutPIDLockFile(app.args.pidfile, 10)
         with daemon.DaemonContext(pidfile=pid):
-            nb.main()
+            app.main()
 
 
 if __name__ == "__main__":
