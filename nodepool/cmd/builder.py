@@ -16,7 +16,6 @@ import argparse
 import extras
 import signal
 import sys
-import threading
 
 import daemon
 
@@ -62,9 +61,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
             self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
-
-        nb_thread = threading.Thread(target=self.nb.run)
-        nb_thread.start()
+        self.nb.start()
 
         while True:
             signal.pause()

@@ -437,10 +437,8 @@ class BuilderFixture(fixtures.Fixture):
     def setUp(self):
         super(BuilderFixture, self).setUp()
         self.builder = builder.NodePoolBuilder(self.configfile)
-        nb_thread = threading.Thread(target=self.builder.run)
-        nb_thread.daemon = True
+        self.builder.start()
         self.addCleanup(self.cleanup)
-        nb_thread.start()
 
     def cleanup(self):
         self.builder.stop()
