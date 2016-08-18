@@ -12,6 +12,9 @@ zmq-publishers:
 gearman-servers:
   - host: localhost
 
+zookeeper-servers:
+  - host: localhost
+
 labels:
   - name: nodepool-fake
     image: nodepool-fake
