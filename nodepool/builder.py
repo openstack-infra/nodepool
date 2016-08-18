@@ -389,10 +389,6 @@ class NodePoolBuilder(object):
         if self._config.scriptdir:
             env['NODEPOOL_SCRIPTDIR'] = self._config.scriptdir
 
-        # this puts a disk-usage report in the logs so we can see if
-        # something blows up the image size.
-        env['DIB_SHOW_IMAGE_USAGE'] = '1'
-
         # send additional env vars if needed
         for k, v in image.env_vars.items():
             env[k] = v
