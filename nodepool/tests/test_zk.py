@@ -11,7 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
 import testtools
+import time
 
 from nodepool import exceptions as npe
 from nodepool import tests
@@ -174,3 +176,29 @@ class TestZooKeeper(tests.ZKTestCase):
 
         data = self.zk.getImageUpload(image, build_number, provider, upload_id)
         self.assertEqual(orig_data, data)
+
+    def test_registerBuildRequestWatch(self):
+        func = mock.MagicMock()
+        image = "ubuntu-trusty"
+        watch_path = self.zk._imageBuildRequestPath(image)
+
+        zk2 = zk.ZooKeeper()
+        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
+                                                  self.zookeeper_port,
+                                                  self.chroot_path)])
+
+        # First client registers the watch
+        self.zk.registerBuildRequestWatch(image, func)
+        self.assertIn(watch_path, self.zk._data_watches)
+
+        # Second client triggers the watch. Give ZK time to dispatch the event
+        # to the other client.
+        zk2.client.create(watch_path, makepath=True)
+        time.sleep(1)
+        zk2.disconnect()
+
+        # Make sure the registered function was called.
+        func.assert_called_once_with(mock.ANY)
+
+        # The watch should be unregistered now.
+        self.assertNotIn(watch_path, self.zk._data_watches)

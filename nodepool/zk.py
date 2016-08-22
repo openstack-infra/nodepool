@@ -69,6 +69,27 @@ def buildZooKeeperHosts(host_list):
     return ",".join(hosts)
 
 
+class ZooKeeperWatchEvent(object):
+    '''
+    Class representing a watch trigger event.
+
+    This is mostly used to not pass the kazoo event object to the function
+    registered by the caller and maintain a consistent API. Attributes of
+    this object include::
+
+        * `type` - Event type. E.g., CREATED/DELETED
+        * `state` - Event state. E.g., CONNECTED
+        * `path` - Event path. E.g., /nodepool/image/trusty/request-build
+        * `image` - Image name this event is based on. E.g., trusty
+    '''
+    def __init__(self, e_type, e_state, e_path, image):
+        self.type = e_type
+        self.state = e_state
+        self.path = e_path
+        # Pass image name so callback func doesn't need to parse from the path
+        self.image = image
+
+
 class ZooKeeper(object):
     '''
     Class implementing the ZooKeeper interface.
@@ -102,12 +123,22 @@ class ZooKeeper(object):
         self.client = client
         self._current_lock = None
 
+        # Dictionary that maps an image build request path being watched to
+        # the function to call when triggered. Why have this? We may need to
+        # handle automatically re-registering these watches for the user in
+        # the event of a disconnect from the cluster.
+        # TODO(Shrews): Hande re-registration
+        self._data_watches = {}
+
     #========================================================================
     # Private Methods
     #========================================================================
 
     def _imagePath(self, image):
         return "%s/%s" % (self.IMAGE_ROOT, image)
+
+    def _imageBuildRequestPath(self, image):
+        return "%s/request-build" % self._imagePath(image)
 
     def _imageBuildsPath(self, image):
         return "%s/builds" % self._imagePath(image)
@@ -169,6 +200,21 @@ class ZooKeeper(object):
         else:
             self.log.debug("ZooKeeper connection: CONNECTED")
 
+    def _watch_wrapper(self, event):
+        '''
+        Function used to handle watch triggers.
+
+        This handles unregistering watch events from the internal mapping
+        and calling the registered function as requested during registration.
+        '''
+        if event.path not in self._data_watches:
+            self.log.error(
+                "Got trigger on %s but watch not registered" % event.path)
+            return
+        (image, func) = self._data_watches[event.path]
+        del self._data_watches[event.path]
+        func(ZooKeeperWatchEvent(event.type, event.state, event.path, image))
+
 
     #========================================================================
     # Public Methods
@@ -184,11 +230,10 @@ class ZooKeeper(object):
         :param list host_list: A list of
             :py:class:`~nodepool.zk.ZooKeeperConnectionConfig` objects
             (one per server) defining the ZooKeeper cluster servers.
-
         :param bool read_only: If True, establishes a read-only connection.
 
         '''
-        if not self.client:
+        if self.client is None:
             hosts = buildZooKeeperHosts(host_list)
             self.client = KazooClient(hosts=hosts, read_only=read_only)
             self.client.add_listener(self._connection_listener)
@@ -201,8 +246,9 @@ class ZooKeeper(object):
         You should call this method if you used connect() to establish a
         cluster connection.
         '''
-        if self.client:
+        if self.client is not None:
             self.client.stop()
+            self.client = None
 
     def getMaxBuildId(self, image):
         '''
@@ -440,3 +486,20 @@ class ZooKeeper(object):
         self.client.create(path, self._dictToStr(image_data))
 
         return next_id
+
+    def registerBuildRequestWatch(self, image, func):
+        '''
+        Register a watch for a node create/delete or data change.
+
+        This registers a one-time watch trigger for a build request for
+        a particular image. Your handler function will need to re-register
+        after an event is received if you want to continue watching.
+
+        Your handler will receive an object of ZooKeeperWatchEvent type.
+
+        :param str image: The image name we want to watch.
+        :param func: A function to call when the watch is triggered.
+        '''
+        path = self._imageBuildRequestPath(image)
+        self._data_watches[path] = (image, func)
+        self.client.exists(path, watch=self._watch_wrapper)
