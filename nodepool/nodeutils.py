@@ -61,7 +61,8 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
                      (username, ip, count))
         except socket.error as e:
             if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
-                log.exception('Exception while testing ssh access:')
+                log.exception(
+                    'Exception while testing ssh access to %s:' % ip)
 
     out = client.ssh("test ssh access", "echo access okay", output=True)
     if "access okay" in out:
