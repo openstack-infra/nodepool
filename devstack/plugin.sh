@@ -246,6 +246,7 @@ EOF
     cat >>/tmp/clouds.yaml <<EOF
 cache:
   expiration:
+    floating-ip: 5
     server: 5
     port: 5
 EOF
