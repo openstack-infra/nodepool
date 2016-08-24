@@ -22,30 +22,49 @@ from kazoo.recipe.lock import Lock
 from nodepool import exceptions as npe
 
 
+class ZooKeeperConnectionConfig(object):
+    '''
+    Represents the connection parameters for a ZooKeeper server.
+    '''
+
+    def __eq__(self, other):
+        if isinstance(other, ZooKeeperConnectionConfig):
+            if other.__dict__ == self.__dict__:
+                return True
+        return False
+
+    def __init__(self, host, port=2181, chroot=None):
+        '''Initialize the ZooKeeperConnectionConfig object.
+
+        :param str host: The hostname of the ZooKeeper server.
+        :param int port: The port on which ZooKeeper is listening.
+            Optional, default: 2181.
+        :param str chroot: A chroot for this connection.  All
+            ZooKeeper nodes will be underneath this root path.
+            Optional, default: None.
+
+        (one per server) defining the ZooKeeper cluster servers. Only
+        the 'host' attribute is required.'.
+
+        '''
+        self.host = host
+        self.port = port
+        self.chroot = chroot or ''
+
+
 def buildZooKeeperHosts(host_list):
     '''
     Build the ZK cluster host list for client connections.
 
-    :param list host_list: A list of dicts (one per server) defining
-        the ZooKeeper cluster servers. Keys for 'host', 'port', and
-        'chroot' are expected. Only 'host' is required.'. E.g.::
-
-            [
-              dict(host='192.168.0.2'),
-              dict(host='192.168.0.3', port=2181, chroot='/junk')
-            ]
+    :param list host_list: A list of
+        :py:class:`~nodepool.zk.ZooKeeperConnectionConfig` objects (one
+        per server) defining the ZooKeeper cluster servers.
     '''
     if not isinstance(host_list, list):
         raise Exception("'host_list' must be a list")
     hosts = []
     for host_def in host_list:
-        host = host_def['host']
-        if 'port' in host_def:
-            host = host + ":%s" % host_def['port']
-        else:
-            host = host + ":2181"
-        if 'chroot' in host_def:
-            host = host + host_def['chroot']
+        host = '%s:%s%s' % (host_def.host, host_def.port, host_def.chroot)
         hosts.append(host)
     return ",".join(hosts)
 
@@ -162,10 +181,12 @@ class ZooKeeper(object):
         Convenience method if a pre-existing ZooKeeper connection is not
         supplied to the ZooKeeper object at instantiation time.
 
-        :param list host_list: A list of dicts (one per server) defining
-            the ZooKeeper cluster servers.
+        :param list host_list: A list of
+            :py:class:`~nodepool.zk.ZooKeeperConnectionConfig` objects
+            (one per server) defining the ZooKeeper cluster servers.
 
         :param bool read_only: If True, establishes a read-only connection.
+
         '''
         if not self.client:
             hosts = buildZooKeeperHosts(host_list)

@@ -21,6 +21,7 @@ from six.moves import configparser as ConfigParser
 import yaml
 
 import fakeprovider
+import zk
 
 
 class ConfigValue(object):
@@ -102,10 +103,6 @@ class GearmanServer(ConfigValue):
     pass
 
 
-class ZooKeeperServer(ConfigValue):
-    pass
-
-
 class DiskImage(ConfigValue):
     pass
 
@@ -161,12 +158,11 @@ def loadConfig(config_path):
         newconfig.gearman_servers[g.name] = g
 
     for server in config.get('zookeeper-servers', []):
-        z = ZooKeeperServer()
-        z.host = server['host']
-        z.port = server.get('port', 2181)
-        z.chroot = server.get('chroot', '')
-        z.name = z.host + '_' + str(z.port)
-        newconfig.zookeeper_servers[z.name] = z
+        z = zk.ZooKeeperConnectionConfig(server['host'],
+                                         server.get('port', 2181),
+                                         server.get('chroot', None))
+        name = z.host + '_' + str(z.port)
+        newconfig.zookeeper_servers[name] = z
 
     for provider in config.get('providers', []):
         p = Provider()

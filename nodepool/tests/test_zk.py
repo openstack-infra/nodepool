@@ -26,15 +26,18 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_buildZooKeeperHosts_single(self):
         hosts = [
-            dict(host='127.0.0.1', port=2181, chroot='/test1')
+            zk.ZooKeeperConnectionConfig('127.0.0.1', port=2181,
+                                         chroot='/test1')
         ]
         self.assertEqual('127.0.0.1:2181/test1',
                          zk.buildZooKeeperHosts(hosts))
 
     def test_buildZooKeeperHosts_multiple(self):
         hosts = [
-            dict(host='127.0.0.1', port=2181, chroot='/test1'),
-            dict(host='127.0.0.2', port=2182, chroot='/test2')
+            zk.ZooKeeperConnectionConfig('127.0.0.1', port=2181,
+                                         chroot='/test1'),
+            zk.ZooKeeperConnectionConfig('127.0.0.2', port=2182,
+                                         chroot='/test2')
         ]
         self.assertEqual('127.0.0.1:2181/test1,127.0.0.2:2182/test2',
                          zk.buildZooKeeperHosts(hosts))
@@ -89,9 +92,9 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_imageBuildLock_exception_nonblocking(self):
         zk2 = zk.ZooKeeper()
-        zk2.connect([{'host': self.zookeeper_host,
-                      'port': self.zookeeper_port,
-                      'chroot': self.chroot_path}])
+        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
+                                                  port=self.zookeeper_port,
+                                                  chroot=self.chroot_path)])
         with zk2.imageBuildLock("ubuntu-trusty", blocking=False):
             with testtools.ExpectedException(npe.ZKLockException):
                 with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
@@ -100,9 +103,9 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_imageBuildLock_exception_blocking(self):
         zk2 = zk.ZooKeeper()
-        zk2.connect([{'host': self.zookeeper_host,
-                      'port': self.zookeeper_port,
-                      'chroot': self.chroot_path}])
+        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
+                                                  port=self.zookeeper_port,
+                                                  chroot=self.chroot_path)])
         with zk2.imageBuildLock("ubuntu-trusty", blocking=False):
             with testtools.ExpectedException(npe.TimeoutException):
                 with self.zk.imageBuildLock("ubuntu-trusty",
