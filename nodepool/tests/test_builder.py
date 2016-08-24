@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import time
 import fixtures
 
 from nodepool import builder, exceptions, fakeprovider, tests
@@ -89,9 +88,6 @@ class TestBuilderScheduler(tests.DBTestCase):
         config = self.setup_config('node_dib.yaml')
         nb = builder.BuilderScheduler(config)
         nb.startBuilder()
-
-        while not nb.running:
-            time.sleep(.5)
 
         nb.stopBuilder()
 

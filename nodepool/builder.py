@@ -97,7 +97,7 @@ class BuildWorker(BaseWorker):
 
     def work(self):
         #TODO: Actually do something useful
-        time.sleep(5)
+        time.sleep(0.1)
 
     def _handleJob(self, job):
         try:
@@ -134,7 +134,7 @@ class UploadWorker(BaseWorker):
 
     def work(self):
         #TODO: Actually do something useful
-        time.sleep(5)
+        time.sleep(0.1)
 
     def _handleJob(self, job):
         try:
@@ -205,10 +205,6 @@ class BuilderScheduler(object):
         # startup process has completed.
         self._start_lock = threading.Lock()
 
-    @property
-    def running(self):
-        return self._running
-
     #=======================================================================
     # Private methods
     #=======================================================================
@@ -237,6 +233,8 @@ class BuilderScheduler(object):
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
 
+            self._running = True
+
             # Create build and upload worker objects
             for i in range(self._num_builders):
                 w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
@@ -262,8 +260,6 @@ class BuilderScheduler(object):
             watch_thread.start()
             self._threads.append(watch_thread)
 
-            self._running = True
-
     def _stop(self):
         '''
         Stop the BuilderScheduler threads.
@@ -281,7 +277,7 @@ class BuilderScheduler(object):
 
     def _registerWatches(self):
         while self._running:
-            time.sleep(5)
+            time.sleep(0.1)
 
     #=======================================================================
     # Public methods
