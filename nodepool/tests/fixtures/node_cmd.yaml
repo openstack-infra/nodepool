@@ -13,6 +13,9 @@ gearman-servers:
   - host: localhost
     port: {gearman_port}
 
+zookeeper-servers:
+  - host: localhost
+
 labels:
   - name: fake-label1
     image: fake-image1

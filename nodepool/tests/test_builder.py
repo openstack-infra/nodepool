@@ -90,7 +90,7 @@ class TestNodepoolBuilder(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
         nb = builder.NodePoolBuilder(config)
-        nb_thread = threading.Thread(target=nb.runForever)
+        nb_thread = threading.Thread(target=nb.run)
         nb_thread.daemon = True
 
         nb_thread.start()
@@ -103,6 +103,8 @@ class TestNodepoolBuilder(tests.DBTestCase):
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
+        self.skip("Skipping until ZooKeeper is enabled")
+
         # Enter a working state before we test that fails are handled.
         configfile = self.setup_config('node_dib.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
