@@ -87,9 +87,8 @@ class TestBuilderScheduler(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
         nb = builder.BuilderScheduler(config)
-        nb.startBuilder()
-
-        nb.stopBuilder()
+        nb.start()
+        nb.stop()
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""

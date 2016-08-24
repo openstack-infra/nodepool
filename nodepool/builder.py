@@ -222,16 +222,28 @@ class BuilderScheduler(object):
         if not self._config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
 
-    def _start(self):
-        '''
-        Execution block for the main scheduler thread.
+    def _registerWatches(self):
+        while self._running:
+            time.sleep(0.1)
 
-        This starts the scheduler thread and all child threads, including the
-        builders, uploaders, and watch threads.
+    #=======================================================================
+    # Public methods
+    #=======================================================================
+
+    def start(self):
+        '''
+        Start the builder.
+
+        The builder functionality is encapsulated within threads run
+        by the BuilderScheduler. This starts the needed sub-threads
+        which will run forever until we tell them to stop.
         '''
         with self._start_lock:
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
+
+            self._load_config(self._config_path)
+            self._validate_config()
 
             self._running = True
 
@@ -260,12 +272,13 @@ class BuilderScheduler(object):
             watch_thread.start()
             self._threads.append(watch_thread)
 
-    def _stop(self):
+    def stop(self):
         '''
-        Stop the BuilderScheduler threads.
+        Stop the builder.
 
-        NOTE: This method will block if called soon after startup and the
-        startup process has not yet completed.
+        Signal the sub threads to begin the shutdown process. We don't
+        want this method to return until the scheduler has successfully
+        stopped all of its own threads.
         '''
         with self._start_lock:
             self.log.debug("Stopping. BuilderScheduler shutting down workers")
@@ -274,36 +287,6 @@ class BuilderScheduler(object):
 
         # Setting _running to False will trigger the watch thread to stop.
         self._running = False
-
-    def _registerWatches(self):
-        while self._running:
-            time.sleep(0.1)
-
-    #=======================================================================
-    # Public methods
-    #=======================================================================
-
-    def startBuilder(self):
-        '''
-        Start the builder.
-
-        The builder functionality is encapsulated within threads run
-        by the BuilderScheduler. This starts the needed sub-threads
-        which will run forever until we tell them to stop.
-        '''
-        self._load_config(self._config_path)
-        self._validate_config()
-        self._start()
-
-    def stopBuilder(self):
-        '''
-        Stop the builder.
-
-        Signal the sub threads to begin the shutdown process. We don't
-        want this method to return until the scheduler has successfully
-        stopped all of its own threads.
-        '''
-        self._stop()
 
         self.log.debug('Waiting for jobs to complete')
 

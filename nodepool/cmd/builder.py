@@ -30,7 +30,7 @@ pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
 class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
     def sigint_handler(self, signal, frame):
-        self.nb.stopBuilder()
+        self.nb.stop()
         sys.exit(0)
 
     def parse_arguments(self):
@@ -61,7 +61,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
             self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
-        self.nb.startBuilder()
+        self.nb.start()
 
         while True:
             signal.pause()
