@@ -84,16 +84,16 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
         image = builder.DibImageFile('myid1234')
         self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')
 
-class TestNodepoolBuilder(tests.DBTestCase):
+class TestBuilderScheduler(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
-        nb = builder.NodePoolBuilder(config)
-        nb.start()
+        nb = builder.BuilderScheduler(config)
+        nb.startBuilder()
 
         while not nb.running:
             time.sleep(.5)
 
-        nb.stop()
+        nb.stopBuilder()
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""

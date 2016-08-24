@@ -182,8 +182,16 @@ class BuilderScheduler(object):
     '''
     log = logging.getLogger("nodepool.builder.BuilderScheduler")
 
-    def __init__(self, config, num_builders, num_uploaders):
-        self._config = config
+    def __init__(self, config_path, num_builders=1, num_uploaders=4):
+        '''
+        Initialize the BuilderScheduler object.
+
+        :param str config_path: Path to configuration file.
+        :param int num_builders: Number of build workers to start.
+        :param int num_uploaders: Number of upload workers to start.
+        '''
+        self._config_path = config_path
+        self._config = None
         self._num_builders = num_builders
         self._build_workers = []
         self._num_uploaders = num_uploaders
@@ -201,7 +209,30 @@ class BuilderScheduler(object):
     def running(self):
         return self._running
 
-    def run(self):
+    #=======================================================================
+    # Private methods
+    #=======================================================================
+
+    def _load_config(self, config_path):
+        config = nodepool_config.loadConfig(config_path)
+        provider_manager.ProviderManager.reconfigure(
+            self._config, config)
+        self._config = config
+
+    def _validate_config(self):
+        if not self._config.zookeeper_servers.values():
+            raise RuntimeError('No ZooKeeper servers specified in config.')
+
+        if not self._config.imagesdir:
+            raise RuntimeError('No images-dir specified in config.')
+
+    def _run(self):
+        '''
+        Execution block for the main scheduler thread.
+
+        This starts the scheduler thread and all child threads, including the
+        builders, uploaders, and watch threads.
+        '''
         with self._start_lock:
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
@@ -226,7 +257,7 @@ class BuilderScheduler(object):
                 self._threads.append(t)
 
             # Start our watch thread to handle ZK watch notifications
-            watch_thread = threading.Thread(target=self.registerWatches)
+            watch_thread = threading.Thread(target=self._registerWatches)
             watch_thread.daemon = True
             watch_thread.start()
             self._threads.append(watch_thread)
@@ -238,7 +269,7 @@ class BuilderScheduler(object):
         for thd in self._threads:
             thd.join()
 
-    def stop(self):
+    def _stop(self):
         '''
         Stop the BuilderScheduler threads.
 
@@ -253,42 +284,15 @@ class BuilderScheduler(object):
         # Setting _running to False will trigger the watch thread to stop.
         self._running = False
 
-    def registerWatches(self):
+    def _registerWatches(self):
         while self._running:
             time.sleep(5)
 
+    #=======================================================================
+    # Public methods
+    #=======================================================================
 
-class NodePoolBuilder(object):
-    '''
-    Class used to control the builder start and stop actions.
-
-    An instance of this class is used to start the builder threads
-    and also to terminate all threads of execution.
-    '''
-    log = logging.getLogger("nodepool.builder.NodePoolBuilder")
-
-    def __init__(self, config_path, build_workers=1, upload_workers=4):
-        self._config_path = config_path
-        self._built_image_ids = set()
-        self._config = None
-        self._build_workers = build_workers
-        self._upload_workers = upload_workers
-        self._scheduler = None
-        self.statsd = stats.get_client()
-
-    @property
-    def running(self):
-        '''
-        Return whether or not the builder is running.
-
-        Since the scheduler is implementing the builder functionality, we
-        need to query it to see if it is running and use that value.
-        '''
-        if self._scheduler is not None:
-            return self._scheduler.running
-        return False
-
-    def start(self):
+    def startBuilder(self):
         '''
         Start the builder.
 
@@ -299,18 +303,13 @@ class NodePoolBuilder(object):
         NOTE: This method returns immediately, even though the BuilderScheduler
         may not have completed its startup process.
         '''
-        self.load_config(self._config_path)
+        self._load_config(self._config_path)
         self._validate_config()
-
-        self._scheduler = BuilderScheduler(self._config,
-                                           self._build_workers,
-                                           self._upload_workers)
-
-        self._scheduler_thread = threading.Thread(target=self._scheduler.run)
+        self._scheduler_thread = threading.Thread(target=self._run)
         self._scheduler_thread.daemon = True
         self._scheduler_thread.start()
 
-    def stop(self):
+    def stopBuilder(self):
         '''
         Stop the builder.
 
@@ -319,7 +318,7 @@ class NodePoolBuilder(object):
         stopped all of its own threads. Since we haven't yet joined to that
         thread, do it here.
         '''
-        self._scheduler.stop()
+        self._stop()
 
         # Wait for the builder to complete any currently running jobs
         # by joining with the main scheduler thread which should return
@@ -331,18 +330,20 @@ class NodePoolBuilder(object):
         provider_manager.ProviderManager.stopProviders(self._config)
         self.log.debug('Finished stopping')
 
-    def load_config(self, config_path):
-        config = nodepool_config.loadConfig(config_path)
-        provider_manager.ProviderManager.reconfigure(
-            self._config, config)
-        self._config = config
 
-    def _validate_config(self):
-        if not self._config.zookeeper_servers.values():
-            raise RuntimeError('No ZooKeeper servers specified in config.')
+class NodePoolBuilder(object):
+    '''
+    Class used to control the builder start and stop actions.
 
-        if not self._config.imagesdir:
-            raise RuntimeError('No images-dir specified in config.')
+    An instance of this class is used to start the builder threads
+    and also to terminate all threads of execution.
+    '''
+    log = logging.getLogger("nodepool.builder.NodePoolBuilder")
+
+    def __init__(self):
+        self._built_image_ids = set()
+        self._config = None
+        self.statsd = stats.get_client()
 
     def canHandleImageIdJob(self, job, image_op):
         return (job.name.startswith(image_op + ':') and

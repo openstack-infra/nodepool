@@ -18,11 +18,11 @@ its most important pieces::
                             ^      |
                      bld    |      | watch
      +------------+  req    |      | trigger
-     |   client   +---------+      |           +-----------------+
-     +------------+                |           | NodepoolBuilder |
-                                   |           +---+-------------+
+     |   client   +---------+      |           +--------------------+
+     +------------+                |           | NodepoolBuilderApp |
+                                   |           +---+----------------+
                                    |               |
-                                   |               | run/stop
+                                   |               | start/stop
                                    |               |
                            +-------v-------+       |
                            |               <-------+
