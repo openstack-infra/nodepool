@@ -15,8 +15,6 @@
 
 import os
 import time
-import threading
-
 import fixtures
 
 from nodepool import builder, exceptions, fakeprovider, tests
@@ -90,16 +88,12 @@ class TestNodepoolBuilder(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
         nb = builder.NodePoolBuilder(config)
-        nb_thread = threading.Thread(target=nb.run)
-        nb_thread.daemon = True
+        nb.start()
 
-        nb_thread.start()
         while not nb.running:
             time.sleep(.5)
 
         nb.stop()
-        while nb_thread.isAlive():
-            time.sleep(.5)
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""

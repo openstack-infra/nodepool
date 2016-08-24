@@ -183,50 +183,74 @@ class BuilderScheduler(object):
     log = logging.getLogger("nodepool.builder.BuilderScheduler")
 
     def __init__(self, config, num_builders, num_uploaders):
-        self.config = config
-        self.num_builders = num_builders
-        self.build_workers = []
-        self.num_uploaders = num_uploaders
-        self.upload_workers = []
-        self.threads = []
+        self._config = config
+        self._num_builders = num_builders
+        self._build_workers = []
+        self._num_uploaders = num_uploaders
+        self._upload_workers = []
+        self._threads = []
+        self._running = False
+
+        # This lock is needed because the run() method is started in a
+        # separate thread of control, which can return before the scheduler
+        # has completed startup. We need to avoid shutting down before the
+        # startup process has completed.
+        self._start_lock = threading.Lock()
+
+    @property
+    def running(self):
+        return self._running
 
     def run(self):
-        # Create build and upload worker objects
-        for i in range(self.num_builders):
-            w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
-                            builder=self)
-            self.build_workers.append(w)
+        with self._start_lock:
+            if self._running:
+                raise exceptions.BuilderError('Cannot start, already running.')
 
-        for i in range(self.num_uploaders):
-            w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
-                             builder=self)
-            self.upload_workers.append(w)
+            # Create build and upload worker objects
+            for i in range(self._num_builders):
+                w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
+                                builder=self)
+                self._build_workers.append(w)
 
-        self.log.debug('Starting listener for build jobs')
+            for i in range(self._num_uploaders):
+                w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
+                                 builder=self)
+                self._upload_workers.append(w)
 
-        for thd in (self.build_workers + self.upload_workers):
-            t = threading.Thread(target=thd.run)
-            t.daemon = True
-            t.start()
-            self.threads.append(t)
+            self.log.debug('Starting listener for build jobs')
 
-        self._running = True
+            for thd in (self._build_workers + self._upload_workers):
+                t = threading.Thread(target=thd.run)
+                t.daemon = True
+                t.start()
+                self._threads.append(t)
 
-        # Start our watch thread to handle ZK watch notifications
-        watch_thread = threading.Thread(target=self.registerWatches)
-        watch_thread.daemon = True
-        watch_thread.start()
-        self.threads.append(watch_thread)
+            # Start our watch thread to handle ZK watch notifications
+            watch_thread = threading.Thread(target=self.registerWatches)
+            watch_thread.daemon = True
+            watch_thread.start()
+            self._threads.append(watch_thread)
+
+            self._running = True
 
         # Do not exit until all of our owned threads exit, which will only
         # happen when BuildScheduler.stop() is called.
-        for thd in self.threads:
+        for thd in self._threads:
             thd.join()
 
     def stop(self):
-        self.log.debug("BuilderScheduler shutting down workers")
-        for worker in (self.build_workers + self.upload_workers):
-            worker.shutdown()
+        '''
+        Stop the BuilderScheduler threads.
+
+        NOTE: This method will block if called soon after startup and the
+        startup process has not yet completed.
+        '''
+        with self._start_lock:
+            self.log.debug("Stopping. BuilderScheduler shutting down workers")
+            for worker in (self._build_workers + self._upload_workers):
+                worker.shutdown()
+
+        # Setting _running to False will trigger the watch thread to stop.
         self._running = False
 
     def registerWatches(self):
@@ -236,47 +260,55 @@ class BuilderScheduler(object):
 
 class NodePoolBuilder(object):
     '''
-    Class used to control the builder functionality.
+    Class used to control the builder start and stop actions.
+
+    An instance of this class is used to start the builder threads
+    and also to terminate all threads of execution.
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
     def __init__(self, config_path, build_workers=1, upload_workers=4):
         self._config_path = config_path
-        self._running = False
         self._built_image_ids = set()
-        self._start_lock = threading.Lock()
         self._config = None
         self._build_workers = build_workers
         self._upload_workers = upload_workers
+        self._scheduler = None
         self.statsd = stats.get_client()
 
     @property
     def running(self):
-        return self._running
+        '''
+        Return whether or not the builder is running.
 
-    def run(self):
+        Since the scheduler is implementing the builder functionality, we
+        need to query it to see if it is running and use that value.
+        '''
+        if self._scheduler is not None:
+            return self._scheduler.running
+        return False
+
+    def start(self):
         '''
         Start the builder.
 
         The builder functionality is encapsulated within the BuilderScheduler
         code. This starts the main scheduler thread, which will run forever
         until we tell it to stop.
+
+        NOTE: This method returns immediately, even though the BuilderScheduler
+        may not have completed its startup process.
         '''
-        with self._start_lock:
-            if self._running:
-                raise exceptions.BuilderError('Cannot start, already running.')
+        self.load_config(self._config_path)
+        self._validate_config()
 
-            self.load_config(self._config_path)
-            self._validate_config()
+        self._scheduler = BuilderScheduler(self._config,
+                                           self._build_workers,
+                                           self._upload_workers)
 
-            self.scheduler = BuilderScheduler(self._config,
-                                              self._build_workers,
-                                              self._upload_workers)
-
-            self.scheduler_thread = threading.Thread(target=self.scheduler.run)
-            self.scheduler_thread.daemon = True
-            self.scheduler_thread.start()
-            self._running = True
+        self._scheduler_thread = threading.Thread(target=self._scheduler.run)
+        self._scheduler_thread.daemon = True
+        self._scheduler_thread.start()
 
     def stop(self):
         '''
@@ -287,25 +319,17 @@ class NodePoolBuilder(object):
         stopped all of its own threads. Since we haven't yet joined to that
         thread, do it here.
         '''
-        with self._start_lock:
-            self.log.debug('Stopping.')
-            if not self._running:
-                self.log.warning("Stop called when already stopped")
-                return
+        self._scheduler.stop()
 
-            self.scheduler.stop()
+        # Wait for the builder to complete any currently running jobs
+        # by joining with the main scheduler thread which should return
+        # when all of its worker threads are done.
+        self.log.debug('Waiting for jobs to complete')
+        self._scheduler_thread.join()
 
-            # Wait for the builder to complete any currently running jobs
-            # by joining with the main scheduler thread which should return
-            # when all of its worker threads are done.
-            self.log.debug('Waiting for jobs to complete')
-            self.scheduler_thread.join()
-
-            self.log.debug('Stopping providers')
-            provider_manager.ProviderManager.stopProviders(self._config)
-            self.log.debug('Finished stopping')
-
-            self._running = False
+        self.log.debug('Stopping providers')
+        provider_manager.ProviderManager.stopProviders(self._config)
+        self.log.debug('Finished stopping')
 
     def load_config(self, config_path):
         config = nodepool_config.loadConfig(config_path)
