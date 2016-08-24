@@ -226,7 +226,7 @@ class BuilderScheduler(object):
         if not self._config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
 
-    def _run(self):
+    def _start(self):
         '''
         Execution block for the main scheduler thread.
 
@@ -264,11 +264,6 @@ class BuilderScheduler(object):
 
             self._running = True
 
-        # Do not exit until all of our owned threads exit, which will only
-        # happen when BuildScheduler.stop() is called.
-        for thd in self._threads:
-            thd.join()
-
     def _stop(self):
         '''
         Stop the BuilderScheduler threads.
@@ -296,35 +291,29 @@ class BuilderScheduler(object):
         '''
         Start the builder.
 
-        The builder functionality is encapsulated within the BuilderScheduler
-        code. This starts the main scheduler thread, which will run forever
-        until we tell it to stop.
-
-        NOTE: This method returns immediately, even though the BuilderScheduler
-        may not have completed its startup process.
+        The builder functionality is encapsulated within threads run
+        by the BuilderScheduler. This starts the needed sub-threads
+        which will run forever until we tell them to stop.
         '''
         self._load_config(self._config_path)
         self._validate_config()
-        self._scheduler_thread = threading.Thread(target=self._run)
-        self._scheduler_thread.daemon = True
-        self._scheduler_thread.start()
+        self._start()
 
     def stopBuilder(self):
         '''
         Stop the builder.
 
-        Signal the scheduler thread to begin the shutdown process. We don't
+        Signal the sub threads to begin the shutdown process. We don't
         want this method to return until the scheduler has successfully
-        stopped all of its own threads. Since we haven't yet joined to that
-        thread, do it here.
+        stopped all of its own threads.
         '''
         self._stop()
 
-        # Wait for the builder to complete any currently running jobs
-        # by joining with the main scheduler thread which should return
-        # when all of its worker threads are done.
         self.log.debug('Waiting for jobs to complete')
-        self._scheduler_thread.join()
+
+        # Do not exit until all of our owned threads exit.
+        for thd in self._threads:
+            thd.join()
 
         self.log.debug('Stopping providers')
         provider_manager.ProviderManager.stopProviders(self._config)
