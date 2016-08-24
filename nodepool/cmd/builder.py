@@ -56,7 +56,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
     def main(self):
         self.setup_logging()
-        self.nb = builder.BuilderScheduler(
+        self.nb = builder.NodePoolBuilder(
             self.args.config, self.args.build_workers,
             self.args.upload_workers)
 

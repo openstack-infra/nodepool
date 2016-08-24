@@ -83,10 +83,10 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
         image = builder.DibImageFile('myid1234')
         self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')
 
-class TestBuilderScheduler(tests.DBTestCase):
+class TestNodePoolBuilder(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
-        nb = builder.BuilderScheduler(config)
+        nb = builder.NodePoolBuilder(config)
         nb.start()
         nb.stop()
 

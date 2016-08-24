@@ -168,11 +168,11 @@ class UploadWorker(BaseWorker):
             job.sendWorkException(traceback.format_exc())
 
 
-class BuilderScheduler(object):
+class NodePoolBuilder(object):
     '''
-    Class used for thread of execution for the builder scheduler.
+    Main class for the Nodepool Builder.
 
-    The builder scheduler has the responsibility to:
+    The builder has the responsibility to:
 
         * Handle the image updating process as scheduled via the image-update
           cron job defined within the `cron` config section.
@@ -180,11 +180,11 @@ class BuilderScheduler(object):
           workers for those events.
         * Start and maintain the working state of each worker thread.
     '''
-    log = logging.getLogger("nodepool.builder.BuilderScheduler")
+    log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
     def __init__(self, config_path, num_builders=1, num_uploaders=4):
         '''
-        Initialize the BuilderScheduler object.
+        Initialize the NodePoolBuilder object.
 
         :param str config_path: Path to configuration file.
         :param int num_builders: Number of build workers to start.
@@ -235,7 +235,7 @@ class BuilderScheduler(object):
         Start the builder.
 
         The builder functionality is encapsulated within threads run
-        by the BuilderScheduler. This starts the needed sub-threads
+        by the NodePoolBuilder. This starts the needed sub-threads
         which will run forever until we tell them to stop.
         '''
         with self._start_lock:
@@ -281,7 +281,7 @@ class BuilderScheduler(object):
         stopped all of its own threads.
         '''
         with self._start_lock:
-            self.log.debug("Stopping. BuilderScheduler shutting down workers")
+            self.log.debug("Stopping. NodePoolBuilder shutting down workers")
             for worker in (self._build_workers + self._upload_workers):
                 worker.shutdown()
 
@@ -299,12 +299,10 @@ class BuilderScheduler(object):
         self.log.debug('Finished stopping')
 
 
-class NodePoolBuilder(object):
+class OldNodePoolBuilder(object):
     '''
-    Class used to control the builder start and stop actions.
-
-    An instance of this class is used to start the builder threads
-    and also to terminate all threads of execution.
+    Methods used by the builder that have not moved to the new
+    system yet.
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
