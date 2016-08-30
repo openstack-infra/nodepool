@@ -13,13 +13,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import json
 import logging
 import os
 import subprocess
 import threading
 import time
-import traceback
 
 import shlex
 
@@ -75,97 +73,71 @@ class DibImageFile(object):
 
 
 class BaseWorker(object):
-    nplog = logging.getLogger("nodepool.builder.BaseWorker")
+    log = logging.getLogger("nodepool.builder.BaseWorker")
 
-    def __init__(self, *args, **kw):
-        super(BaseWorker, self).__init__()
-        self.builder = kw.pop('builder')
-        self.images = []
+    def __init__(self):
         self._running = False
+
+    @property
+    def running(self):
+        return self._running
 
     def run(self):
         self._running = True
         while self._running:
             self.work()
+            # TODO: Make this configurable
+            time.sleep(0.1)
 
     def shutdown(self):
         self._running = False
 
 
 class BuildWorker(BaseWorker):
-    nplog = logging.getLogger("nodepool.builder.BuildWorker")
+    log = logging.getLogger("nodepool.builder.BuildWorker")
+
+    def __init__(self, config_path):
+        super(BuildWorker, self).__init__()
+        self._config = None
+        self._config_path = config_path
+
+    def _checkForUpdatedConfig(self, new_config):
+        '''
+        Check for changes to the config file (new images, etc).
+        '''
+        pass
+
+    def _checkForScheduledImageUpdates(self):
+        '''
+        Check every DIB image to see if it has aged out and needs rebuilt.
+        '''
+        for name, image in self._config.diskimages.items():
+            # TODO(Shrews): rebuild based on image.rebuild_age
+            pass
+
+    def _checkForManualBuildRequest(self):
+        '''
+        Query ZooKeeper for any manual image build requests.
+        '''
+        pass
 
     def work(self):
-        #TODO: Actually do something useful
-        time.sleep(0.1)
+        new_config = nodepool_config.loadConfig(self._config_path)
+        self._checkForUpdatedConfig(new_config)
+        self._config = new_config
 
-    def _handleJob(self, job):
-        try:
-            self.nplog.debug('Got job %s with data %s',
-                             job.name, job.arguments)
-            if job.name.startswith('image-build:'):
-                args = json.loads(job.arguments)
-                image_id = args['image-id']
-                if '/' in image_id:
-                    raise exceptions.BuilderInvalidCommandError(
-                        'Invalid image-id specified'
-                    )
-
-                image_name = job.name.split(':', 1)[1]
-                try:
-                    self.builder.buildImage(image_name, image_id)
-                except exceptions.BuilderError:
-                    self.nplog.exception('Exception while building image')
-                    job.sendWorkFail()
-                else:
-                    # We can now upload this image
-                    self.builder.registerImageId(image_id)
-                    job.sendWorkComplete(json.dumps({'image-id': image_id}))
-            else:
-                self.nplog.error('Unable to handle job %s', job.name)
-                job.sendWorkFail()
-        except Exception:
-            self.nplog.exception('Exception while running job')
-            job.sendWorkException(traceback.format_exc())
+        self._checkForScheduledImageUpdates()
+        self._checkForManualBuildRequest()
 
 
 class UploadWorker(BaseWorker):
-    nplog = logging.getLogger("nodepool.builder.UploadWorker")
+    log = logging.getLogger("nodepool.builder.UploadWorker")
+
+    def __init__(self):
+        super(UploadWorker, self).__init__()
 
     def work(self):
-        #TODO: Actually do something useful
-        time.sleep(0.1)
-
-    def _handleJob(self, job):
-        try:
-            self.nplog.debug('Got job %s with data %s',
-                             job.name, job.arguments)
-            if self.builder.canHandleImageIdJob(job, 'image-upload'):
-                args = json.loads(job.arguments)
-                image_name = args['image-name']
-                image_id = job.name.split(':')[1]
-                try:
-                    external_id = self.builder.uploadImage(image_id,
-                                                           args['provider'],
-                                                           image_name)
-                except exceptions.BuilderError:
-                    self.nplog.exception('Exception while uploading image')
-                    job.sendWorkFail()
-                else:
-                    job.sendWorkComplete(
-                        json.dumps({'external-id': external_id})
-                    )
-            elif self.builder.canHandleImageIdJob(job, 'image-delete'):
-                image_id = job.name.split(':')[1]
-                self.builder.deleteImage(image_id)
-                self.builder.unregisterImageId(image_id)
-                job.sendWorkComplete()
-            else:
-                self.nplog.error('Unable to handle job %s', job.name)
-                job.sendWorkFail()
-        except Exception:
-            self.nplog.exception('Exception while running job')
-            job.sendWorkException(traceback.format_exc())
+        pass
 
 
 class NodePoolBuilder(object):
@@ -209,22 +181,13 @@ class NodePoolBuilder(object):
     # Private methods
     #=======================================================================
 
-    def _load_config(self, config_path):
-        config = nodepool_config.loadConfig(config_path)
-        provider_manager.ProviderManager.reconfigure(
-            self._config, config)
-        self._config = config
-
-    def _validate_config(self):
-        if not self._config.zookeeper_servers.values():
+    def _getAndValidateConfig(self):
+        config = nodepool_config.loadConfig(self._config_path)
+        if not config.zookeeper_servers.values():
             raise RuntimeError('No ZooKeeper servers specified in config.')
-
-        if not self._config.imagesdir:
+        if not config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
-
-    def _registerWatches(self):
-        while self._running:
-            time.sleep(0.1)
+        return config
 
     #=======================================================================
     # Public methods
@@ -242,20 +205,16 @@ class NodePoolBuilder(object):
             if self._running:
                 raise exceptions.BuilderError('Cannot start, already running.')
 
-            self._load_config(self._config_path)
-            self._validate_config()
-
+            self._config = self._getAndValidateConfig()
             self._running = True
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker('Nodepool Builder Build Worker %s' % (i+1,),
-                                builder=self)
+                w = BuildWorker(self._config_path)
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker('Nodepool Builder Upload Worker %s' % (i+1,),
-                                 builder=self)
+                w = UploadWorker()
                 self._upload_workers.append(w)
 
             self.log.debug('Starting listener for build jobs')
@@ -266,11 +225,13 @@ class NodePoolBuilder(object):
                 t.start()
                 self._threads.append(t)
 
-            # Start our watch thread to handle ZK watch notifications
-            watch_thread = threading.Thread(target=self._registerWatches)
-            watch_thread.daemon = True
-            watch_thread.start()
-            self._threads.append(watch_thread)
+            # Wait until all threads are running. Otherwise, we have a race
+            # on the worker _running attribute if shutdown() is called before
+            # run() actually begins.
+            while not all([
+                x.running for x in (self._build_workers + self._upload_workers)
+            ]):
+                pass
 
     def stop(self):
         '''
@@ -285,7 +246,6 @@ class NodePoolBuilder(object):
             for worker in (self._build_workers + self._upload_workers):
                 worker.shutdown()
 
-        # Setting _running to False will trigger the watch thread to stop.
         self._running = False
 
         self.log.debug('Waiting for jobs to complete')
