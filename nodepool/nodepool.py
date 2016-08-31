@@ -1226,7 +1226,6 @@ class NodePool(threading.Thread):
 
     def reconfigureCrons(self, config):
         cron_map = {
-            'image-update': self._doUpdateImages,
             'cleanup': self._doPeriodicCleanup,
             'check': self._doPeriodicCheck,
             }
@@ -1629,6 +1628,8 @@ class NodePool(threading.Thread):
                     self.log.exception("Exception in missing image check:")
 
     def _doUpdateImages(self):
+        # TODO(jeblair): remove this; functionality is moving to
+        # builder
         try:
             with self.getDB().getSession() as session:
                 self.updateImages(session)

@@ -115,17 +115,14 @@ cron
 ----
 This section is optional.
 
-Nodepool runs several periodic tasks.  The ``image-update`` task
-creates a new image for each of the defined images, typically used to
-keep the data cached on the images up to date.  The ``cleanup`` task
-deletes old images and servers which may have encountered errors
-during their initial deletion.  The ``check`` task attempts to log
-into each node that is waiting to be used to make sure that it is
-still operational.  The following illustrates how to change the
-schedule for these tasks and also indicates their default values::
+Nodepool runs several periodic tasks.  The ``cleanup`` task deletes
+old images and servers which may have encountered errors during their
+initial deletion.  The ``check`` task attempts to log into each node
+that is waiting to be used to make sure that it is still operational.
+The following illustrates how to change the schedule for these tasks
+and also indicates their default values::
 
   cron:
-    image-update: '14 2 * * *'
     cleanup: '27 */6 * * *'
     check: '*/15 * * * *'
 
@@ -242,7 +239,7 @@ will be built using the provider snapshot approach::
 
   diskimages:
   - name: devstack-precise
-    elements:
+    rebuild-age: 86400
       - ubuntu
       - vm
       - puppet
@@ -260,6 +257,11 @@ will be built using the provider snapshot approach::
     Identifier to reference the disk image in :ref:`images` and :ref:`labels`.
 
 **optional**
+
+  ``rebuild-age``
+    If the current diskimage is older than this value (in seconds),
+    then nodepool will attempt to rebuild it.  Defaults to 86400 (24
+    hours).
 
   ``release``
     Specifies the distro to be used as a base image to build the image using

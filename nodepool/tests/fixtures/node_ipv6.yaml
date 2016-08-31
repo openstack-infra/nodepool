@@ -5,7 +5,6 @@ images-dir: '{images_dir}'
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881

@@ -177,7 +177,6 @@ targets:
 cron:
   cleanup: '*/1 * * * *'
   check: '*/15 * * * *'
-  image-update: '14 14 * * *'
 
 # Devstack does not make an Ubuntu image by default. You can
 # grab one from Ubuntu and upload it yourself. Note that we
@@ -226,6 +225,7 @@ providers:
 
 diskimages:
   - name: ubuntu-dib
+    rebuild-age: 86400
     elements:
       - ubuntu-minimal
       - vm

@@ -27,7 +27,6 @@ class ConfigValidator:
         cron = {
             'check': str,
             'cleanup': str,
-            'image-update': str,
         }
 
         images = {
@@ -109,6 +108,7 @@ class ConfigValidator:
             'name': str,
             'elements': [str],
             'release': v.Any(str, int),
+            'rebuild-age': int,
             'env-vars': dict,
         }
 

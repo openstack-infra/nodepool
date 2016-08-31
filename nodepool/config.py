@@ -134,7 +134,6 @@ def loadConfig(config_path):
     newconfig.crons = {}
 
     for name, default in [
-        ('image-update', '14 2 * * *'),
         ('cleanup', '* * * * *'),
         ('check', '*/15 * * * *'),
         ]:
@@ -248,6 +247,7 @@ def loadConfig(config_path):
             # d-i-b, but might be untyped in the yaml and
             # interpreted as a number (e.g. "21" for fedora)
             d.release = str(diskimage.get('release', ''))
+            d.rebuild_age = int(diskimage.get('rebuild-age', 86400))
             d.env_vars = diskimage.get('env-vars', {})
             if not isinstance(d.env_vars, dict):
                 #self.log.error("%s: ignoring env-vars; "

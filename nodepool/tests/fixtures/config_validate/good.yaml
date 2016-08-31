@@ -5,7 +5,6 @@ images-dir: /opt/nodepool_dib
 cron:
   cleanup: '*/1 * * * *'
   check: '*/15 * * * *'
-  image-update: '14 14 * * *'
 
 zmq-publishers:
   - tcp://jenkins01.openstack.org:8888
@@ -994,6 +993,7 @@ diskimages:
       - nodepool-base
       - node-devstack
     release: trusty
+    rebuild-age: 3600
     env-vars:
       TMPDIR: /opt/dib_tmp
       DIB_IMAGE_CACHE: /opt/dib_cache
