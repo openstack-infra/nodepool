@@ -183,9 +183,13 @@ class ProviderManager(TaskManager):
                      nodepool_image_name=None,
                      nodepool_snapshot_image_id=None):
         if image_name:
-            image_id = self.findImage(image_name)['id']
+            image = self.findImage(image_name)
+        else:
+            image = {'id': image_id}
         flavor = self.findFlavor(min_ram, name_filter)
-        create_args = dict(name=name, image=image_id, flavor=flavor['id'],
+        create_args = dict(name=name,
+                           image=image,
+                           flavor=flavor,
                            config_drive=config_drive)
         if key_name:
             create_args['key_name'] = key_name
