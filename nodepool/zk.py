@@ -246,8 +246,9 @@ class ZooKeeper(object):
         You should call this method if you used connect() to establish a
         cluster connection.
         '''
-        if self.client is not None:
+        if self.client is not None and self.client.connected:
             self.client.stop()
+            self.client.close()
             self.client = None
 
     def getMaxBuildId(self, image):
