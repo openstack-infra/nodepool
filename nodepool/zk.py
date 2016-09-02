@@ -488,6 +488,29 @@ class ZooKeeper(object):
 
         return next_id
 
+    def hasBuildRequest(self, image):
+        '''
+        Check if an image has a pending build request.
+
+        :param str image: The image name to check.
+
+        :returns: True if request is pending, False otherwise
+        '''
+        path = self._imageBuildRequestPath(image)
+        if self.client.exists(path) is not None:
+            return True
+        return False
+
+    def removeBuildRequest(self, image):
+        '''
+        Remove an image build request.
+
+        :param str image: The image name to check.
+        '''
+        path = self._imageBuildRequestPath(image)
+        if self.hasBuildRequest(image):
+            self.client.delete(path)
+
     def registerBuildRequestWatch(self, image, func):
         '''
         Register a watch for a node create/delete or data change.

@@ -207,3 +207,17 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.sendHeartbeat()
         # Not sure what to test here other than it's actually connected
         self.assertTrue(self.zkclient.connected)
+
+    def test_hasBuildRequest(self):
+        image = "ubuntu-trusty"
+        path = self.zk._imageBuildRequestPath(image)
+        self.zk.client.create(path, makepath=True)
+        self.assertTrue(self.zk.hasBuildRequest(image))
+
+    def test_removeBuildRequest(self):
+        image = "ubuntu-trusty"
+        path = self.zk._imageBuildRequestPath(image)
+        self.zk.client.create(path, makepath=True)
+        self.assertTrue(self.zk.hasBuildRequest(image))
+        self.zk.removeBuildRequest(image)
+        self.assertFalse(self.zk.hasBuildRequest(image))
