@@ -253,7 +253,7 @@ class NodePoolBuilder(object):
             while not all([
                 x.running for x in (self._build_workers + self._upload_workers)
             ]):
-                pass
+                time.sleep(0)
 
     def stop(self):
         '''
