@@ -72,10 +72,12 @@ class DibImageFile(object):
         return my_path
 
 
-class BaseWorker(object):
+class BaseWorker(threading.Thread):
     log = logging.getLogger("nodepool.builder.BaseWorker")
 
     def __init__(self):
+        super(BaseWorker, self).__init__()
+        self.daemon = True
         self._running = False
 
     @property
@@ -168,7 +170,6 @@ class NodePoolBuilder(object):
         self._build_workers = []
         self._num_uploaders = num_uploaders
         self._upload_workers = []
-        self._threads = []
         self._running = False
 
         # This lock is needed because the run() method is started in a
@@ -208,22 +209,18 @@ class NodePoolBuilder(object):
             self._config = self._getAndValidateConfig()
             self._running = True
 
+            self.log.debug('Starting listener for build jobs')
+
             # Create build and upload worker objects
             for i in range(self._num_builders):
                 w = BuildWorker(self._config_path)
+                w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
                 w = UploadWorker()
+                w.start()
                 self._upload_workers.append(w)
-
-            self.log.debug('Starting listener for build jobs')
-
-            for thd in (self._build_workers + self._upload_workers):
-                t = threading.Thread(target=thd.run)
-                t.daemon = True
-                t.start()
-                self._threads.append(t)
 
             # Wait until all threads are running. Otherwise, we have a race
             # on the worker _running attribute if shutdown() is called before
@@ -251,8 +248,8 @@ class NodePoolBuilder(object):
         self.log.debug('Waiting for jobs to complete')
 
         # Do not exit until all of our owned threads exit.
-        for thd in self._threads:
-            thd.join()
+        for worker in (self._build_workers + self._upload_workers):
+            worker.join()
 
         self.log.debug('Stopping providers')
         provider_manager.ProviderManager.stopProviders(self._config)
