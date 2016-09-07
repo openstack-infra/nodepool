@@ -133,10 +133,7 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertEqual(orig_data, data)
 
     def test_getBuild_not_found(self):
-        with testtools.ExpectedException(
-            npe.ZKException, "Cannot find build data .*"
-        ):
-            self.zk.getBuild("ubuntu-trusty", 0)
+        self.assertIsNone(self.zk.getBuild("ubuntu-trusty", 0))
 
     def test_getImageUpload_not_found(self):
         image = "ubuntu-trusty"
@@ -223,3 +220,20 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertTrue(self.zk.hasBuildRequest(image))
         self.zk.removeBuildRequest(image)
         self.assertFalse(self.zk.hasBuildRequest(image))
+
+    def test_getMostRecentBuild(self):
+        image = "ubuntu-trusty"
+        path = self.zk._imageBuildsPath(image)
+        v1 = {'state': 'ready', 'state_time': int(time.time())}
+        v2 = {'state': 'ready', 'state_time': v1['state_time'] + 10}
+        v3 = {'state': 'delete', 'state_time': v2['state_time'] + 10}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+
+        # v2 should be the most recent 'ready' build
+        data = self.zk.getMostRecentBuild(image, 'ready')
+        self.assertEqual(data, v2)

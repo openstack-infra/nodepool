@@ -333,18 +333,48 @@ class ZooKeeper(object):
         :param str image: The image name.
         :param int build_number: The image build number.
 
-        :returns: The dictionary of build data.
+        :returns: The dictionary of build data, or None if not found.
         '''
         path = self._imageBuildsPath(image) + "/%s" % build_number
 
         if not self.client.exists(path):
-            raise npe.ZKException(
-                "Cannot find build data (image: %s, build: %s)" % (
-                    image, build_number)
-            )
+            return None
 
         data, stat = self.client.get(path)
         return self._strToDict(data)
+
+    def getMostRecentBuild(self, image, state="ready"):
+        '''
+        Retrieve the most recent image build data with the given state.
+
+        :param str image: The image name.
+        :param str state: The build state to match on.
+
+        :returns: The most recent dictionary of build data matching the
+            given state, or None if there was no build matching the state.
+        '''
+        path = self._imageBuildsPath(image)
+
+        if not self.client.exists(path):
+            return None
+
+        builds = self.client.get_children(path)
+        if not builds:
+            return None
+
+        recent = None
+        for build in builds:
+            if build == 'lock':   # skip the build lock node
+                continue
+            data = self.getBuild(image, build)
+            if data.get('state', '') != state:
+                continue
+            elif (recent is None or
+                  recent['state_time'] < data.get('state_time', 0)
+            ):
+                recent = data
+
+        return recent
 
     def storeBuild(self, image, build_data, build_number=None):
         '''
