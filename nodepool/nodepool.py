@@ -2171,6 +2171,7 @@ class NodePool(threading.Thread):
             if len(images) > 1:
                 previous = images[1]
             if (image != current and image != previous and
+                    image.state != nodedb.BUILDING and
                     (now - image.state_time) > IMAGE_CLEANUP):
                 self.log.info("Deleting image id: %s which is "
                               "%s hours old" %

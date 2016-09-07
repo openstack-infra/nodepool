@@ -692,7 +692,7 @@ class TestNodepool(tests.DBTestCase):
             node = session.getNode(2)
             self.assertEqual(node, None)
 
-    def test_dont_delete_building_images(self):
+    def test_dont_delete_building_dib_images(self):
         """Test we don't delete building dib images"""
         # Get a valid image
         configfile = self.setup_config('node_dib.yaml')
@@ -719,6 +719,36 @@ class TestNodepool(tests.DBTestCase):
             dib_image = session.getDibImage(1)
             self.assertEqual(dib_image.state, nodedb.BUILDING)
             self.assertTrue(time.time() - dib_image.state_time > timeout)
+
+    def test_dont_delete_building_snap_images(self):
+        """Test we don't delete building snapshot images"""
+        # Get a valid image
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        # Because this builds a dib image we also get a snapshot entry
+        # for the uploaded cloud provider image.
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        timeout = nodepool.nodepool.IMAGE_CLEANUP
+
+        # Modify the image to be BUILDING and have a state time older
+        # than the cleanup time.
+        with pool.getDB().getSession() as session:
+            snap_image = session.getSnapshotImage(1)
+            snap_image.state = nodedb.BUILDING
+            snap_image.state_time = time.time() - timeout - 1
+            session.commit()
+
+            # Run cleanup which should not delete the building image
+            pool.cleanupOneImage(session, snap_image)
+
+        # Check that the image is still present in a new session
+        with pool.getDB().getSession() as session:
+            snap_image = session.getSnapshotImage(1)
+            self.assertEqual(snap_image.state, nodedb.BUILDING)
+            self.assertTrue(time.time() - snap_image.state_time > timeout)
 
 class TestGearClient(tests.DBTestCase):
     def test_wait_for_completion(self):
