@@ -143,7 +143,7 @@ class ZooKeeper(object):
     def _imageBuildsPath(self, image):
         return "%s/builds" % self._imagePath(image)
 
-    def _imageLockPath(self, image):
+    def _imageBuildLockPath(self, image):
         return "%s/lock" % self._imageBuildsPath(image)
 
     def _imageUploadPath(self, image, build_number, provider):
@@ -156,9 +156,9 @@ class ZooKeeper(object):
     def _strToDict(self, data):
         return json.loads(data)
 
-    def _getImageLock(self, image, blocking=True, timeout=None):
+    def _getImageBuildLock(self, image, blocking=True, timeout=None):
         # If we don't already have a znode for this image, create it.
-        image_lock = self._imageLockPath(image)
+        image_lock = self._imageBuildLockPath(image)
         try:
             self.client.ensure_path(self._imagePath(image))
             self._current_lock = Lock(self.client, image_lock)
@@ -171,21 +171,6 @@ class ZooKeeper(object):
         # because someone else has it.
         if not have_lock:
             raise npe.ZKLockException("Did not get lock on %s" % image_lock)
-
-    def _getImageBuildLock(self, image, blocking=True, timeout=None):
-        '''
-        This differs from _get_image_lock() in that it creates a new build
-        znode and returns its name to the caller.
-        '''
-        self._getImageLock(image, blocking, timeout)
-
-        # Create new znode with new build_number
-        build_number = self.getMaxBuildId(image) + 1
-        self.client.create(
-            self._imageBuildsPath(image) + "/%s" % build_number
-        )
-
-        return build_number
 
     def _connection_listener(self, state):
         '''
@@ -314,52 +299,18 @@ class ZooKeeper(object):
         return max_found
 
     @contextmanager
-    def imageLock(self, image, blocking=True, timeout=None):
-        '''
-        Context manager to use for locking an image.
-
-        Obtains a write lock for the specified image. A thread of control
-        using this API may have only one image locked at a time. This is
-        different from image_build_lock() in that a new build node is NOT
-        created and returned.
-
-        :param str image: Name of the image to lock
-        :param bool blocking: Whether or not to block on trying to
-            acquire the lock
-        :param int timeout: When blocking, how long to wait for the lock
-            to get acquired. None, the default, waits forever.
-
-        :raises: TimeoutException if we failed to acquire the lock when
-            blocking with a timeout. ZKLockException if we are not blocking
-            and could not get the lock, or a lock is already held.
-        '''
-        if self._current_lock:
-            raise npe.ZKLockException("A lock is already held.")
-
-        try:
-            yield self._getImageLock(image, blocking, timeout)
-        finally:
-            if self._current_lock:
-                self._current_lock.release()
-                self._current_lock = None
-
-    @contextmanager
     def imageBuildLock(self, image, blocking=True, timeout=None):
         '''
-        Context manager to use for locking new image builds.
+        Context manager to use for locking image builds.
 
         Obtains a write lock for the specified image. A thread of control
-        using this API may have only one image locked at a time. A new
-        znode is created with the next highest build number. This build
-        number is returned to the caller.
+        using this API may have only one image locked at a time.
 
         :param str image: Name of the image to lock
         :param bool blocking: Whether or not to block on trying to
             acquire the lock
         :param int timeout: When blocking, how long to wait for the lock
             to get acquired. None, the default, waits forever.
-
-        :returns: A integer to use for the new build id.
 
         :raises: TimeoutException if we failed to acquire the lock when
             blocking with a timeout. ZKLockException if we are not blocking
@@ -395,7 +346,7 @@ class ZooKeeper(object):
         data, stat = self.client.get(path)
         return self._strToDict(data)
 
-    def storeBuild(self, image, build_number, build_data):
+    def storeBuild(self, image, build_data, build_number=None):
         '''
         Store the image build data.
 
@@ -404,21 +355,30 @@ class ZooKeeper(object):
         The build data is expected to be represented as a dict. This dict may
         contain any data, as appropriate.
 
-        :param str image: The image name for which we have data.
-        :param int build_number: The image build number.
-        :param dict build_data: The build data.
+        If a build number is not supplied, then a new build node/number is
+        created. The new build number is available in the return value.
 
-        :raises: ZKException if the build znode does not exist (it is created
-            with the image_build_lock() context manager).
+        .. important: You should have the image locked before calling this
+            method.
+
+        :param str image: The image name for which we have data.
+        :param dict build_data: The build data.
+        :param int build_number: The image build number.
+
+        :returns: The build number that was updated.
         '''
+        if build_number is None:
+            build_number = self.getMaxBuildId(image) + 1
+
         path = self._imageBuildsPath(image) + "/%s" % build_number
 
-        # The build path won't exist until it's created with the build lock
         if not self.client.exists(path):
-            raise npe.ZKException(
-                "%s does not exist. Did you lock it?" % path)
+            self.client.create(
+                self._imageBuildsPath(image) + "/%s" % build_number
+            )
 
         self.client.set(path, self._dictToStr(build_data))
+        return build_number
 
     def getImageUpload(self, image, build_number, provider,
                          upload_number=None):

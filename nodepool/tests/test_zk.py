@@ -88,9 +88,9 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.client.create(test_root, makepath=True)
         self.zk.client.create(test_root + "/10")
 
-        with self.zk.imageBuildLock("ubuntu-trusty", blocking=False) as e:
-            # Make sure the volume goes to 11
-            self.assertEqual(11, e)
+        with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
+            self.assertIsNotNone(self.zk._current_lock)
+        self.assertIsNone(self.zk._current_lock)
 
     def test_imageBuildLock_exception_nonblocking(self):
         zk2 = zk.ZooKeeper()
@@ -116,18 +116,20 @@ class TestZooKeeper(tests.ZKTestCase):
                     pass
         zk2.disconnect()
 
-    def test_storeBuild_not_locked(self):
-        with testtools.ExpectedException(npe.ZKException):
-            self.zk.storeBuild("ubuntu-trusty", 123, "")
+    def test_storeBuild_new(self):
+        image = "ubuntu-trusty"
+        test_root = self.zk._imageBuildsPath(image)
+        self.zk.client.create(test_root, makepath=True)
+        self.zk.client.create(test_root + "/10")
+        self.assertEqual(11, self.zk.storeBuild(image, {}))
 
     def test_store_and_get_build(self):
+        image = "ubuntu-trusty"
         orig_data = dict(builder="host", filename="file", state="state")
-        with self.zk.imageBuildLock("ubuntu-trusty",
-                                    blocking=True,
-                                    timeout=1) as build_num:
-            self.zk.storeBuild("ubuntu-trusty", build_num, orig_data)
+        with self.zk.imageBuildLock(image, blocking=True, timeout=1):
+            build_num = self.zk.storeBuild(image, orig_data)
 
-        data = self.zk.getBuild("ubuntu-trusty", build_num)
+        data = self.zk.getBuild(image, build_num)
         self.assertEqual(orig_data, data)
 
     def test_getBuild_not_found(self):

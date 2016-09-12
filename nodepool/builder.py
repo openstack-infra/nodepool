@@ -153,20 +153,16 @@ class BuildWorker(BaseWorker):
             if not self._zk.hasBuildRequest(image.name):
                 continue
             try:
-                with self._zk.imageBuildLock(
-                    image.name, blocking=False
-                ) as build_number:
+                with self._zk.imageBuildLock(image.name, blocking=False):
                     # Make sure that the request is still valid now that we
                     # have obtained the lock. Otherwise it is a bit racey since
                     # another builder could have removed it and released the
                     # lock *just* before we acquired the lock.
                     if not self._zk.hasBuildRequest(image.name):
-                        self._zk.storeBuild(image.name, build_number,
-                                            self._makeStateData('unused'))
                         continue
 
                     data = self._buildImage(image)
-                    self._zk.storeBuild(image.name, build_number, data)
+                    self._zk.storeBuild(image.name, data)
 
                     # Remove request on a successful build
                     if data['state'] == 'ready':
