@@ -150,8 +150,11 @@ class BuildWorker(BaseWorker):
                         # No build data recorded, or it has aged out.
                         self.log.info(
                             "Rebuild age exceeded for image %s" % name)
+
+                        bnum = self._zk.storeBuild(
+                            image.name, self._makeStateData('building'))
                         data = self._buildImage(image)
-                        self._zk.storeBuild(image.name, data)
+                        self._zk.storeBuild(image.name, data, bnum)
             except exceptions.ZKLockException:
                 # Lock is already held. Skip it.
                 pass
@@ -168,8 +171,11 @@ class BuildWorker(BaseWorker):
 
                     self.log.info(
                         "Manual build request for image %s" % image.name)
+
+                    bnum = self._zk.storeBuild(
+                        image.name, self._makeStateData('building'))
                     data = self._buildImage(image)
-                    self._zk.storeBuild(image.name, data)
+                    self._zk.storeBuild(image.name, data, bnum)
 
                     # Remove request on a successful build
                     if data['state'] == 'ready':
