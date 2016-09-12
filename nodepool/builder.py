@@ -161,14 +161,8 @@ class BuildWorker(BaseWorker):
         Query ZooKeeper for any manual image build requests.
         '''
         for image in self._config.diskimages.values():
-            if not self._zk.hasBuildRequest(image.name):
-                continue
             try:
                 with self._zk.imageBuildLock(image.name, blocking=False):
-                    # Make sure that the request is still valid now that we
-                    # have obtained the lock. Otherwise it is a bit racey since
-                    # another builder could have removed it and released the
-                    # lock *just* before we acquired the lock.
                     if not self._zk.hasBuildRequest(image.name):
                         continue
 
