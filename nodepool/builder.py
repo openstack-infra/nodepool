@@ -212,11 +212,7 @@ class BuildWorker(BaseWorker):
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
 
-        # We need to poll the subprocess rather than wait for it because
-        # we have to keep the ZooKeeper connection alive in order to maintain
-        # our build lock.
         while p.poll() is None:
-            self._zk.sendHeartbeat()
             time.sleep(1)
 
         if p.returncode:

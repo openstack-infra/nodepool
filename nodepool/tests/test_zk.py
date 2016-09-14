@@ -202,11 +202,6 @@ class TestZooKeeper(tests.ZKTestCase):
         # The watch should be unregistered now.
         self.assertNotIn(watch_path, self.zk._data_watches)
 
-    def test_sendHeartbeat(self):
-        self.zk.sendHeartbeat()
-        # Not sure what to test here other than it's actually connected
-        self.assertTrue(self.zkclient.connected)
-
     def test_hasBuildRequest(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildRequestPath(image)

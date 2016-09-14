@@ -518,12 +518,3 @@ class ZooKeeper(object):
         self._data_watches[path] = (image, func)
         self.client.exists(path, watch=self._watch_wrapper)
 
-    def sendHeartbeat(self):
-        '''
-        Send a heartbeat to the ZooKeeper cluster to keep the session alive.
-
-        If a session is terminated due to client inactivity, any locks or
-        watches that are set are gone. This method supplies a way for callers
-        to keep the session alive.
-        '''
-        self.client.server_version()
