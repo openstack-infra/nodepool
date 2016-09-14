@@ -498,8 +498,10 @@ class ZooKeeper(object):
         :param str image: The image name to check.
         '''
         path = self._imageBuildRequestPath(image)
-        if self.hasBuildRequest(image):
+        try:
             self.client.delete(path)
+        except kze.NoNodeError:
+            pass
 
     def registerBuildRequestWatch(self, image, func):
         '''
