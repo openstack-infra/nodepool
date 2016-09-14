@@ -1915,7 +1915,7 @@ class NodePool(threading.Thread):
         for subnode in node.subnodes:
             if subnode.external_id:
                 manager.waitForServerDeletion(subnode.external_id)
-                subnode.delete()
+            subnode.delete()
 
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
