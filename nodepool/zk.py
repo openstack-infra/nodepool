@@ -236,38 +236,6 @@ class ZooKeeper(object):
             self.client.close()
             self.client = None
 
-    def getMaxImageUploadId(self, image, build_number, provider):
-        '''
-        Find the highest image upload number for a given image for a provider.
-
-        For a given image build, it may have been uploaded one or more times
-        to a provider (with once being the most common case). Each upload is
-        given its own znode, which is a integer increased by one for each
-        upload. This method gets the highest numbered znode.
-
-        :param str image: The image name.
-        :param int build_number: The image build number.
-        :param str provider: The provider name owning the image.
-
-        :returns: An int value for the max existing image upload number, or
-            zero if none exist.
-
-        :raises: ZKException if the image upload path is not found.
-        '''
-        path = self._imageUploadPath(image, build_number, provider)
-
-        if not self.client.exists(path):
-            raise npe.ZKException(
-                "Image upload path not found for build %s of image %s" % (
-                    build_number, provider)
-            )
-
-        max_found = 0
-        children = self.client.get_children(path )
-        if children:
-            max_found = max([int(child) for child in children])
-        return max_found
-
     @contextmanager
     def imageBuildLock(self, image, blocking=True, timeout=None):
         '''
@@ -301,7 +269,7 @@ class ZooKeeper(object):
         Retrieve the image build data.
 
         :param str image: The image name.
-        :param int build_number: The image build number.
+        :param str build_number: The image build number.
 
         :returns: The dictionary of build data, or None if not found.
         '''
@@ -382,48 +350,90 @@ class ZooKeeper(object):
 
         return build_number
 
-    def getImageUpload(self, image, build_number, provider,
-                         upload_number=None):
+    def getImageUpload(self, image, build_number, provider, upload_number):
         '''
         Retrieve the image upload data.
 
         :param str image: The image name.
-        :param int build_number: The image build number.
+        :param str build_number: The image build number.
         :param str provider: The provider name owning the image.
-        :param int build_number: The image upload number. If this is None,
-            the most recent upload data is returned.
+        :param str upload_number: The image upload number.
 
         :returns: A dict of upload data.
 
         :raises: ZKException if the image upload path is not found.
         '''
-        if upload_number is None:
-            upload_number = self.getMaxImageUploadId(image, build_number,
-                                                     provider)
-
         path = self._imageUploadPath(image, build_number, provider)
         path = path + "/%s" % upload_number
 
-        if not self.client.exists(path):
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
             raise npe.ZKException(
                 "Cannot find upload data "
                 "(image: %s, build: %s, provider: %s, upload: %s)" % (
                     image, build_number, provider, upload_number)
             )
 
-        data, stat = self.client.get(path)
         return self._strToDict(data)
 
-    def storeImageUpload(self, image, build_number, provider, image_data):
+    def getMostRecentImageUpload(self, image, build_number, provider,
+                                 state="ready"):
+        '''
+        Retrieve the most recent image upload data with the given state.
+
+        :param str image: The image name.
+        :param str build_number: The image build number.
+        :param str provider: The provider name owning the image.
+        :param str state: The image upload state to match on.
+
+        :returns: The most recent dictionary of upload data matching the
+            given state, or None if there was no upload matching the state.
+        '''
+        path = self._imageUploadPath(image, build_number, provider)
+
+        if not self.client.exists(path):
+            return None
+
+        uploads = self.client.get_children(path)
+        if not uploads:
+            return None
+
+        recent = None
+        for upload in uploads:
+            if upload == 'lock':   # skip the upload lock node
+                continue
+            data = self.getImageUpload(image, build_number, provider, upload)
+            if data.get('state', '') != state:
+                continue
+            elif (recent is None or
+                  recent['state_time'] < data.get('state_time', 0)
+            ):
+                recent = data
+
+        return recent
+
+    def storeImageUpload(self, image, build_number, provider, image_data,
+                         upload_number=None):
         '''
         Store the built image's upload data for the given provider.
 
+        The image upload data is either created if it does not exist, or it
+        is updated in its entirety if it does not. There is no partial
+        updating. The image data is expected to be represented as a dict.
+        This dict may contain any data, as appropriate.
+
+        If an image upload number is not supplied, then a new image upload
+        node/number is created. The new upload number is available in the
+        return value.
+
         :param str image: The image name for which we have data.
-        :param int build_number: The image build number.
+        :param str build_number: The image build number.
         :param str provider: The provider name owning the image.
         :param dict image_data: The image data we want to store.
+        :param str upload_number: The image upload number to update.
 
-        :returns: An int for the new upload id.
+        :returns: A string for the upload number that was updated.
 
         :raises: ZKException for an invalid image build.
         '''
@@ -431,24 +441,25 @@ class ZooKeeper(object):
         build_path = self._imageBuildsPath(image)
         if not self.client.exists(build_path):
             raise npe.ZKException(
-                "Cannot find build %s of image %s" % (build_number, provider)
+                "Cannot find build %s of image %s" % (build_number, image)
             )
 
         # Generate a path for the upload. This doesn't have to exist yet
         # since we'll create new provider/upload ID znodes automatically.
-        path = self._imageUploadPath(image, build_number, provider)
+        # Append trailing / so the sequence node is created as a child node.
+        upload_path = self._imageUploadPath(image, build_number, provider) + "/"
 
-        # We need to create the provider upload path if it doesn't exist
-        # before we attempt to get the max image upload ID next.
-        self.client.ensure_path(path)
+        if upload_number is None:
+            path = self.client.create(upload_path,
+                                      value=self._dictToStr(image_data),
+                                      sequence=True,
+                                      makepath=True)
+            upload_number = path.split("/")[-1]
+        else:
+            path = upload_path + upload_number
+            self.client.set(path, self._dictToStr(image_data))
 
-        # Get a new upload ID
-        next_id = self.getMaxImageUploadId(image, build_number, provider) + 1
-
-        path = path + "/%s" % next_id
-        self.client.create(path, self._dictToStr(image_data))
-
-        return next_id
+        return upload_number
 
     def hasBuildRequest(self, image):
         '''

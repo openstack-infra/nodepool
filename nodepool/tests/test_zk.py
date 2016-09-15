@@ -44,28 +44,6 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertEqual('127.0.0.1:2181/test1,127.0.0.2:2182/test2',
                          zk.buildZooKeeperHosts(hosts))
 
-    def test_getMaxImageUploadId(self):
-        image = "ubuntu-trusty"
-        build_number = 1
-        provider = "rax"
-
-        test_root = self.zk._imageUploadPath(image, build_number, provider)
-        self.zk.client.create(test_root, makepath=True)
-        self.zk.client.create(test_root + "/1")
-        self.zk.client.create(test_root + "/10")
-        self.zk.client.create(test_root + "/3")
-        self.zk.client.create(test_root + "/22")
-
-        self.assertEqual(22, self.zk.getMaxImageUploadId(image,
-                                                         build_number,
-                                                         provider))
-
-    def test_getMaxImageUploadId_not_found(self):
-        with testtools.ExpectedException(
-            npe.ZKException, "Image upload path not found for .*"
-        ):
-            self.zk.getMaxImageUploadId("aaa", 1, "xyz")
-
     def test_imageBuildLock(self):
         test_root = self.zk._imageBuildsPath("ubuntu-trusty")
         self.zk.client.create(test_root, makepath=True)
@@ -119,20 +97,25 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_getImageUpload_not_found(self):
         image = "ubuntu-trusty"
-        build_number = 1
+        build_number = "0000000001"
         provider = "rax"
-        test_root = self.zk._imageUploadPath(image, build_number, provider)
-        self.zk.client.create(test_root, makepath=True)
-        self.zk.client.create(test_root + "/1")
 
         with testtools.ExpectedException(
             npe.ZKException, "Cannot find upload data .*"
         ):
-            self.zk.getImageUpload(image, build_number, provider, 2)
+            self.zk.getImageUpload(image, build_number, provider, "0000000001")
+
+    def test_storeImageUpload(self):
+        image = "ubuntu-trusty"
+        provider = "rax"
+        bnum = self.zk.storeBuild(image, {})
+        up1 = self.zk.storeImageUpload(image, bnum, provider, {})
+        up2 = self.zk.storeImageUpload(image, bnum, provider, {})
+        self.assertLess(int(up1), int(up2))
 
     def test_storeImageUpload_invalid_build(self):
         image = "ubuntu-trusty"
-        build_number = 1
+        build_number = "0000000001"
         provider = "rax"
         orig_data = dict(external_id="deadbeef", state="READY")
 
@@ -143,19 +126,14 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_store_and_get_image_upload(self):
         image = "ubuntu-trusty"
-        build_number = 1
         provider = "rax"
         orig_data = dict(external_id="deadbeef", state="READY")
-        test_root = self.zk._imageUploadPath(image, build_number, provider)
-        self.zk.client.create(test_root, makepath=True)
 
+        build_number = self.zk.storeBuild(image, {})
         upload_id = self.zk.storeImageUpload(image, build_number, provider,
                                              orig_data)
-
-        # Should be the first upload
-        self.assertEqual(1, upload_id)
-
         data = self.zk.getImageUpload(image, build_number, provider, upload_id)
+
         self.assertEqual(orig_data, data)
 
     def test_registerBuildRequestWatch(self):
@@ -210,3 +188,21 @@ class TestZooKeeper(tests.ZKTestCase):
         # v2 should be the most recent 'ready' build
         data = self.zk.getMostRecentBuild(image, 'ready')
         self.assertEqual(data, v2)
+
+    def test_getMostRecentImageUpload(self):
+        image = "ubuntu-trusty"
+        provider = "rax"
+        build = {'state': 'ready', 'state_time': int(time.time())}
+        up1 = {'state': 'ready', 'state_time': int(time.time())}
+        up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
+        up3 = {'state': 'delete', 'state_time': up2['state_time'] + 10}
+
+        bnum = self.zk.storeBuild(image, build)
+        self.zk.storeImageUpload(image, bnum, provider, up1)
+        self.zk.storeImageUpload(image, bnum, provider, up2)
+        self.zk.storeImageUpload(image, bnum, provider, up3)
+
+        # up2 should be the most recent 'ready' upload
+        data = self.zk.getMostRecentImageUpload(image, bnum, provider, 'ready')
+        self.assertEqual(data, up2)
+
