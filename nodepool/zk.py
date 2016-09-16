@@ -474,6 +474,15 @@ class ZooKeeper(object):
             return True
         return False
 
+    def submitBuildRequest(self, image):
+        '''
+        Submit a request for a new image build.
+
+        :param str image: The image name.
+        '''
+        path = self._imageBuildRequestPath(image)
+        self.client.ensure_path(path)
+
     def removeBuildRequest(self, image):
         '''
         Remove an image build request.

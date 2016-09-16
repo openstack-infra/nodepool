@@ -152,7 +152,7 @@ class TestZooKeeper(tests.ZKTestCase):
 
         # Second client triggers the watch. Give ZK time to dispatch the event
         # to the other client.
-        zk2.client.create(watch_path, makepath=True)
+        zk2.submitBuildRequest(image)
         time.sleep(1)
         zk2.disconnect()
 
@@ -162,16 +162,10 @@ class TestZooKeeper(tests.ZKTestCase):
         # The watch should be unregistered now.
         self.assertNotIn(watch_path, self.zk._data_watches)
 
-    def test_hasBuildRequest(self):
+    def test_build_request(self):
+        '''Test the build request API methods (has/submit/remove)'''
         image = "ubuntu-trusty"
-        path = self.zk._imageBuildRequestPath(image)
-        self.zk.client.create(path, makepath=True)
-        self.assertTrue(self.zk.hasBuildRequest(image))
-
-    def test_removeBuildRequest(self):
-        image = "ubuntu-trusty"
-        path = self.zk._imageBuildRequestPath(image)
-        self.zk.client.create(path, makepath=True)
+        self.zk.submitBuildRequest(image)
         self.assertTrue(self.zk.hasBuildRequest(image))
         self.zk.removeBuildRequest(image)
         self.assertFalse(self.zk.hasBuildRequest(image))

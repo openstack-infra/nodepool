@@ -21,6 +21,7 @@ import sys
 from nodepool import nodedb
 from nodepool import nodepool
 from nodepool import status
+from nodepool import zk
 from nodepool.cmd import NodepoolApp
 from nodepool.version import version_info as npc_version_info
 from config_validator import ConfigValidator
@@ -227,8 +228,7 @@ class NodePoolCmd(NodepoolApp):
             raise Exception("Trying to build a non disk-image-builder "
                             "image: %s" % diskimage)
 
-        self.pool.buildImage(self.pool.config.diskimages[diskimage])
-        self.pool.waitForBuiltImages()
+        self.zk.submitBuildRequest(diskimage)
 
     def image_upload(self):
         self.pool.reconfigureManagers(self.pool.config, False)
@@ -379,6 +379,8 @@ class NodePoolCmd(NodepoolApp):
                 t.join()
 
     def main(self):
+        self.zk = None
+
         # commands which do not need to start-up or parse config
         if self.args.command in ('config-validate'):
             return self.args.func()
@@ -386,13 +388,21 @@ class NodePoolCmd(NodepoolApp):
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
         if self.args.command in ('dib-image-delete', 'dib-image-list',
-                                 'image-build', 'image-delete',
+                                 'image-delete',
                                  'image-upload', 'image-update'):
             self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
+
+        # commands needing ZooKeeper
+        if self.args.command in ('image-build'):
+            self.zk = zk.ZooKeeper()
+            self.zk.connect(config.zookeeper_servers.values())
+
         self.args.func()
 
+        if self.zk:
+            self.zk.disconnect()
 
 def main():
     npc = NodePoolCmd()
