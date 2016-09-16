@@ -139,6 +139,10 @@ class BuildWorker(BaseWorker):
             the state time and then build to eliminate any race condition.
         '''
         for name, image in self._config.diskimages.items():
+            # Check if we've been told to shutdown
+            if not self.running:
+                return
+
             try:
                 with self._zk.imageBuildLock(image.name, blocking=False):
                     build = self._zk.getMostRecentBuild(name, 'ready')
@@ -164,6 +168,10 @@ class BuildWorker(BaseWorker):
         Query ZooKeeper for any manual image build requests.
         '''
         for image in self._config.diskimages.values():
+            # Check if we've been told to shutdown
+            if not self.running:
+                return
+
             try:
                 with self._zk.imageBuildLock(image.name, blocking=False):
                     if not self._zk.hasBuildRequest(image.name):
