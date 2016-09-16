@@ -44,23 +44,6 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertEqual('127.0.0.1:2181/test1,127.0.0.2:2182/test2',
                          zk.buildZooKeeperHosts(hosts))
 
-    def test_getMaxBuildId(self):
-        test_root = self.zk._imageBuildsPath("ubuntu-trusty")
-        self.zk.client.create(test_root, makepath=True)
-        self.zk.client.create(test_root + "/1")
-        self.zk.client.create(test_root + "/10")
-        self.zk.client.create(test_root + "/3")
-        self.zk.client.create(test_root + "/22")
-        self.zk.client.create(test_root + "/lock")
-
-        self.assertEqual(22, self.zk.getMaxBuildId("ubuntu-trusty"))
-
-    def test_getMaxBuildId_not_found(self):
-        with testtools.ExpectedException(
-            npe.ZKException, "Image build path not found for .*"
-        ):
-            self.zk.getMaxBuildId("aaa")
-
     def test_getMaxImageUploadId(self):
         image = "ubuntu-trusty"
         build_number = 1
@@ -116,12 +99,11 @@ class TestZooKeeper(tests.ZKTestCase):
                     pass
         zk2.disconnect()
 
-    def test_storeBuild_new(self):
+    def test_storeBuild(self):
         image = "ubuntu-trusty"
-        test_root = self.zk._imageBuildsPath(image)
-        self.zk.client.create(test_root, makepath=True)
-        self.zk.client.create(test_root + "/10")
-        self.assertEqual(11, self.zk.storeBuild(image, {}))
+        b1 = self.zk.storeBuild(image, {})
+        b2 = self.zk.storeBuild(image, {})
+        self.assertLess(int(b1), int(b2))
 
     def test_store_and_get_build(self):
         image = "ubuntu-trusty"
@@ -133,7 +115,7 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertEqual(orig_data, data)
 
     def test_getBuild_not_found(self):
-        self.assertIsNone(self.zk.getBuild("ubuntu-trusty", 0))
+        self.assertIsNone(self.zk.getBuild("ubuntu-trusty", "0000000000"))
 
     def test_getImageUpload_not_found(self):
         image = "ubuntu-trusty"
@@ -218,16 +200,12 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_getMostRecentBuild(self):
         image = "ubuntu-trusty"
-        path = self.zk._imageBuildsPath(image)
         v1 = {'state': 'ready', 'state_time': int(time.time())}
         v2 = {'state': 'ready', 'state_time': v1['state_time'] + 10}
         v3 = {'state': 'delete', 'state_time': v2['state_time'] + 10}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
+        self.zk.storeBuild(image, v1)
+        self.zk.storeBuild(image, v2)
+        self.zk.storeBuild(image, v3)
 
         # v2 should be the most recent 'ready' build
         data = self.zk.getMostRecentBuild(image, 'ready')

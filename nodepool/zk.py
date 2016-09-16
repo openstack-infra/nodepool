@@ -236,36 +236,6 @@ class ZooKeeper(object):
             self.client.close()
             self.client = None
 
-    def getMaxBuildId(self, image):
-        '''
-        Find the highest build number for a given image.
-
-        Image builds are integer znodes, which are children of the 'builds'
-        parent znode.
-
-        :param str image: The image name.
-
-        :returns: An int value for the max existing image build number, or
-            zero if none exist.
-
-        :raises: ZKException if the image build path is not found.
-        '''
-        path = self._imageBuildsPath(image)
-
-        if not self.client.exists(path):
-            raise npe.ZKException(
-                "Image build path not found for image %s" % image
-            )
-
-        max_found = 0
-        children = self.client.get_children(path)
-        if children:
-            for child in children:
-                # There can be a lock znode that we should ignore
-                if child != 'lock':
-                    max_found = max(max_found, int(child))
-        return max_found
-
     def getMaxImageUploadId(self, image, build_number, provider):
         '''
         Find the highest image upload number for a given image for a provider.
@@ -393,21 +363,23 @@ class ZooKeeper(object):
 
         :param str image: The image name for which we have data.
         :param dict build_data: The build data.
-        :param int build_number: The image build number.
+        :param str build_number: The image build number.
 
-        :returns: The build number that was updated.
+        :returns: A string for the build number that was updated.
         '''
+        # Append trailing / so the sequence node is created as a child node.
+        build_path = self._imageBuildsPath(image) + "/"
+
         if build_number is None:
-            build_number = self.getMaxBuildId(image) + 1
+            path = self.client.create(build_path,
+                                      value=self._dictToStr(build_data),
+                                      sequence=True,
+                                      makepath=True)
+            build_number = path.split("/")[-1]
+        else:
+            path = build_path + build_number
+            self.client.set(path, self._dictToStr(build_data))
 
-        path = self._imageBuildsPath(image) + "/%s" % build_number
-
-        if not self.client.exists(path):
-            self.client.create(
-                self._imageBuildsPath(image) + "/%s" % build_number
-            )
-
-        self.client.set(path, self._dictToStr(build_data))
         return build_number
 
     def getImageUpload(self, image, build_number, provider,
