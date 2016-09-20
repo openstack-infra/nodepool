@@ -32,6 +32,8 @@ import zk
 MINS = 60
 HOURS = 60 * MINS
 IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
+SUSPEND_WAIT_TIME = 30       # How long to wait between checks for
+                             # ZooKeeper connectivity if it disappears.
 
 # HP Cloud requires qemu compat with 0.10. That version works elsewhere,
 # so just hardcode it for all qcow2 building
@@ -140,7 +142,8 @@ class BuildWorker(BaseWorker):
         '''
         for name, image in self._config.diskimages.items():
             # Check if we've been told to shutdown
-            if not self.running:
+            # or if ZK connection is suspended
+            if not self.running or self._zk.suspended or self._zk.lost:
                 return
 
             try:
@@ -169,7 +172,8 @@ class BuildWorker(BaseWorker):
         '''
         for image in self._config.diskimages.values():
             # Check if we've been told to shutdown
-            if not self.running:
+            # or if ZK connection is suspended
+            if not self.running or self._zk.suspended or self._zk.lost:
                 return
 
             try:
@@ -220,22 +224,38 @@ class BuildWorker(BaseWorker):
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
 
-        while p.poll() is None:
-            time.sleep(1)
+        p.wait()
 
-        if p.returncode:
+        # It's possible the connection to the ZK cluster could have been
+        # interrupted during the build. If so, wait for it to return.
+        # It could transition directly from SUSPENDED to CONNECTED, or go
+        # through the LOST state before CONNECTED.
+        while self._zk.suspended or self._zk.lost:
+            self.log.info("ZooKeeper suspended during build. Waiting")
+            time.sleep(SUSPEND_WAIT_TIME)
+
+        if self._zk.didLoseConnection:
+            self.log.info("ZooKeeper lost while building %s" % image.name)
+            self._zk.resetLostFlag()
+            build_data = self._makeStateData('failed')
+        elif p.returncode:
             self.log.info("DIB failed creating %s" % image.name)
             build_data = self._makeStateData('failed')
         else:
             self.log.info("DIB image %s is built" % image.name)
             build_data = self._makeStateData('ready')
+            build_data['filename'] = ''
 
-        build_data['filename'] = ''
         return build_data
 
     def run(self):
         self._running = True
         while self._running:
+            # Don't do work if we've lost communication with the ZK cluster
+            while self._zk and (self._zk.suspended or self._zk.lost):
+                self.log.info("ZooKeeper suspended. Waiting")
+                time.sleep(SUSPEND_WAIT_TIME)
+
             # NOTE: For the first iteration, we expect self._config to be None
             new_config = nodepool_config.loadConfig(self._config_path)
             self._checkForZooKeeperChanges(new_config)

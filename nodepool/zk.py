@@ -122,6 +122,7 @@ class ZooKeeper(object):
         '''
         self.client = client
         self._current_lock = None
+        self._became_lost = False
 
         # Dictionary that maps an image build request path being watched to
         # the function to call when triggered. Why have this? We may need to
@@ -180,6 +181,7 @@ class ZooKeeper(object):
         '''
         if state == KazooState.LOST:
             self.log.debug("ZooKeeper connection: LOST")
+            self._became_lost = True
         elif state == KazooState.SUSPENDED:
             self.log.debug("ZooKeeper connection: SUSPENDED")
         else:
@@ -202,8 +204,27 @@ class ZooKeeper(object):
 
 
     #========================================================================
-    # Public Methods
+    # Public Methods and Properties
     #========================================================================
+
+    @property
+    def connected(self):
+        return self.client.state == KazooState.CONNECTED
+
+    @property
+    def suspended(self):
+        return self.client.state == KazooState.SUSPENDED
+
+    @property
+    def lost(self):
+        return self.client.state == KazooState.LOST
+
+    @property
+    def didLoseConnection(self):
+        return self._became_lost
+
+    def resetLostFlag(self):
+        self._became_lost = False
 
     def connect(self, host_list, read_only=False):
         '''
