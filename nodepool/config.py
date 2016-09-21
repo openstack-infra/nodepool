@@ -18,6 +18,7 @@
 
 import os_client_config
 from six.moves import configparser as ConfigParser
+import time
 import yaml
 
 import fakeprovider
@@ -112,7 +113,25 @@ class Network(ConfigValue):
 
 
 def loadConfig(config_path):
-    config = yaml.load(open(config_path))
+    retry = 3
+
+    # Since some nodepool code attempts to dynamically re-read its config
+    # file, we need to handle the race that happens if an outside entity
+    # edits it (causing it to temporarily not exist) at the same time we
+    # attempt to reload it.
+    while True:
+        try:
+            config = yaml.load(open(config_path))
+            break
+        except IOError as e:
+            if e.errno == 2:
+                retry = retry - 1
+                time.sleep(.5)
+            else:
+                raise e
+            if retry == 0:
+                raise e
+
     cloud_config = os_client_config.OpenStackConfig()
 
     newconfig = Config()
