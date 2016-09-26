@@ -1126,11 +1126,15 @@ class SnapshotImageUpdater(ImageUpdater):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    def __init__(self, securefile, configfile,
+    def __init__(self, securefile, configfile, no_deletes=False,
+                 no_launches=False, no_images=False,
                  watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
+        self.no_deletes = no_deletes
+        self.no_launches = no_launches
+        self.no_images = no_images
         self.watermark_sleep = watermark_sleep
         self._stopped = False
         self.config = None
@@ -1255,6 +1259,8 @@ class NodePool(threading.Thread):
                 c.job = self.config.crons[c.name].job
 
     def reconfigureUpdateListeners(self, config):
+        if self.no_deletes:
+            return
         if self.config:
             running = set(self.config.zmq_publishers.keys())
         else:
@@ -1533,6 +1539,8 @@ class NodePool(threading.Thread):
             self._wake_condition.release()
 
     def _run(self, session, allocation_history):
+        if self.no_launches:
+            return
         self.checkForMissingImages(session)
 
         # Make up the subnode deficit first to make sure that an
@@ -1613,6 +1621,8 @@ class NodePool(threading.Thread):
                 self.checkForMissingDiskImage(session, provider, image)
 
     def checkForMissingImages(self, session):
+        if self.no_images:
+            return
         # If we are missing an image, run the image update function
         # outside of its schedule.
         self.log.debug("Checking missing images.")
@@ -1629,6 +1639,8 @@ class NodePool(threading.Thread):
                     self.log.exception("Exception in missing image check:")
 
     def _doUpdateImages(self):
+        if self.no_images:
+            return
         try:
             with self.getDB().getSession() as session:
                 self.updateImages(session)
@@ -2001,6 +2013,8 @@ class NodePool(threading.Thread):
         manager.cleanupServer(external_id)
 
     def _doPeriodicCleanup(self):
+        if self.no_deletes:
+            return
         try:
             self.periodicCleanup()
         except Exception:
@@ -2218,6 +2232,8 @@ class NodePool(threading.Thread):
                                    image.id)
 
     def _doPeriodicCheck(self):
+        if self.no_deletes:
+            return
         try:
             with self.getDB().getSession() as session:
                 self.periodicCheck(session)

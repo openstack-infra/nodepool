@@ -103,6 +103,9 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('--upload-workers', dest='upload_workers',
                             default=4, help='number of upload workers',
                             type=int)
+        parser.add_argument('--no-deletes', action='store_true')
+        parser.add_argument('--no-launches', action='store_true')
+        parser.add_argument('--no-images', action='store_true')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
         self.args = parser.parse_args()
@@ -120,7 +123,10 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
     def main(self):
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
-                                               self.args.config)
+                                               self.args.config,
+                                               self.args.no_deletes,
+                                               self.args.no_launches,
+                                               self.args.no_images)
         if self.args.builder:
             self.builder = nodepool.builder.NodePoolBuilder(
                 self.args.config, self.args.build_workers,
