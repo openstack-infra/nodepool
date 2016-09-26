@@ -79,42 +79,14 @@ class DibImageFile(object):
 class BaseWorker(threading.Thread):
     log = logging.getLogger("nodepool.builder.BaseWorker")
 
-    def __init__(self):
+    def __init__(self, config_path):
         super(BaseWorker, self).__init__()
         self.daemon = True
         self._running = False
-
-    @property
-    def running(self):
-        return self._running
-
-    def shutdown(self):
-        self._running = False
-
-
-class BuildWorker(BaseWorker):
-    log = logging.getLogger("nodepool.builder.BuildWorker")
-
-    def __init__(self, config_path):
-        super(BuildWorker, self).__init__()
         self._config = None
         self._config_path = config_path
         self._zk = None
         self._hostname = socket.gethostname()
-
-    def _makeStateData(self, state):
-        '''
-        Create a build state dict with minimal, common state information.
-
-        Sets common attributes, such as builder host, state, and state time.
-
-        :param str state: The build state you want.
-        '''
-        data = {}
-        data['builder'] = self._hostname
-        data['state'] = state
-        data['state_time'] = int(time.time())
-        return data
 
     def _checkForZooKeeperChanges(self, new_config):
         '''
@@ -132,6 +104,34 @@ class BuildWorker(BaseWorker):
             self.log.debug("Detected ZooKeeper server changes")
             self._zk.disconnect()
             self._zk.connect(new_config.zookeeper_servers.values())
+
+    @property
+    def running(self):
+        return self._running
+
+    def shutdown(self):
+        self._running = False
+
+
+class BuildWorker(BaseWorker):
+    log = logging.getLogger("nodepool.builder.BuildWorker")
+
+    def __init__(self, config_path):
+        super(BuildWorker, self).__init__(config_path)
+
+    def _makeStateData(self, state):
+        '''
+        Create a build state dict with minimal, common state information.
+
+        Sets common attributes, such as builder host, state, and state time.
+
+        :param str state: The build state you want.
+        '''
+        data = {}
+        data['builder'] = self._hostname
+        data['state'] = state
+        data['state_time'] = int(time.time())
+        return data
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -249,6 +249,9 @@ class BuildWorker(BaseWorker):
         return build_data
 
     def run(self):
+        '''
+        Start point for the BuildWorker thread.
+        '''
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
@@ -274,15 +277,37 @@ class BuildWorker(BaseWorker):
 class UploadWorker(BaseWorker):
     log = logging.getLogger("nodepool.builder.UploadWorker")
 
-    def __init__(self):
-        super(UploadWorker, self).__init__()
+    def __init__(self, config_path):
+        super(UploadWorker, self).__init__(config_path)
+
+    def _checkForProviderUploads(self):
+        pass
 
     def run(self):
+        '''
+        Start point for the UploadWorker thread.
+        '''
         self._running = True
         while self._running:
+            # Don't do work if we've lost communication with the ZK cluster
+            while self._zk and (self._zk.suspended or self._zk.lost):
+                self.log.info("ZooKeeper suspended. Waiting")
+                time.sleep(SUSPEND_WAIT_TIME)
+
+            new_config = nodepool_config.loadConfig(self._config_path)
+            self._checkForZooKeeperChanges(new_config)
+            provider_manager.ProviderManager.reconfigure(self._config, new_config)
+            self._config = new_config
+
+            self._checkForProviderUploads()
+
             # TODO: Make this configurable
             time.sleep(0.1)
 
+        if self._zk:
+            self._zk.disconnect()
+
+        provider_manager.ProviderManager.stopProviders(self._config)
 
 class NodePoolBuilder(object):
     '''
@@ -360,7 +385,7 @@ class NodePoolBuilder(object):
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker()
+                w = UploadWorker(self._config_path)
                 w.start()
                 self._upload_workers.append(w)
 
