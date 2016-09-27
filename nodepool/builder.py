@@ -344,7 +344,8 @@ class NodePoolBuilder(object):
                                       with_extension=True)
 
         dummy_image = type('obj', (object,),
-                           {'name': image_name})
+                           {'name': image_name,
+                            'id': image_id})
         ext_image_name = provider.template_hostname.format(
             provider=provider, image=dummy_image, timestamp=str(timestamp))
         self.log.info("Uploading dib image id: %s from %s in %s" %
