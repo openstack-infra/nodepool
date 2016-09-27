@@ -1506,20 +1506,23 @@ class NodePool(threading.Thread):
         # after a restart.  To clean up, mark all building node and
         # images for deletion when the daemon starts.
         with self.getDB().getSession() as session:
-            for node in session.getNodes(state=nodedb.BUILDING):
-                self.log.info("Setting building node id: %s to delete "
-                              "on startup" % node.id)
-                node.state = nodedb.DELETE
+            if not self.no_deletes:
+                for node in session.getNodes(state=nodedb.BUILDING):
+                    self.log.info("Setting building node id: %s to delete "
+                                  "on startup" % node.id)
+                    node.state = nodedb.DELETE
 
-            for image in session.getSnapshotImages(state=nodedb.BUILDING):
-                self.log.info("Setting building image id: %s to delete "
-                              "on startup" % image.id)
-                image.state = nodedb.DELETE
+            if not self.no_images:
+                for image in session.getSnapshotImages(state=nodedb.BUILDING):
+                    self.log.info("Setting building image id: %s to delete "
+                                  "on startup" % image.id)
+                    image.state = nodedb.DELETE
 
-            for dib_image in session.getDibImages(state=nodedb.BUILDING):
-                self.log.info("Setting building dib image id: %s to delete "
-                              "on startup" % dib_image.id)
-                dib_image.state = nodedb.DELETE
+            if not self.no_images:
+                for dib_image in session.getDibImages(state=nodedb.BUILDING):
+                    self.log.info("Setting building dib image id: %s to delete "
+                                  "on startup" % dib_image.id)
+                    dib_image.state = nodedb.DELETE
 
     def run(self):
         try:
