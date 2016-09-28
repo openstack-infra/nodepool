@@ -152,6 +152,10 @@ class ZooKeeper(object):
                                              build_number,
                                              provider)
 
+    def _imageUploadLockPath(self, image, build_number, provider):
+        return "%s/lock" % self._imageUploadPath(image, build_number,
+                                                 provider)
+
     def _dictToStr(self, data):
         return json.dumps(data)
 
@@ -160,6 +164,21 @@ class ZooKeeper(object):
 
     def _getImageBuildLock(self, image, blocking=True, timeout=None):
         lock = self._imageBuildLockPath(image)
+        try:
+            self._current_lock = Lock(self.client, lock)
+            have_lock = self._current_lock.acquire(blocking, timeout)
+        except kze.LockTimeout:
+            raise npe.TimeoutException(
+                "Timeout trying to acquire lock %s" % lock)
+
+        # If we aren't blocking, it's possible we didn't get the lock
+        # because someone else has it.
+        if not have_lock:
+            raise npe.ZKLockException("Did not get lock on %s" % lock)
+
+    def _getImageUploadLock(self, image, build_number, provider,
+                            blocking=True, timeout=None):
+        lock = self._imageUploadLockPath(image, build_number, provider)
         try:
             self._current_lock = Lock(self.client, lock)
             have_lock = self._current_lock.acquire(blocking, timeout)
@@ -279,6 +298,38 @@ class ZooKeeper(object):
 
         try:
             yield self._getImageBuildLock(image, blocking, timeout)
+        finally:
+            if self._current_lock:
+                self._current_lock.release()
+                self._current_lock = None
+
+    @contextmanager
+    def imageUploadLock(self, image, build_number, provider,
+                        blocking=True, timeout=None):
+        '''
+        Context manager to use for locking image builds.
+
+        Obtains a write lock for the specified image upload. A thread of
+        control using this API may have only one lock at a time.
+
+        :param str image: Name of the image.
+        :param str build_number: The image build number.
+        :param str provider: The provider name owning the image.
+        :param bool blocking: Whether or not to block on trying to
+            acquire the lock
+        :param int timeout: When blocking, how long to wait for the lock
+            to get acquired. None, the default, waits forever.
+
+        :raises: TimeoutException if we failed to acquire the lock when
+            blocking with a timeout. ZKLockException if we are not blocking
+            and could not get the lock, or a lock is already held.
+        '''
+        if self._current_lock:
+            raise npe.ZKLockException("A lock is already held.")
+
+        try:
+            yield self._getImageUploadLock(image, build_number, provider,
+                                           blocking, timeout)
         finally:
             if self._current_lock:
                 self._current_lock.release()
