@@ -45,12 +45,10 @@ class TestZooKeeper(tests.ZKTestCase):
                          zk.buildZooKeeperHosts(hosts))
 
     def test_imageBuildLock(self):
-        test_root = self.zk._imageBuildsPath("ubuntu-trusty")
-        self.zk.client.create(test_root, makepath=True)
-        self.zk.client.create(test_root + "/10")
-
+        path = self.zk._imageBuildLockPath("ubuntu-trusty")
         with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
             self.assertIsNotNone(self.zk._current_lock)
+            self.assertIsNotNone(self.zk.client.exists(path))
         self.assertIsNone(self.zk._current_lock)
 
     def test_imageBuildLock_exception_nonblocking(self):

@@ -158,20 +158,18 @@ class ZooKeeper(object):
         return json.loads(data)
 
     def _getImageBuildLock(self, image, blocking=True, timeout=None):
-        # If we don't already have a znode for this image, create it.
-        image_lock = self._imageBuildLockPath(image)
+        lock = self._imageBuildLockPath(image)
         try:
-            self.client.ensure_path(self._imagePath(image))
-            self._current_lock = Lock(self.client, image_lock)
+            self._current_lock = Lock(self.client, lock)
             have_lock = self._current_lock.acquire(blocking, timeout)
         except kze.LockTimeout:
             raise npe.TimeoutException(
-                "Timeout trying to acquire lock %s" % image_lock)
+                "Timeout trying to acquire lock %s" % lock)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
         if not have_lock:
-            raise npe.ZKLockException("Did not get lock on %s" % image_lock)
+            raise npe.ZKLockException("Did not get lock on %s" % lock)
 
     def _connection_listener(self, state):
         '''
