@@ -151,6 +151,7 @@ class ZooKeeper(object):
         return "%s/%s/provider/%s/images" % (self._imageBuildsPath(image),
                                              build_number,
                                              provider)
+
     def _dictToStr(self, data):
         return json.dumps(data)
 
@@ -307,8 +308,9 @@ class ZooKeeper(object):
         :param str image: The image name.
         :param str state: The build state to match on.
 
-        :returns: The most recent dictionary of build data matching the
-            given state, or None if there was no build matching the state.
+        :returns: A tuple with the most recent build number and dictionary of
+            build data matching the given state, or None if there was no build
+            matching the state.
         '''
         path = self._imageBuildsPath(image)
 
@@ -319,19 +321,24 @@ class ZooKeeper(object):
         if not builds:
             return None
 
-        recent = None
+        recent_data = None
+        recent_bnum = None
         for build in builds:
             if build == 'lock':   # skip the build lock node
                 continue
             data = self.getBuild(image, build)
             if data.get('state', '') != state:
                 continue
-            elif (recent is None or
-                  recent['state_time'] < data.get('state_time', 0)
+            elif (recent_data is None or
+                  recent_data['state_time'] < data.get('state_time', 0)
             ):
-                recent = data
+                recent_bnum = build
+                recent_data = data
 
-        return recent
+        if recent_bnum is None and recent_data is None:
+            return None
+
+        return (recent_bnum, recent_data)
 
     def storeBuild(self, image, build_data, build_number=None):
         '''
@@ -406,8 +413,9 @@ class ZooKeeper(object):
         :param str provider: The provider name owning the image.
         :param str state: The image upload state to match on.
 
-        :returns: The most recent dictionary of upload data matching the
-            given state, or None if there was no upload matching the state.
+        :returns: A tuple with the most recent upload number and dictionary of
+            upload data matching the given state, or None if there was no
+            upload matching the state.
         '''
         path = self._imageUploadPath(image, build_number, provider)
 
@@ -418,19 +426,24 @@ class ZooKeeper(object):
         if not uploads:
             return None
 
-        recent = None
+        recent_upnum = None
+        recent_data = None
         for upload in uploads:
             if upload == 'lock':   # skip the upload lock node
                 continue
             data = self.getImageUpload(image, build_number, provider, upload)
             if data.get('state', '') != state:
                 continue
-            elif (recent is None or
-                  recent['state_time'] < data.get('state_time', 0)
+            elif (recent_data is None or
+                  recent_data['state_time'] < data.get('state_time', 0)
             ):
-                recent = data
+                recent_upnum = upload
+                recent_data = data
 
-        return recent
+        if recent_upnum is None and recent_data is None:
+            return None
+
+        return (recent_upnum, recent_data)
 
     def storeImageUpload(self, image, build_number, provider, image_data,
                          upload_number=None):

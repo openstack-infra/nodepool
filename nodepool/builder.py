@@ -151,8 +151,8 @@ class BuildWorker(BaseWorker):
                     build = self._zk.getMostRecentBuild(name, 'ready')
                     now = int(time.time())
 
-                    if (not build or
-                        (now - build['state_time']) >= image.rebuild_age
+                    if (build is None or
+                        (now - build[1]['state_time']) >= image.rebuild_age
                     ):
                         # No build data recorded, or it has aged out.
                         self.log.info(
