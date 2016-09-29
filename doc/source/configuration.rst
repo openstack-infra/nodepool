@@ -516,7 +516,7 @@ Example::
      settings defined in the ``diskimages`` section will be used instead. See
      :ref:`scripts` for setup script details.
 
-  ``diskimages``
+  ``diskimage``
      See :ref:`diskimages`.
 
   ``username``

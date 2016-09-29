@@ -41,6 +41,12 @@ DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
 
 
 class DibImageFile(object):
+    '''
+    Class used as an API to finding locally built DIB image files, and
+    also used to represent the found files. Image files are named using
+    a unique ID, but can be available in multiple formats (with different
+    extensions).
+    '''
     def __init__(self, image_id, extension=None):
         self.image_id = image_id
         self.extension = extension
@@ -244,7 +250,7 @@ class BuildWorker(BaseWorker):
         else:
             self.log.info("DIB image %s is built" % image.name)
             build_data = self._makeStateData('ready')
-            build_data['filename'] = ''
+            build_data['formats'] = ",".join(image.image_types)
 
         return build_data
 
@@ -280,8 +286,146 @@ class UploadWorker(BaseWorker):
     def __init__(self, config_path):
         super(UploadWorker, self).__init__(config_path)
 
+    def _makeStateData(self, state):
+        '''
+        Create an upload state dict with minimal, common state information.
+
+        :param str state: The upload state you want.
+        '''
+        data = {}
+        data['state'] = state
+        data['state_time'] = int(time.time())
+        return data
+
+    def _uploadImage(self, build_id, image_name, images, provider):
+        '''
+        Upload a local DIB image build to a provider.
+
+        :param str build_id: Unique ID of the image build to upload.
+        :param str image_name: Name of the diskimage.
+        :param list images: A list of DibImageFile objects from this build
+            that available for uploading.
+        :param provider: The provider from the parsed config file.
+        '''
+        start_time = time.time()
+        timestamp = int(start_time)
+
+        image = None
+        for i in images:
+            if provider.image_type == i.extension:
+                image = i
+                break
+
+        if not image:
+            raise exceptions.BuilderInvalidCommandError(
+                "Unable to find image file of type %s for id %s to upload" %
+                (provider.image_type, build_id)
+            )
+
+        self.log.debug("Found image file of type %s for image id: %s" %
+                       (image.extension, image.image_id))
+
+        filename = image.to_path(self._config.imagesdir, with_extension=True)
+
+        dummy_image = type('obj', (object,), {'name': image_name})
+
+        ext_image_name = provider.template_hostname.format(
+            provider=provider, image=dummy_image,
+            timestamp=str(timestamp)
+        )
+
+        self.log.info("Uploading DIB image build %s from %s to %s" %
+                      (build_id, filename, provider.name))
+
+        manager = self._config.provider_managers[provider.name]
+        try:
+            provider_image = provider.images[image_name]
+        except KeyError:
+            raise exceptions.BuilderInvalidCommandError(
+                "Could not find matching provider image for %s", image_name
+            )
+
+        external_id = manager.uploadImage(
+            ext_image_name, filename,
+            image_type=image.extension,
+            meta=provider_image.meta
+        )
+
+        if self.statsd:
+            dt = int((time.time() - start_time) * 1000)
+            key = 'nodepool.image_update.%s.%s' % (image_name,
+                                                   provider.name)
+            self.statsd.timing(key, dt)
+            self.statsd.incr(key)
+
+        self.log.info("Image build %s in %s is ready" %
+                      (build_id, provider.name))
+
+        data = self._makeStateData('ready')
+        data['external_id'] = external_id
+        return data
+
     def _checkForProviderUploads(self):
-        pass
+        '''
+        Check for any image builds that need to be uploaded to providers.
+
+        If we find any builds in the 'ready' state that haven't been uploaded
+        to providers, do the upload if they are available on the local disk.
+        '''
+        for provider in self._config.providers.values():
+            for image in provider.images.values():
+                # Check if we've been told to shutdown
+                # or if ZK connection is suspended
+                if not self.running or self._zk.suspended or self._zk.lost:
+                    return
+
+                if image.name not in self._config.images_in_use:
+                    continue
+                if not image.diskimage:
+                    continue
+
+                # Search for the most recent 'ready' image build
+                build = self._zk.getMostRecentBuild(image.diskimage)
+                if build is None:
+                    continue
+
+                # Search for locally built images. The build sequence ID is
+                # used to name the image.
+                local_images = DibImageFile.from_image_id(self._config.imagesdir,
+                                                          build[0])
+                if not local_images:
+                    continue
+
+                # See if this image has already been uploaded
+                upload = self._zk.getMostRecentImageUpload(
+                    image.diskimage, build[0], provider.name)
+                if upload is not None:
+                    continue
+
+                # See if this provider supports the available image formats
+                image_formats = build[1]['formats'].split(',')
+                if provider.image_type not in image_formats:
+                    continue
+
+                try:
+                    with self._zk.imageUploadLock(
+                        image.diskimage, build[0], provider.name,
+                        blocking=False
+                    ):
+                        # New upload number with initial state 'uploading'
+                        upnum = self._zk.storeImageUpload(
+                            image.diskimage, build[0], provider.name,
+                            self._makeStateData('uploading'))
+
+                        data = self._uploadImage(build[0], image.diskimage,
+                                                 local_images, provider)
+
+                        # Set final state
+                        self._zk.storeImageUpload(image.diskimage, build[0],
+                                                  provider.name, data, upnum)
+                except exceptions.ZKLockException:
+                    # Lock is already held. Skip it.
+                    pass
 
     def run(self):
         '''
