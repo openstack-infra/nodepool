@@ -93,6 +93,7 @@ class BaseWorker(threading.Thread):
         self._config_path = config_path
         self._zk = None
         self._hostname = socket.gethostname()
+        self._statsd = stats.get_client()
 
     def _checkForZooKeeperChanges(self, new_config):
         '''
@@ -166,7 +167,7 @@ class BuildWorker(BaseWorker):
 
                         bnum = self._zk.storeBuild(
                             image.name, self._makeStateData('building'))
-                        data = self._buildImage(image)
+                        data = self._buildImage(bnum, image)
                         self._zk.storeBuild(image.name, data, bnum)
             except exceptions.ZKLockException:
                 # Lock is already held. Skip it.
@@ -192,7 +193,7 @@ class BuildWorker(BaseWorker):
 
                     bnum = self._zk.storeBuild(
                         image.name, self._makeStateData('building'))
-                    data = self._buildImage(image)
+                    data = self._buildImage(bnum, image)
                     self._zk.storeBuild(image.name, data, bnum)
 
                     # Remove request on a successful build
@@ -203,20 +204,59 @@ class BuildWorker(BaseWorker):
                 # Lock is already held. Skip it.
                 pass
 
-    def _buildImage(self, image):
+    def _buildImage(self, build_id, image):
         '''
         Run the external command to build the image.
 
+        :param str build_id: The ID for the build (used in image filename).
         :param image: The image as retrieved from our config file.
 
         :returns: A dict of build-related data.
 
         :raises: BuilderError if we failed to execute the build command.
         '''
-        env = os.environ.copy()
-        cmd = 'sleep 5'
+        image_file = DibImageFile(build_id)
+        filename = image_file.to_path(self._config.imagesdir, False)
 
-        self.log.info("Creating image %s" % image.name)
+        env = os.environ.copy()
+        env['DIB_RELEASE'] = image.release
+        env['DIB_IMAGE_NAME'] = image.name
+        env['DIB_IMAGE_FILENAME'] = filename
+
+        # Note we use a reference to the nodepool config here so
+        # that whenever the config is updated we get up to date
+        # values in this thread.
+        if self._config.elementsdir:
+            env['ELEMENTS_PATH'] = self._config.elementsdir
+        if self._config.scriptdir:
+            env['NODEPOOL_SCRIPTDIR'] = self._config.scriptdir
+
+        # this puts a disk-usage report in the logs so we can see if
+        # something blows up the image size.
+        env['DIB_SHOW_IMAGE_USAGE'] = '1'
+
+        # send additional env vars if needed
+        for k, v in image.env_vars.items():
+            env[k] = v
+
+        img_elements = image.elements
+        img_types = ",".join(image.image_types)
+
+        qemu_img_options = ''
+        if 'qcow2' in img_types:
+            qemu_img_options = DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS
+
+        if 'fake-' in image.name:
+            dib_cmd = 'nodepool/tests/fake-image-create'
+        else:
+            dib_cmd = 'disk-image-create'
+
+        cmd = ('%s -x -t %s --no-tmpfs %s -o %s %s' %
+               (dib_cmd, img_types, qemu_img_options, filename, img_elements))
+
+        log = logging.getLogger("nodepool.image.build.%s" %
+                                (image.name,))
+
         self.log.info('Running %s' % cmd)
 
         try:
@@ -229,6 +269,12 @@ class BuildWorker(BaseWorker):
             raise exceptions.BuilderError(
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
+
+        while True:
+            ln = p.stdout.readline()
+            log.info(ln.strip())
+            if not ln:
+                break
 
         p.wait()
 
@@ -250,7 +296,21 @@ class BuildWorker(BaseWorker):
         else:
             self.log.info("DIB image %s is built" % image.name)
             build_data = self._makeStateData('ready')
-            build_data['formats'] = ",".join(image.image_types)
+            build_data['formats'] = img_types
+
+            if self._statsd:
+                # record stats on the size of each image we create
+                for ext in img_types.split(','):
+                    key = 'nodepool.dib_image_build.%s.%s.size' % (image.name, ext)
+                    # A bit tricky because these image files may be sparse
+                    # files; we only want the true size of the file for
+                    # purposes of watching if we've added too much stuff
+                    # into the image.  Note that st_blocks is defined as
+                    # 512-byte blocks by stat(2)
+                    size = os.stat("%s.%s" % (filename, ext)).st_blocks * 512
+                    self.log.debug("%s created image %s.%s (size: %d) " %
+                                   (image.name, filename, ext, size))
+                    self._statsd.gauge(key, size)
 
         return build_data
 
@@ -351,12 +411,12 @@ class UploadWorker(BaseWorker):
             meta=provider_image.meta
         )
 
-        if self.statsd:
+        if self._statsd:
             dt = int((time.time() - start_time) * 1000)
             key = 'nodepool.image_update.%s.%s' % (image_name,
                                                    provider.name)
-            self.statsd.timing(key, dt)
-            self.statsd.incr(key)
+            self._statsd.timing(key, dt)
+            self._statsd.incr(key)
 
         self.log.info("Image build %s in %s is ready" %
                       (build_id, provider.name))
