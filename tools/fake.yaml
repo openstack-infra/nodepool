@@ -14,14 +14,26 @@ gearman-servers:
 zookeeper-servers:
   - host: localhost
 
+diskimages:
+  - name: fake-nodepool
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
+
 labels:
-  - name: nodepool-fake
-    image: nodepool-fake
+  - name: single-fake
+    image: fake-nodepool
     min-ready: 2
     providers:
       - name: fake-provider
   - name: multi-fake
-    image: nodepool-fake
+    image: fake-nodepool
     ready-script: multinode_setup.sh
     subnodes: 2
     min-ready: 2
@@ -38,16 +50,12 @@ providers:
     project-id: 'fake'
     max-servers: 96
     images:
-      - name: nodepool-fake
+      - name: fake-nodepool
         base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
         setup: prepare_node_devstack.sh
-      - name: multi-fake
-        base-image: 'Fake Precise'
-        min-ram: 8192
-        name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
+        diskimage: fake-nodepool
 
 targets:
   - name: zuul
