@@ -153,27 +153,37 @@ class BuildWorker(BaseWorker):
             if not self.running or self._zk.suspended or self._zk.lost:
                 return
 
-            try:
-                with self._zk.imageBuildLock(image.name, blocking=False):
-                    build = self._zk.getMostRecentBuild(name, 'ready')
-                    now = int(time.time())
+            now = int(time.time())
+            build = self._zk.getMostRecentBuild(name, 'ready')
 
-                    # If there is no build for this image, or it has aged out
-                    # or if the current build is missing an image type from
-                    # the config file, start a new build.
-                    if (build is None
-                        or (now - build[1]['state_time']) >= image.rebuild_age
-                        or not set(build[1]['formats'].split(',')).\
-                            issuperset(image.image_types)
-                    ):
+            # If there is no build for this image, or it has aged out
+            # or if the current build is missing an image type from
+            # the config file, start a new build.
+            if (build is None
+                or (now - build[1]['state_time']) >= image.rebuild_age
+                or not set(build[1]['formats'].split(',')).\
+                    issuperset(image.image_types)
+            ):
+                try:
+                    with self._zk.imageBuildLock(image.name, blocking=False):
+                        # To avoid locking each image repeatedly, we have an
+                        # second, redundant check here to verify that a new
+                        # build didn't appear between the first check and the
+                        # lock acquisition. If it's not the same build as
+                        # identified in the first check above, assume another
+                        # BuildWorker created the build for us and continue.
+                        build2 = self._zk.getMostRecentBuild(name, 'ready')
+                        if build2 and build[0] != build2[0]:
+                            continue
+
                         self.log.info("Building image %s" % name)
                         bnum = self._zk.storeBuild(
                             image.name, self._makeStateData('building'))
                         data = self._buildImage(bnum, image)
                         self._zk.storeBuild(image.name, data, bnum)
-            except exceptions.ZKLockException:
-                # Lock is already held. Skip it.
-                pass
+                except exceptions.ZKLockException:
+                    # Lock is already held. Skip it.
+                    pass
 
     def _checkForManualBuildRequest(self):
         '''
@@ -185,8 +195,14 @@ class BuildWorker(BaseWorker):
             if not self.running or self._zk.suspended or self._zk.lost:
                 return
 
+            # Reduce use of locks by adding an initial check here and
+            # a redundant check after lock acquisition.
+            if not self._zk.hasBuildRequest(image.name):
+                continue
+
             try:
                 with self._zk.imageBuildLock(image.name, blocking=False):
+                    # Redundant check
                     if not self._zk.hasBuildRequest(image.name):
                         continue
 
