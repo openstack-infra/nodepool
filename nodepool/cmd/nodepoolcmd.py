@@ -177,7 +177,7 @@ class NodePoolCmd(NodepoolApp):
         print status.dib_image_list(self.zk)
 
     def image_list(self):
-        print status.image_list(self.pool.getDB())
+        print status.image_list(self.zk)
 
     def image_update(self):
         threads = []
@@ -397,7 +397,8 @@ class NodePoolCmd(NodepoolApp):
         self.pool.setConfig(config)
 
         # commands needing ZooKeeper
-        if self.args.command in ('image-build', 'dib-image-list'):
+        if self.args.command in ('image-build', 'dib-image-list',
+                                 'image-list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
 

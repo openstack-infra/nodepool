@@ -61,15 +61,20 @@ def dib_image_list(zk):
     return str(t)
 
 
-def image_list(db):
-    t = PrettyTable(["ID", "Provider", "Image", "Hostname", "Version",
-                     "Image ID", "Server ID", "State", "Age"])
+def image_list(zk):
+    t = PrettyTable(["ID", "Provider", "Image", "Provider Image Name",
+                     "Provider Image ID", "State", "Age"])
     t.align = 'l'
-    with db.getSession() as session:
-        for image in session.getSnapshotImages():
-            t.add_row([image.id, image.provider_name, image.image_name,
-                       image.hostname, image.version,
-                       image.external_id, image.server_external_id,
-                       nodedb.STATE_NAMES[image.state],
-                       age(image.state_time)])
+    for image_name in zk.getImageNames():
+        for build_no in zk.getBuildNumbers(image_name):
+            for provider in zk.getBuildProviders(image_name, build_no):
+                for upload_no in zk.getImageUploadNumbers(
+                        image_name, build_no, provider):
+                    upload = zk.getImageUpload(image_name, build_no,
+                                               provider, upload_no)
+                    t.add_row([upload_no, provider, image_name,
+                               upload['external_name'],
+                               upload['external_id'],
+                               upload['state'],
+                               age(upload['state_time'])])
     return str(t)

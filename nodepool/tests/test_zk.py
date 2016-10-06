@@ -132,6 +132,14 @@ class TestZooKeeper(tests.ZKTestCase):
     def test_getBuildNumbers_not_found(self):
         self.assertEqual(self.zk.getBuildNumbers("ubuntu-trusty"), [])
 
+    def test_getBuildProviders_not_found(self):
+        self.assertEqual(self.zk.getBuildProviders(
+            "ubuntu-trusty", "0000000000"), [])
+
+    def test_getImageUploadNumbers_not_found(self):
+        self.assertEqual(self.zk.getImageUploadNumbers(
+            "ubuntu-trusty", "0000000000", "rax"), [])
+
     def test_getBuild_not_found(self):
         self.assertIsNone(self.zk.getBuild("ubuntu-trusty", "0000000000"))
 
@@ -175,6 +183,13 @@ class TestZooKeeper(tests.ZKTestCase):
         data = self.zk.getImageUpload(image, build_number, provider, upload_id)
 
         self.assertEqual(orig_data, data)
+        self.assertEqual(self.zk.getBuildProviders("ubuntu-trusty",
+                                                   build_number),
+                         [provider])
+        self.assertEqual(self.zk.getImageUploadNumbers("ubuntu-trusty",
+                                                       build_number,
+                                                       provider),
+                         [upload_id])
 
     def test_registerBuildRequestWatch(self):
         func = mock.MagicMock()

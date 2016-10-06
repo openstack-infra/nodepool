@@ -441,6 +441,7 @@ class UploadWorker(BaseWorker):
 
         data = self._makeStateData('ready')
         data['external_id'] = external_id
+        data['external_name'] = ext_image_name
         return data
 
     def _checkForProviderUploads(self):

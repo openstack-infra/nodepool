@@ -147,6 +147,10 @@ class ZooKeeper(object):
     def _imageBuildLockPath(self, image):
         return "%s/lock" % self._imageBuildsPath(image)
 
+    def _imageProviderPath(self, image, build_number):
+        return "%s/%s/provider" % (self._imageBuildsPath(image),
+                                   build_number)
+
     def _imageUploadPath(self, image, build_number, provider):
         return "%s/%s/provider/%s/images" % (self._imageBuildsPath(image),
                                              build_number,
@@ -365,6 +369,47 @@ class ZooKeeper(object):
             return []
         builds = [x for x in builds if x != 'lock']
         return builds
+
+    def getBuildProviders(self, image, build_number):
+        '''
+        Retrieve the providers which have uploads for an image build.
+
+        :param str image: The image name.
+        :param str build_number: The image build number.
+
+        :returns: A list of provider names or the empty list.
+
+        '''
+        path = self._imageProviderPath(image, build_number)
+
+        try:
+            providers = self.client.get_children(path)
+        except kze.NoNodeError:
+            return []
+
+        return providers
+
+    def getImageUploadNumbers(self, image, build_number, provider):
+        '''
+        Retrieve upload numbers for a provider and image build.
+
+        :param str image: The image name.
+        :param str build_number: The image build number.
+        :param str provider: The provider name owning the image.
+
+        :returns: A list of upload numbers or the empty list.
+
+        '''
+        path = self._imageUploadPath(image, build_number, provider)
+        print path
+
+        try:
+            uploads = self.client.get_children(path)
+        except kze.NoNodeError:
+            return []
+
+        uploads = [x for x in uploads if x != 'lock']
+        return uploads
 
     def getBuild(self, image, build_number):
         '''
