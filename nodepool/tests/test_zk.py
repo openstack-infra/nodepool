@@ -123,6 +123,14 @@ class TestZooKeeper(tests.ZKTestCase):
 
         data = self.zk.getBuild(image, build_num)
         self.assertEqual(orig_data, data)
+        self.assertEqual(self.zk.getImageNames(), ["ubuntu-trusty"])
+        self.assertEqual(self.zk.getBuildNumbers("ubuntu-trusty"), [build_num])
+
+    def test_getImageNames_not_found(self):
+        self.assertEqual(self.zk.getImageNames(), [])
+
+    def test_getBuildNumbers_not_found(self):
+        self.assertEqual(self.zk.getBuildNumbers("ubuntu-trusty"), [])
 
     def test_getBuild_not_found(self):
         self.assertIsNone(self.zk.getBuild("ubuntu-trusty", "0000000000"))

@@ -167,12 +167,14 @@ class NodePoolCmd(NodepoolApp):
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)s %(name)s: '
                                        '%(message)s')
+            l = logging.getLogger('kazoo')
+            l.setLevel(logging.WARNING)
 
     def list(self, node_id=None):
         print status.node_list(self.pool.getDB(), node_id)
 
     def dib_image_list(self):
-        print status.dib_image_list(self.pool.getDB())
+        print status.dib_image_list(self.zk)
 
     def image_list(self):
         print status.image_list(self.pool.getDB())
@@ -387,7 +389,7 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('dib-image-delete', 'dib-image-list',
+        if self.args.command in ('dib-image-delete',
                                  'image-delete',
                                  'image-upload', 'image-update'):
             self.pool.reconfigureGearmanClient(config)
@@ -395,7 +397,7 @@ class NodePoolCmd(NodepoolApp):
         self.pool.setConfig(config)
 
         # commands needing ZooKeeper
-        if self.args.command in ('image-build'):
+        if self.args.command in ('image-build', 'dib-image-list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
 

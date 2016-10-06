@@ -48,16 +48,16 @@ def node_list(db, node_id=None):
     return str(t)
 
 
-def dib_image_list(db):
-    t = PrettyTable(["ID", "Image", "Filename", "Version",
+def dib_image_list(zk):
+    t = PrettyTable(["ID", "Image", "Builder", "Formats",
                      "State", "Age"])
     t.align = 'l'
-    with db.getSession() as session:
-        for image in session.getDibImages():
-            t.add_row([image.id, image.image_name,
-                       image.filename, image.version,
-                       nodedb.STATE_NAMES[image.state],
-                       age(image.state_time)])
+    for image_name in zk.getImageNames():
+        for build_no in zk.getBuildNumbers(image_name):
+            build = zk.getBuild(image_name, build_no)
+            t.add_row([build_no, image_name,
+                       build['builder'], build['formats'],
+                       build['state'], age(build['state_time'])])
     return str(t)
 
 

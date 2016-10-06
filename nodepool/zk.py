@@ -335,6 +335,37 @@ class ZooKeeper(object):
                 self._current_lock.release()
                 self._current_lock = None
 
+    def getImageNames(self):
+        '''
+        Retrieve the image names in Zookeeper.
+
+        :returns: A list of image names or the empty list.
+        '''
+        path = self.IMAGE_ROOT
+
+        try:
+            images = self.client.get_children(path)
+        except kze.NoNodeError:
+            return []
+        return images
+
+    def getBuildNumbers(self, image):
+        '''
+        Retrieve the builds available for an image.
+
+        :param str image: The image name.
+
+        :returns: A list of image build numbers or the empty list.
+        '''
+        path = self._imageBuildsPath(image)
+
+        try:
+            builds = self.client.get_children(path)
+        except kze.NoNodeError:
+            return []
+        builds = [x for x in builds if x != 'lock']
+        return builds
+
     def getBuild(self, image, build_number):
         '''
         Retrieve the image build data.
@@ -363,20 +394,9 @@ class ZooKeeper(object):
             build data matching the given state, or None if there was no build
             matching the state.
         '''
-        path = self._imageBuildsPath(image)
-
-        if not self.client.exists(path):
-            return None
-
-        builds = self.client.get_children(path)
-        if not builds:
-            return None
-
         recent_data = None
         recent_bnum = None
-        for build in builds:
-            if build == 'lock':   # skip the build lock node
-                continue
+        for build in self.getBuildNumbers(image):
             data = self.getBuild(image, build)
             if data.get('state', '') != state:
                 continue
