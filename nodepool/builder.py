@@ -158,13 +158,15 @@ class BuildWorker(BaseWorker):
                     build = self._zk.getMostRecentBuild(name, 'ready')
                     now = int(time.time())
 
-                    if (build is None or
-                        (now - build[1]['state_time']) >= image.rebuild_age
+                    # If there is no build for this image, or it has aged out
+                    # or if the current build is missing an image type from
+                    # the config file, start a new build.
+                    if (build is None
+                        or (now - build[1]['state_time']) >= image.rebuild_age
+                        or not set(build[1]['formats'].split(',')).\
+                            issuperset(image.image_types)
                     ):
-                        # No build data recorded, or it has aged out.
-                        self.log.info(
-                            "Rebuild age exceeded for image %s" % name)
-
+                        self.log.info("Building image %s" % name)
                         bnum = self._zk.storeBuild(
                             image.name, self._makeStateData('building'))
                         data = self._buildImage(bnum, image)
