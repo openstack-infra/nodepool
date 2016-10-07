@@ -428,6 +428,38 @@ class ZooKeeper(object):
         data, stat = self.client.get(path)
         return self._strToDict(data)
 
+    def getBuildsWithStates(self, image, states):
+        '''
+        Retrieve all image build data matching the given states.
+
+        :param str image: The image name.
+        :param list states: A list of build state values to match against.
+            An empty string ('') will match states with no state recorded.
+
+        :returns: A dictionary of dictionaries of build data, keyed by
+            build number, or None if not found.
+        '''
+        path = self._imageBuildsPath(image)
+
+        if not self.client.exists(path):
+            return None
+
+        matches = {}
+        builds = self.client.get_children(path)
+        if not builds:
+            return None
+
+        for build in builds:
+            if build == 'lock':   # skip the build lock node
+                continue
+            data = self.getBuild(image, build)
+            if not data or data.get('state', '') in states:
+                matches[build] = data
+
+        if not matches:
+            return None
+        return matches
+
     def getMostRecentBuild(self, image, state="ready"):
         '''
         Retrieve the most recent image build data with the given state.
