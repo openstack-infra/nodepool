@@ -544,18 +544,13 @@ class DBTestCase(BaseTestCase):
                 return
             time.sleep(0.1)
 
-    def waitForImage(self, pool, provider_name, image_name):
-        self.wait_for_config(pool)
+    def waitForImage(self, provider_name, image_name):
         while True:
             self.wait_for_threads()
-            self.waitForJobs()
-            with pool.getDB().getSession() as session:
-                image = session.getCurrentSnapshotImage(provider_name,
-                                                        image_name)
-
-                if image:
-                    break
-                time.sleep(1)
+            image = self.zk.getMostRecentImageUpload(image_name, provider_name)
+            if image:
+                break
+            time.sleep(1)
         self.wait_for_threads()
 
     def waitForNodes(self, pool):
