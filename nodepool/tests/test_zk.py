@@ -225,19 +225,24 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.removeBuildRequest(image)
         self.assertFalse(self.zk.hasBuildRequest(image))
 
-    def test_getMostRecentBuild(self):
+    def test_getMostRecentBuilds(self):
         image = "ubuntu-trusty"
         v1 = {'state': 'ready', 'state_time': int(time.time())}
         v2 = {'state': 'ready', 'state_time': v1['state_time'] + 10}
-        v3 = {'state': 'delete', 'state_time': v2['state_time'] + 10}
+        v3 = {'state': 'ready', 'state_time': v1['state_time'] + 20}
+        v4 = {'state': 'delete', 'state_time': v2['state_time'] + 10}
         self.zk.storeBuild(image, v1)
         self.zk.storeBuild(image, v2)
         self.zk.storeBuild(image, v3)
+        self.zk.storeBuild(image, v4)
 
-        # v2 should be the most recent 'ready' build
-        data = self.zk.getMostRecentBuild(image, 'ready')
-        self.assertIsNotNone(data)
-        self.assertEqual(data[1], v2)
+        # v2 and v3 should be the 2 most recent 'ready' builds
+        matches = self.zk.getMostRecentBuilds(2, image, 'ready')
+        self.assertEqual(2, len(matches))
+
+        # Should be in descending order, according to state_time
+        self.assertEqual(matches[0][1], v3)
+        self.assertEqual(matches[1][1], v2)
 
     def test_getMostRecentImageUpload(self):
         image = "ubuntu-trusty"

@@ -154,14 +154,14 @@ class BuildWorker(BaseWorker):
                 return
 
             now = int(time.time())
-            build = self._zk.getMostRecentBuild(name, 'ready')
+            builds = self._zk.getMostRecentBuilds(1, name, 'ready')
 
             # If there is no build for this image, or it has aged out
             # or if the current build is missing an image type from
             # the config file, start a new build.
-            if (build is None
-                or (now - build[1]['state_time']) >= image.rebuild_age
-                or not set(build[1]['formats'].split(',')).\
+            if (not builds
+                or (now - builds[0][1]['state_time']) >= image.rebuild_age
+                or not set(builds[0][1]['formats'].split(',')).\
                     issuperset(image.image_types)
             ):
                 try:
@@ -172,8 +172,8 @@ class BuildWorker(BaseWorker):
                         # lock acquisition. If it's not the same build as
                         # identified in the first check above, assume another
                         # BuildWorker created the build for us and continue.
-                        build2 = self._zk.getMostRecentBuild(name, 'ready')
-                        if build2 and build[0] != build2[0]:
+                        builds2 = self._zk.getMostRecentBuilds(1, name, 'ready')
+                        if builds2 and builds[0][0] != builds2[0][0]:
                             continue
 
                         self.log.info("Building image %s" % name)
@@ -464,43 +464,45 @@ class UploadWorker(BaseWorker):
                     continue
 
                 # Search for the most recent 'ready' image build
-                build = self._zk.getMostRecentBuild(image.diskimage)
-                if build is None:
+                builds = self._zk.getMostRecentBuilds(1, image.diskimage)
+                if not builds:
                     continue
+
+                build_id, build_data = builds[0]
 
                 # Search for locally built images. The build sequence ID is
                 # used to name the image.
                 local_images = DibImageFile.from_image_id(self._config.imagesdir,
-                                                          build[0])
+                                                          build_id)
                 if not local_images:
                     continue
 
                 # See if this image has already been uploaded
                 upload = self._zk.getMostRecentImageUpload(
-                    image.diskimage, build[0], provider.name)
+                    image.diskimage, build_id, provider.name)
                 if upload is not None:
                     continue
 
                 # See if this provider supports the available image formats
-                image_formats = build[1]['formats'].split(',')
+                image_formats = build_data['formats'].split(',')
                 if provider.image_type not in image_formats:
                     continue
 
                 try:
                     with self._zk.imageUploadLock(
-                        image.diskimage, build[0], provider.name,
+                        image.diskimage, build_id, provider.name,
                         blocking=False
                     ):
                         # New upload number with initial state 'uploading'
                         upnum = self._zk.storeImageUpload(
-                            image.diskimage, build[0], provider.name,
+                            image.diskimage, build_id, provider.name,
                             self._makeStateData('uploading'))
 
-                        data = self._uploadImage(build[0], image.diskimage,
+                        data = self._uploadImage(build_id, image.diskimage,
                                                  local_images, provider)
 
                         # Set final state
-                        self._zk.storeImageUpload(image.diskimage, build[0],
+                        self._zk.storeImageUpload(image.diskimage, build_id,
                                                   provider.name, data, upnum)
                 except exceptions.ZKLockException:
                     # Lock is already held. Skip it.
