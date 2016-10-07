@@ -152,7 +152,7 @@ class CleanupWorker(BaseWorker):
                 for provider in self._zk.getBuildProviders(image, build.id):
                     if provider not in self._rtable[image]:
                         self._rtable[image][provider] = []
-                        uploads = self._zk.getMostRecentImageUploads(
+                        uploads = self._zk.getMostRecentBuildImageUploads(
                             2, image, build.id, provider, 'ready')
                         for upload in uploads:
                             self._rtable[image][provider].append(
@@ -667,7 +667,7 @@ class UploadWorker(BaseWorker):
                     continue
 
                 # See if this image has already been uploaded
-                upload = self._zk.getMostRecentImageUploads(
+                upload = self._zk.getMostRecentBuildImageUploads(
                     1, image.diskimage, build.id, provider.name, 'ready')
                 if upload:
                     continue

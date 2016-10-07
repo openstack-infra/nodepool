@@ -285,7 +285,7 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(matches[0].id, v3_id)
         self.assertEqual(matches[1].id, v2_id)
 
-    def test_getMostRecentImageUploads_with_state(self):
+    def test_getMostRecentBuildImageUploads_with_state(self):
         image = "ubuntu-trusty"
         provider = "rax"
         build = {'state': 'ready', 'state_time': int(time.time())}
@@ -302,12 +302,12 @@ class TestZooKeeper(tests.DBTestCase):
                                  zk.ImageUpload.fromDict(up3))
 
         # up2 should be the most recent 'ready' upload
-        data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, 'ready')
+        data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, 'ready')
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
         self.assertEqual(data[0].id, up2_id)
 
-    def test_getMostRecentImageUploads_any_state(self):
+    def test_getMostRecentBuildImageUploads_any_state(self):
         image = "ubuntu-trusty"
         provider = "rax"
         build = {'state': 'ready', 'state_time': int(time.time())}
@@ -324,7 +324,7 @@ class TestZooKeeper(tests.DBTestCase):
                                           zk.ImageUpload.fromDict(up3))
 
         # up3 should be the most recent upload, regardless of state
-        data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, None)
+        data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, None)
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
         self.assertEqual(data[0].id, up3_id)
