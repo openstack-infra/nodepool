@@ -34,6 +34,7 @@ import kazoo.client
 import testtools
 
 from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
+from nodepool import zk
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -508,6 +509,8 @@ class DBTestCase(BaseTestCase):
         self.useFixture(gearman_fixture)
         self.gearman_server = gearman_fixture.gearman_server
 
+        self.setupZK()
+
     def setup_config(self, filename):
         images_dir = fixtures.TempDir()
         self.useFixture(images_dir)
@@ -592,15 +595,7 @@ class DBTestCase(BaseTestCase):
     def _useBuilder(self, configfile):
         self.useFixture(BuilderFixture(configfile))
 
-
-class IntegrationTestCase(DBTestCase):
-    def setUpFakes(self):
-        pass
-
-
-class ZKTestCase(BaseTestCase):
-    def setUp(self):
-        super(ZKTestCase, self).setUp()
+    def setupZK(self):
         f = ZookeeperServerFixture()
         self.useFixture(f)
         self.zookeeper_host = f.zookeeper_host
@@ -610,4 +605,10 @@ class ZKTestCase(BaseTestCase):
             self.zookeeper_host,
             self.zookeeper_port))
         self.zkclient = kz_fxtr.zkclient
-        self.chroot_path = kz_fxtr.chroot_path
+        self.zk = zk.ZooKeeper(self.zkclient)
+        self.zookeeper_chroot = kz_fxtr.chroot_path
+
+
+class IntegrationTestCase(DBTestCase):
+    def setUpFakes(self):
+        pass
