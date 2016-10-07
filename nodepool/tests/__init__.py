@@ -520,7 +520,10 @@ class DBTestCase(BaseTestCase):
         with open(configfile) as conf_fd:
             config = conf_fd.read()
             os.write(fd, config.format(images_dir=images_dir.path,
-                                       gearman_port=self.gearman_server.port))
+                                       gearman_port=self.gearman_server.port,
+                                       zookeeper_host=self.zookeeper_host,
+                                       zookeeper_port=self.zookeeper_port,
+                                       zookeeper_chroot=self.zookeeper_chroot))
         os.close(fd)
         return path
 
