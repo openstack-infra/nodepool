@@ -603,9 +603,12 @@ class UploadWorker(BaseWorker):
                       (build_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
-        try:
-            provider_image = provider.images[image_name]
-        except KeyError:
+        provider_image = None
+        for p_image in provider.images.values():
+            if p_image.diskimage == image_name:
+                provider_image = p_image
+                break
+        if provider_image is None:
             raise exceptions.BuilderInvalidCommandError(
                 "Could not find matching provider image for %s" % image_name
             )
