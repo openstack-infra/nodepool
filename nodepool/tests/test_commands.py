@@ -15,6 +15,7 @@
 
 import os.path
 import sys  # noqa making sure its available for monkey patching
+from unittest import skip
 
 import fixtures
 import mock
@@ -24,10 +25,6 @@ from nodepool import tests
 
 
 class TestNodepoolCMD(tests.DBTestCase):
-    def setUp(self):
-        super(TestNodepoolCMD, self).setUp()
-        self.skip("Skipping until ZooKeeper is enabled")
-
     def patch_argv(self, *args):
         argv = ["nodepool", "-s", self.secure_conf]
         argv.extend(args)
@@ -51,6 +48,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
         self.assert_listed(configfile, ['list'], 10, status, node_cnt)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_snapshot_image_update(self):
         configfile = self.setup_config("node.yaml")
         self.patch_argv("-c", configfile, "image-update",
@@ -58,6 +56,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_dib_image_update(self):
         configfile = self.setup_config("node_dib.yaml")
         self._useBuilder(configfile)
@@ -66,6 +65,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_dib_snapshot_image_update(self):
         configfile = self.setup_config("node_dib_and_snap.yaml")
         self._useBuilder(configfile)
@@ -77,6 +77,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 2)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_dib_snapshot_image_update_all(self):
         configfile = self.setup_config("node_dib_and_snap.yaml")
         self._useBuilder(configfile)
@@ -85,6 +86,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 2)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_update_all(self):
         configfile = self.setup_config("node_cmd.yaml")
         self._useBuilder(configfile)
@@ -93,14 +95,17 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_delete_invalid(self):
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "image-delete", "invalid-image")
         nodepoolcmd.main()
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_delete_snapshot(self):
         configfile = self.setup_config("node_cmd.yaml")
         self.patch_argv("-c", configfile, "image-update",
@@ -116,6 +121,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 0)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_alien_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
@@ -127,6 +133,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "alien-list")
         nodepoolcmd.main()
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_alien_image_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
@@ -138,6 +145,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_list_nodes(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -146,6 +154,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForNodes(pool)
         self.assert_nodes_listed(configfile, 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_config_validate(self):
         config = os.path.join(os.path.dirname(tests.__file__),
                               'fixtures', 'config_validate', 'good.yaml')
@@ -154,13 +163,11 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_list(self):
         configfile = self.setup_config('node_dib.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
-        self.waitForNodes(pool)
+        self.waitForImage('fake-dib-provider', 'fake-dib-diskimage')
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_dib_image_delete(self):
         configfile = self.setup_config('node_dib.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -177,6 +184,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Check the the image is no longer listed
         self.assert_listed(configfile, ['dib-image-list'], 0, 1, 0)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_upload(self):
         configfile = self.setup_config('node_dib.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -194,6 +202,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_upload_all(self):
         configfile = self.setup_config('node_dib.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -211,6 +220,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_hold(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -227,6 +237,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['list'], 0, 1, 1)
         self.assert_nodes_listed(configfile, 1, 'hold')
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -239,6 +250,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Delete node 1
         self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -254,6 +266,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Assert the node is gone
         self.assert_listed(configfile, ['list'], 0, 1, 0)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_image_build(self):
         configfile = self.setup_config('node_dib.yaml')
         self._useBuilder(configfile)
@@ -262,6 +275,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_job_create(self):
         configfile = self.setup_config('node.yaml')
         self.patch_argv("-c", configfile, "job-create", "fake-job",
@@ -269,6 +283,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_listed(configfile, ['job-list'], 2, 1, 1)
 
+    @skip("Skipping until ZooKeeper is enabled")
     def test_job_delete(self):
         configfile = self.setup_config('node.yaml')
         self.patch_argv("-c", configfile, "job-create", "fake-job",
