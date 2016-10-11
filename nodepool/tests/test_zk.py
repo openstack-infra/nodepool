@@ -47,9 +47,9 @@ class TestZooKeeper(tests.ZKTestCase):
     def test_imageBuildLock(self):
         path = self.zk._imageBuildLockPath("ubuntu-trusty")
         with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
-            self.assertIsNotNone(self.zk._current_lock)
+            self.assertIsNotNone(self.zk._current_build_lock)
             self.assertIsNotNone(self.zk.client.exists(path))
-        self.assertIsNone(self.zk._current_lock)
+        self.assertIsNone(self.zk._current_build_lock)
 
     def test_imageBuildLock_exception_nonblocking(self):
         zk2 = zk.ZooKeeper()
@@ -75,13 +75,48 @@ class TestZooKeeper(tests.ZKTestCase):
                     pass
         zk2.disconnect()
 
+    def test_imageBuildNumberLock(self):
+        path = self.zk._imageBuildNumberLockPath("ubuntu-trusty", "0000")
+        with self.zk.imageBuildNumberLock(
+            "ubuntu-trusty", "0000", blocking=False
+        ):
+            self.assertIsNotNone(self.zk._current_build_number_lock)
+            self.assertIsNotNone(self.zk.client.exists(path))
+        self.assertIsNone(self.zk._current_build_number_lock)
+
+    def test_imageBuildNumberLock_exception_nonblocking(self):
+        zk2 = zk.ZooKeeper()
+        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
+                                                  port=self.zookeeper_port,
+                                                  chroot=self.chroot_path)])
+        with zk2.imageBuildNumberLock("ubuntu-trusty", "0000", blocking=False):
+            with testtools.ExpectedException(npe.ZKLockException):
+                with self.zk.imageBuildNumberLock(
+                    "ubuntu-trusty", "0000", blocking=False
+                ):
+                    pass
+        zk2.disconnect()
+
+    def test_imageBuildNumberLock_exception_blocking(self):
+        zk2 = zk.ZooKeeper()
+        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
+                                                  port=self.zookeeper_port,
+                                                  chroot=self.chroot_path)])
+        with zk2.imageBuildNumberLock("ubuntu-trusty", "0000", blocking=False):
+            with testtools.ExpectedException(npe.TimeoutException):
+                with self.zk.imageBuildNumberLock(
+                    "ubuntu-trusty", "0000", blocking=True, timeout=1
+                ):
+                    pass
+        zk2.disconnect()
+
     def test_imageUploadLock(self):
         path = self.zk._imageUploadLockPath("ubuntu-trusty", "0000", "prov1")
         with self.zk.imageUploadLock("ubuntu-trusty", "0000", "prov1",
                                      blocking=False):
-            self.assertIsNotNone(self.zk._current_lock)
+            self.assertIsNotNone(self.zk._current_upload_lock)
             self.assertIsNotNone(self.zk.client.exists(path))
-        self.assertIsNone(self.zk._current_lock)
+        self.assertIsNone(self.zk._current_upload_lock)
 
     def test_imageUploadLock_exception_nonblocking(self):
         zk2 = zk.ZooKeeper()
