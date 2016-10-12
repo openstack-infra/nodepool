@@ -420,7 +420,7 @@ class UploadWorker(BaseWorker):
             provider_image = provider.images[image_name]
         except KeyError:
             raise exceptions.BuilderInvalidCommandError(
-                "Could not find matching provider image for %s", image_name
+                "Could not find matching provider image for %s" % image_name
             )
 
         external_id = manager.uploadImage(
