@@ -464,7 +464,8 @@ class UploadWorker(BaseWorker):
                     continue
 
                 # Search for the most recent 'ready' image build
-                builds = self._zk.getMostRecentBuilds(1, image.diskimage)
+                builds = self._zk.getMostRecentBuilds(1, image.diskimage,
+                                                      'ready')
                 if not builds:
                     continue
 
@@ -478,9 +479,9 @@ class UploadWorker(BaseWorker):
                     continue
 
                 # See if this image has already been uploaded
-                upload = self._zk.getMostRecentImageUpload(
-                    image.diskimage, build_id, provider.name)
-                if upload is not None:
+                upload = self._zk.getMostRecentImageUploads(
+                    1, image.diskimage, build_id, provider.name, 'ready')
+                if upload:
                     continue
 
                 # See if this provider supports the available image formats

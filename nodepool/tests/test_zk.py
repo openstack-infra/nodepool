@@ -279,7 +279,7 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertEqual(matches[0][1], v3)
         self.assertEqual(matches[1][1], v2)
 
-    def test_getMostRecentImageUpload(self):
+    def test_getMostRecentImageUploads_with_state(self):
         image = "ubuntu-trusty"
         provider = "rax"
         build = {'state': 'ready', 'state_time': int(time.time())}
@@ -289,15 +289,35 @@ class TestZooKeeper(tests.ZKTestCase):
 
         bnum = self.zk.storeBuild(image, build)
         self.zk.storeImageUpload(image, bnum, provider, up1)
-        self.zk.storeImageUpload(image, bnum, provider, up2)
+        up2_id = self.zk.storeImageUpload(image, bnum, provider, up2)
         self.zk.storeImageUpload(image, bnum, provider, up3)
 
         # up2 should be the most recent 'ready' upload
-        data = self.zk.getMostRecentImageUpload(image, bnum, provider, 'ready')
-        self.assertIsNotNone(data)
-        self.assertEqual(data[1], up2)
+        data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, 'ready')
+        self.assertNotEqual([], data)
+        self.assertEqual(1, len(data))
+        self.assertEqual(data[0], (up2_id, up2))
 
-    def test_getBuildsWithStates(self):
+    def test_getMostRecentImageUploads_any_state(self):
+        image = "ubuntu-trusty"
+        provider = "rax"
+        build = {'state': 'ready', 'state_time': int(time.time())}
+        up1 = {'state': 'ready', 'state_time': int(time.time())}
+        up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
+        up3 = {'state': 'uploading', 'state_time': up2['state_time'] + 10}
+
+        bnum = self.zk.storeBuild(image, build)
+        self.zk.storeImageUpload(image, bnum, provider, up1)
+        self.zk.storeImageUpload(image, bnum, provider, up2)
+        up3_id = self.zk.storeImageUpload(image, bnum, provider, up3)
+
+        # up3 should be the most recent upload, regardless of state
+        data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, None)
+        self.assertNotEqual([], data)
+        self.assertEqual(1, len(data))
+        self.assertEqual(data[0], (up3_id, up3))
+
+    def test_getBuilds_any(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildsPath(image)
         v1 = {'state': ''}
@@ -320,7 +340,127 @@ class TestZooKeeper(tests.ZKTestCase):
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
-        matches = self.zk.getBuildsWithStates(image, ['', 'deleted', 'failed'])
+        matches = self.zk.getBuilds(image, None)
 
-        expected = {'1': v1, '4': v4, '5': v5, '6': v6}
+        expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
+        self.assertEqual(expected, matches)
+
+    def test_getBuilds_empty(self):
+        image = "ubuntu-trusty"
+        path = self.zk._imageBuildsPath(image)
+        v1 = {'state': ''}
+        v2 = {'state': 'ready'}
+        v3 = {}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+        self.zk.client.create(path + "/lock", makepath=True)
+
+        matches = self.zk.getBuilds(image, [''])
+
+        expected = {'1': v1, '3': v3}
+        self.assertEqual(expected, matches)
+
+    def test_getBuilds(self):
+        image = "ubuntu-trusty"
+        path = self.zk._imageBuildsPath(image)
+        v1 = {'state': ''}
+        v2 = {'state': 'ready'}
+        v3 = {'state': 'unused'}
+        v4 = {'state': 'failed'}
+        v5 = {'state': 'deleted'}
+        v6 = {}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
+                              makepath=True)
+        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
+                              makepath=True)
+        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
+                              makepath=True)
+        self.zk.client.create(path + "/lock", makepath=True)
+
+        matches = self.zk.getBuilds(image, ['deleted', 'failed'])
+
+        expected = {'4': v4, '5': v5}
+        self.assertEqual(expected, matches)
+
+    def test_getImageUploads(self):
+        path = self.zk._imageUploadPath("trusty", "000", "rax")
+        v1 = {'state': ''}
+        v2 = {'state': 'ready'}
+        v3 = {'state': 'uploading'}
+        v4 = {'state': 'failed'}
+        v5 = {'state': 'deleted'}
+        v6 = {}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
+                              makepath=True)
+        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
+                              makepath=True)
+        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
+                              makepath=True)
+        self.zk.client.create(path + "/lock", makepath=True)
+
+        matches = self.zk.getImageUploads("trusty", "000", "rax",
+                                          ['deleted', 'failed'])
+
+        expected = {'4': v4, '5': v5}
+        self.assertEqual(expected, matches)
+
+    def test_getImageUploads_empty(self):
+        path = self.zk._imageUploadPath("trusty", "000", "rax")
+        v1 = {'state': ''}
+        v2 = {'state': 'ready'}
+        v3 = {}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+        self.zk.client.create(path + "/lock", makepath=True)
+
+        matches = self.zk.getImageUploads("trusty", "000", "rax", [''])
+
+        expected = {'1': v1, '3': v3}
+        self.assertEqual(expected, matches)
+
+    def test_getImageUploads_any(self):
+        path = self.zk._imageUploadPath("trusty", "000", "rax")
+        v1 = {'state': ''}
+        v2 = {'state': 'ready'}
+        v3 = {'state': 'uploading'}
+        v4 = {'state': 'failed'}
+        v5 = {'state': 'deleted'}
+        v6 = {}
+        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
+                              makepath=True)
+        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
+                              makepath=True)
+        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
+                              makepath=True)
+        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
+                              makepath=True)
+        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
+                              makepath=True)
+        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
+                              makepath=True)
+        self.zk.client.create(path + "/lock", makepath=True)
+
+        matches = self.zk.getImageUploads("trusty", "000", "rax", None)
+
+        expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
         self.assertEqual(expected, matches)

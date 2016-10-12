@@ -483,13 +483,15 @@ class ZooKeeper(object):
         data, stat = self.client.get(path)
         return self._strToDict(data)
 
-    def getBuildsWithStates(self, image, states):
+    def getBuilds(self, image, states=None):
         '''
-        Retrieve all image build data matching the given states.
+        Retrieve all image build data matching any given states.
 
         :param str image: The image name.
         :param list states: A list of build state values to match against.
             An empty string ('') will match states with no state recorded.
+            A value of None will disable state matching and just return
+            all builds.
 
         :returns: A dictionary of dictionaries of build data, keyed by
             build number, or None if not found.
@@ -508,21 +510,26 @@ class ZooKeeper(object):
             if build == 'lock':   # skip the build lock node
                 continue
             data = self.getBuild(image, build)
-            if not data or data.get('state', '') in states:
+            if states is None:
+                matches[build] = data
+            elif not data and '' in states:
+                matches[build] = data
+            elif data and data.get('state', '') in states:
                 matches[build] = data
 
         if not matches:
             return None
         return matches
 
-    def getMostRecentBuilds(self, count, image, state="ready"):
+    def getMostRecentBuilds(self, count, image, state=None):
         '''
         Retrieve the most recent image build data with the given state.
 
         :param int count: A count of the most recent builds to return.
             Use None for all builds.
         :param str image: The image name.
-        :param str state: The build state to match on.
+        :param str state: The build state to match on. Use None to
+            ignore state
 
         :returns: A list of tuples with the most recent build number and
             dictionary of build data matching the given state, or an empty
@@ -530,7 +537,11 @@ class ZooKeeper(object):
             less than 'count' entries if there were not enough matching
             builds.
         '''
-        builds = self.getBuildsWithStates(image, [state])
+        states = None
+        if state:
+            states = [state]
+
+        builds = self.getBuilds(image, states)
         if builds is None:
             return []
 
@@ -605,47 +616,76 @@ class ZooKeeper(object):
 
         return self._strToDict(data)
 
-    def getMostRecentImageUpload(self, image, build_number, provider,
-                                 state="ready"):
+    def getImageUploads(self, image, build_number, provider, states=None):
         '''
-        Retrieve the most recent image upload data with the given state.
+        Retrieve all image upload data matching any given states.
 
         :param str image: The image name.
         :param str build_number: The image build number.
         :param str provider: The provider name owning the image.
-        :param str state: The image upload state to match on.
+        :param list states: A list of upload state values to match against.
+            An empty string ('') will match states with no state recorded.
+            A value of None will disable state matching and just return
+            all uploads.
+
+        :returns: A dictionary of dictionaries of upload data, keyed by
+            upload number, or None if not found.
+        '''
+        path = self._imageUploadPath(image, build_number, provider)
+
+        try:
+            uploads = self.client.get_children(path)
+        except kze.NoNodeError:
+            return None
+
+        matches = {}
+        for upload in uploads:
+            if upload == 'lock':
+                continue
+            data = self.getImageUpload(image, build_number, provider, upload)
+            if states is None:
+                matches[upload] = data
+            elif not data and '' in states:
+                matches[upload] = data
+            elif data and data.get('state', '') in states:
+                matches[upload] = data
+
+        if not matches:
+            return None
+        return matches
+
+    def getMostRecentImageUploads(self, count, image, build_number, provider,
+                                  state=None):
+        '''
+        Retrieve the most recent image upload data with the given state.
+
+        :param int count: A count of the most recent uploads to return.
+            Use None for all uploads.
+        :param str image: The image name.
+        :param str build_number: The image build number.
+        :param str provider: The provider name owning the image.
+        :param str state: The image upload state to match on. Use None to
+            ignore state.
 
         :returns: A tuple with the most recent upload number and dictionary of
             upload data matching the given state, or None if there was no
             upload matching the state.
         '''
-        path = self._imageUploadPath(image, build_number, provider)
+        states = None
+        if state:
+            states = [state]
 
-        if not self.client.exists(path):
-            return None
+        uploads = self.getImageUploads(image, build_number, provider, states)
+        if uploads is None:
+            return []
 
-        uploads = self.client.get_children(path)
-        if not uploads:
-            return None
+        matches = []
+        for upload_id, upload_data in uploads.iteritems():
+            matches.append((upload_id, upload_data))
 
-        recent_upnum = None
-        recent_data = None
-        for upload in uploads:
-            if upload == 'lock':   # skip the upload lock node
-                continue
-            data = self.getImageUpload(image, build_number, provider, upload)
-            if data.get('state', '') != state:
-                continue
-            elif (recent_data is None or
-                  recent_data['state_time'] < data.get('state_time', 0)
-            ):
-                recent_upnum = upload
-                recent_data = data
+        matches.sort(key=lambda x: x[1].get('state_time', 0), reverse=True)
 
-        if recent_upnum is None and recent_data is None:
-            return None
-
-        return (recent_upnum, recent_data)
+        return matches[:count]
 
     def storeImageUpload(self, image, build_number, provider, image_data,
                          upload_number=None):
