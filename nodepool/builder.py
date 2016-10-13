@@ -233,7 +233,8 @@ class BuildWorker(BaseWorker):
 
         :raises: BuilderError if we failed to execute the build command.
         '''
-        image_file = DibImageFile(build_id)
+        base = "-".join([image.name, build_id])
+        image_file = DibImageFile(base)
         filename = image_file.to_path(self._config.imagesdir, False)
 
         env = os.environ.copy()
@@ -471,10 +472,10 @@ class UploadWorker(BaseWorker):
 
                 build_id, build_data = builds[0]
 
-                # Search for locally built images. The build sequence ID is
-                # used to name the image.
-                local_images = DibImageFile.from_image_id(self._config.imagesdir,
-                                                          build_id)
+                # Search for locally built images. The image name and build
+                # sequence ID is used to name the image.
+                local_images = DibImageFile.from_image_id(
+                    self._config.imagesdir, "-".join([image.name, build_id]))
                 if not local_images:
                     continue
 
