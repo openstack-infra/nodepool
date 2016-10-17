@@ -392,7 +392,7 @@ class TestZooKeeper(tests.ZKTestCase):
         expected = {'4': v4, '5': v5}
         self.assertEqual(expected, matches)
 
-    def test_getImageUploads(self):
+    def test_getUploads(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
         v1 = {'state': ''}
         v2 = {'state': 'ready'}
@@ -414,13 +414,13 @@ class TestZooKeeper(tests.ZKTestCase):
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
-        matches = self.zk.getImageUploads("trusty", "000", "rax",
-                                          ['deleted', 'failed'])
+        matches = self.zk.getUploads("trusty", "000", "rax",
+                                     ['deleted', 'failed'])
 
         expected = {'4': v4, '5': v5}
         self.assertEqual(expected, matches)
 
-    def test_getImageUploads_empty(self):
+    def test_getUploads_empty(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
         v1 = {'state': ''}
         v2 = {'state': 'ready'}
@@ -433,12 +433,12 @@ class TestZooKeeper(tests.ZKTestCase):
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
-        matches = self.zk.getImageUploads("trusty", "000", "rax", [''])
+        matches = self.zk.getUploads("trusty", "000", "rax", [''])
 
         expected = {'1': v1, '3': v3}
         self.assertEqual(expected, matches)
 
-    def test_getImageUploads_any(self):
+    def test_getUploads_any(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
         v1 = {'state': ''}
         v2 = {'state': 'ready'}
@@ -460,7 +460,7 @@ class TestZooKeeper(tests.ZKTestCase):
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
-        matches = self.zk.getImageUploads("trusty", "000", "rax", None)
+        matches = self.zk.getUploads("trusty", "000", "rax", None)
 
         expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
         self.assertEqual(expected, matches)
