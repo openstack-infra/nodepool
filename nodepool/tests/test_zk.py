@@ -464,3 +464,15 @@ class TestZooKeeper(tests.ZKTestCase):
 
         expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
         self.assertEqual(expected, matches)
+
+    def test_deleteBuild(self):
+        path = self.zk._imageBuildsPath("trusty") + "/000001"
+        self.zk.client.create(path, makepath=True)
+        self.zk.deleteBuild("trusty", "000001")
+        self.assertIsNone(self.zk.client.exists(path))
+
+    def test_deleteUpload(self):
+        path = self.zk._imageUploadPath("trusty", "000", "rax") + "/000001"
+        self.zk.client.create(path, makepath=True)
+        self.zk.deleteUpload("trusty", "000", "rax", "000001")
+        self.assertIsNone(self.zk.client.exists(path))

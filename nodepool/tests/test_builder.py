@@ -87,6 +87,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
     def test_start_stop(self):
         config = self.setup_config('node_dib.yaml')
         nb = builder.NodePoolBuilder(config)
+        nb.cleanup_interval = .5
         nb.start()
         nb.stop()
 
