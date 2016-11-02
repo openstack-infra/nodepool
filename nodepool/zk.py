@@ -494,18 +494,16 @@ class ZooKeeper(object):
             all builds.
 
         :returns: A dictionary of dictionaries of build data, keyed by
-            build number, or None if not found.
+            build number.
         '''
         path = self._imageBuildsPath(image)
 
-        if not self.client.exists(path):
-            return None
+        try:
+            builds = self.client.get_children(path)
+        except kze.NoNodeError:
+            return {}
 
         matches = {}
-        builds = self.client.get_children(path)
-        if not builds:
-            return None
-
         for build in builds:
             if build == 'lock':   # skip the build lock node
                 continue
@@ -517,8 +515,6 @@ class ZooKeeper(object):
             elif data and data.get('state', '') in states:
                 matches[build] = data
 
-        if not matches:
-            return None
         return matches
 
     def getMostRecentBuilds(self, count, image, state=None):
@@ -542,7 +538,7 @@ class ZooKeeper(object):
             states = [state]
 
         builds = self.getBuilds(image, states)
-        if builds is None:
+        if not builds:
             return []
 
         matches = []
@@ -616,7 +612,7 @@ class ZooKeeper(object):
 
         return self._strToDict(data)
 
-    def getImageUploads(self, image, build_number, provider, states=None):
+    def getUploads(self, image, build_number, provider, states=None):
         '''
         Retrieve all image upload data matching any given states.
 
@@ -629,14 +625,14 @@ class ZooKeeper(object):
             all uploads.
 
         :returns: A dictionary of dictionaries of upload data, keyed by
-            upload number, or None if not found.
+            upload number.
         '''
         path = self._imageUploadPath(image, build_number, provider)
 
         try:
             uploads = self.client.get_children(path)
         except kze.NoNodeError:
-            return None
+            return {}
 
         matches = {}
         for upload in uploads:
@@ -650,8 +646,6 @@ class ZooKeeper(object):
             elif data and data.get('state', '') in states:
                 matches[upload] = data
 
-        if not matches:
-            return None
         return matches
 
     def getMostRecentImageUploads(self, count, image, build_number, provider,
@@ -675,8 +669,8 @@ class ZooKeeper(object):
         if state:
             states = [state]
 
-        uploads = self.getImageUploads(image, build_number, provider, states)
-        if uploads is None:
+        uploads = self.getUploads(image, build_number, provider, states)
+        if not uploads:
             return []
 
         matches = []
