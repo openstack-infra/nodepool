@@ -15,6 +15,7 @@
 from contextlib import contextmanager
 import json
 import logging
+import six
 from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
 from kazoo.recipe.lock import Lock
@@ -542,7 +543,7 @@ class ZooKeeper(object):
             return []
 
         matches = []
-        for build_id, build_data in builds.iteritems():
+        for build_id, build_data in six.iteritems(builds):
             matches.append((build_id, build_data))
 
         matches.sort(key=lambda x: x[1].get('state_time', 0), reverse=True)
@@ -674,7 +675,7 @@ class ZooKeeper(object):
             return []
 
         matches = []
-        for upload_id, upload_data in uploads.iteritems():
+        for upload_id, upload_data in six.iteritems(uploads):
             matches.append((upload_id, upload_data))
 
         matches.sort(key=lambda x: x[1].get('state_time', 0), reverse=True)

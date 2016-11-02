@@ -16,6 +16,7 @@
 import logging
 import os
 import shutil
+import six
 import socket
 import subprocess
 import threading
@@ -165,7 +166,7 @@ class CleanupWorker(BaseWorker):
                         self._rtable[image][provider] = []
                         uploads = self._zk.getMostRecentImageUploads(
                             2, image, build_id, provider, 'ready')
-                        for u_id, u_data in uploads.iteritems():
+                        for u_id, u_data in six.iteritems(uploads):
                             self._rtable[image][provider].append(
                                 (build_id, u_id, u_data['state_time'])
                             )
@@ -283,7 +284,7 @@ class CleanupWorker(BaseWorker):
             builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
             all_builds = self._zk.getBuilds(image)
 
-            for build_id, build_data in all_builds.iteritems():
+            for build_id, build_data in six.iteritems(all_builds):
                 if build_data['state'] != 'deleted':
                     if build_id in [b[0] for b in builds_to_keep]:
                         continue
