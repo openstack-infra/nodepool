@@ -780,3 +780,32 @@ class ZooKeeper(object):
         self._data_watches[path] = (image, func)
         self.client.exists(path, watch=self._watch_wrapper)
 
+    def deleteBuild(self, image, build_number):
+        '''
+        Delete an image build from ZooKeeper.
+
+        :param str image: The image name.
+        :param str build_number: The image build number to delete.
+        '''
+        path = self._imageBuildsPath(image)
+        path = path + "/%s" % build_number
+        try:
+            self.client.delete(path)
+        except kze.NoNodeError:
+            pass
+
+    def deleteUpload(self, image, build_number, provider, upload_number):
+        '''
+        Delete an image upload from ZooKeeper.
+
+        :param str image: The image name.
+        :param str build_number: The image build number.
+        :param str provider: The provider name owning the image.
+        :param str upload_number: The image upload number to delete.
+        '''
+        path = self._imageUploadPath(image, build_number, provider)
+        path = path + "/%s" % upload_number
+        try:
+            self.client.delete(path)
+        except kze.NoNodeError:
+            pass
