@@ -146,18 +146,23 @@ class TestZooKeeper(tests.ZKTestCase):
 
     def test_storeBuild(self):
         image = "ubuntu-trusty"
-        b1 = self.zk.storeBuild(image, {})
-        b2 = self.zk.storeBuild(image, {})
+        b1 = self.zk.storeBuild(image, zk.ImageBuild())
+        b2 = self.zk.storeBuild(image, zk.ImageBuild())
         self.assertLess(int(b1), int(b2))
 
     def test_store_and_get_build(self):
         image = "ubuntu-trusty"
-        orig_data = dict(builder="host", filename="file", state="state")
+        orig_data = zk.ImageBuild()
+        orig_data.builder = 'host'
+        orig_data.state = 'ready'
         with self.zk.imageBuildLock(image, blocking=True, timeout=1):
             build_num = self.zk.storeBuild(image, orig_data)
 
         data = self.zk.getBuild(image, build_num)
-        self.assertEqual(orig_data, data)
+        self.assertEqual(orig_data.builder, data.builder)
+        self.assertEqual(orig_data.state, data.state)
+        self.assertEqual(orig_data.state_time, data.state_time)
+        self.assertEqual(build_num, data.id)
         self.assertEqual(self.zk.getImageNames(), ["ubuntu-trusty"])
         self.assertEqual(self.zk.getBuildNumbers("ubuntu-trusty"), [build_num])
 
@@ -179,28 +184,23 @@ class TestZooKeeper(tests.ZKTestCase):
         self.assertIsNone(self.zk.getBuild("ubuntu-trusty", "0000000000"))
 
     def test_getImageUpload_not_found(self):
-        image = "ubuntu-trusty"
-        build_number = "0000000001"
-        provider = "rax"
-
-        with testtools.ExpectedException(
-            npe.ZKException, "Cannot find upload data .*"
-        ):
-            self.zk.getImageUpload(image, build_number, provider, "0000000001")
+        self.assertIsNone(
+            self.zk.getImageUpload("trusty", "0001", "rax", "0000000001")
+        )
 
     def test_storeImageUpload(self):
         image = "ubuntu-trusty"
         provider = "rax"
-        bnum = self.zk.storeBuild(image, {})
-        up1 = self.zk.storeImageUpload(image, bnum, provider, {})
-        up2 = self.zk.storeImageUpload(image, bnum, provider, {})
+        bnum = self.zk.storeBuild(image, zk.ImageBuild())
+        up1 = self.zk.storeImageUpload(image, bnum, provider, zk.ImageUpload())
+        up2 = self.zk.storeImageUpload(image, bnum, provider, zk.ImageUpload())
         self.assertLess(int(up1), int(up2))
 
     def test_storeImageUpload_invalid_build(self):
         image = "ubuntu-trusty"
         build_number = "0000000001"
         provider = "rax"
-        orig_data = dict(external_id="deadbeef", state="READY")
+        orig_data = zk.ImageUpload()
 
         with testtools.ExpectedException(
             npe.ZKException, "Cannot find build .*"
@@ -210,14 +210,19 @@ class TestZooKeeper(tests.ZKTestCase):
     def test_store_and_get_image_upload(self):
         image = "ubuntu-trusty"
         provider = "rax"
-        orig_data = dict(external_id="deadbeef", state="READY")
+        orig_data = zk.ImageUpload()
+        orig_data.external_id="deadbeef"
+        orig_data.state="ready"
 
-        build_number = self.zk.storeBuild(image, {})
+        build_number = self.zk.storeBuild(image, zk.ImageBuild())
         upload_id = self.zk.storeImageUpload(image, build_number, provider,
                                              orig_data)
         data = self.zk.getImageUpload(image, build_number, provider, upload_id)
 
-        self.assertEqual(orig_data, data)
+        self.assertEqual(upload_id, data.id)
+        self.assertEqual(orig_data.external_id, data.external_id)
+        self.assertEqual(orig_data.state, data.state)
+        self.assertEqual(orig_data.state_time, data.state_time)
         self.assertEqual(self.zk.getBuildProviders("ubuntu-trusty",
                                                    build_number),
                          [provider])
@@ -265,19 +270,19 @@ class TestZooKeeper(tests.ZKTestCase):
         v1 = {'state': 'ready', 'state_time': int(time.time())}
         v2 = {'state': 'ready', 'state_time': v1['state_time'] + 10}
         v3 = {'state': 'ready', 'state_time': v1['state_time'] + 20}
-        v4 = {'state': 'delete', 'state_time': v2['state_time'] + 10}
-        self.zk.storeBuild(image, v1)
-        self.zk.storeBuild(image, v2)
-        self.zk.storeBuild(image, v3)
-        self.zk.storeBuild(image, v4)
+        v4 = {'state': 'deleted', 'state_time': v2['state_time'] + 10}
+        self.zk.storeBuild(image, zk.ImageBuild.fromDict(v1))
+        v2_id = self.zk.storeBuild(image, zk.ImageBuild.fromDict(v2))
+        v3_id = self.zk.storeBuild(image, zk.ImageBuild.fromDict(v3))
+        self.zk.storeBuild(image, zk.ImageBuild.fromDict(v4))
 
         # v2 and v3 should be the 2 most recent 'ready' builds
         matches = self.zk.getMostRecentBuilds(2, image, 'ready')
         self.assertEqual(2, len(matches))
 
         # Should be in descending order, according to state_time
-        self.assertEqual(matches[0][1], v3)
-        self.assertEqual(matches[1][1], v2)
+        self.assertEqual(matches[0].id, v3_id)
+        self.assertEqual(matches[1].id, v2_id)
 
     def test_getMostRecentImageUploads_with_state(self):
         image = "ubuntu-trusty"
@@ -285,18 +290,21 @@ class TestZooKeeper(tests.ZKTestCase):
         build = {'state': 'ready', 'state_time': int(time.time())}
         up1 = {'state': 'ready', 'state_time': int(time.time())}
         up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
-        up3 = {'state': 'delete', 'state_time': up2['state_time'] + 10}
+        up3 = {'state': 'deleted', 'state_time': up2['state_time'] + 10}
 
-        bnum = self.zk.storeBuild(image, build)
-        self.zk.storeImageUpload(image, bnum, provider, up1)
-        up2_id = self.zk.storeImageUpload(image, bnum, provider, up2)
-        self.zk.storeImageUpload(image, bnum, provider, up3)
+        bnum = self.zk.storeBuild(image, zk.ImageBuild.fromDict(build))
+        self.zk.storeImageUpload(image, bnum, provider,
+                                 zk.ImageUpload.fromDict(up1))
+        up2_id = self.zk.storeImageUpload(image, bnum, provider,
+                                 zk.ImageUpload.fromDict(up2))
+        self.zk.storeImageUpload(image, bnum, provider,
+                                 zk.ImageUpload.fromDict(up3))
 
         # up2 should be the most recent 'ready' upload
         data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, 'ready')
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
-        self.assertEqual(data[0], (up2_id, up2))
+        self.assertEqual(data[0].id, up2_id)
 
     def test_getMostRecentImageUploads_any_state(self):
         image = "ubuntu-trusty"
@@ -306,26 +314,28 @@ class TestZooKeeper(tests.ZKTestCase):
         up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
         up3 = {'state': 'uploading', 'state_time': up2['state_time'] + 10}
 
-        bnum = self.zk.storeBuild(image, build)
-        self.zk.storeImageUpload(image, bnum, provider, up1)
-        self.zk.storeImageUpload(image, bnum, provider, up2)
-        up3_id = self.zk.storeImageUpload(image, bnum, provider, up3)
+        bnum = self.zk.storeBuild(image, zk.ImageBuild.fromDict(build))
+        self.zk.storeImageUpload(image, bnum, provider,
+                                 zk.ImageUpload.fromDict(up1))
+        self.zk.storeImageUpload(image, bnum, provider,
+                                 zk.ImageUpload.fromDict(up2))
+        up3_id = self.zk.storeImageUpload(image, bnum, provider,
+                                          zk.ImageUpload.fromDict(up3))
 
         # up3 should be the most recent upload, regardless of state
         data = self.zk.getMostRecentImageUploads(1, image, bnum, provider, None)
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
-        self.assertEqual(data[0], (up3_id, up3))
+        self.assertEqual(data[0].id, up3_id)
 
     def test_getBuilds_any(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildsPath(image)
-        v1 = {'state': ''}
-        v2 = {'state': 'ready'}
-        v3 = {'state': 'unused'}
-        v4 = {'state': 'failed'}
-        v5 = {'state': 'deleted'}
-        v6 = {}
+        v1 = {'state': 'ready'}
+        v2 = {'state': 'building'}
+        v3 = {'state': 'failed'}
+        v4 = {'state': 'deleted'}
+        v5 = {}
         self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
                               makepath=True)
         self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
@@ -335,44 +345,20 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
                               makepath=True)
         self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
-        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getBuilds(image, None)
-
-        expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
-        self.assertEqual(expected, matches)
-
-    def test_getBuilds_empty(self):
-        image = "ubuntu-trusty"
-        path = self.zk._imageBuildsPath(image)
-        v1 = {'state': ''}
-        v2 = {'state': 'ready'}
-        v3 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/lock", makepath=True)
-
-        matches = self.zk.getBuilds(image, [''])
-
-        expected = {'1': v1, '3': v3}
-        self.assertEqual(expected, matches)
+        self.assertEqual(5, len(matches))
 
     def test_getBuilds(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildsPath(image)
-        v1 = {'state': ''}
+        v1 = {'state': 'building'}
         v2 = {'state': 'ready'}
-        v3 = {'state': 'unused'}
-        v4 = {'state': 'failed'}
-        v5 = {'state': 'deleted'}
-        v6 = {}
+        v3 = {'state': 'failed'}
+        v4 = {'state': 'deleted'}
+        v5 = {}
         self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
                               makepath=True)
         self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
@@ -382,24 +368,19 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
                               makepath=True)
         self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
-        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getBuilds(image, ['deleted', 'failed'])
-
-        expected = {'4': v4, '5': v5}
-        self.assertEqual(expected, matches)
+        self.assertEqual(2, len(matches))
 
     def test_getUploads(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
-        v1 = {'state': ''}
-        v2 = {'state': 'ready'}
-        v3 = {'state': 'uploading'}
-        v4 = {'state': 'failed'}
-        v5 = {'state': 'deleted'}
-        v6 = {}
+        v1 = {'state': 'ready'}
+        v2 = {'state': 'uploading'}
+        v3 = {'state': 'failed'}
+        v4 = {'state': 'deleted'}
+        v5 = {}
         self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
                               makepath=True)
         self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
@@ -409,43 +390,20 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
                               makepath=True)
         self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
-        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
                               makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getUploads("trusty", "000", "rax",
                                      ['deleted', 'failed'])
-
-        expected = {'4': v4, '5': v5}
-        self.assertEqual(expected, matches)
-
-    def test_getUploads_empty(self):
-        path = self.zk._imageUploadPath("trusty", "000", "rax")
-        v1 = {'state': ''}
-        v2 = {'state': 'ready'}
-        v3 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/lock", makepath=True)
-
-        matches = self.zk.getUploads("trusty", "000", "rax", [''])
-
-        expected = {'1': v1, '3': v3}
-        self.assertEqual(expected, matches)
+        self.assertEqual(2, len(matches))
 
     def test_getUploads_any(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
-        v1 = {'state': ''}
-        v2 = {'state': 'ready'}
-        v3 = {'state': 'uploading'}
-        v4 = {'state': 'failed'}
-        v5 = {'state': 'deleted'}
-        v6 = {}
+        v1 = {'state': 'ready'}
+        v2 = {'state': 'uploading'}
+        v3 = {'state': 'failed'}
+        v4 = {'state': 'deleted'}
+        v5 = {}
         self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
                               makepath=True)
         self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
@@ -456,14 +414,10 @@ class TestZooKeeper(tests.ZKTestCase):
                               makepath=True)
         self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
                               makepath=True)
-        self.zk.client.create(path + "/6", value=self.zk._dictToStr(v6),
-                              makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getUploads("trusty", "000", "rax", None)
-
-        expected = {'1': v1, '2': v2, '3': v3, '4': v4, '5': v5, '6': v6}
-        self.assertEqual(expected, matches)
+        self.assertEqual(5, len(matches))
 
     def test_deleteBuild(self):
         path = self.zk._imageBuildsPath("trusty") + "/000001"
@@ -476,3 +430,84 @@ class TestZooKeeper(tests.ZKTestCase):
         self.zk.client.create(path, makepath=True)
         self.zk.deleteUpload("trusty", "000", "rax", "000001")
         self.assertIsNone(self.zk.client.exists(path))
+
+
+class TestZKModel(tests.BaseTestCase):
+
+    def setUp(self):
+        super(TestZKModel, self).setUp()
+
+    def test_BaseBuilderModel_bad_id(self):
+        with testtools.ExpectedException(
+            TypeError, "'id' attribute must be a string type"
+        ):
+            zk.BaseBuilderModel(123)
+
+    def test_BaseBuilderModel_bad_state(self):
+        with testtools.ExpectedException(
+            TypeError, "'blah' is not a valid state"
+        ):
+            o = zk.BaseBuilderModel('0001')
+            o.state = 'blah'
+
+    def test_BaseBuilderModel_toDict(self):
+        o = zk.BaseBuilderModel('0001')
+        o.state = 'building'
+        d = o.toDict()
+        self.assertNotIn('id', d)
+        self.assertEqual(o.state, d['state'])
+        self.assertIsNotNone(d['state_time'])
+
+    def test_ImageBuild_toDict(self):
+        o = zk.ImageBuild('0001')
+        o.builder = 'localhost'
+        o.formats = ['qemu', 'raw']
+
+        d = o.toDict()
+        self.assertNotIn('id', d)
+        self.assertEqual(','.join(o.formats), d['formats'])
+        self.assertEqual(o.builder, d['builder'])
+
+    def test_ImageBuild_fromDict(self):
+        now = int(time.time())
+        d_id = '0001'
+        d = {
+            'builder': 'localhost',
+            'formats': 'qemu,raw',
+            'state': 'building',
+            'state_time': now
+        }
+
+        o = zk.ImageBuild.fromDict(d, d_id)
+        self.assertEqual(o.id, d_id)
+        self.assertEqual(o.state, d['state'])
+        self.assertEqual(o.state_time, d['state_time'])
+        self.assertEqual(o.builder, d['builder'])
+        self.assertEqual(o.formats, d['formats'].split(','))
+
+    def test_ImageUpload_toDict(self):
+        o = zk.ImageUpload('0001')
+        o.external_id = 'DEADBEEF'
+        o.external_name = 'trusty'
+
+        d = o.toDict()
+        self.assertNotIn('id', d)
+        self.assertEqual(o.external_id, d['external_id'])
+        self.assertEqual(o.external_name, d['external_name'])
+
+    def test_ImageUpload_fromDict(self):
+        now = int(time.time())
+        d_id = '0001'
+        d = {
+            'external_id': 'DEADBEEF',
+            'external_name': 'trusty',
+            'state': 'ready',
+            'state_time': now
+        }
+
+        o = zk.ImageUpload.fromDict(d, d_id)
+        self.assertEqual(o.id, d_id)
+        self.assertEqual(o.state, d['state'])
+        self.assertEqual(o.state_time, d['state_time'])
+        self.assertEqual(o.external_id, d['external_id'])
+        self.assertEqual(o.external_name, d['external_name'])

@@ -56,8 +56,8 @@ def dib_image_list(zk):
         for build_no in zk.getBuildNumbers(image_name):
             build = zk.getBuild(image_name, build_no)
             t.add_row([build_no, image_name,
-                       build['builder'], build['formats'],
-                       build['state'], age(build['state_time'])])
+                       build.builder, ','.join(build.formats),
+                       build.state, age(build.state_time)])
     return str(t)
 
 
@@ -73,8 +73,8 @@ def image_list(zk):
                     upload = zk.getImageUpload(image_name, build_no,
                                                provider, upload_no)
                     t.add_row([upload_no, provider, image_name,
-                               upload['external_name'],
-                               upload['external_id'],
-                               upload['state'],
-                               age(upload['state_time'])])
+                               upload.external_name,
+                               upload.external_id,
+                               upload.state,
+                               age(upload.state_time)])
     return str(t)

@@ -16,7 +16,6 @@
 import logging
 import os
 import shutil
-import six
 import socket
 import subprocess
 import threading
@@ -97,17 +96,6 @@ class BaseWorker(threading.Thread):
         self._hostname = socket.gethostname()
         self._statsd = stats.get_client()
 
-    def _makeStateData(self, state):
-        '''
-        Create a state dict with minimal, common state information.
-
-        :param str state: The state you want.
-        '''
-        data = {}
-        data['state'] = state
-        data['state_time'] = int(time.time())
-        return data
-
     def _checkForZooKeeperChanges(self, new_config):
         '''
         Connect to ZooKeeper cluster.
@@ -160,15 +148,15 @@ class CleanupWorker(BaseWorker):
         self._rtable = {}
         for image in self._zk.getImageNames():
             self._rtable[image] = {}
-            for build_id, build_data in self._zk.getBuilds(image, 'ready'):
-                for provider in self._zk.getBuildProviders(image, build_id):
+            for build in self._zk.getBuilds(image, 'ready'):
+                for provider in self._zk.getBuildProviders(image, build.id):
                     if provider not in self._rtable[image]:
                         self._rtable[image][provider] = []
                         uploads = self._zk.getMostRecentImageUploads(
-                            2, image, build_id, provider, 'ready')
-                        for u_id, u_data in six.iteritems(uploads):
+                            2, image, build.id, provider, 'ready')
+                        for upload in uploads:
                             self._rtable[image][provider].append(
-                                (build_id, u_id, u_data['state_time'])
+                                (build.id, upload.id, upload.state_time)
                             )
 
         # Sort uploads by state_time (upload time) and keep the 2 most recent
@@ -186,15 +174,15 @@ class CleanupWorker(BaseWorker):
                 return True
         return False
 
-    def _inProgressUpload(self, upload_id, upload_data, image, provider):
+    def _inProgressUpload(self, upload, image, provider):
         '''
         Determine if an upload is in progress.
         '''
-        if upload_data['state'] != 'uploading':
+        if upload.state != 'uploading':
             return False
 
         try:
-            with self._zk.imageUploadLock(image, upload_id,
+            with self._zk.imageUploadLock(image, upload.id,
                                           provider, blocking=False):
                 pass
         except exceptions.ZKLockException:
@@ -244,32 +232,32 @@ class CleanupWorker(BaseWorker):
     def _cleanupProvider(self, provider, image, build_id):
         all_uploads = self._zk.getUploads(image, build_id, provider.name)
 
-        for upload_id, upload_data in all_uploads:
-            if self._isRecentUpload(image, provider, build_id, upload_id):
+        for upload in all_uploads:
+            if self._isRecentUpload(image, provider, build_id, upload.id):
                 continue
 
             deleted = False
 
-            if upload_data['state'] != 'deleted':
-                if not self._inProgressUpload(upload_id, upload_data,
-                                              image, provider.name):
-                    data = self._makeStateData('deleted')
+            if upload.state != 'deleted':
+                if not self._inProgressUpload(upload, image, provider.name):
+                    data = zk.ImageUpload()
+                    data.state = 'deleted'
                     self._zk.storeImageUpload(image, build_id, provider,
-                                              data, upload_id)
+                                              data, upload.id)
                     deleted = True
 
-            if upload_data['state'] == 'deleted' or deleted:
+            if upload.state == 'deleted' or deleted:
                 manager = self._config.provider_managers[provider.name]
                 try:
-                    manager.deleteImage(upload_data['external_name'])
+                    manager.deleteImage(upload.external_name)
                 except Exception as e:
                     self.log.error(
                         "Unable to delete image %s from %s: %s" %
-                        (upload_data['external_name'], provider.name, e)
+                        (upload.external_name, provider.name, e)
                     )
                 else:
                     self._zk.deleteUpload(image, build_id,
-                                          provider.name, upload_id)
+                                          provider.name, upload.id)
 
     def _cleanup(self):
         '''
@@ -284,25 +272,26 @@ class CleanupWorker(BaseWorker):
             builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
             all_builds = self._zk.getBuilds(image)
 
-            for build_id, build_data in six.iteritems(all_builds):
-                if build_data['state'] != 'deleted':
-                    if build_id in [b[0] for b in builds_to_keep]:
+            for build in all_builds:
+                if build.state != 'deleted':
+                    if build.id in [b.id for b in builds_to_keep]:
                         continue
 
                 for provider in known_providers:
-                    self._cleanupProvider(provider, image, build_id)
+                    self._cleanupProvider(provider, image, build.id)
 
                 uploads_exist = False
-                for p in self._zk.getBuildProviders(image, build_id):
-                    if self._zk.getImageUploadNumbers(image, build_id, p):
+                for p in self._zk.getBuildProviders(image, build.id):
+                    if self._zk.getImageUploadNumbers(image, build.id, p):
                         uploads_exist = True
                         break
 
                 if not uploads_exist:
-                    data = self._makeStateData('deleted')
-                    self._zk.storeBuild(image, data, build_id)
-                    if self._deleteLocalBuild(image, build_id):
-                        self._zk.deleteBuild(image, build_id)
+                    data = zk.ImageBuild()
+                    data.state = 'deleted'
+                    self._zk.storeBuild(image, data, build.id)
+                    if self._deleteLocalBuild(image, build.id):
+                        self._zk.deleteBuild(image, build.id)
 
 
     def run(self):
@@ -337,17 +326,6 @@ class BuildWorker(BaseWorker):
     def __init__(self, config_path):
         super(BuildWorker, self).__init__(config_path)
 
-    def _makeStateData(self, state):
-        '''
-        Create a build state dict with minimal, common state information.
-
-        Sets common attributes, such as builder host, state, and state time.
-
-        :param str state: The build state you want.
-        '''
-        data = super(BuildWorker, self)._makeStateData(state)
-        data['builder'] = self._hostname
-        return data
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -369,9 +347,8 @@ class BuildWorker(BaseWorker):
             # or if the current build is missing an image type from
             # the config file, start a new build.
             if (not builds
-                or (now - builds[0][1]['state_time']) >= image.rebuild_age
-                or not set(builds[0][1]['formats'].split(',')).\
-                    issuperset(image.image_types)
+                or (now - builds[0].state_time) >= image.rebuild_age
+                or not set(builds[0].formats).issuperset(image.image_types)
             ):
                 try:
                     with self._zk.imageBuildLock(image.name, blocking=False):
@@ -382,12 +359,16 @@ class BuildWorker(BaseWorker):
                         # identified in the first check above, assume another
                         # BuildWorker created the build for us and continue.
                         builds2 = self._zk.getMostRecentBuilds(1, name, 'ready')
-                        if builds2 and builds[0][0] != builds2[0][0]:
+                        if builds2 and builds[0].id != builds2[0].id:
                             continue
 
                         self.log.info("Building image %s" % name)
-                        bnum = self._zk.storeBuild(
-                            image.name, self._makeStateData('building'))
+
+                        data = zk.ImageBuild()
+                        data.state = 'building'
+                        data.builder = self._hostname
+
+                        bnum = self._zk.storeBuild(image.name, data)
                         data = self._buildImage(bnum, image)
                         self._zk.storeBuild(image.name, data, bnum)
                 except exceptions.ZKLockException:
@@ -418,13 +399,16 @@ class BuildWorker(BaseWorker):
                     self.log.info(
                         "Manual build request for image %s" % image.name)
 
-                    bnum = self._zk.storeBuild(
-                        image.name, self._makeStateData('building'))
+                    data = zk.ImageBuild()
+                    data.state = 'building'
+                    data.builder = self._hostname
+
+                    bnum = self._zk.storeBuild(image.name, data)
                     data = self._buildImage(bnum, image)
                     self._zk.storeBuild(image.name, data, bnum)
 
                     # Remove request on a successful build
-                    if data['state'] == 'ready':
+                    if data.state == 'ready':
                         self._zk.removeBuildRequest(image.name)
 
             except exceptions.ZKLockException:
@@ -438,7 +422,7 @@ class BuildWorker(BaseWorker):
         :param str build_id: The ID for the build (used in image filename).
         :param image: The image as retrieved from our config file.
 
-        :returns: A dict of build-related data.
+        :returns: An ImageBuild object of build-related data.
 
         :raises: BuilderError if we failed to execute the build command.
         '''
@@ -514,17 +498,20 @@ class BuildWorker(BaseWorker):
             self.log.info("ZooKeeper suspended during build. Waiting")
             time.sleep(SUSPEND_WAIT_TIME)
 
+        build_data = zk.ImageBuild()
+        build_data.builder = self._hostname
+
         if self._zk.didLoseConnection:
             self.log.info("ZooKeeper lost while building %s" % image.name)
             self._zk.resetLostFlag()
-            build_data = self._makeStateData('failed')
+            build_data.state = 'failed'
         elif p.returncode:
             self.log.info("DIB failed creating %s" % image.name)
-            build_data = self._makeStateData('failed')
+            build_data.state = 'failed'
         else:
             self.log.info("DIB image %s is built" % image.name)
-            build_data = self._makeStateData('ready')
-            build_data['formats'] = img_types
+            build_data.state = 'ready'
+            build_data.formats = img_types.split(",")
 
             if self._statsd:
                 # record stats on the size of each image we create
@@ -573,6 +560,7 @@ class UploadWorker(BaseWorker):
 
     def __init__(self, config_path):
         super(UploadWorker, self).__init__(config_path)
+
 
     def _uploadImage(self, build_id, image_name, images, provider):
         '''
@@ -638,9 +626,10 @@ class UploadWorker(BaseWorker):
         self.log.info("Image build %s in %s is ready" %
                       (build_id, provider.name))
 
-        data = self._makeStateData('ready')
-        data['external_id'] = external_id
-        data['external_name'] = ext_image_name
+        data = zk.ImageUpload()
+        data.state = 'ready'
+        data.external_id = external_id
+        data.external_name = ext_image_name
         return data
 
     def _checkForProviderUploads(self):
@@ -668,41 +657,41 @@ class UploadWorker(BaseWorker):
                 if not builds:
                     continue
 
-                build_id, build_data = builds[0]
+                build = builds[0]
 
                 # Search for locally built images. The image name and build
                 # sequence ID is used to name the image.
                 local_images = DibImageFile.from_image_id(
-                    self._config.imagesdir, "-".join([image.name, build_id]))
+                    self._config.imagesdir, "-".join([image.name, build.id]))
                 if not local_images:
                     continue
 
                 # See if this image has already been uploaded
                 upload = self._zk.getMostRecentImageUploads(
-                    1, image.diskimage, build_id, provider.name, 'ready')
+                    1, image.diskimage, build.id, provider.name, 'ready')
                 if upload:
                     continue
 
                 # See if this provider supports the available image formats
-                image_formats = build_data['formats'].split(',')
-                if provider.image_type not in image_formats:
+                if provider.image_type not in build.formats:
                     continue
 
                 try:
                     with self._zk.imageUploadLock(
-                        image.diskimage, build_id, provider.name,
+                        image.diskimage, build.id, provider.name,
                         blocking=False
                     ):
                         # New upload number with initial state 'uploading'
+                        data = zk.ImageUpload()
+                        data.state = 'uploading'
                         upnum = self._zk.storeImageUpload(
-                            image.diskimage, build_id, provider.name,
-                            self._makeStateData('uploading'))
+                            image.diskimage, build.id, provider.name, data)
 
-                        data = self._uploadImage(build_id, image.diskimage,
+                        data = self._uploadImage(build.id, image.diskimage,
                                                  local_images, provider)
 
                         # Set final state
-                        self._zk.storeImageUpload(image.diskimage, build_id,
+                        self._zk.storeImageUpload(image.diskimage, build.id,
                                                   provider.name, data, upnum)
                 except exceptions.ZKLockException:
                     # Lock is already held. Skip it.

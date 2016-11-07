@@ -13,9 +13,11 @@
 # under the License.
 
 from contextlib import contextmanager
+from copy import copy
 import json
 import logging
 import six
+import time
 from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
 from kazoo.recipe.lock import Lock
@@ -89,6 +91,147 @@ class ZooKeeperWatchEvent(object):
         self.path = e_path
         # Pass image name so callback func doesn't need to parse from the path
         self.image = image
+
+
+class BaseBuilderModel(object):
+    STATES = ['building', 'uploading', 'ready', 'deleted', 'failed']
+
+    def __init__(self, o_id):
+        if o_id:
+            self.id = o_id
+        self._state = None
+        self.state_time = None
+
+    @property
+    def id(self):
+        return self._id
+
+    @id.setter
+    def id(self, value):
+        if not isinstance(value, six.string_types):
+            raise TypeError("'id' attribute must be a string type")
+        self._id = value
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if value not in self.STATES:
+            raise TypeError("'%s' is not a valid state" % value)
+        self._state = value
+        self.state_time = int(time.time())
+
+    def toDict(self):
+        '''
+        Convert a BaseBuilderModel object's attributes to a dictionary.
+        '''
+        d = {}
+        d['state'] = self.state
+        d['state_time'] = self.state_time
+        return d
+
+    def fromDict(self, d):
+        '''
+        Set base attributes based on the given dict.
+
+        Unlike the derived classes, this should NOT return an object as it
+        assumes self has already been instantiated.
+        '''
+        if 'state' in d:
+            self.state = d['state']
+        if 'state_time' in d:
+            self.state_time = d['state_time']
+
+
+class ImageBuild(BaseBuilderModel):
+    '''
+    Class representing a DIB image build within the ZooKeeper cluster.
+    '''
+
+    def __init__(self, build_id=None):
+        super(ImageBuild, self).__init__(build_id)
+        self._formats = []
+        self.builder = None          # Builder hostname
+
+    @property
+    def formats(self):
+        return self._formats
+
+    @formats.setter
+    def formats(self, value):
+        if not isinstance(value, list):
+            raise TypeError("'formats' attribute must be a list type")
+        self._formats = copy(value)
+
+    def addFormat(self, fmt):
+        self._formats.append(fmt)
+
+    def toDict(self):
+        '''
+        Convert an ImageBuild object's attributes to a dictionary.
+        '''
+        d = super(ImageBuild, self).toDict()
+        if self.builder is not None:
+            d['builder'] = self.builder
+        if len(self.formats):
+            d['formats'] = ','.join(self.formats)
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create an ImageBuild object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized ImageBuild object.
+        '''
+        o = ImageBuild(o_id)
+        super(ImageBuild, o).fromDict(d)
+        o.builder = d.get('builder')
+        # Only attempt the split on non-empty string
+        if d.get('formats', ''):
+            o.formats = d.get('formats', '').split(',')
+        return o
+
+
+class ImageUpload(BaseBuilderModel):
+    '''
+    Class representing a provider image upload within the ZooKeeper cluster.
+    '''
+
+    def __init__(self, upload_id=None):
+        super(ImageUpload, self).__init__(upload_id)
+        self.external_id = None      # Provider ID of the image
+        self.external_name = None    # Provider name of the image
+
+    def toDict(self):
+        '''
+        Convert an ImageUpload object's attributes to a dictionary.
+        '''
+        d = super(ImageUpload, self).toDict()
+        d['external_id'] = self.external_id
+        d['external_name'] = self.external_name
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create an ImageUpload object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized ImageUpload object.
+        '''
+        o = ImageUpload(o_id)
+        super(ImageUpload, o).fromDict(d)
+        o.external_id = d.get('external_id')
+        o.external_name = d.get('external_name')
+        return o
 
 
 class ZooKeeper(object):
@@ -474,15 +617,16 @@ class ZooKeeper(object):
         :param str image: The image name.
         :param str build_number: The image build number.
 
-        :returns: The dictionary of build data, or None if not found.
+        :returns: An ImageBuild object, or None if not found.
         '''
         path = self._imageBuildsPath(image) + "/%s" % build_number
 
-        if not self.client.exists(path):
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
             return None
 
-        data, stat = self.client.get(path)
-        return self._strToDict(data)
+        return ImageBuild.fromDict(self._strToDict(data), build_number)
 
     def getBuilds(self, image, states=None):
         '''
@@ -490,31 +634,27 @@ class ZooKeeper(object):
 
         :param str image: The image name.
         :param list states: A list of build state values to match against.
-            An empty string ('') will match states with no state recorded.
             A value of None will disable state matching and just return
             all builds.
 
-        :returns: A dictionary of dictionaries of build data, keyed by
-            build number.
+        :returns: A list of ImageBuild objects.
         '''
         path = self._imageBuildsPath(image)
 
         try:
             builds = self.client.get_children(path)
         except kze.NoNodeError:
-            return {}
+            return []
 
-        matches = {}
+        matches = []
         for build in builds:
             if build == 'lock':   # skip the build lock node
                 continue
             data = self.getBuild(image, build)
             if states is None:
-                matches[build] = data
-            elif not data and '' in states:
-                matches[build] = data
-            elif data and data.get('state', '') in states:
-                matches[build] = data
+                matches.append(data)
+            elif data and data.state in states:
+                matches.append(data)
 
         return matches
 
@@ -528,11 +668,10 @@ class ZooKeeper(object):
         :param str state: The build state to match on. Use None to
             ignore state
 
-        :returns: A list of tuples with the most recent build number and
-            dictionary of build data matching the given state, or an empty
-            list if there was no builds matching the state. You may get
-            less than 'count' entries if there were not enough matching
-            builds.
+        :returns: A list of the most recent ImageBuild objects matching the
+            given state, or an empty list if there were no builds matching
+            the state. You may get less than 'count' entries if there were
+            not enough matching builds.
         '''
         states = None
         if state:
@@ -542,13 +681,8 @@ class ZooKeeper(object):
         if not builds:
             return []
 
-        matches = []
-        for build_id, build_data in six.iteritems(builds):
-            matches.append((build_id, build_data))
-
-        matches.sort(key=lambda x: x[1].get('state_time', 0), reverse=True)
-
-        return matches[:count]
+        builds.sort(key=lambda x: x.state_time, reverse=True)
+        return builds[:count]
 
     def storeBuild(self, image, build_data, build_number=None):
         '''
@@ -566,7 +700,7 @@ class ZooKeeper(object):
             method.
 
         :param str image: The image name for which we have data.
-        :param dict build_data: The build data.
+        :param ImageBuild build_data: The build data.
         :param str build_number: The image build number.
 
         :returns: A string for the build number that was updated.
@@ -575,14 +709,15 @@ class ZooKeeper(object):
         build_path = self._imageBuildsPath(image) + "/"
 
         if build_number is None:
-            path = self.client.create(build_path,
-                                      value=self._dictToStr(build_data),
-                                      sequence=True,
-                                      makepath=True)
+            path = self.client.create(
+                build_path,
+                value=self._dictToStr(build_data.toDict()),
+                sequence=True,
+                makepath=True)
             build_number = path.split("/")[-1]
         else:
             path = build_path + build_number
-            self.client.set(path, self._dictToStr(build_data))
+            self.client.set(path, self._dictToStr(build_data.toDict()))
 
         return build_number
 
@@ -595,7 +730,7 @@ class ZooKeeper(object):
         :param str provider: The provider name owning the image.
         :param str upload_number: The image upload number.
 
-        :returns: A dict of upload data.
+        :returns: An ImageUpload object, or None if not found.
 
         :raises: ZKException if the image upload path is not found.
         '''
@@ -605,13 +740,9 @@ class ZooKeeper(object):
         try:
             data, stat = self.client.get(path)
         except kze.NoNodeError:
-            raise npe.ZKException(
-                "Cannot find upload data "
-                "(image: %s, build: %s, provider: %s, upload: %s)" % (
-                    image, build_number, provider, upload_number)
-            )
+            return None
 
-        return self._strToDict(data)
+        return ImageUpload.fromDict(self._strToDict(data), upload_number)
 
     def getUploads(self, image, build_number, provider, states=None):
         '''
@@ -621,31 +752,27 @@ class ZooKeeper(object):
         :param str build_number: The image build number.
         :param str provider: The provider name owning the image.
         :param list states: A list of upload state values to match against.
-            An empty string ('') will match states with no state recorded.
             A value of None will disable state matching and just return
             all uploads.
 
-        :returns: A dictionary of dictionaries of upload data, keyed by
-            upload number.
+        :returns: A list of ImageUpload objects.
         '''
         path = self._imageUploadPath(image, build_number, provider)
 
         try:
             uploads = self.client.get_children(path)
         except kze.NoNodeError:
-            return {}
+            return []
 
-        matches = {}
+        matches = []
         for upload in uploads:
             if upload == 'lock':
                 continue
             data = self.getImageUpload(image, build_number, provider, upload)
             if states is None:
-                matches[upload] = data
-            elif not data and '' in states:
-                matches[upload] = data
-            elif data and data.get('state', '') in states:
-                matches[upload] = data
+                matches.append(data)
+            elif data and data.state in states:
+                matches.append(data)
 
         return matches
 
@@ -674,13 +801,8 @@ class ZooKeeper(object):
         if not uploads:
             return []
 
-        matches = []
-        for upload_id, upload_data in six.iteritems(uploads):
-            matches.append((upload_id, upload_data))
-
-        matches.sort(key=lambda x: x[1].get('state_time', 0), reverse=True)
-
-        return matches[:count]
+        uploads.sort(key=lambda x: x.state_time, reverse=True)
+        return uploads[:count]
 
     def storeImageUpload(self, image, build_number, provider, image_data,
                          upload_number=None):
@@ -699,7 +821,7 @@ class ZooKeeper(object):
         :param str image: The image name for which we have data.
         :param str build_number: The image build number.
         :param str provider: The provider name owning the image.
-        :param dict image_data: The image data we want to store.
+        :param ImageUpload image_data: The image data we want to store.
         :param str upload_number: The image upload number to update.
 
         :returns: A string for the upload number that was updated.
@@ -719,14 +841,15 @@ class ZooKeeper(object):
         upload_path = self._imageUploadPath(image, build_number, provider) + "/"
 
         if upload_number is None:
-            path = self.client.create(upload_path,
-                                      value=self._dictToStr(image_data),
-                                      sequence=True,
-                                      makepath=True)
+            path = self.client.create(
+                upload_path,
+                value=self._dictToStr(image_data.toDict()),
+                sequence=True,
+                makepath=True)
             upload_number = path.split("/")[-1]
         else:
             path = upload_path + upload_number
-            self.client.set(path, self._dictToStr(image_data))
+            self.client.set(path, self._dictToStr(image_data.toDict()))
 
         return upload_number
 
