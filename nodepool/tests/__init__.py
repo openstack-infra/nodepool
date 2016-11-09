@@ -243,6 +243,58 @@ class ZookeeperServerFixture(fixtures.Fixture):
                     self.log.debug(line.strip())
 
 
+class ChrootedKazooFixture(fixtures.Fixture):
+    def __init__(self, zookeeper_host, zookeeper_port):
+        super(ChrootedKazooFixture, self).__init__()
+        self.zookeeper_host = zookeeper_host
+        self.zookeeper_port = zookeeper_port
+
+    def _setUp(self):
+        # Make sure the test chroot paths do not conflict
+        random_bits = ''.join(random.choice(string.ascii_lowercase +
+                                            string.ascii_uppercase)
+                              for x in range(8))
+
+        rand_test_path = '%s_%s' % (random_bits, os.getpid())
+        self.chroot_path = "/nodepool_test/%s" % rand_test_path
+
+        # Ensure the chroot path exists and clean up an pre-existing znodes.
+        # Allow extra time for the very first connection because we might
+        # be waiting for the ZooKeeper server to be started from the
+        # ZookeeperServerFixture fixture.
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port),
+            timeout=60)
+        _tmp_client.start()
+
+        if _tmp_client.exists(self.chroot_path):
+            _tmp_client.delete(self.chroot_path, recursive=True)
+
+        _tmp_client.ensure_path(self.chroot_path)
+        _tmp_client.stop()
+
+        # Create a chroot'ed client
+        self.zkclient = kazoo.client.KazooClient(
+            hosts='%s:%s%s' % (self.zookeeper_host,
+                               self.zookeeper_port,
+                               self.chroot_path)
+        )
+        self.zkclient.start()
+
+        self.addCleanup(self._cleanup)
+
+    def _cleanup(self):
+        '''Stop the client and remove the chroot path.'''
+        self.zkclient.stop()
+
+        # Need a non-chroot'ed client to remove the chroot path
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+        _tmp_client.start()
+        _tmp_client.delete(self.chroot_path, recursive=True)
+        _tmp_client.stop()
+
+
 class GearmanClient(gear.Client):
     def __init__(self):
         super(GearmanClient, self).__init__(client_id='test_client')
@@ -553,45 +605,9 @@ class ZKTestCase(BaseTestCase):
         self.useFixture(f)
         self.zookeeper_host = f.zookeeper_host
         self.zookeeper_port = f.zookeeper_port
-        # Make sure the test chroot paths do not conflict
-        random_bits = ''.join(random.choice(string.ascii_lowercase +
-                                            string.ascii_uppercase)
-                              for x in range(8))
-        rand_test_path = '%s_%s' % (random_bits, os.getpid())
-        self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
-        # Ensure the chroot path exists and clean up an pre-existing znodes.
-        # Allow extra time for the very first connection because we might
-        # be waiting for the ZooKeeper server to be started from the
-        # ZookeeperServerFixture fixture.
-        _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port),
-            timeout=60)
-        _tmp_client.start()
-
-        if _tmp_client.exists(self.chroot_path):
-            _tmp_client.delete(self.chroot_path, recursive=True)
-
-        _tmp_client.ensure_path(self.chroot_path)
-        _tmp_client.stop()
-
-        # Create a chroot'ed client
-        self.zkclient = kazoo.client.KazooClient(
-            hosts='%s:%s%s' % (self.zookeeper_host,
-                               self.zookeeper_port,
-                               self.chroot_path)
-        )
-        self.zkclient.start()
-
-        self.addCleanup(self._cleanup)
-
-    def _cleanup(self):
-        '''Stop the client and remove the chroot path.'''
-        self.zkclient.stop()
-
-        # Need a non-chroot'ed client to remove the chroot path
-        _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
-        _tmp_client.start()
-        _tmp_client.delete(self.chroot_path, recursive=True)
-        _tmp_client.stop()
+        kz_fxtr = self.useFixture(ChrootedKazooFixture(
+            self.zookeeper_host,
+            self.zookeeper_port))
+        self.zkclient = kz_fxtr.zkclient
+        self.chroot_path = kz_fxtr.chroot_path
