@@ -215,7 +215,37 @@ class TestNodepool(tests.DBTestCase):
             snapshot_images = session.getSnapshotImages()
             self.assertEqual(len(snapshot_images), 1)
             snap_id = snapshot_images[0].id
-            pool.deleteImage(snap_id)
+            pool.deleteImage(snap_id, force=False)
+
+        self.wait_for_threads()
+
+        with pool.getDB().getSession() as session:
+            while True:
+                snap_image = session.getSnapshotImage(snap_id)
+                if snap_image is None:
+                    break
+                time.sleep(.2)
+
+    def test_dib_snapimage_force_delete(self):
+        """Test that a dib image (snapshot) can be forcibily deleted."""
+        configfile = self.setup_config('node_dib.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForNodes(pool)
+        snap_id = None
+
+        with pool.getDB().getSession() as session:
+            snapshot_images = session.getSnapshotImages()
+            self.assertEqual(len(snapshot_images), 1)
+            snap_id = snapshot_images[0].id
+            # delete the provider in the config, simulating us
+            # removing a provider but forgetting to remove existing
+            # images; then force the delete.
+            print pool.config.providers
+            pool.config.providers.pop(snapshot_images[0].provider_name)
+            pool.deleteImage(snap_id, force=True)
 
         self.wait_for_threads()
 

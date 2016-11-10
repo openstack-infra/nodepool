@@ -114,6 +114,9 @@ class NodePoolCmd(NodepoolApp):
             help='delete an image')
         cmd_image_delete.set_defaults(func=self.image_delete)
         cmd_image_delete.add_argument('id', help='image id')
+        cmd_image_delete.add_argument('--force',
+                                      help='Ignore failure to remove image'
+                                      'from cloud', action='store_true')
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
@@ -342,7 +345,7 @@ class NodePoolCmd(NodepoolApp):
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config, False)
-        thread = self.pool.deleteImage(self.args.id)
+        thread = self.pool.deleteImage(self.args.id, self.args.force)
         self._wait_for_threads((thread, ))
 
     def config_validate(self):

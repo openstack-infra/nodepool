@@ -131,7 +131,7 @@ class TestNodepoolBuilder(tests.DBTestCase):
         with pool.getDB().getSession() as session:
             images = session.getSnapshotImages()
             self.assertEqual(len(images), 1)
-            pool.deleteImage(images[0].id)
+            pool.deleteImage(images[0].id, force=False)
 
         # Now wait for image uploads to fail at least once
         # cycling out the existing snap image and making a new one

@@ -877,17 +877,18 @@ class SubNodeLauncher(threading.Thread):
 class ImageDeleter(threading.Thread):
     log = logging.getLogger("nodepool.ImageDeleter")
 
-    def __init__(self, nodepool, snap_image_id):
+    def __init__(self, nodepool, snap_image_id, force):
         threading.Thread.__init__(self,
                                   name='ImageDeleter for %s' % snap_image_id)
         self.snap_image_id = snap_image_id
+        self.force = force
         self.nodepool = nodepool
 
     def run(self):
         try:
             with self.nodepool.getDB().getSession() as session:
                 snap_image = session.getSnapshotImage(self.snap_image_id)
-                self.nodepool._deleteImage(session, snap_image)
+                self.nodepool._deleteImage(session, snap_image, self.force)
         except Exception:
             self.log.exception("Exception deleting image %s:" %
                                self.snap_image_id)
@@ -1929,7 +1930,7 @@ class NodePool(threading.Thread):
             self.statsd.incr(key)
         self.updateStats(session, node.provider_name)
 
-    def deleteImage(self, snap_image_id):
+    def deleteImage(self, snap_image_id, force):
         try:
             self._image_delete_threads_lock.acquire()
 
@@ -1942,7 +1943,7 @@ class NodePool(threading.Thread):
 
             if snap_image_id in self._image_delete_threads:
                 return
-            t = ImageDeleter(self, snap_image_id)
+            t = ImageDeleter(self, snap_image_id, force)
             self._image_delete_threads[snap_image_id] = t
             t.start()
             return t
@@ -1951,35 +1952,42 @@ class NodePool(threading.Thread):
         finally:
             self._image_delete_threads_lock.release()
 
-    def _deleteImage(self, session, snap_image):
+    def _deleteImage(self, session, snap_image, force):
         # Delete an image (and its associated server)
         snap_image.state = nodedb.DELETE
-        provider = self.config.providers[snap_image.provider_name]
-        manager = self.getProviderManager(provider)
 
-        if snap_image.server_external_id:
-            try:
-                server = manager.getServer(snap_image.server_external_id)
-                if server:
-                    self.log.debug('Deleting server %s for image id: %s' %
-                                   (snap_image.server_external_id,
-                                    snap_image.id))
-                    manager.cleanupServer(server['id'])
-                    manager.waitForServerDeletion(server['id'])
+        try:
+            provider = self.config.providers[snap_image.provider_name]
+            manager = self.getProviderManager(provider)
+
+            if snap_image.server_external_id:
+                try:
+                    server = manager.getServer(snap_image.server_external_id)
+                    if server:
+                        self.log.debug('Deleting server %s for image id: %s' %
+                                       (snap_image.server_external_id,
+                                        snap_image.id))
+                        manager.cleanupServer(server['id'])
+                        manager.waitForServerDeletion(server['id'])
+                    else:
+                        raise provider_manager.NotFound
+                except provider_manager.NotFound:
+                    self.log.warning('Image server id %s not found' %
+                                     snap_image.server_external_id)
+
+            if snap_image.external_id:
+                remote_image = manager.getImage(snap_image.external_id)
+                if remote_image is None:
+                    self.log.warning('Image id %s not found' %
+                                     snap_image.external_id)
                 else:
-                    raise provider_manager.NotFound
-            except provider_manager.NotFound:
-                self.log.warning('Image server id %s not found' %
-                                 snap_image.server_external_id)
-
-        if snap_image.external_id:
-            remote_image = manager.getImage(snap_image.external_id)
-            if remote_image is None:
-                self.log.warning('Image id %s not found' %
-                                 snap_image.external_id)
+                    self.log.debug('Deleting image %s' % remote_image['id'])
+                    manager.deleteImage(remote_image['id'])
+        except Exception:
+            if not force:
+                raise
             else:
-                self.log.debug('Deleting image %s' % remote_image['id'])
-                manager.deleteImage(remote_image['id'])
+                self.log.info("Ignoring image delete errors")
 
         snap_image.delete()
         self.log.info("Deleted image id: %s" % snap_image.id)
@@ -2197,7 +2205,7 @@ class NodePool(threading.Thread):
                 delete = True
         if delete:
             try:
-                self.deleteImage(image.id)
+                self.deleteImage(image.id, force=False)
             except Exception:
                 self.log.exception("Exception deleting image id: %s:" %
                                    image.id)
