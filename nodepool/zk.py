@@ -155,6 +155,9 @@ class ImageBuild(BaseBuilderModel):
         self._formats = []
         self.builder = None          # Builder hostname
 
+    def __repr__(self):
+        return '<ImageBuild %s>' % self.toDict()
+
     @property
     def formats(self):
         return self._formats
@@ -207,6 +210,9 @@ class ImageUpload(BaseBuilderModel):
         super(ImageUpload, self).__init__(upload_id)
         self.external_id = None      # Provider ID of the image
         self.external_name = None    # Provider name of the image
+
+    def __repr__(self):
+        return '<ImageUpload %s>' % self.toDict()
 
     def toDict(self):
         '''
