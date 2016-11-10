@@ -490,6 +490,7 @@ class BuilderFixture(fixtures.Fixture):
     def setUp(self):
         super(BuilderFixture, self).setUp()
         self.builder = builder.NodePoolBuilder(self.configfile)
+        self.builder.cleanup_interval = .5
         self.builder.start()
         self.addCleanup(self.cleanup)
 
