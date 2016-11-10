@@ -665,7 +665,7 @@ class UploadWorker(BaseWorker):
                 # Search for locally built images. The image name and build
                 # sequence ID is used to name the image.
                 local_images = DibImageFile.from_image_id(
-                    self._config.imagesdir, "-".join([image.name, build.id]))
+                    self._config.imagesdir, "-".join([image.diskimage, build.id]))
                 if not local_images:
                     continue
 
