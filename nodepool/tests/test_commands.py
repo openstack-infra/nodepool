@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os.path
 import sys  # noqa making sure its available for monkey patching
 from unittest import skip
@@ -31,6 +32,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
     def assert_listed(self, configfile, cmd, col, val, count):
+        log = logging.getLogger("tests.PrettyTableMock")
         self.patch_argv("-c", configfile, *cmd)
         with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
             nodepoolcmd.main()
@@ -38,12 +40,13 @@ class TestNodepoolCMD(tests.DBTestCase):
             # Find add_rows with the status were looking for
             for args, kwargs in m_add_row.call_args_list:
                 row = args[0]
+                log.debug(row)
                 if row[col] == val:
                     rows_with_val += 1
             self.assertEquals(rows_with_val, count)
 
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
-        self.assert_listed(configfile, ['image-list'], 7, status, image_cnt)
+        self.assert_listed(configfile, ['image-list'], 5, status, image_cnt)
 
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
         self.assert_listed(configfile, ['list'], 10, status, node_cnt)
@@ -95,7 +98,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 1)
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
 
@@ -190,7 +192,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-diskimage')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
