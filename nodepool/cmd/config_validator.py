@@ -31,12 +31,10 @@ class ConfigValidator:
 
         images = {
             'name': str,
-            'base-image': str,
             'min-ram': int,
             'name-filter': str,
             'diskimage': str,
             'meta': dict,
-            'setup': str,
             'username': str,
             'private-key': str,
             'config-drive': bool,

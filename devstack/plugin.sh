@@ -178,16 +178,7 @@ cron:
   cleanup: '*/1 * * * *'
   check: '*/15 * * * *'
 
-# Devstack does not make an Ubuntu image by default. You can
-# grab one from Ubuntu and upload it yourself. Note that we
-# cannot use devstack's cirros default because cirros does not
-# support sftp.
 labels:
-  - name: $NODEPOOL_IMAGE
-    image: $NODEPOOL_IMAGE
-    min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-dib
     image: ubuntu-dib
     min-ready: 1
@@ -205,17 +196,6 @@ providers:
     max-servers: 2
     rate: 0.25
     images:
-      - name: $NODEPOOL_IMAGE
-        base-image: '$NODEPOOL_IMAGE'
-        min-ram: 1024
-        # This script should setup the jenkins user to accept
-        # the ssh key configured below. It goes in the script-dir
-        # configured above and an example is below.
-        setup: prepare_node_ubuntu.sh
-        username: jenkins
-        # Alter below to point to your local user private key
-        private-key: $NODEPOOL_KEY
-        config-drive: true
       - name: ubuntu-dib
         min-ram: 1024
         diskimage: ubuntu-dib

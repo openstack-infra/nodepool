@@ -50,10 +50,8 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
 
   - name: fake-provider2
     keypair: 'if-present-use-this-keypair'
@@ -68,10 +66,8 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
 
   - name: fake-provider3
     keypair: 'if-present-use-this-keypair'
@@ -87,10 +83,12 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        base-image: 'Fake Precise'
+        diskimage: fake-image
         min-ram: 8192
         name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
 
 targets:
   - name: fake-target
+
+diskimages:
+  - name: fake-image

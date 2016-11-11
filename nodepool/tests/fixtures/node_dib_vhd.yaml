@@ -38,7 +38,6 @@ providers:
     rate: 0.0001
     images:
       - name: fake-dib-image
-        base-image: 'Fake Precise'
         min-ram: 8192
         diskimage: fake-dib-image
 

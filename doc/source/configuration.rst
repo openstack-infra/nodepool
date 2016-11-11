@@ -303,10 +303,8 @@ provider, the Nodepool image types are also defined (see
           public: True
       images:
         - name: trusty
-          base-image: 'Trusty'
           min-ram: 8192
           name-filter: 'something to match'
-          setup: prepare_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -314,9 +312,7 @@ provider, the Nodepool image types are also defined (see
               key: value
               key2: value
         - name: precise
-          base-image: 'Precise'
           min-ram: 8192
-          setup: prepare_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -338,9 +334,7 @@ provider, the Nodepool image types are also defined (see
       template-hostname: '{image.name}-{timestamp}-nodepool-template'
       images:
         - name: precise
-          base-image: 'Fake Precise'
           min-ram: 8192
-          setup: prepare_node.sh
           username: jenkins
           user-home: '/home/jenkins'
           private-key: /var/lib/jenkins/.ssh/id_rsa
@@ -471,10 +465,8 @@ Example::
 
   images:
     - name: precise
-      base-image: 'Precise'
       min-ram: 8192
       name-filter: 'something to match'
-      setup: prepare_node.sh
       username: jenkins
       private-key: /var/lib/jenkins/.ssh/id_rsa
       meta:
@@ -487,18 +479,10 @@ Example::
     Identifier to refer this image from :ref:`labels` and :ref:`provider`
     sections.
 
-    If the resulting images from different providers ``base-image`` should be
-    equivalent, give them the same name; e.g. if one provider has a ``Fedora
-    20`` image and another has an equivalent ``Fedora 20 (Heisenbug)`` image,
-    they should use a common ``name``.  Otherwise select a unique ``name``.
-
-  ``base-image``
-    UUID or string-name of the image to boot as specified by the provider.
-
   ``min-ram``
-    Determine the flavor of ``base-image`` to use (e.g. ``m1.medium``,
-    ``m1.large``, etc).  The smallest flavor that meets the ``min-ram``
-    requirements will be chosen. To further filter by flavor name, see optional
+    Determine the flavor to use (e.g. ``m1.medium``, ``m1.large``,
+    etc).  The smallest flavor that meets the ``min-ram`` requirements
+    will be chosen. To further filter by flavor name, see optional
     ``name-filter`` below.
 
 **optional**
@@ -508,13 +492,6 @@ Example::
     the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
     `name-filter` to ``Performance`` will ensure the chosen flavor also
     contains this string as well as meeting `min-ram` requirements).
-
-  ``setup``
-     Script to run to prepare the instance.
-
-     Used only when not building images using diskimage-builder, in that case
-     settings defined in the ``diskimages`` section will be used instead. See
-     :ref:`scripts` for setup script details.
 
   ``diskimage``
      See :ref:`diskimages`.

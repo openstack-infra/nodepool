@@ -69,27 +69,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_images_listed(configfile, 1)
 
     @skip("Skipping until ZooKeeper is enabled")
-    def test_dib_snapshot_image_update(self):
-        configfile = self.setup_config("node_dib_and_snap.yaml")
-        self._useBuilder(configfile)
-        self.patch_argv("-c", configfile, "image-update",
-                        "fake-provider1", "fake-dib-image")
-        nodepoolcmd.main()
-        self.patch_argv("-c", configfile, "image-update",
-                        "fake-provider2", "fake-dib-image")
-        nodepoolcmd.main()
-        self.assert_images_listed(configfile, 2)
-
-    @skip("Skipping until ZooKeeper is enabled")
-    def test_dib_snapshot_image_update_all(self):
-        configfile = self.setup_config("node_dib_and_snap.yaml")
-        self._useBuilder(configfile)
-        self.patch_argv("-c", configfile, "image-update",
-                        "all", "fake-dib-image")
-        nodepoolcmd.main()
-        self.assert_images_listed(configfile, 2)
-
-    @skip("Skipping until ZooKeeper is enabled")
     def test_image_update_all(self):
         configfile = self.setup_config("node_cmd.yaml")
         self._useBuilder(configfile)

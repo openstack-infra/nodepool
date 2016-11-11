@@ -43,10 +43,12 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        base-image: 'Fake Precise'
         min-ram: 8192
+        diskimage: fake-image
         name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
 
 targets:
   - name: fake-target
+
+diskimages:
+  - name: fake-image

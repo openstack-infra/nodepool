@@ -123,68 +123,9 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
-    def test_dib_and_snap_label(self):
-        """Test that a label with dib and snapshot images build."""
-        configfile = self.setup_config('node_dib_and_snap.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage(pool, 'fake-provider1', 'fake-dib-image')
-        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider1',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-            nodes = session.getNodes(provider_name='fake-provider2',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-
-    def test_dib_and_snap_fail(self):
-        """Test that snap based nodes build when dib fails."""
-        configfile = self.setup_config('node_dib_and_snap_fail.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        # fake-provider1 will fail to build fake-dib-image
-        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            # fake-provider1 uses dib.
-            nodes = session.getNodes(provider_name='fake-provider1',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 0)
-            # fake-provider2 uses snapshots.
-            nodes = session.getNodes(provider_name='fake-provider2',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 2)
-        # The fake disk image create script will return 127 with
-        # SHOULD_FAIL flag set to true.
-        self.assertEqual(self.subprocesses[0].returncode, 127)
-        self.assertEqual(self.subprocesses[-1].returncode, 127)
-
-        with pool.getDB().getSession() as session:
-            while True:
-                dib_images = session.getDibImages()
-                images = filter(lambda x: x.image_name == 'fake-dib-image',
-                                dib_images)
-                if len(images) == 0:
-                    break
-                time.sleep(.2)
-
     def test_dib_upload_fail(self):
-        """Test that a dib and snap image upload failure is contained."""
-        configfile = self.setup_config('node_dib_and_snap_upload_fail.yaml')
+        """Test that a dib upload failure is contained."""
+        configfile = self.setup_config('node_dib_upload_fail.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
@@ -192,13 +133,11 @@ class TestNodepool(tests.DBTestCase):
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
-            # fake-provider1 uses dib.
             nodes = session.getNodes(provider_name='fake-provider1',
                                      label_name='fake-label',
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 0)
-            # fake-provider2 uses snapshots.
             nodes = session.getNodes(provider_name='fake-provider2',
                                      label_name='fake-label',
                                      target_name='fake-target',

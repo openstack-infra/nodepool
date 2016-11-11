@@ -59,13 +59,10 @@ class Provider(ConfigValue):
             return False
         # check if existing images have been updated
         for k in new_images:
-            if (new_images[k].base_image != old_images[k].base_image or
-                new_images[k].min_ram != old_images[k].min_ram or
+            if (new_images[k].min_ram != old_images[k].min_ram or
                 new_images[k].name_filter != old_images[k].name_filter or
-                new_images[k].setup != old_images[k].setup or
                 new_images[k].username != old_images[k].username or
                 new_images[k].user_home != old_images[k].user_home or
-                new_images[k].diskimage != old_images[k].diskimage or
                 new_images[k].private_key != old_images[k].private_key or
                 new_images[k].meta != old_images[k].meta or
                 new_images[k].config_drive != old_images[k].config_drive):
@@ -225,10 +222,8 @@ def loadConfig(config_path):
             i = ProviderImage()
             i.name = image['name']
             p.images[i.name] = i
-            i.base_image = image.get('base-image', None)
             i.min_ram = image['min-ram']
             i.name_filter = image.get('name-filter', None)
-            i.setup = image.get('setup', None)
             i.diskimage = image.get('diskimage', None)
             i.username = image.get('username', 'jenkins')
             i.user_home = image.get('user-home', '/home/jenkins')
