@@ -57,13 +57,12 @@ Following settings are available::
 Nodepool reads its configuration from ``/etc/nodepool/nodepool.yaml``
 by default.  The configuration file follows the standard YAML syntax
 with a number of sections defined with top level keys.  For example, a
-full configuration file may have the ``labels``, ``providers``, and
-``targets`` sections. If building images using diskimage-builder, the
-``diskimages`` section is also required::
+full configuration file may have the ``diskimages``, ``labels``,
+``providers``, and ``targets`` sections::
 
-  labels:
-    ...
   diskimages:
+    ...
+  labels:
     ...
   providers:
     ...
@@ -234,8 +233,7 @@ Lists the images that are going to be built using diskimage-builder.
 Image keyword defined on labels section will be mapped to the
 images listed on diskimages. If an entry matching the image is found
 this will be built using diskimage-builder and the settings found
-on this configuration. If no matching image is found, image
-will be built using the provider snapshot approach::
+on this configuration::
 
   diskimages:
   - name: devstack-precise
@@ -318,7 +316,6 @@ provider, the Nodepool image types are also defined (see
           private-key: /var/lib/jenkins/.ssh/id_rsa
         - name: devstack-trusty
           min-ram: 30720
-          diskimage: devstack-trusty
           username: jenkins
           private-key: /home/nodepool/.ssh/id_rsa
     - name: provider2
@@ -476,7 +473,7 @@ Example::
 **required**
 
   ``name``
-    Identifier to refer this image from :ref:`labels` and :ref:`provider`
+    Identifier to refer this image from :ref:`labels` and :ref:`diskimages`
     sections.
 
   ``min-ram``
@@ -492,9 +489,6 @@ Example::
     the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
     `name-filter` to ``Performance`` will ensure the chosen flavor also
     contains this string as well as meeting `min-ram` requirements).
-
-  ``diskimage``
-     See :ref:`diskimages`.
 
   ``username``
     Nodepool expects that user to exist after running the script indicated by

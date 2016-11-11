@@ -40,7 +40,6 @@ providers:
     images:
       - name: fake-dib-image
         min-ram: 8192
-        diskimage: fake-dib-image
   - name: fake-provider2
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
@@ -56,7 +55,6 @@ providers:
     images:
       - name: fake-dib-image
         min-ram: 8192
-        diskimage: fake-dib-image
 
 targets:
   - name: fake-target

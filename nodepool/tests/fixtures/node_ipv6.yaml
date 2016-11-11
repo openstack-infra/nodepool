@@ -83,7 +83,6 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        diskimage: fake-image
         min-ram: 8192
         name-filter: 'Fake'
 

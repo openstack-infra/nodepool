@@ -42,7 +42,6 @@ providers:
     images:
       - name: fake-image1
         min-ram: 8192
-        diskimage: fake-image1
         name-filter: 'Fake'
         meta:
           key: value
@@ -61,7 +60,6 @@ providers:
     images:
       - name: fake-image2
         min-ram: 8192
-        diskimage: fake-image2
         name-filter: 'Fake'
         meta:
           key: value

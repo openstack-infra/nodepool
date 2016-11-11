@@ -145,7 +145,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_dib_image_list(self):
         configfile = self.setup_config('node_dib.yaml')
         self._useBuilder(configfile)
-        self.waitForImage('fake-dib-provider', 'fake-dib-diskimage')
+        self.waitForImage('fake-dib-provider', 'fake-dib-image')
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 
     @skip("Skipping until ZooKeeper is enabled")

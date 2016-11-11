@@ -193,14 +193,11 @@ class NodePoolCmd(NodepoolApp):
                 dib_images_built = set()
                 for provider in self.pool.config.providers.values():
                     image = provider.images.get(self.args.image)
-                    if image and image.diskimage:
-                        if image.diskimage not in dib_images_built:
-                            self.image_build(image.diskimage)
-                            dib_images_built.add(image.diskimage)
+                    if image:
+                        if image.name not in dib_images_built:
+                            self.image_build(image.name)
+                            dib_images_built.add(image.name)
                         jobs.append(self.pool.uploadImage(
-                            session, provider.name, image.name))
-                    elif image:
-                        threads.append(self.pool.updateImage(
                             session, provider.name, image.name))
             else:
                 provider = self.pool.config.providers.get(self.args.provider)
@@ -208,12 +205,9 @@ class NodePoolCmd(NodepoolApp):
                     raise Exception("Provider %s does not exist"
                                     % self.args.provider)
                 image = provider.images.get(self.args.image)
-                if image and image.diskimage:
-                    self.image_build(image.diskimage)
+                if image:
+                    self.image_build(image.name)
                     jobs.append(self.pool.uploadImage(
-                        session, provider.name, image.name))
-                elif image:
-                    threads.append(self.pool.updateImage(
                         session, provider.name, image.name))
                 else:
                     raise Exception("Image %s not in use by provider %s"
@@ -242,21 +236,13 @@ class NodePoolCmd(NodepoolApp):
                 # iterate for all providers listed in label
                 for provider in self.pool.config.providers.values():
                     image = provider.images[self.args.image]
-                    if not image.diskimage:
-                        self.log.warning("Trying to upload a non "
-                                         "disk-image-builder image: %s",
-                                         self.args.image)
-                    else:
-                        jobs.append(self.pool.uploadImage(
-                            session, provider.name, self.args.image))
+                    jobs.append(self.pool.uploadImage(
+                        session, provider.name, image.name))
             else:
                 provider = self.pool.config.providers[self.args.provider]
-                if not provider.images[self.args.image].diskimage:
-                    raise Exception("Trying to upload a non "
-                                    "disk-image-builder image: %s",
-                                    self.args.image)
+                image = provider.images[self.args.image]
                 jobs.append(self.pool.uploadImage(
-                    session, self.args.provider, self.args.image))
+                    session, self.args.provider, image.name))
 
         for job in jobs:
             job.waitForCompletion()

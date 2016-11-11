@@ -44,7 +44,6 @@ providers:
     images:
       - name: fake-image
         min-ram: 8192
-        diskimage: fake-image
         name-filter: 'Fake'
 
 targets:

@@ -224,18 +224,14 @@ def loadConfig(config_path):
             p.images[i.name] = i
             i.min_ram = image['min-ram']
             i.name_filter = image.get('name-filter', None)
-            i.diskimage = image.get('diskimage', None)
             i.username = image.get('username', 'jenkins')
             i.user_home = image.get('user-home', '/home/jenkins')
             i.private_key = image.get('private-key',
                                       '/var/lib/jenkins/.ssh/id_rsa')
             i.config_drive = image.get('config-drive', None)
 
-            # note this does "double-duty" -- for
-            # SnapshotImageUpdater the meta-data dict is passed to
-            # nova when the snapshot image is created.  For
-            # DiskImageUpdater, this dict is expanded and used as
-            # custom properties when the image is uploaded.
+            # This dict is expanded and used as custom properties when
+            # the image is uploaded.
             i.meta = image.get('meta', {})
             # 5 elements, and no key or value can be > 255 chars
             # per Nova API rules
@@ -271,10 +267,8 @@ def loadConfig(config_path):
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():
-                if (image.diskimage and
-                    image.diskimage in newconfig.diskimages):
-                    diskimage = newconfig.diskimages[image.diskimage]
-                    diskimage.image_types.add(provider.image_type)
+                diskimage = newconfig.diskimages[image.name]
+                diskimage.image_types.add(provider.image_type)
 
     for label in config.get('labels', []):
         l = Label()

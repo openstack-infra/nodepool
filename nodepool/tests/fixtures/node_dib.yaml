@@ -40,13 +40,12 @@ providers:
     images:
       - name: fake-dib-image
         min-ram: 8192
-        diskimage: fake-dib-diskimage
 
 targets:
   - name: fake-target
 
 diskimages:
-  - name: fake-dib-diskimage
+  - name: fake-dib-image
     elements:
       - fedora
       - vm

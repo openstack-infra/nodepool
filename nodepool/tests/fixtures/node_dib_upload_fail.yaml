@@ -39,7 +39,6 @@ providers:
     images:
       - name: fake-dib-image
         min-ram: 8192
-        diskimage: fake-dib-image
         meta:
           SHOULD_FAIL: 'true'
   - name: fake-provider2
@@ -56,7 +55,6 @@ providers:
     images:
       - name: fake-dib-image
         min-ram: 8192
-        diskimage: fake-dib-image
 
 targets:
   - name: fake-target

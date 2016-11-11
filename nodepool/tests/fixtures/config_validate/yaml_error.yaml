@@ -55,7 +55,6 @@ providers:
     images:
       - name: trusty
         min-ram: 8192
-        diskimage: devstack-precise
         username: jenkins
         private-key: /home/nodepool/.ssh/id_rsa
   - name: cloud2
@@ -72,7 +71,6 @@ providers:
     images:
       - name: trusty
         min-ram: 8192
-        diskimage: devstack-precise
         username: jenkins
         private-key: /home/nodepool/.ssh/id_rsa
 

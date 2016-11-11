@@ -357,43 +357,43 @@ class BuildWorker(BaseWorker):
         .. note:: It's important to lock the image build before we check
             the state time and then build to eliminate any race condition.
         '''
-        for name, image in self._config.diskimages.items():
+        for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
             if not self.running or self._zk.suspended or self._zk.lost:
                 return
 
             now = int(time.time())
-            builds = self._zk.getMostRecentBuilds(1, name, 'ready')
+            builds = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
 
             # If there is no build for this image, or it has aged out
             # or if the current build is missing an image type from
             # the config file, start a new build.
             if (not builds
-                or (now - builds[0].state_time) >= image.rebuild_age
-                or not set(builds[0].formats).issuperset(image.image_types)
+                or (now - builds[0].state_time) >= diskimage.rebuild_age
+                or not set(builds[0].formats).issuperset(diskimage.image_types)
             ):
                 try:
-                    with self._zk.imageBuildLock(image.name, blocking=False):
+                    with self._zk.imageBuildLock(diskimage.name, blocking=False):
                         # To avoid locking each image repeatedly, we have an
                         # second, redundant check here to verify that a new
                         # build didn't appear between the first check and the
                         # lock acquisition. If it's not the same build as
                         # identified in the first check above, assume another
                         # BuildWorker created the build for us and continue.
-                        builds2 = self._zk.getMostRecentBuilds(1, name, 'ready')
+                        builds2 = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
                         if builds2 and builds[0].id != builds2[0].id:
                             continue
 
-                        self.log.info("Building image %s" % name)
+                        self.log.info("Building image %s" % diskimage.name)
 
                         data = zk.ImageBuild()
                         data.state = 'building'
                         data.builder = self._hostname
 
-                        bnum = self._zk.storeBuild(image.name, data)
-                        data = self._buildImage(bnum, image)
-                        self._zk.storeBuild(image.name, data, bnum)
+                        bnum = self._zk.storeBuild(diskimage.name, data)
+                        data = self._buildImage(bnum, diskimage)
+                        self._zk.storeBuild(diskimage.name, data, bnum)
                 except exceptions.ZKLockException:
                     # Lock is already held. Skip it.
                     pass
@@ -402,7 +402,7 @@ class BuildWorker(BaseWorker):
         '''
         Query ZooKeeper for any manual image build requests.
         '''
-        for image in self._config.diskimages.values():
+        for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
             if not self.running or self._zk.suspended or self._zk.lost:
@@ -410,52 +410,52 @@ class BuildWorker(BaseWorker):
 
             # Reduce use of locks by adding an initial check here and
             # a redundant check after lock acquisition.
-            if not self._zk.hasBuildRequest(image.name):
+            if not self._zk.hasBuildRequest(diskimage.name):
                 continue
 
             try:
-                with self._zk.imageBuildLock(image.name, blocking=False):
+                with self._zk.imageBuildLock(diskimage.name, blocking=False):
                     # Redundant check
-                    if not self._zk.hasBuildRequest(image.name):
+                    if not self._zk.hasBuildRequest(diskimage.name):
                         continue
 
                     self.log.info(
-                        "Manual build request for image %s" % image.name)
+                        "Manual build request for image %s" % diskimage.name)
 
                     data = zk.ImageBuild()
                     data.state = 'building'
                     data.builder = self._hostname
 
-                    bnum = self._zk.storeBuild(image.name, data)
-                    data = self._buildImage(bnum, image)
-                    self._zk.storeBuild(image.name, data, bnum)
+                    bnum = self._zk.storeBuild(diskimage.name, data)
+                    data = self._buildImage(bnum, diskimage)
+                    self._zk.storeBuild(diskimage.name, data, bnum)
 
                     # Remove request on a successful build
                     if data.state == 'ready':
-                        self._zk.removeBuildRequest(image.name)
+                        self._zk.removeBuildRequest(diskimage.name)
 
             except exceptions.ZKLockException:
                 # Lock is already held. Skip it.
                 pass
 
-    def _buildImage(self, build_id, image):
+    def _buildImage(self, build_id, diskimage):
         '''
-        Run the external command to build the image.
+        Run the external command to build the diskimage.
 
         :param str build_id: The ID for the build (used in image filename).
-        :param image: The image as retrieved from our config file.
+        :param diskimage: The diskimage as retrieved from our config file.
 
         :returns: An ImageBuild object of build-related data.
 
         :raises: BuilderError if we failed to execute the build command.
         '''
-        base = "-".join([image.name, build_id])
+        base = "-".join([diskimage.name, build_id])
         image_file = DibImageFile(base)
         filename = image_file.to_path(self._config.imagesdir, False)
 
         env = os.environ.copy()
-        env['DIB_RELEASE'] = image.release
-        env['DIB_IMAGE_NAME'] = image.name
+        env['DIB_RELEASE'] = diskimage.release
+        env['DIB_IMAGE_NAME'] = diskimage.name
         env['DIB_IMAGE_FILENAME'] = filename
 
         # Note we use a reference to the nodepool config here so
@@ -471,17 +471,17 @@ class BuildWorker(BaseWorker):
         env['DIB_SHOW_IMAGE_USAGE'] = '1'
 
         # send additional env vars if needed
-        for k, v in image.env_vars.items():
+        for k, v in diskimage.env_vars.items():
             env[k] = v
 
-        img_elements = image.elements
-        img_types = ",".join(image.image_types)
+        img_elements = diskimage.elements
+        img_types = ",".join(diskimage.image_types)
 
         qemu_img_options = ''
         if 'qcow2' in img_types:
             qemu_img_options = DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS
 
-        if 'fake-' in image.name:
+        if 'fake-' in diskimage.name:
             dib_cmd = 'nodepool/tests/fake-image-create'
         else:
             dib_cmd = 'disk-image-create'
@@ -490,7 +490,7 @@ class BuildWorker(BaseWorker):
                (dib_cmd, img_types, qemu_img_options, filename, img_elements))
 
         log = logging.getLogger("nodepool.image.build.%s" %
-                                (image.name,))
+                                (diskimage.name,))
 
         self.log.info('Running %s' % cmd)
 
@@ -525,21 +525,21 @@ class BuildWorker(BaseWorker):
         build_data.builder = self._hostname
 
         if self._zk.didLoseConnection:
-            self.log.info("ZooKeeper lost while building %s" % image.name)
+            self.log.info("ZooKeeper lost while building %s" % diskimage.name)
             self._zk.resetLostFlag()
             build_data.state = 'failed'
         elif p.returncode:
-            self.log.info("DIB failed creating %s" % image.name)
+            self.log.info("DIB failed creating %s" % diskimage.name)
             build_data.state = 'failed'
         else:
-            self.log.info("DIB image %s is built" % image.name)
+            self.log.info("DIB image %s is built" % diskimage.name)
             build_data.state = 'ready'
             build_data.formats = img_types.split(",")
 
             if self._statsd:
                 # record stats on the size of each image we create
                 for ext in img_types.split(','):
-                    key = 'nodepool.dib_image_build.%s.%s.size' % (image.name, ext)
+                    key = 'nodepool.dib_image_build.%s.%s.size' % (diskimage.name, ext)
                     # A bit tricky because these image files may be sparse
                     # files; we only want the true size of the file for
                     # purposes of watching if we've added too much stuff
@@ -547,7 +547,7 @@ class BuildWorker(BaseWorker):
                     # 512-byte blocks by stat(2)
                     size = os.stat("%s.%s" % (filename, ext)).st_blocks * 512
                     self.log.debug("%s created image %s.%s (size: %d) " %
-                                   (image.name, filename, ext, size))
+                                   (diskimage.name, filename, ext, size))
                     self._statsd.gauge(key, size)
 
         return build_data
@@ -626,11 +626,7 @@ class UploadWorker(BaseWorker):
                       (build_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
-        provider_image = None
-        for p_image in provider.images.values():
-            if p_image.diskimage == image_name:
-                provider_image = p_image
-                break
+        provider_image = provider.images.get(image_name)
         if provider_image is None:
             raise exceptions.BuilderInvalidCommandError(
                 "Could not find matching provider image for %s" % image_name
@@ -674,11 +670,9 @@ class UploadWorker(BaseWorker):
 
                 if image.name not in self._config.images_in_use:
                     continue
-                if not image.diskimage:
-                    continue
 
                 # Search for the most recent 'ready' image build
-                builds = self._zk.getMostRecentBuilds(1, image.diskimage,
+                builds = self._zk.getMostRecentBuilds(1, image.name,
                                                       'ready')
                 if not builds:
                     continue
@@ -688,13 +682,13 @@ class UploadWorker(BaseWorker):
                 # Search for locally built images. The image name and build
                 # sequence ID is used to name the image.
                 local_images = DibImageFile.from_image_id(
-                    self._config.imagesdir, "-".join([image.diskimage, build.id]))
+                    self._config.imagesdir, "-".join([image.name, build.id]))
                 if not local_images:
                     continue
 
                 # See if this image has already been uploaded
                 upload = self._zk.getMostRecentBuildImageUploads(
-                    1, image.diskimage, build.id, provider.name, 'ready')
+                    1, image.name, build.id, provider.name, 'ready')
                 if upload:
                     continue
 
@@ -704,20 +698,20 @@ class UploadWorker(BaseWorker):
 
                 try:
                     with self._zk.imageUploadLock(
-                        image.diskimage, build.id, provider.name,
+                        image.name, build.id, provider.name,
                         blocking=False
                     ):
                         # New upload number with initial state 'uploading'
                         data = zk.ImageUpload()
                         data.state = 'uploading'
                         upnum = self._zk.storeImageUpload(
-                            image.diskimage, build.id, provider.name, data)
+                            image.name, build.id, provider.name, data)
 
-                        data = self._uploadImage(build.id, image.diskimage,
+                        data = self._uploadImage(build.id, image.name,
                                                  local_images, provider)
 
                         # Set final state
-                        self._zk.storeImageUpload(image.diskimage, build.id,
+                        self._zk.storeImageUpload(image.name, build.id,
                                                   provider.name, data, upnum)
                 except exceptions.ZKLockException:
                     # Lock is already held. Skip it.
