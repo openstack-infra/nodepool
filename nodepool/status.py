@@ -55,7 +55,7 @@ def dib_image_list(zk):
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
             build = zk.getBuild(image_name, build_no)
-            t.add_row([build_no, image_name,
+            t.add_row(['-'.join([image_name, build_no]), image_name,
                        build.builder, ','.join(build.formats),
                        build.state, age(build.state_time)])
     return str(t)
