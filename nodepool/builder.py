@@ -290,8 +290,12 @@ class CleanupWorker(BaseWorker):
         self._buildUploadRecencyTable()
 
         for image in image_names:
-            builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
+            # Get the list of all builds before we get the list of
+            # builds to keep.  That way, if a build transitions to
+            # ready between the two calls, it will show up in the list
+            # of builds to keep.
             all_builds = self._zk.getBuilds(image)
+            builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
 
             for build in all_builds:
                 if build.state != 'deleted':
