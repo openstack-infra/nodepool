@@ -112,136 +112,20 @@ class GearmanServerFixture(fixtures.Fixture):
 
 
 class ZookeeperServerFixture(fixtures.Fixture):
-    def __init__(self, port=0):
-        self._port = port
-        self.log = logging.getLogger("tests.ZookeeperServerFixture")
-
     def _setUp(self):
-        if 'NODEPOOL_ZK_HOST' in os.environ:
-           if ':' in os.environ['NODEPOOL_ZK_HOST']:
-               host, port = os.environ['NODEPOOL_ZK_HOST'].split(':')
-           else:
-               host = os.environ['NODEPOOL_ZK_HOST']
-               port = None
+        zk_host = os.environ.get('NODEPOOL_ZK_HOST', 'localhost')
+        if ':' in zk_host:
+            host, port = zk_host.split(':')
+        else:
+            host = zk_host
+            port = None
 
-           self.zookeeper_host = host
+        self.zookeeper_host = host
 
-           if not port:
-               self.zookeeper_port = 2181
-           else:
-               self.zookeeper_port = int(port)
-
-           return
-
-        self.zookeeper_host = '127.0.0.1'
-
-        # Get the local port range, we're going to pick one at a time
-        # at random to try.
-        with open('/proc/sys/net/ipv4/ip_local_port_range') as f:
-            line = f.readline()
-            begin, end = map(int, line.split())
-
-        zookeeper_fixtures = os.path.join(os.path.dirname(__file__),
-                                          'fixtures', 'zookeeper')
-
-        # Make a tmpdir to hold the config file, zookeeper data dir,
-        # and log file.
-        tmp_root = self.useFixture(fixtures.TempDir()).path
-        with open(os.path.join(zookeeper_fixtures, 'log4j.properties')) as i:
-            with open(os.path.join(tmp_root, 'log4j.properties'), 'w') as o:
-                o.write(i.read())
-
-        config_path = os.path.join(tmp_root, 'zoo.cfg')
-        log_path = os.path.join(tmp_root, 'zookeeper.log')
-
-        classpath = [
-            tmp_root,
-            '/usr/share/java/jline.jar',
-            '/usr/share/java/log4j-1.2.jar',
-            '/usr/share/java/xercesImpl.jar',
-            '/usr/share/java/xmlParserAPIs.jar',
-            '/usr/share/java/netty.jar',
-            '/usr/share/java/slf4j-api.jar',
-            '/usr/share/java/slf4j-log4j12.jar',
-            '/usr/share/java/zookeeper.jar',
-        ]
-        classpath = ':'.join(classpath)
-
-        args = ['/usr/bin/java', '-cp', classpath,
-                '-Dzookeeper.log.dir=%s' % (tmp_root,),
-                '-Dzookeeper.root.logger=INFO,ROLLINGFILE',
-                'org.apache.zookeeper.server.quorum.QuorumPeerMain',
-                config_path]
-
-        found_port = False
-
-        self.zookeeper_process = None
-        self.addCleanup(self.shutdownZookeeper)
-
-        # Try a random port in the local port range one at a time
-        # until we find one that's available.
-        while not found_port:
-            port = random.randrange(begin, end)
-
-            self.log.debug("Starting ZK on port %s", port)
-            # Write a config file with this port.
-            with open(os.path.join(zookeeper_fixtures, 'zoo.cfg')) as i:
-                with open(config_path, 'w') as o:
-                    o.write(i.read().format(datadir=os.path.join(tmp_root, 'data'),
-                                            port=port))
-
-            # Run zookeeper.
-            p = subprocess.Popen(args)
-            self.zookeeper_port = port
-            self.zookeeper_process = p
-            self.zookeeper_log_path = log_path
-
-            # Wait up to 30 seconds to figure out if it has started.
-            for x in range(30):
-                r = self._checkZKLog(log_path)
-                if r is True:
-                    found_port = True
-                    break
-                elif r is False:
-                    break
-                time.sleep(1)
-
-            if not found_port:
-                p.kill()
-                p.wait()
-                if os.path.exists(log_path):
-                    os.unlink(log_path)
-
-    def _checkZKLog(self, path):
-        if not os.path.exists(path):
-            return None
-        # Our return value starts as indeterminate.
-        bound = None
-        with open(path) as f:
-            for line in f:
-                # Note: success appears as "binding to port" when
-                # *not* followed by "Address already in use".  That
-                # makes this a little racy, but failure is generally
-                # fast, and this is called at 1 second intervals.
-                if 'binding to port' in line:
-                    bound = True
-                if 'Address already in use' in line:
-                    return False
-        return bound
-
-    def shutdownZookeeper(self):
-        if self.zookeeper_process:
-            try:
-                self.zookeeper_process.kill()
-                self.zookeeper_process.wait()
-            except OSError:
-                self.log.exception("Error stopping ZK (ignored)")
-                pass
-        if os.path.exists(self.zookeeper_log_path):
-            self.log.debug("Zookeeper log file:")
-            with open(self.zookeeper_log_path) as f:
-                for line in f:
-                    self.log.debug(line.strip())
+        if not port:
+            self.zookeeper_port = 2181
+        else:
+            self.zookeeper_port = int(port)
 
 
 class ChrootedKazooFixture(fixtures.Fixture):
@@ -260,12 +144,8 @@ class ChrootedKazooFixture(fixtures.Fixture):
         self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
         # Ensure the chroot path exists and clean up an pre-existing znodes.
-        # Allow extra time for the very first connection because we might
-        # be waiting for the ZooKeeper server to be started from the
-        # ZookeeperServerFixture fixture.
         _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port),
-            timeout=60)
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
         _tmp_client.start()
 
         if _tmp_client.exists(self.chroot_path):
