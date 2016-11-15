@@ -233,6 +233,9 @@ class BaseTestCase(testtools.TestCase):
                                                 format=fs))
         else:
             logging.basicConfig(level=logging.DEBUG)
+        l = logging.getLogger('kazoo')
+        l.setLevel(logging.INFO)
+        l.propagate=False
         self.useFixture(fixtures.NestedTempfile())
 
         self.subprocesses = []
