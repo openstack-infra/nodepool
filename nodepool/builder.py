@@ -259,6 +259,27 @@ class CleanupWorker(BaseWorker):
                     self._zk.deleteUpload(image, build_id,
                                           provider.name, upload.id)
 
+    def _inProgressBuild(self, build, image):
+        '''
+        Determine if a DIB build is in progress.
+        '''
+        if build.state != 'building':
+            return False
+
+        try:
+            with self._zk.imageBuildLock(image, blocking=False):
+                # An additional state check is needed to make sure it hasn't
+                # changed on us. If it has, then let's pretend a build is
+                # still in progress so that it is checked again later with
+                # its new build state.
+                b = self._zk.getBuild(image, build.id)
+                if b.state != 'building':
+                    return True
+                pass
+        except exceptions.ZKLockException:
+            return True
+        return False
+
     def _cleanup(self):
         '''
         Clean up builds on disk and in providers.
@@ -275,6 +296,8 @@ class CleanupWorker(BaseWorker):
             for build in all_builds:
                 if build.state != 'deleted':
                     if build.id in [b.id for b in builds_to_keep]:
+                        continue
+                    elif self._inProgressBuild(build, image):
                         continue
 
                 for provider in known_providers:
