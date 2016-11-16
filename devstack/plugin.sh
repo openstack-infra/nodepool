@@ -16,6 +16,7 @@
 
 NODEPOOL_KEY=$HOME/.ssh/id_nodepool
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
+NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
 
 # Install shade from git if requested. If not requested
 # nodepool install will pull it in.
@@ -229,6 +230,11 @@ diskimages:
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
 EOF
+    if [ -f $NODEPOOL_CACHE_GET_PIP ] ; then
+        cat >> /tmp/nodepool.yaml <<EOF
+      DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP
+EOF
+    fi
 
     sudo mv /tmp/nodepool.yaml $NODEPOOL_CONFIG
     cp /etc/openstack/clouds.yaml /tmp
