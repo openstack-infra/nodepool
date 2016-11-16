@@ -538,13 +538,13 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.USED)
             self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
     def test_job_end_event(self):
         """Test that job end marks node delete"""
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         msg_obj = {'name': 'fake-job',
