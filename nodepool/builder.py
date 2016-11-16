@@ -671,57 +671,72 @@ class UploadWorker(BaseWorker):
                 # or if ZK connection is suspended
                 if not self.running or self._zk.suspended or self._zk.lost:
                     return
-
-                if image.name not in self._config.images_in_use:
-                    continue
-
-                # Search for the most recent 'ready' image build
-                builds = self._zk.getMostRecentBuilds(1, image.name,
-                                                      'ready')
-                if not builds:
-                    continue
-
-                build = builds[0]
-
-                # Search for locally built images. The image name and build
-                # sequence ID is used to name the image.
-                local_images = DibImageFile.from_image_id(
-                    self._config.imagesdir, "-".join([image.name, build.id]))
-                if not local_images:
-                    continue
-
-                # See if this image has already been uploaded
-                upload = self._zk.getMostRecentBuildImageUploads(
-                    1, image.name, build.id, provider.name, 'ready')
-                if upload:
-                    continue
-
-                # See if this provider supports the available image formats
-                if provider.image_type not in build.formats:
-                    continue
-
                 try:
-                    with self._zk.imageUploadLock(
-                        image.name, build.id, provider.name,
-                        blocking=False
-                    ):
-                        # New upload number with initial state 'uploading'
-                        data = zk.ImageUpload()
-                        data.state = 'uploading'
-                        upnum = self._zk.storeImageUpload(
-                            image.name, build.id, provider.name, data)
+                    self._checkProviderImageUpload(provider, image)
+                except Exception:
+                    self.log.exception("Error uploading image %s "
+                                       "to provider %s:",
+                                       image, provider)
 
-                        data = self._uploadImage(build.id, image.name,
-                                                 local_images, provider)
+    def _checkProviderImageUpload(self, provider, image):
+        '''
+        The main body of _checkForProviderUploads.  This encapsulates
+        checking whether an image for a provider should be uploaded
+        and performing the upload.  It is a separate function so that
+        exception handling can treat all provider-image uploads
+        indepedently.
+        '''
+        if image.name not in self._config.images_in_use:
+            return
 
-                        # Set final state
-                        self._zk.storeImageUpload(image.name, build.id,
-                                                  provider.name, data, upnum)
-                except exceptions.ZKLockException:
-                    # Lock is already held. Skip it.
-                    pass
+        # Search for the most recent 'ready' image build
+        builds = self._zk.getMostRecentBuilds(1, image.name,
+                                              'ready')
+        if not builds:
+            return
+
+        build = builds[0]
+
+        # Search for locally built images. The image name and build
+        # sequence ID is used to name the image.
+        local_images = DibImageFile.from_image_id(
+            self._config.imagesdir, "-".join([image.name, build.id]))
+        if not local_images:
+            return
+
+        # See if this image has already been uploaded
+        upload = self._zk.getMostRecentBuildImageUploads(
+            1, image.name, build.id, provider.name, 'ready')
+        if upload:
+            return
+
+        # See if this provider supports the available image formats
+        if provider.image_type not in build.formats:
+            return
+
+        try:
+            with self._zk.imageUploadLock(
+                image.name, build.id, provider.name,
+                blocking=False
+            ):
+                # New upload number with initial state 'uploading'
+                data = zk.ImageUpload()
+                data.state = 'uploading'
+                upnum = self._zk.storeImageUpload(
+                    image.name, build.id, provider.name, data)
+
+                data = self._uploadImage(build.id, image.name,
+                                         local_images, provider)
+
+                # Set final state
+                self._zk.storeImageUpload(image.name, build.id,
+                                          provider.name, data, upnum)
+        except exceptions.ZKLockException:
+            # Lock is already held. Skip it.
+            pass
 
     def run(self):
+
         '''
         Start point for the UploadWorker thread.
         '''
