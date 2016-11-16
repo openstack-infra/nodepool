@@ -512,18 +512,20 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.formats, d['formats'].split(','))
 
     def test_ImageUpload_toDict(self):
-        o = zk.ImageUpload('0001')
+        o = zk.ImageUpload('0001', '0003')
         o.external_id = 'DEADBEEF'
         o.external_name = 'trusty'
 
         d = o.toDict()
         self.assertNotIn('id', d)
+        self.assertNotIn('build_id', d)
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
 
     def test_ImageUpload_fromDict(self):
         now = int(time.time())
-        d_id = '0001'
+        upload_id = '0001'
+        build_id = '0003'
         d = {
             'external_id': 'DEADBEEF',
             'external_name': 'trusty',
@@ -531,8 +533,9 @@ class TestZKModel(tests.BaseTestCase):
             'state_time': now
         }
 
-        o = zk.ImageUpload.fromDict(d, d_id)
-        self.assertEqual(o.id, d_id)
+        o = zk.ImageUpload.fromDict(d, build_id, upload_id)
+        self.assertEqual(o.id, upload_id)
+        self.assertEqual(o.build_id, build_id)
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])
