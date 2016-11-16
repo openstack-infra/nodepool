@@ -215,6 +215,12 @@ class ImageUpload(BaseBuilderModel):
     def __repr__(self):
         return '<ImageUpload %s>' % self.toDict()
 
+    def __eq__(self, other):
+        if isinstance(other, ImageUpload):
+            return self.id == other.id and self.build_id == other.build_id
+        else:
+            return False
+
     def toDict(self):
         '''
         Convert an ImageUpload object's attributes to a dictionary.

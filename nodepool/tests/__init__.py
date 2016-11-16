@@ -428,12 +428,15 @@ class DBTestCase(BaseTestCase):
                 return
             time.sleep(0.1)
 
-    def waitForImage(self, provider_name, image_name):
+    def waitForImage(self, provider_name, image_name, ignore_list=None):
         while True:
             self.wait_for_threads()
             image = self.zk.getMostRecentImageUpload(image_name, provider_name)
             if image:
-                break
+                if ignore_list and image not in ignore_list:
+                    break
+                elif not ignore_list:
+                    break
             time.sleep(1)
         self.wait_for_threads()
 
