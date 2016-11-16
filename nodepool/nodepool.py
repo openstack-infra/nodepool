@@ -1300,11 +1300,6 @@ class NodePool(threading.Thread):
                               "on startup" % image.id)
                 image.state = nodedb.DELETE
 
-            for dib_image in session.getDibImages(state=nodedb.BUILDING):
-                self.log.info("Setting building dib image id: %s to delete "
-                              "on startup" % dib_image.id)
-                dib_image.state = nodedb.DELETE
-
     def run(self):
         try:
             self.startup()
