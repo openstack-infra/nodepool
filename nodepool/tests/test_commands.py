@@ -61,10 +61,10 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_dib_image_update(self):
-        configfile = self.setup_config("node_dib.yaml")
+        configfile = self.setup_config("node.yaml")
         self._useBuilder(configfile)
         self.patch_argv("-c", configfile, "image-update",
-                        "fake-dib-provider", "fake-dib-image")
+                        "fake-provider", "fake-image")
         nodepoolcmd.main()
         self.assert_images_listed(configfile, 1)
 
@@ -143,18 +143,18 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
 
     def test_dib_image_list(self):
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         self._useBuilder(configfile)
-        self.waitForImage('fake-dib-provider', 'fake-dib-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_dib_image_delete(self):
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Check the image exists
         self.assert_listed(configfile, ['dib-image-list'], 0, 1, 1)
@@ -167,36 +167,36 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_image_upload(self):
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-diskimage')
+        self.waitForImage(pool, 'fake-provider', 'fake-diskimage')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
-                        'fake-dib-provider', 'fake-dib-image')
+                        'fake-provider', 'fake-image')
         nodepoolcmd.main()
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_image_upload_all(self):
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
-                        'all', 'fake-dib-image')
+                        'all', 'fake-image')
         nodepoolcmd.main()
         # Check that two images are ready for it now.
         self.assert_images_listed(configfile, 2)
@@ -249,10 +249,10 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_image_build(self):
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         self._useBuilder(configfile)
 
-        self.patch_argv("-c", configfile, "image-build", "fake-dib-diskimage")
+        self.patch_argv("-c", configfile, "image-build", "fake-diskimage")
         nodepoolcmd.main()
         self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
 

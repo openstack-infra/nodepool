@@ -39,16 +39,16 @@ class TestNodepool(tests.DBTestCase):
 
     def test_node(self):
         """Test that an image and node are created"""
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage('fake-dib-provider', 'fake-dib-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-dib-provider',
-                                     label_name='fake-dib-label',
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
@@ -134,11 +134,11 @@ class TestNodepool(tests.DBTestCase):
     @skip("Disabled for early v3 development")
     def test_dib_snapimage_delete(self):
         """Test that a dib image (snapshot) can be deleted."""
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         snap_id = None
 
@@ -160,11 +160,11 @@ class TestNodepool(tests.DBTestCase):
     @skip("Disabled for early v3 development")
     def test_dib_image_delete(self):
         """Test that a dib image (snapshot) can be deleted."""
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         image_id = None
 
@@ -435,13 +435,13 @@ class TestNodepool(tests.DBTestCase):
     @skip("Disabled for early v3 development")
     def test_building_dib_image_cleanup_on_start(self):
         """Test that a building dib image is deleted on start"""
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = nodepool.nodepool.NodePool(self.secure_conf, configfile,
                                           watermark_sleep=1)
         self._useBuilder(configfile)
         try:
             pool.start()
-            self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+            self.waitForImage(pool, 'fake-provider', 'fake-image')
             self.waitForNodes(pool)
         finally:
             # Stop nodepool instance so that it can be restarted.
@@ -475,7 +475,7 @@ class TestNodepool(tests.DBTestCase):
                 time.sleep(0)
         # Necessary to force cleanup to happen within the test timeframe
         pool.periodicCleanup()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
@@ -488,7 +488,7 @@ class TestNodepool(tests.DBTestCase):
     @skip("Disabled for early v3 development")
     def test_handle_dib_build_gear_disconnect(self):
         """Ensure a disconnect when waiting for a build is handled properly"""
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
         pool.start()
@@ -515,7 +515,7 @@ class TestNodepool(tests.DBTestCase):
                     break
 
         self._useBuilder(configfile)
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
     @skip("Disabled for early v3 development")

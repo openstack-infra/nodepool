@@ -85,7 +85,7 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
 
 class TestNodePoolBuilder(tests.DBTestCase):
     def test_start_stop(self):
-        config = self.setup_config('node_dib.yaml')
+        config = self.setup_config('node.yaml')
         nb = builder.NodePoolBuilder(config)
         nb.cleanup_interval = .5
         nb.start()
@@ -96,11 +96,11 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.skip("Skipping until ZooKeeper is enabled")
 
         # Enter a working state before we test that fails are handled.
-        configfile = self.setup_config('node_dib.yaml')
+        configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         # Now swap out the upload fake so that the next uploads fail
@@ -116,7 +116,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
             'nodepool.nodepool._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
 
-        provider = pool.config.providers['fake-dib-provider']
+        provider = pool.config.providers['fake-provider']
         pool.getProviderManager(provider).resetClient()
 
         # Delete our existing image forcing a reupload
