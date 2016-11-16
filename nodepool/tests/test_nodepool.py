@@ -220,15 +220,15 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].az, 'az1')
 
-    @skip("Disabled for early v3 development")
     def test_node_ipv6(self):
         """Test that a node is created w/ or w/o ipv6 preferred flag"""
         configfile = self.setup_config('node_ipv6.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider1', 'fake-image')
-        self.waitForImage(pool, 'fake-provider2', 'fake-image')
-        self.waitForImage(pool, 'fake-provider3', 'fake-image')
+        self.waitForImage('fake-provider1', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        self.waitForImage('fake-provider3', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
