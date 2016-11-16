@@ -107,14 +107,13 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
     def test_dib_upload_fail(self):
-        """Test that a dib upload failure is contained."""
-        configfile = self.setup_config('node_dib_upload_fail.yaml')
+        """Test that an image upload failure is contained."""
+        configfile = self.setup_config('node_upload_fail.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
+        self.waitForImage('fake-provider2', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
