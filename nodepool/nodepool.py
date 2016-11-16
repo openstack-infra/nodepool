@@ -478,7 +478,7 @@ class NodeLauncher(threading.Thread):
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
 
-        snap_image = self.nodepool.zookeeper_client.getMostRecentImageUpload(
+        snap_image = self.nodepool.zk.getMostRecentImageUpload(
             self.image.name, self.provider.name)
         if not snap_image:
             raise LaunchNodepoolException("Unable to find current snapshot "
@@ -798,7 +798,7 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.hostname = hostname
         self.subnode.nodename = hostname.split('.')[0]
 
-        snap_image = self.nodepool.zookeeper_client.getMostRecentImageUpload(
+        snap_image = self.nodepool.zk.getMostRecentImageUpload(
             self.image.name, self.provider.name)
         if not snap_image:
             raise LaunchNodepoolException("Unable to find current snapshot "
@@ -906,7 +906,7 @@ class NodePool(threading.Thread):
         self.zmq_context = None
         self.gearman_client = None
         self.apsched = None
-        self.zookeeper_client = None
+        self.zk = None
         self.statsd = stats.get_client()
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
@@ -1069,25 +1069,25 @@ class NodePool(threading.Thread):
 
     def reconfigureZooKeeper(self, config):
         if self.config:
-            running = self.config.zookeeper_servers.values()[0]
+            running = self.config.zookeeper_servers.values()
         else:
             running = None
 
-        configured = config.zookeeper_servers.values()[0]
+        configured = config.zookeeper_servers.values()
         if running == configured:
             self.log.debug("Zookeeper client does not need to be updated")
             if self.config:
                 config.zookeeper_servers = self.config.zookeeper_servers
             return
 
-        if not self.zookeeper_client:
+        if not self.zk:
             self.log.debug("Connecting to ZooKeeper servers")
-            self.zookeeper_client = zk.ZooKeeper()
+            self.zk = zk.ZooKeeper()
         else:
             self.log.debug("Detected ZooKeeper server changes")
-            self.zookeeper_client.disconnect()
+            self.zk.disconnect()
         if configured:
-            self.zookeeper_client.connect(config.zookeeper_servers.values())
+            self.zk.connect(config.zookeeper_servers.values())
 
     def setConfig(self, config):
         self.config = config
@@ -1218,7 +1218,7 @@ class NodePool(threading.Thread):
                 allocation_requests[label.name] = ar
                 ar.addTarget(at, len(nodes))
                 for provider in label.providers.values():
-                    image = self.zookeeper_client.getMostRecentImageUpload(
+                    image = self.zk.getMostRecentImageUpload(
                         label.image, provider.name)
                     if image:
                         # This request may be supplied by this provider
@@ -1343,7 +1343,7 @@ class NodePool(threading.Thread):
                           (num_to_launch, label.name,
                            target.name, provider.name))
             for i in range(num_to_launch):
-                snap_image = self.zookeeper_client.getMostRecentImageUpload(
+                snap_image = self.zk.getMostRecentImageUpload(
                     label.image, provider.name)
                 if not snap_image:
                     self.log.debug("No current image for %s on %s"
