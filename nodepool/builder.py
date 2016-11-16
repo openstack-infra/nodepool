@@ -577,19 +577,29 @@ class BuildWorker(BaseWorker):
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
 
-            # NOTE: For the first iteration, we expect self._config to be None
-            new_config = nodepool_config.loadConfig(self._config_path)
-            self._checkForZooKeeperChanges(new_config)
-            self._config = new_config
-
-            self._checkForScheduledImageUpdates()
-            self._checkForManualBuildRequest()
+            try:
+                self._run()
+            except Exception:
+                self.log.exception("Exception in BuildWorker:")
+                time.sleep(10)
 
             # TODO: Make this configurable
             time.sleep(0.1)
 
         if self._zk:
             self._zk.disconnect()
+
+    def _run(self):
+        '''
+        Body of run method for exception handling purposes.
+        '''
+        # NOTE: For the first iteration, we expect self._config to be None
+        new_config = nodepool_config.loadConfig(self._config_path)
+        self._checkForZooKeeperChanges(new_config)
+        self._config = new_config
+
+        self._checkForScheduledImageUpdates()
+        self._checkForManualBuildRequest()
 
 
 class UploadWorker(BaseWorker):
