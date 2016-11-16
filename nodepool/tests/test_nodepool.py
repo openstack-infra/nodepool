@@ -53,13 +53,13 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
     def test_node_net_name(self):
         """Test that a node is created with a net name"""
         configfile = self.setup_config('node_net_name.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
