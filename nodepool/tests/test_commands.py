@@ -135,7 +135,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForNodes(pool)
         self.assert_nodes_listed(configfile, 1)
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_config_validate(self):
         config = os.path.join(os.path.dirname(tests.__file__),
                               'fixtures', 'config_validate', 'good.yaml')
