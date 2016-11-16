@@ -381,50 +381,60 @@ class BuildWorker(BaseWorker):
     def _checkForScheduledImageUpdates(self):
         '''
         Check every DIB image to see if it has aged out and needs rebuilt.
-
-        .. note:: It's important to lock the image build before we check
-            the state time and then build to eliminate any race condition.
         '''
         for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
             if not self.running or self._zk.suspended or self._zk.lost:
                 return
+            try:
+                self._checkImageForScheduledImageUpdates(diskimage)
+            except Exception:
+                self.log.exception("Exception checking for scheduled "
+                                   "update of diskimage %s",
+                                   diskimage)
 
-            now = int(time.time())
-            builds = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
+    def _checkImageForScheduledImageUpdates(self, diskimage):
+        '''
+        Check one DIB image to see if it needs to be rebuilt.
 
-            # If there is no build for this image, or it has aged out
-            # or if the current build is missing an image type from
-            # the config file, start a new build.
-            if (not builds
-                or (now - builds[0].state_time) >= diskimage.rebuild_age
-                or not set(builds[0].formats).issuperset(diskimage.image_types)
-            ):
-                try:
-                    with self._zk.imageBuildLock(diskimage.name, blocking=False):
-                        # To avoid locking each image repeatedly, we have an
-                        # second, redundant check here to verify that a new
-                        # build didn't appear between the first check and the
-                        # lock acquisition. If it's not the same build as
-                        # identified in the first check above, assume another
-                        # BuildWorker created the build for us and continue.
-                        builds2 = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
-                        if builds2 and builds[0].id != builds2[0].id:
-                            continue
+        .. note:: It's important to lock the image build before we check
+            the state time and then build to eliminate any race condition.
+        '''
+        now = int(time.time())
+        builds = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
 
-                        self.log.info("Building image %s" % diskimage.name)
+        # If there is no build for this image, or it has aged out
+        # or if the current build is missing an image type from
+        # the config file, start a new build.
+        if (not builds
+            or (now - builds[0].state_time) >= diskimage.rebuild_age
+            or not set(builds[0].formats).issuperset(diskimage.image_types)
+        ):
+            try:
+                with self._zk.imageBuildLock(diskimage.name, blocking=False):
+                    # To avoid locking each image repeatedly, we have an
+                    # second, redundant check here to verify that a new
+                    # build didn't appear between the first check and the
+                    # lock acquisition. If it's not the same build as
+                    # identified in the first check above, assume another
+                    # BuildWorker created the build for us and continue.
+                    builds2 = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
+                    if builds2 and builds[0].id != builds2[0].id:
+                        return
 
-                        data = zk.ImageBuild()
-                        data.state = 'building'
-                        data.builder = self._hostname
+                    self.log.info("Building image %s" % diskimage.name)
 
-                        bnum = self._zk.storeBuild(diskimage.name, data)
-                        data = self._buildImage(bnum, diskimage)
-                        self._zk.storeBuild(diskimage.name, data, bnum)
-                except exceptions.ZKLockException:
-                    # Lock is already held. Skip it.
-                    pass
+                    data = zk.ImageBuild()
+                    data.state = 'building'
+                    data.builder = self._hostname
+
+                    bnum = self._zk.storeBuild(diskimage.name, data)
+                    data = self._buildImage(bnum, diskimage)
+                    self._zk.storeBuild(diskimage.name, data, bnum)
+            except exceptions.ZKLockException:
+                # Lock is already held. Skip it.
+                pass
 
     def _checkForManualBuildRequest(self):
         '''
@@ -435,36 +445,46 @@ class BuildWorker(BaseWorker):
             # or if ZK connection is suspended
             if not self.running or self._zk.suspended or self._zk.lost:
                 return
-
-            # Reduce use of locks by adding an initial check here and
-            # a redundant check after lock acquisition.
-            if not self._zk.hasBuildRequest(diskimage.name):
-                continue
-
             try:
-                with self._zk.imageBuildLock(diskimage.name, blocking=False):
-                    # Redundant check
-                    if not self._zk.hasBuildRequest(diskimage.name):
-                        continue
+                self._checkImageForManualBuildRequest(diskimage)
+            except Exception:
+                self.log.exception("Exception checking for manual "
+                                   "update of diskimage %s",
+                                   diskimage)
 
-                    self.log.info(
-                        "Manual build request for image %s" % diskimage.name)
+    def _checkImageForManualBuildRequest(self, diskimage):
+        '''
+        Query ZooKeeper for a manual image build request for one image.
+        '''
+        # Reduce use of locks by adding an initial check here and
+        # a redundant check after lock acquisition.
+        if not self._zk.hasBuildRequest(diskimage.name):
+            return
 
-                    data = zk.ImageBuild()
-                    data.state = 'building'
-                    data.builder = self._hostname
+        try:
+            with self._zk.imageBuildLock(diskimage.name, blocking=False):
+                # Redundant check
+                if not self._zk.hasBuildRequest(diskimage.name):
+                    return
 
-                    bnum = self._zk.storeBuild(diskimage.name, data)
-                    data = self._buildImage(bnum, diskimage)
-                    self._zk.storeBuild(diskimage.name, data, bnum)
+                self.log.info(
+                    "Manual build request for image %s" % diskimage.name)
 
-                    # Remove request on a successful build
-                    if data.state == 'ready':
-                        self._zk.removeBuildRequest(diskimage.name)
+                data = zk.ImageBuild()
+                data.state = 'building'
+                data.builder = self._hostname
 
-            except exceptions.ZKLockException:
-                # Lock is already held. Skip it.
-                pass
+                bnum = self._zk.storeBuild(diskimage.name, data)
+                data = self._buildImage(bnum, diskimage)
+                self._zk.storeBuild(diskimage.name, data, bnum)
+
+                # Remove request on a successful build
+                if data.state == 'ready':
+                    self._zk.removeBuildRequest(diskimage.name)
+
+        except exceptions.ZKLockException:
+            # Lock is already held. Skip it.
+            pass
 
     def _buildImage(self, build_id, diskimage):
         '''
