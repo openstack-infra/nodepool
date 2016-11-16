@@ -178,13 +178,13 @@ class TestNodepool(tests.DBTestCase):
                     break
                 time.sleep(.1)
 
-    @skip("Disabled for early v3 development")
     def test_subnodes(self):
         """Test that an image and node are created"""
         configfile = self.setup_config('subnodes.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
