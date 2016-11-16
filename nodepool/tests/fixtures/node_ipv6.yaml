@@ -14,7 +14,9 @@ gearman-servers:
     port: {gearman_port}
 
 zookeeper-servers:
-  - host: localhost
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
   - name: fake-label1
@@ -37,6 +39,7 @@ labels:
 
 providers:
   - name: fake-provider1
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -52,8 +55,12 @@ providers:
       - name: fake-image
         min-ram: 8192
         name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
 
   - name: fake-provider2
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -68,8 +75,12 @@ providers:
       - name: fake-image
         min-ram: 8192
         name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
 
   - name: fake-provider3
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -85,9 +96,21 @@ providers:
       - name: fake-image
         min-ram: 8192
         name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
 
 targets:
   - name: fake-target
 
 diskimages:
   - name: fake-image
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
