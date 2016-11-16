@@ -514,13 +514,13 @@ class TestNodepool(tests.DBTestCase):
         self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
-    @skip("Disabled for early v3 development")
     def test_job_start_event(self):
         """Test that job start marks node used"""
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         msg_obj = {'name': 'fake-job',
