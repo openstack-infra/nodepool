@@ -332,13 +332,13 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(deleted_nodes), 1)
             self.assertEqual(node_id, deleted_nodes[0].id)
 
-    @skip("Disabled for early v3 development")
     def test_leaked_node(self):
         """Test that a leaked node is deleted"""
         configfile = self.setup_config('leaked_node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.log.debug("Waiting for initial pool...")
         self.waitForNodes(pool)
         self.log.debug("...done waiting for initial pool.")
