@@ -31,7 +31,6 @@ import nodepool.nodepool
 class TestNodepool(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestNodepool")
 
-    @skip("Disabled for early v3 development")
     def test_db(self):
         db = nodedb.NodeDatabase(self.dburi)
         with db.getSession() as session:
