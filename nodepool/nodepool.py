@@ -39,6 +39,7 @@ import stats
 import config as nodepool_config
 
 import jobs
+import zk
 
 MINS = 60
 HOURS = 60 * MINS
@@ -477,8 +478,8 @@ class NodeLauncher(threading.Thread):
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
 
-        snap_image = session.getCurrentSnapshotImage(
-            self.provider.name, self.image.name)
+        snap_image = self.nodepool.zookeeper_client.getMostRecentImageUpload(
+            self.image.name, self.provider.name)
         if not snap_image:
             raise LaunchNodepoolException("Unable to find current snapshot "
                                           "image %s in %s" %
@@ -797,8 +798,8 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.hostname = hostname
         self.subnode.nodename = hostname.split('.')[0]
 
-        snap_image = session.getCurrentSnapshotImage(
-            self.provider.name, self.image.name)
+        snap_image = self.nodepool.zookeeper_client.getMostRecentImageUpload(
+            self.image.name, self.provider.name)
         if not snap_image:
             raise LaunchNodepoolException("Unable to find current snapshot "
                                           "image %s in %s" %
@@ -905,6 +906,7 @@ class NodePool(threading.Thread):
         self.zmq_context = None
         self.gearman_client = None
         self.apsched = None
+        self.zookeeper_client = None
         self.statsd = stats.get_client()
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
@@ -1065,6 +1067,28 @@ class NodePool(threading.Thread):
                 self.gearman_client.addServer(g.host, g.port)
             self.gearman_client.waitForServer()
 
+    def reconfigureZooKeeper(self, config):
+        if self.config:
+            running = self.config.zookeeper_servers.values()[0]
+        else:
+            running = None
+
+        configured = config.zookeeper_servers.values()[0]
+        if running == configured:
+            self.log.debug("Zookeeper client does not need to be updated")
+            if self.config:
+                config.zookeeper_servers = self.config.zookeeper_servers
+            return
+
+        if not self.zookeeper_client:
+            self.log.debug("Connecting to ZooKeeper servers")
+            self.zookeeper_client = zk.ZooKeeper()
+        else:
+            self.log.debug("Detected ZooKeeper server changes")
+            self.zookeeper_client.disconnect()
+        if configured:
+            self.zookeeper_client.connect(config.zookeeper_servers.values())
+
     def setConfig(self, config):
         self.config = config
 
@@ -1194,8 +1218,8 @@ class NodePool(threading.Thread):
                 allocation_requests[label.name] = ar
                 ar.addTarget(at, len(nodes))
                 for provider in label.providers.values():
-                    image = session.getCurrentSnapshotImage(
-                        provider.name, label.image)
+                    image = self.zookeeper_client.getMostRecentImageUpload(
+                        label.image, provider.name)
                     if image:
                         # This request may be supplied by this provider
                         # (and nodes from this provider supplying this
@@ -1252,6 +1276,7 @@ class NodePool(threading.Thread):
     def updateConfig(self):
         config = self.loadConfig()
         self.reconfigureDatabase(config)
+        self.reconfigureZooKeeper(config)
         self.reconfigureManagers(config)
         self.reconfigureUpdateListeners(config)
         self.reconfigureGearmanClient(config)
@@ -1318,8 +1343,8 @@ class NodePool(threading.Thread):
                           (num_to_launch, label.name,
                            target.name, provider.name))
             for i in range(num_to_launch):
-                snap_image = session.getCurrentSnapshotImage(
-                    provider.name, label.image)
+                snap_image = self.zookeeper_client.getMostRecentImageUpload(
+                    label.image, provider.name)
                 if not snap_image:
                     self.log.debug("No current image for %s on %s"
                                    % (label.image, provider.name))
