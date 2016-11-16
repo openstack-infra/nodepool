@@ -564,13 +564,13 @@ class TestNodepool(tests.DBTestCase):
             node = session.getNode(1)
             self.assertEqual(node, None)
 
-    @skip("Disabled for early v3 development")
     def _test_job_auto_hold(self, result):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
 
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
@@ -590,7 +590,6 @@ class TestNodepool(tests.DBTestCase):
         self.wait_for_threads()
         return pool
 
-    @skip("Disabled for early v3 development")
     def test_job_auto_hold_success(self):
         """Test that a successful job does not hold a node"""
         pool = self._test_job_auto_hold('SUCCESS')
@@ -598,7 +597,6 @@ class TestNodepool(tests.DBTestCase):
             node = session.getNode(1)
             self.assertIsNone(node)
 
-    @skip("Disabled for early v3 development")
     def test_job_auto_hold_failure(self):
         """Test that a failed job automatically holds a node"""
         pool = self._test_job_auto_hold('FAILURE')
@@ -606,7 +604,6 @@ class TestNodepool(tests.DBTestCase):
             node = session.getNode(1)
             self.assertEqual(node.state, nodedb.HOLD)
 
-    @skip("Disabled for early v3 development")
     def test_job_auto_hold_failure_max(self):
         """Test that a failed job automatically holds only one node"""
         pool = self._test_job_auto_hold('FAILURE')
