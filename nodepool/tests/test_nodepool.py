@@ -85,15 +85,14 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
         self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
-    def test_dib_node_vhd_and_qcow2(self):
+    def test_node_vhd_and_qcow2(self):
         """Test label provided by vhd and qcow2 images builds"""
-        configfile = self.setup_config('node_dib_vhd_and_qcow2.yaml')
+        configfile = self.setup_config('node_vhd_and_qcow2.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider1', 'fake-dib-image')
-        self.waitForImage(pool, 'fake-provider2', 'fake-dib-image')
+        self.waitForImage('fake-provider1', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
