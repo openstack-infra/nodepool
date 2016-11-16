@@ -478,10 +478,10 @@ class NodeLauncher(threading.Thread):
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
 
-        snap_image = self.nodepool.zk.getMostRecentImageUpload(
+        cloud_image = self.nodepool.zk.getMostRecentImageUpload(
             self.image.name, self.provider.name)
-        if not snap_image:
-            raise LaunchNodepoolException("Unable to find current snapshot "
+        if not cloud_image:
+            raise LaunchNodepoolException("Unable to find current cloud"
                                           "image %s in %s" %
                                           (self.image.name,
                                            self.provider.name))
@@ -490,7 +490,7 @@ class NodeLauncher(threading.Thread):
                       "for node id: %s" % (hostname, self.provider.name,
                                            self.image.name, self.node_id))
         server = self.manager.createServer(
-            hostname, self.image.min_ram, snap_image.external_id,
+            hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node.az,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
@@ -798,10 +798,10 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.hostname = hostname
         self.subnode.nodename = hostname.split('.')[0]
 
-        snap_image = self.nodepool.zk.getMostRecentImageUpload(
+        cloud_image = self.nodepool.zk.getMostRecentImageUpload(
             self.image.name, self.provider.name)
-        if not snap_image:
-            raise LaunchNodepoolException("Unable to find current snapshot "
+        if not cloud_image:
+            raise LaunchNodepoolException("Unable to find current cloud "
                                           "image %s in %s" %
                                           (self.image.name,
                                            self.provider.name))
@@ -811,7 +811,7 @@ class SubNodeLauncher(threading.Thread):
                       % (hostname, self.provider.name,
                          self.image.name, self.subnode_id, self.node_id))
         server = self.manager.createServer(
-            hostname, self.image.min_ram, snap_image.external_id,
+            hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node_az,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
@@ -1314,9 +1314,9 @@ class NodePool(threading.Thread):
                           (num_to_launch, label.name,
                            target.name, provider.name))
             for i in range(num_to_launch):
-                snap_image = self.zk.getMostRecentImageUpload(
+                cloud_image = self.zk.getMostRecentImageUpload(
                     label.image, provider.name)
-                if not snap_image:
+                if not cloud_image:
                     self.log.debug("No current image for %s on %s"
                                    % (label.image, provider.name))
                 else:
