@@ -203,13 +203,13 @@ class TestNodepool(tests.DBTestCase):
                 for subnode in node.subnodes:
                     self.assertEqual(subnode.state, nodedb.READY)
 
-    @skip("Disabled for early v3 development")
     def test_node_az(self):
         """Test that an image and node are created with az specified"""
         configfile = self.setup_config('node_az.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
