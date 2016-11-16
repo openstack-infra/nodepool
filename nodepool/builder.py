@@ -290,35 +290,49 @@ class CleanupWorker(BaseWorker):
         self._buildUploadRecencyTable()
 
         for image in image_names:
-            # Get the list of all builds before we get the list of
-            # builds to keep.  That way, if a build transitions to
-            # ready between the two calls, it will show up in the list
-            # of builds to keep.
-            all_builds = self._zk.getBuilds(image)
-            builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
+            try:
+                self._cleanupImage(known_providers, image)
+            except Exception:
+                self.log.exception("Exception cleaning up image %s:", image)
 
-            for build in all_builds:
-                if build.state != 'deleted':
-                    if build.id in [b.id for b in builds_to_keep]:
-                        continue
-                    elif self._inProgressBuild(build, image):
-                        continue
+    def _cleanupImage(self, known_providers, image):
+        '''
+        Clean up one image.
+        '''
+        # Get the list of all builds before we get the list of
+        # builds to keep.  That way, if a build transitions to
+        # ready between the two calls, it will show up in the list
+        # of builds to keep.
+        all_builds = self._zk.getBuilds(image)
+        builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
 
-                for provider in known_providers:
+        for build in all_builds:
+            if build.state != 'deleted':
+                if build.id in [b.id for b in builds_to_keep]:
+                    continue
+                elif self._inProgressBuild(build, image):
+                    continue
+
+            for provider in known_providers:
+                try:
                     self._cleanupProvider(provider, image, build.id)
+                except Exception:
+                    self.log.exception("Exception cleaning up build %s "
+                                       "of image %s in provider %s:",
+                                       build, image, provider)
 
-                uploads_exist = False
-                for p in self._zk.getBuildProviders(image, build.id):
-                    if self._zk.getImageUploadNumbers(image, build.id, p):
-                        uploads_exist = True
-                        break
+            uploads_exist = False
+            for p in self._zk.getBuildProviders(image, build.id):
+                if self._zk.getImageUploadNumbers(image, build.id, p):
+                    uploads_exist = True
+                    break
 
-                if not uploads_exist:
-                    data = zk.ImageBuild()
-                    data.state = 'deleted'
-                    self._zk.storeBuild(image, data, build.id)
-                    if self._deleteLocalBuild(image, build.id):
-                        self._zk.deleteBuild(image, build.id)
+            if not uploads_exist:
+                data = zk.ImageBuild()
+                data.state = 'deleted'
+                self._zk.storeBuild(image, data, build.id)
+                if self._deleteLocalBuild(image, build.id):
+                    self._zk.deleteBuild(image, build.id)
 
 
     def run(self):
