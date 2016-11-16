@@ -206,8 +206,9 @@ class ImageUpload(BaseBuilderModel):
     Class representing a provider image upload within the ZooKeeper cluster.
     '''
 
-    def __init__(self, upload_id=None):
+    def __init__(self, build_id=None, upload_id=None):
         super(ImageUpload, self).__init__(upload_id)
+        self.build_id = build_id
         self.external_id = None      # Provider ID of the image
         self.external_name = None    # Provider name of the image
 
@@ -224,16 +225,17 @@ class ImageUpload(BaseBuilderModel):
         return d
 
     @staticmethod
-    def fromDict(d, o_id=None):
+    def fromDict(d, build_id=None, upload_id=None):
         '''
         Create an ImageUpload object from a dictionary.
 
         :param dict d: The dictionary.
-        :param str o_id: The object ID.
+        :param str build_id: The build ID.
+        :param str upload_id: The upload ID.
 
         :returns: An initialized ImageUpload object.
         '''
-        o = ImageUpload(o_id)
+        o = ImageUpload(build_id, upload_id)
         super(ImageUpload, o).fromDict(d)
         o.external_id = d.get('external_id')
         o.external_name = d.get('external_name')
@@ -748,7 +750,9 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return None
 
-        return ImageUpload.fromDict(self._strToDict(data), upload_number)
+        return ImageUpload.fromDict(
+            self._strToDict(data), build_number, upload_number
+        )
 
     def getUploads(self, image, build_number, provider, states=None):
         '''
