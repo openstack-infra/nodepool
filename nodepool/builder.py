@@ -747,12 +747,11 @@ class UploadWorker(BaseWorker):
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
 
-            new_config = nodepool_config.loadConfig(self._config_path)
-            self._checkForZooKeeperChanges(new_config)
-            provider_manager.ProviderManager.reconfigure(self._config, new_config)
-            self._config = new_config
-
-            self._checkForProviderUploads()
+            try:
+                self._run()
+            except Exception:
+                self.log.exception("Exception in UploadWorker:")
+                time.sleep(10)
 
             # TODO: Make this configurable
             time.sleep(0.1)
@@ -761,6 +760,18 @@ class UploadWorker(BaseWorker):
             self._zk.disconnect()
 
         provider_manager.ProviderManager.stopProviders(self._config)
+
+    def _run(self):
+        '''
+        Body of run method for exception handling purposes.
+        '''
+        new_config = nodepool_config.loadConfig(self._config_path)
+        self._checkForZooKeeperChanges(new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config)
+        self._config = new_config
+
+        self._checkForProviderUploads()
+
 
 class NodePoolBuilder(object):
     '''
