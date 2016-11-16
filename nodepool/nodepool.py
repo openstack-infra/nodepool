@@ -873,25 +873,6 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
-class ImageDeleter(threading.Thread):
-    log = logging.getLogger("nodepool.ImageDeleter")
-
-    def __init__(self, nodepool, snap_image_id):
-        threading.Thread.__init__(self,
-                                  name='ImageDeleter for %s' % snap_image_id)
-        self.snap_image_id = snap_image_id
-        self.nodepool = nodepool
-
-    def run(self):
-        try:
-            with self.nodepool.getDB().getSession() as session:
-                snap_image = session.getSnapshotImage(self.snap_image_id)
-                self.nodepool._deleteImage(session, snap_image)
-        except Exception:
-            self.log.exception("Exception deleting image %s:" %
-                               self.snap_image_id)
-
-
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
@@ -1295,11 +1276,6 @@ class NodePool(threading.Thread):
                               "on startup" % node.id)
                 node.state = nodedb.DELETE
 
-            for image in session.getSnapshotImages(state=nodedb.BUILDING):
-                self.log.info("Setting building image id: %s to delete "
-                              "on startup" % image.id)
-                image.state = nodedb.DELETE
-
     def run(self):
         try:
             self.startup()
@@ -1575,18 +1551,8 @@ class NodePool(threading.Thread):
                                            provider.name,
                                            meta['provider_name']))
                         continue
-                    snap_image_id = meta.get('snapshot_image_id')
                     node_id = meta.get('node_id')
-                    if snap_image_id:
-                        if session.getSnapshotImage(snap_image_id):
-                            continue
-                        self.log.warning("Deleting leaked instance %s (%s) "
-                                         "in %s for snapshot image id: %s" % (
-                                             server['name'], server['id'],
-                                             provider.name,
-                                             snap_image_id))
-                        self.deleteInstance(provider.name, server['id'])
-                    elif node_id:
+                    if node_id:
                         if session.getNode(node_id):
                             continue
                         self.log.warning("Deleting leaked instance %s (%s) "
