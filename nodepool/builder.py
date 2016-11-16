@@ -332,12 +332,11 @@ class CleanupWorker(BaseWorker):
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
 
-            new_config = nodepool_config.loadConfig(self._config_path)
-            self._checkForZooKeeperChanges(new_config)
-            provider_manager.ProviderManager.reconfigure(self._config, new_config)
-            self._config = new_config
-
-            self._cleanup()
+            try:
+                self._run()
+            except Exception:
+                self.log.exception("Exception in CleanupWorker:")
+                time.sleep(10)
 
             time.sleep(self.cleanup_interval)
 
@@ -345,6 +344,17 @@ class CleanupWorker(BaseWorker):
             self._zk.disconnect()
 
         provider_manager.ProviderManager.stopProviders(self._config)
+
+    def _run(self):
+        '''
+        Body of run method for exception handling purposes.
+        '''
+        new_config = nodepool_config.loadConfig(self._config_path)
+        self._checkForZooKeeperChanges(new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config)
+        self._config = new_config
+
+        self._cleanup()
 
 
 class BuildWorker(BaseWorker):
