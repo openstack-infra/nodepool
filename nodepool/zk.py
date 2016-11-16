@@ -606,7 +606,6 @@ class ZooKeeper(object):
 
         '''
         path = self._imageUploadPath(image, build_number, provider)
-        print path
 
         try:
             uploads = self.client.get_children(path)
