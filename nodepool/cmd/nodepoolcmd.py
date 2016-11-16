@@ -321,12 +321,13 @@ class NodePoolCmd(NodepoolApp):
                 self.list(node_id=node.id)
 
     def dib_image_delete(self):
-        job = None
-        self.pool.reconfigureManagers(self.pool.config, False)
-        with self.pool.getDB().getSession() as session:
-            dib_image = session.getDibImage(self.args.id)
-            job = self.pool.deleteDibImage(dib_image)
-        job.waitForCompletion()
+        (image, build_num) = self.args.id.rsplit('-', 1)
+        build = self.zk.getBuild(image, build_num)
+        if not build:
+            print("Build %s not found" % self.args.id)
+            return
+        build.state = 'deleted'
+        self.zk.storeBuild(image, build, build.id)
 
     def image_delete(self):
         self.pool.reconfigureManagers(self.pool.config, False)
@@ -375,8 +376,7 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('dib-image-delete',
-                                 'image-delete',
+        if self.args.command in ('image-delete',
                                  'image-upload', 'image-update'):
             self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
@@ -384,7 +384,7 @@ class NodePoolCmd(NodepoolApp):
 
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
-                                 'image-list'):
+                                 'image-list', 'dib-image-delete'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
 
