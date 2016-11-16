@@ -14,17 +14,20 @@ gearman-servers:
     port: {gearman_port}
 
 zookeeper-servers:
-  - host: localhost
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
-  - name: fake-dib-label
-    image: fake-dib-image
+  - name: fake-label
+    image: fake-image
     min-ready: 1
     providers:
-      - name: fake-dib-provider
+      - name: fake-provider
 
 providers:
-  - name: fake-dib-provider
+  - name: fake-provider
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -37,14 +40,18 @@ providers:
       - net-id: 'some-uuid'
     rate: 0.0001
     images:
-      - name: fake-dib-image
+      - name: fake-image
         min-ram: 8192
+        name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
 
 targets:
   - name: fake-target
 
 diskimages:
-  - name: fake-dib-image
+  - name: fake-image
     elements:
       - fedora
       - vm

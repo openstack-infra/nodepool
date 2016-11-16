@@ -69,19 +69,18 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
-    def test_dib_node_vhd_image(self):
-        """Test that a dib image and node are created vhd image"""
-        configfile = self.setup_config('node_dib_vhd.yaml')
+    def test_node_vhd_image(self):
+        """Test that a image and node are created vhd image"""
+        configfile = self.setup_config('node_vhd.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-dib-provider', 'fake-dib-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-dib-provider',
-                                     label_name='fake-dib-label',
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
                                      target_name='fake-target',
                                      state=nodedb.READY)
         self.assertEqual(len(nodes), 1)
