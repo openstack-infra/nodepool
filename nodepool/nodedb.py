@@ -48,20 +48,6 @@ from sqlalchemy.orm.session import Session, sessionmaker
 
 metadata = MetaData()
 
-dib_image_table = Table(
-    'dib_image', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('image_name', String(255), index=True, nullable=False),
-    # Image filename
-    Column('filename', String(255)),
-    # Version indicator (timestamp)
-    Column('version', Integer),
-    # One of the above values
-    Column('state', Integer),
-    # Time of last state change
-    Column('state_time', Integer),
-    mysql_engine='InnoDB',
-    )
 snapshot_image_table = Table(
     'snapshot_image', metadata,
     Column('id', Integer, primary_key=True),
@@ -135,32 +121,6 @@ job_table = Table(
     Column('hold_on_failure', Integer),
     mysql_engine='InnoDB',
     )
-
-
-class DibImage(object):
-    def __init__(self, image_name, filename=None, version=None,
-                 state=BUILDING):
-        self.image_name = image_name
-        self.filename = filename
-        self.version = version
-        self.state = state
-
-    def delete(self):
-        session = Session.object_session(self)
-        session.delete(self)
-        session.commit()
-
-    @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, state):
-        self._state = state
-        self.state_time = int(time.time())
-        session = Session.object_session(self)
-        if session:
-            session.commit()
 
 
 class SnapshotImage(object):
@@ -290,9 +250,6 @@ mapper(Node, node_table,
 mapper(SnapshotImage, snapshot_image_table,
        properties=dict(_state=snapshot_image_table.c.state))
 
-mapper(DibImage, dib_image_table,
-       properties=dict(_state=dib_image_table.c.state))
-
 
 class NodeDatabase(object):
     def __init__(self, dburi):
@@ -339,13 +296,6 @@ class NodeDatabaseSession(object):
             self.session().query(SnapshotImage).distinct(
                 snapshot_image_table.c.provider_name).all()]
 
-    def getDibImages(self, state=None):
-        exp = self.session().query(DibImage).order_by(
-            dib_image_table.c.image_name)
-        if state:
-            exp = exp.filter(dib_image_table.c.state == state)
-        return exp.all()
-
     def getImages(self, provider_name):
         return [
             x.image_name for x in
@@ -360,21 +310,6 @@ class NodeDatabaseSession(object):
         if state:
             exp = exp.filter(snapshot_image_table.c.state == state)
         return exp.all()
-
-    def getDibImage(self, image_id):
-        images = self.session().query(DibImage).filter_by(
-            id=image_id).all()
-        if not images:
-            return None
-        return images[0]
-
-    def getBuildingDibImagesByName(self, image_name):
-        images = self.session().query(DibImage).filter(
-            dib_image_table.c.image_name == image_name,
-            dib_image_table.c.state == BUILDING).all()
-        if not images:
-            return None
-        return images
 
     def getSnapshotImage(self, image_id):
         images = self.session().query(SnapshotImage).filter_by(
@@ -391,13 +326,6 @@ class NodeDatabaseSession(object):
             return None
         return images[0]
 
-    def getOrderedReadyDibImages(self, image_name):
-        images = self.session().query(DibImage).filter(
-            dib_image_table.c.image_name == image_name,
-            dib_image_table.c.state == READY).order_by(
-                dib_image_table.c.version.desc()).all()
-        return images
-
     def getOrderedReadySnapshotImages(self, provider_name, image_name):
         images = self.session().query(SnapshotImage).filter(
             snapshot_image_table.c.provider_name == provider_name,
@@ -412,12 +340,6 @@ class NodeDatabaseSession(object):
         if not images:
             return None
         return images[0]
-
-    def createDibImage(self, *args, **kwargs):
-        new = DibImage(*args, **kwargs)
-        self.session().add(new)
-        self.commit()
-        return new
 
     def createSnapshotImage(self, *args, **kwargs):
         new = SnapshotImage(*args, **kwargs)
