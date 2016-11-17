@@ -157,3 +157,10 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImageDeletion('fake-provider2', 'fake-image')
         image2 = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
         self.assertEqual(image, image2)
+
+    def test_image_addition(self):
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        self.replace_config(configfile, 'node_two_image.yaml')
+        self.waitForImage('fake-provider', 'fake-image2')
