@@ -396,9 +396,10 @@ class DBTestCase(BaseTestCase):
 
         self.setupZK()
 
-    def setup_config(self, filename):
-        images_dir = fixtures.TempDir()
-        self.useFixture(images_dir)
+    def setup_config(self, filename, images_dir=None):
+        if images_dir is None:
+            images_dir = fixtures.TempDir()
+            self.useFixture(images_dir)
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
@@ -410,7 +411,12 @@ class DBTestCase(BaseTestCase):
                                        zookeeper_port=self.zookeeper_port,
                                        zookeeper_chroot=self.zookeeper_chroot))
         os.close(fd)
+        self._config_images_dir = images_dir
         return path
+
+    def replace_config(self, configfile, filename):
+        new_configfile = self.setup_config(filename, self._config_images_dir)
+        os.rename(new_configfile, configfile)
 
     def _setup_secure(self):
         # replace entries in secure.conf

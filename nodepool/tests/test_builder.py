@@ -139,3 +139,10 @@ class TestNodePoolBuilder(tests.DBTestCase):
                     # We failed to upload first_fail_id and have
                     # moved onto another upload that will fail.
                     break
+
+    def test_provider_addition(self):
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        self.replace_config(configfile, 'node_two_provider.yaml')
+        self.waitForImage('fake-provider2', 'fake-image')
