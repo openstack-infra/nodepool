@@ -250,11 +250,10 @@ class CleanupWorker(BaseWorker):
                 manager = self._config.provider_managers[provider.name]
                 try:
                     manager.deleteImage(upload.external_name)
-                except Exception as e:
-                    self.log.error(
-                        "Unable to delete image %s from %s: %s" %
-                        (upload.external_name, provider.name, e)
-                    )
+                except Exception:
+                    self.log.exception(
+                        "Unable to delete image %s from %s: %s",
+                        upload.external_name, provider.name)
                 else:
                     self._zk.deleteUpload(image, build_id,
                                           provider.name, upload.id)
