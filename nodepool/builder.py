@@ -169,7 +169,11 @@ class CleanupWorker(BaseWorker):
         '''
         Search for an upload for a build within the recency table.
         '''
-        for b_id, u_id, u_time in self._rtable[image][provider]:
+        provider = self._rtable[image].get(provider)
+        if not provider:
+            return False
+
+        for b_id, u_id, u_time in provider:
             if build_id == b_id and upload_id == u_id:
                 return True
         return False
@@ -233,7 +237,7 @@ class CleanupWorker(BaseWorker):
         all_uploads = self._zk.getUploads(image, build_id, provider.name)
 
         for upload in all_uploads:
-            if self._isRecentUpload(image, provider, build_id, upload.id):
+            if self._isRecentUpload(image, provider.name, build_id, upload.id):
                 continue
             self._deleteUpload(upload, image, provider)
 

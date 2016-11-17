@@ -456,6 +456,19 @@ class DBTestCase(BaseTestCase):
             time.sleep(1)
         self.wait_for_threads()
 
+    def waitForBuildDeletion(self, image_name, build_id):
+        base = "-".join([image_name, build_id])
+        while True:
+            self.wait_for_threads()
+            files = builder.DibImageFile.from_image_id(
+                self._config_images_dir.path, base)
+            if not files:
+                break
+            time.sleep(1)
+
+        self.assertIsNone(self.zk.getBuild(image_name, build_id))
+        self.wait_for_threads()
+
     def waitForNodes(self, pool):
         self.wait_for_config(pool)
         allocation_history = allocation.AllocationHistory()

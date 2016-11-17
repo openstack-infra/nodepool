@@ -153,8 +153,10 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv('-c', configfile, 'dib-image-delete',
                         'fake-image-%s' % (builds[0].id))
         nodepoolcmd.main()
-        # Check the the image is marked for deletion
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'deleted', 1)
+        self.waitForBuildDeletion('fake-image', '0000000001')
+        # Check that fake-image-0000000001 doesn't exist
+        self.assert_listed(
+            configfile, ['dib-image-list'], 0, 'fake-image-0000000001', 0)
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_image_upload(self):
