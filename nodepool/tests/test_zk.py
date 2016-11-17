@@ -450,10 +450,25 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(5, len(matches))
 
     def test_deleteBuild(self):
-        path = self.zk._imageBuildsPath("trusty") + "/000001"
-        self.zk.client.create(path, makepath=True)
-        self.zk.deleteBuild("trusty", "000001")
-        self.assertIsNone(self.zk.client.exists(path))
+        image = 'trusty'
+        build = zk.ImageBuild()
+        build.state = 'ready'
+        bnum = self.zk.storeBuild(image, build)
+        self.assertTrue(self.zk.deleteBuild(image, bnum))
+
+    def test_deleteBuild_with_uploads(self):
+        image = 'trusty'
+        provider = 'rax'
+
+        build = zk.ImageBuild()
+        build.state = 'ready'
+        bnum = self.zk.storeBuild(image, build)
+
+        upload = zk.ImageUpload()
+        upload.state = 'ready'
+        self.zk.storeImageUpload(image, bnum, provider, upload)
+
+        self.assertFalse(self.zk.deleteBuild(image, bnum))
 
     def test_deleteUpload(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax") + "/000001"

@@ -961,15 +961,30 @@ class ZooKeeper(object):
         '''
         Delete an image build from ZooKeeper.
 
+        Any provider uploads for this build must be deleted before the build
+        node can be deleted.
+
         :param str image: The image name.
         :param str build_number: The image build number to delete.
+
+        :returns: True if the build is successfully deleted or did not exist,
+           False if the provider uploads still exist.
         '''
         path = self._imageBuildsPath(image)
         path = path + "/%s" % build_number
+
+        # Verify that no upload znodes exist.
+        for prov in self.getBuildProviders(image, build_number):
+             if self.getImageUploadNumbers(image, build_number, prov):
+                 return False
+
         try:
-            self.client.delete(path)
+            # NOTE: Need to do recursively to remove lock znodes
+            self.client.delete(path, recursive=True)
         except kze.NoNodeError:
             pass
+
+        return True
 
     def deleteUpload(self, image, build_number, provider, upload_number):
         '''

@@ -363,8 +363,9 @@ class CleanupWorker(BaseWorker):
                 data.state = 'deleted'
                 self._zk.storeBuild(image, data, build.id)
                 if self._deleteLocalBuild(image, build.id):
-                    self._zk.deleteBuild(image, build.id)
-
+                    if not self._zk.deleteBuild(image, build.id):
+                        self.log.error("Unable to delete build %s because"
+                                       " uploads still remain.", build)
 
     def run(self):
         '''
