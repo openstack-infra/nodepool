@@ -384,6 +384,7 @@ class BuilderFixture(fixtures.Fixture):
 class DBTestCase(BaseTestCase):
     def setUp(self):
         super(DBTestCase, self).setUp()
+        self.log = logging.getLogger("tests")
         f = MySQLSchemaFixture()
         self.useFixture(f)
         self.dburi = f.dburi
@@ -492,6 +493,20 @@ class DBTestCase(BaseTestCase):
         self.zkclient = kz_fxtr.zkclient
         self.zk = zk.ZooKeeper(self.zkclient)
         self.zookeeper_chroot = kz_fxtr.chroot_path
+
+    def printZKTree(self, node):
+        def join(a, b):
+            if a.endswith('/'):
+                return a+b
+            return a+'/'+b
+
+        data, stat = self.zk.client.get(node)
+        self.log.debug("Node: %s" % (node,))
+        if data:
+            self.log.debug(data)
+
+        for child in self.zk.client.get_children(node):
+            self.printZKTree(join(node, child))
 
 
 class IntegrationTestCase(DBTestCase):
