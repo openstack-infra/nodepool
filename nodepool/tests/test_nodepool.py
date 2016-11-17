@@ -481,39 +481,6 @@ class TestNodepool(tests.DBTestCase):
             # should be second image built.
             self.assertEqual(images[0].id, 2)
 
-    @skip("Disabled for early v3 development")
-    def test_handle_dib_build_gear_disconnect(self):
-        """Ensure a disconnect when waiting for a build is handled properly"""
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.updateConfig()
-        pool.start()
-
-        # wait for the job to be submitted
-        client = tests.GearmanClient()
-        client.addServer('localhost', self.gearman_server.port)
-        client.waitForServer()
-        while client.get_queued_image_jobs() == 0:
-            time.sleep(.2)
-
-        # restart the gearman server to simulate a disconnect
-        self.gearman_server.shutdown()
-        self.useFixture(tests.GearmanServerFixture(self.gearman_server.port))
-
-        # Assert that the dib image is eventually deleted from the database
-        with pool.getDB().getSession() as session:
-            while True:
-                images = session.getDibImages()
-                if len(images) > 0:
-                    time.sleep(.2)
-                    pool.periodicCleanup()
-                else:
-                    break
-
-        self._useBuilder(configfile)
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
     def test_job_start_event(self):
         """Test that job start marks node used"""
         configfile = self.setup_config('node.yaml')
