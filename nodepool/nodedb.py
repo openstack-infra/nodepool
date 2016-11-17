@@ -48,25 +48,6 @@ from sqlalchemy.orm.session import Session, sessionmaker
 
 metadata = MetaData()
 
-snapshot_image_table = Table(
-    'snapshot_image', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('provider_name', String(255), index=True, nullable=False),
-    Column('image_name', String(255), index=True, nullable=False),
-    # Image hostname
-    Column('hostname', String(255)),
-    # Version indicator (timestamp)
-    Column('version', Integer),
-    # Provider assigned id for this image
-    Column('external_id', String(255)),
-    # Provider assigned id of the server used to create the snapshot
-    Column('server_external_id', String(255)),
-    # One of the above values
-    Column('state', Integer),
-    # Time of last state change
-    Column('state_time', Integer),
-    mysql_engine='InnoDB',
-    )
 node_table = Table(
     'node', metadata,
     Column('id', Integer, primary_key=True),
@@ -121,35 +102,6 @@ job_table = Table(
     Column('hold_on_failure', Integer),
     mysql_engine='InnoDB',
     )
-
-
-class SnapshotImage(object):
-    def __init__(self, provider_name, image_name, hostname=None, version=None,
-                 external_id=None, server_external_id=None, state=BUILDING):
-        self.provider_name = provider_name
-        self.image_name = image_name
-        self.hostname = hostname
-        self.version = version
-        self.external_id = external_id
-        self.server_external_id = server_external_id
-        self.state = state
-
-    def delete(self):
-        session = Session.object_session(self)
-        session.delete(self)
-        session.commit()
-
-    @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, state):
-        self._state = state
-        self.state_time = int(time.time())
-        session = Session.object_session(self)
-        if session:
-            session.commit()
 
 
 class Node(object):
@@ -247,10 +199,6 @@ mapper(Node, node_table,
                backref='node')))
 
 
-mapper(SnapshotImage, snapshot_image_table,
-       properties=dict(_state=snapshot_image_table.c.state))
-
-
 class NodeDatabase(object):
     def __init__(self, dburi):
         engine_kwargs = dict(echo=False, pool_recycle=3600)
@@ -289,63 +237,6 @@ class NodeDatabaseSession(object):
 
     def delete(self, obj):
         self.session().delete(obj)
-
-    def getProviders(self):
-        return [
-            x.provider_name for x in
-            self.session().query(SnapshotImage).distinct(
-                snapshot_image_table.c.provider_name).all()]
-
-    def getImages(self, provider_name):
-        return [
-            x.image_name for x in
-            self.session().query(SnapshotImage).filter(
-                snapshot_image_table.c.provider_name == provider_name
-                ).distinct(snapshot_image_table.c.image_name).all()]
-
-    def getSnapshotImages(self, state=None):
-        exp = self.session().query(SnapshotImage).order_by(
-            snapshot_image_table.c.provider_name,
-            snapshot_image_table.c.image_name)
-        if state:
-            exp = exp.filter(snapshot_image_table.c.state == state)
-        return exp.all()
-
-    def getSnapshotImage(self, image_id):
-        images = self.session().query(SnapshotImage).filter_by(
-            id=image_id).all()
-        if not images:
-            return None
-        return images[0]
-
-    def getSnapshotImageByExternalID(self, provider_name, external_id):
-        images = self.session().query(SnapshotImage).filter_by(
-            provider_name=provider_name,
-            external_id=external_id).all()
-        if not images:
-            return None
-        return images[0]
-
-    def getOrderedReadySnapshotImages(self, provider_name, image_name):
-        images = self.session().query(SnapshotImage).filter(
-            snapshot_image_table.c.provider_name == provider_name,
-            snapshot_image_table.c.image_name == image_name,
-            snapshot_image_table.c.state == READY).order_by(
-                snapshot_image_table.c.version.desc()).all()
-        return images
-
-    def getCurrentSnapshotImage(self, provider_name, image_name):
-        images = self.getOrderedReadySnapshotImages(provider_name, image_name)
-
-        if not images:
-            return None
-        return images[0]
-
-    def createSnapshotImage(self, *args, **kwargs):
-        new = SnapshotImage(*args, **kwargs)
-        self.session().add(new)
-        self.commit()
-        return new
 
     def getNodes(self, provider_name=None, label_name=None, target_name=None,
                  state=None):
