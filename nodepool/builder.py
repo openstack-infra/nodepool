@@ -355,8 +355,8 @@ class NodePoolBuilder(object):
                             'id': image_id})
         ext_image_name = provider.template_hostname.format(
             provider=provider, image=dummy_image, timestamp=str(timestamp))
-        log.info("Uploading dib image id: %s from %s in %s" %
-                 (image_id, filename, provider.name))
+        log.info("Uploading dib image %s (id:%s) from %s in %s" %
+                 (image_name, image_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
         try:
@@ -372,10 +372,11 @@ class NodePoolBuilder(object):
                 ext_image_name, filename,
                 image_type=image_file.extension,
                 meta=image_meta)
-        except exceptions.BuilderError:
+        except Exception:
             # note this is intended duplication with UploadWorker, as
             # self.log here likely redirected to it's own file.
-            log.exception('Exception while uploading image')
+            log.exception('Exception while uploading image %s (id:%s)'
+                          % (image_name, image_id))
             raise
 
         if self.statsd:
@@ -385,8 +386,8 @@ class NodePoolBuilder(object):
             self.statsd.timing(key, dt)
             self.statsd.incr(key)
 
-        log.info("Image id: %s in %s is ready" % (image_id,
-                                                  provider.name))
+        log.info("Image %s (id:%s) in %s is ready" % (image_name, image_id,
+                                                      provider.name))
         return external_id
 
     def _runDibForImage(self, image, filename):
