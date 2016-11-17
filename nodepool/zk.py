@@ -822,9 +822,8 @@ class ZooKeeper(object):
         :param str provider: The provider name owning the image.
         :param str state: The image upload state to match on.
 
-        :returns: A tuple with the most recent upload number and dictionary of
-            upload data matching the given state, or None if there was no
-            upload matching the state.
+        :returns: An ImageUpload object matching the given state, or
+            None if there is no recent upload.
         '''
 
         recent_data = None
