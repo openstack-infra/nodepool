@@ -289,17 +289,19 @@ class TestZooKeeper(tests.DBTestCase):
         image = "ubuntu-trusty"
         provider = "rax"
         build = {'state': 'ready', 'state_time': int(time.time())}
-        up1 = {'state': 'ready', 'state_time': int(time.time())}
-        up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
-        up3 = {'state': 'deleted', 'state_time': up2['state_time'] + 10}
+        up1 = zk.ImageUpload()
+        up1.state = 'ready'
+        up2 = zk.ImageUpload()
+        up2.state = 'ready'
+        up2.state_time = up1.state_time + 10
+        up3 = zk.ImageUpload()
+        up3.state = 'deleted'
+        up3.state_time = up2.state_time + 10
 
         bnum = self.zk.storeBuild(image, zk.ImageBuild.fromDict(build))
-        self.zk.storeImageUpload(image, bnum, provider,
-                                 zk.ImageUpload.fromDict(up1))
-        up2_id = self.zk.storeImageUpload(image, bnum, provider,
-                                 zk.ImageUpload.fromDict(up2))
-        self.zk.storeImageUpload(image, bnum, provider,
-                                 zk.ImageUpload.fromDict(up3))
+        self.zk.storeImageUpload(image, bnum, provider, up1)
+        up2_id = self.zk.storeImageUpload(image, bnum, provider, up2)
+        self.zk.storeImageUpload(image, bnum, provider, up3)
 
         # up2 should be the most recent 'ready' upload
         data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, 'ready')
@@ -311,17 +313,19 @@ class TestZooKeeper(tests.DBTestCase):
         image = "ubuntu-trusty"
         provider = "rax"
         build = {'state': 'ready', 'state_time': int(time.time())}
-        up1 = {'state': 'ready', 'state_time': int(time.time())}
-        up2 = {'state': 'ready', 'state_time': up1['state_time'] + 10}
-        up3 = {'state': 'uploading', 'state_time': up2['state_time'] + 10}
+        up1 = zk.ImageUpload()
+        up1.state = 'ready'
+        up2 = zk.ImageUpload()
+        up2.state = 'ready'
+        up2.state_time = up1.state_time + 10
+        up3 = zk.ImageUpload()
+        up3.state = 'uploading'
+        up3.state_time = up2.state_time + 10
 
         bnum = self.zk.storeBuild(image, zk.ImageBuild.fromDict(build))
-        self.zk.storeImageUpload(image, bnum, provider,
-                                 zk.ImageUpload.fromDict(up1))
-        self.zk.storeImageUpload(image, bnum, provider,
-                                 zk.ImageUpload.fromDict(up2))
-        up3_id = self.zk.storeImageUpload(image, bnum, provider,
-                                          zk.ImageUpload.fromDict(up3))
+        self.zk.storeImageUpload(image, bnum, provider, up1)
+        self.zk.storeImageUpload(image, bnum, provider, up2)
+        up3_id = self.zk.storeImageUpload(image, bnum, provider, up3)
 
         # up3 should be the most recent upload, regardless of state
         data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, None)
@@ -519,6 +523,7 @@ class TestZKModel(tests.BaseTestCase):
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertNotIn('build_id', d)
+        self.assertNotIn('provider_name', d)
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
 
@@ -533,9 +538,10 @@ class TestZKModel(tests.BaseTestCase):
             'state_time': now
         }
 
-        o = zk.ImageUpload.fromDict(d, build_id, upload_id)
+        o = zk.ImageUpload.fromDict(d, build_id, 'rax', upload_id)
         self.assertEqual(o.id, upload_id)
         self.assertEqual(o.build_id, build_id)
+        self.assertEqual(o.provider_name, 'rax')
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])

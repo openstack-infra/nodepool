@@ -206,9 +206,10 @@ class ImageUpload(BaseBuilderModel):
     Class representing a provider image upload within the ZooKeeper cluster.
     '''
 
-    def __init__(self, build_id=None, upload_id=None):
+    def __init__(self, build_id=None, provider_name=None, upload_id=None):
         super(ImageUpload, self).__init__(upload_id)
         self.build_id = build_id
+        self.provider_name = provider_name
         self.external_id = None      # Provider ID of the image
         self.external_name = None    # Provider name of the image
 
@@ -217,7 +218,9 @@ class ImageUpload(BaseBuilderModel):
 
     def __eq__(self, other):
         if isinstance(other, ImageUpload):
-            return self.id == other.id and self.build_id == other.build_id
+            return (self.id == other.id and
+                    self.provider_name == other.provider_name and
+                    self.build_id == other.build_id)
         else:
             return False
 
@@ -231,17 +234,18 @@ class ImageUpload(BaseBuilderModel):
         return d
 
     @staticmethod
-    def fromDict(d, build_id=None, upload_id=None):
+    def fromDict(d, build_id, provider_name, upload_id):
         '''
         Create an ImageUpload object from a dictionary.
 
         :param dict d: The dictionary.
         :param str build_id: The build ID.
+        :param str provider_name: The provider name.
         :param str upload_id: The upload ID.
 
         :returns: An initialized ImageUpload object.
         '''
-        o = ImageUpload(build_id, upload_id)
+        o = ImageUpload(build_id, provider_name, upload_id)
         super(ImageUpload, o).fromDict(d)
         o.external_id = d.get('external_id')
         o.external_name = d.get('external_name')
@@ -756,7 +760,7 @@ class ZooKeeper(object):
             return None
 
         return ImageUpload.fromDict(
-            self._strToDict(data), build_number, upload_number
+            self._strToDict(data), build_number, provider, upload_number
         )
 
     def getUploads(self, image, build_number, provider, states=None):
