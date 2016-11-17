@@ -235,28 +235,40 @@ class CleanupWorker(BaseWorker):
         for upload in all_uploads:
             if self._isRecentUpload(image, provider, build_id, upload.id):
                 continue
+            self._deleteUpload(upload, image, provider)
 
-            deleted = False
+    def _cleanupObsoleteProviderUploads(self, provider, image, build_id):
+        image_names_for_provider = provider.images.keys()
+        if image in image_names_for_provider:
+            # This image is in use for this provider
+            return
 
-            if upload.state != 'deleted':
-                if not self._inProgressUpload(upload, image, provider.name):
-                    data = zk.ImageUpload()
-                    data.state = 'deleted'
-                    self._zk.storeImageUpload(image, build_id, provider,
-                                              data, upload.id)
-                    deleted = True
+        all_uploads = self._zk.getUploads(image, build_id, provider.name)
+        for upload in all_uploads:
+            self._deleteUpload(upload, image, provider)
 
-            if upload.state == 'deleted' or deleted:
-                manager = self._config.provider_managers[provider.name]
-                try:
-                    manager.deleteImage(upload.external_name)
-                except Exception:
-                    self.log.exception(
-                        "Unable to delete image %s from %s: %s",
-                        upload.external_name, provider.name)
-                else:
-                    self._zk.deleteUpload(image, build_id,
-                                          provider.name, upload.id)
+    def _deleteUpload(self, upload, image, provider):
+        deleted = False
+
+        if upload.state != 'deleted':
+            if not self._inProgressUpload(upload, image, provider.name):
+                data = zk.ImageUpload()
+                data.state = 'deleted'
+                self._zk.storeImageUpload(image, upload.build_id,
+                                          provider.name, data, upload.id)
+                deleted = True
+
+        if upload.state == 'deleted' or deleted:
+            manager = self._config.provider_managers[provider.name]
+            try:
+                manager.deleteImage(upload.external_name)
+            except Exception:
+                self.log.exception(
+                    "Unable to delete image %s from %s: %s",
+                    upload.external_name, provider.name)
+            else:
+                self._zk.deleteUpload(image, upload.build_id,
+                                      provider.name, upload.id)
 
     def _inProgressBuild(self, build, image):
         '''
@@ -306,7 +318,27 @@ class CleanupWorker(BaseWorker):
         builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
 
         for build in all_builds:
+            # Start by deleting any uploads that are no longer needed
+            # because this image has been removed from a provider
+            # (since this should be done regardless of the build
+            # state).
+            for provider in known_providers:
+                try:
+                    self._cleanupObsoleteProviderUploads(provider, image,
+                                                         build.id)
+                except Exception:
+                    self.log.exception("Exception cleaning up uploads "
+                                       "of build %s of image %s in "
+                                       "provider %s:",
+                                       build, image, provider)
+
+            # If the build is in the delete state, we will try to
+            # delete the entire thing regardless.
             if build.state != 'deleted':
+                # If it is in any other state, we will only delete it
+                # if it is older than the most recent two ready
+                # builds, or is in the building state but not actually
+                # building.
                 if build.id in [b.id for b in builds_to_keep]:
                     continue
                 elif self._inProgressBuild(build, image):

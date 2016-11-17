@@ -146,3 +146,14 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.replace_config(configfile, 'node_two_provider.yaml')
         self.waitForImage('fake-provider2', 'fake-image')
+
+    def test_provider_removal(self):
+        configfile = self.setup_config('node_two_provider.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        image = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
+        self.replace_config(configfile, 'node_two_provider_remove.yaml')
+        self.waitForImageDeletion('fake-provider2', 'fake-image')
+        image2 = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
+        self.assertEqual(image, image2)

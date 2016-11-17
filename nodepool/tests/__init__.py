@@ -447,6 +447,15 @@ class DBTestCase(BaseTestCase):
             time.sleep(1)
         self.wait_for_threads()
 
+    def waitForImageDeletion(self, provider_name, image_name):
+        while True:
+            self.wait_for_threads()
+            image = self.zk.getMostRecentImageUpload(image_name, provider_name)
+            if not image:
+                break
+            time.sleep(1)
+        self.wait_for_threads()
+
     def waitForNodes(self, pool):
         self.wait_for_config(pool)
         allocation_history = allocation.AllocationHistory()
