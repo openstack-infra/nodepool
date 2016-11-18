@@ -23,6 +23,7 @@ import mock
 
 from nodepool.cmd import nodepoolcmd
 from nodepool import tests
+from nodepool import zk
 
 
 class TestNodepoolCMD(tests.DBTestCase):
@@ -137,7 +138,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         configfile = self.setup_config('node.yaml')
         self._useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
 
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
@@ -147,8 +148,8 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Check the image exists
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
-        builds = self.zk.getMostRecentBuilds(1, 'fake-image', 'ready')
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
+        builds = self.zk.getMostRecentBuilds(1, 'fake-image', zk.READY)
         # Delete the image
         self.patch_argv('-c', configfile, 'dib-image-delete',
                         'fake-image-%s' % (builds[0].id))
@@ -167,7 +168,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-provider', 'fake-diskimage')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
@@ -185,7 +186,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage(pool, 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
         self.assert_images_listed(configfile, 1)
         # Reupload the image
         self.patch_argv('-c', configfile, 'image-upload',
@@ -203,7 +204,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForNodes(pool)
         # Assert one node exists and it is node 1 in a ready state.
         self.assert_listed(configfile, ['list'], 0, 1, 1)
-        self.assert_nodes_listed(configfile, 1, 'ready')
+        self.assert_nodes_listed(configfile, 1, zk.READY)
         # Hold node 1
         self.patch_argv('-c', configfile, 'hold', '1')
         nodepoolcmd.main()
@@ -220,7 +221,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForNodes(pool)
         # Assert one node exists and it is node 1 in a ready state.
         self.assert_listed(configfile, ['list'], 0, 1, 1)
-        self.assert_nodes_listed(configfile, 1, 'ready')
+        self.assert_nodes_listed(configfile, 1, zk.READY)
         # Delete node 1
         self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
 
@@ -233,7 +234,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForNodes(pool)
         # Assert one node exists and it is node 1 in a ready state.
         self.assert_listed(configfile, ['list'], 0, 1, 1)
-        self.assert_nodes_listed(configfile, 1, 'ready')
+        self.assert_nodes_listed(configfile, 1, zk.READY)
         # Delete node 1
         self.patch_argv('-c', configfile, 'delete', '--now', '1')
         nodepoolcmd.main()
@@ -246,7 +247,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
         # wait for the scheduled build to arrive
         self.waitForImage('fake-provider', 'fake-image')
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
         image = self.zk.getMostRecentImageUpload('fake-image', 'fake-provider')
 
         # now do the manual build request
@@ -254,7 +255,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
 
         self.waitForImage('fake-provider', 'fake-image', [image])
-        self.assert_listed(configfile, ['dib-image-list'], 4, 'ready', 2)
+        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 2)
 
     def test_job_create(self):
         configfile = self.setup_config('node.yaml')
