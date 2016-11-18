@@ -247,19 +247,6 @@ class NodeUpdateListener(threading.Thread):
         t.start()
 
 
-class JobTracker(object):
-    def __init__(self):
-        self._running_jobs = set()
-
-    @property
-    def running_jobs(self):
-        return list(self._running_jobs)
-
-    def addJob(self, job):
-        self._running_jobs.add(job)
-        job.addCompletionHandler(self._running_jobs.remove)
-
-
 class GearmanClient(gear.Client):
     def __init__(self):
         super(GearmanClient, self).__init__(client_id='nodepool')
@@ -893,7 +880,6 @@ class NodePool(threading.Thread):
         self._delete_threads_lock = threading.Lock()
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
-        self._image_build_jobs = JobTracker()
         self._wake_condition = threading.Condition()
 
     def stop(self):
@@ -913,12 +899,6 @@ class NodePool(threading.Thread):
         if self.gearman_client:
             self.gearman_client.shutdown()
         self.log.debug("finished stopping")
-
-    def waitForBuiltImages(self):
-        self.log.debug("Waiting for images to complete building.")
-        for job in self._image_build_jobs.running_jobs:
-            job.waitForCompletion()
-        self.log.debug("Done waiting for images to complete building.")
 
     def loadConfig(self):
         self.log.debug("Loading configuration")
