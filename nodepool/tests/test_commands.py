@@ -82,21 +82,18 @@ class TestNodepoolCMD(tests.DBTestCase):
                         "--upload-id", "invalid-upload-id")
         nodepoolcmd.main()
 
-    @skip("Skipping until ZooKeeper is enabled")
-    def test_image_delete_snapshot(self):
-        configfile = self.setup_config("node_cmd.yaml")
-        self.patch_argv("-c", configfile, "image-update",
-                        "all", "fake-image1")
+    def test_image_delete(self):
+        configfile = self.setup_config("node.yaml")
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        image = self.zk.getMostRecentImageUpload('fake-image', 'fake-provider')
+        self.patch_argv("-c", configfile, "image-delete",
+                        "--provider", "fake-provider",
+                        "--image", "fake-image",
+                        "--build-id", image.build_id,
+                        "--upload-id", image.id)
         nodepoolcmd.main()
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        # This gives us a nodepool with a working db but not running which
-        # is important so we can control image building
-        pool.updateConfig()
-        self.waitForImage(pool, 'fake-provider1', 'fake-image1')
-
-        self.patch_argv("-c", configfile, "image-delete", '1')
-        nodepoolcmd.main()
-        self.assert_images_listed(configfile, 0)
+        self.waitForImageDeletion('fake-provider', 'fake-image')
 
     @skip("Skipping until ZooKeeper is enabled")
     def test_alien_list_fail(self):
