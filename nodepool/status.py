@@ -62,8 +62,9 @@ def dib_image_list(zk):
 
 
 def image_list(zk):
-    t = PrettyTable(["ID", "Provider", "Image", "Provider Image Name",
-                     "Provider Image ID", "State", "Age"])
+    t = PrettyTable(["Build ID", "Upload ID", "Provider", "Image",
+                     "Provider Image Name", "Provider Image ID", "State",
+                     "Age"])
     t.align = 'l'
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
@@ -72,7 +73,7 @@ def image_list(zk):
                         image_name, build_no, provider):
                     upload = zk.getImageUpload(image_name, build_no,
                                                provider, upload_no)
-                    t.add_row([upload_no, provider, image_name,
+                    t.add_row([build_no, upload_no, provider, image_name,
                                upload.external_name,
                                upload.external_id,
                                upload.state,

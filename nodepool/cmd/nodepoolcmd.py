@@ -114,7 +114,14 @@ class NodePoolCmd(NodepoolApp):
             'image-delete',
             help='delete an image')
         cmd_image_delete.set_defaults(func=self.image_delete)
-        cmd_image_delete.add_argument('id', help='image id')
+        cmd_image_delete.add_argument('--provider', help='provider name',
+                                      required=True)
+        cmd_image_delete.add_argument('--image', help='image name',
+                                      required=True)
+        cmd_image_delete.add_argument('--upload-id', help='image upload id',
+                                      required=True)
+        cmd_image_delete.add_argument('--build-id', help='image build id',
+                                      required=True)
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
@@ -330,9 +337,20 @@ class NodePoolCmd(NodepoolApp):
         self.zk.storeBuild(image, build, build.id)
 
     def image_delete(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
-        thread = self.pool.deleteImage(self.args.id)
-        self._wait_for_threads((thread, ))
+        provider_name = self.args.provider
+        image_name = self.args.image
+        build_id = self.args.build_id
+        upload_id = self.args.upload_id
+
+        image = self.zk.getImageUpload(image_name, build_id, provider_name,
+                                       upload_id)
+        if not image:
+            print("Image upload not found")
+            return
+
+        image.state = zk.DELETING
+        self.zk.storeImageUpload(image.image_name, image.build_id,
+                                 image.provider_name, image, image.id)
 
     def config_validate(self):
         validator = ConfigValidator(self.args.config)
@@ -376,15 +394,15 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('image-delete',
-                                 'image-upload', 'image-update'):
+        if self.args.command in ('image-upload', 'image-update'):
             self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
 
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
-                                 'image-list', 'dib-image-delete'):
+                                 'image-list', 'dib-image-delete',
+                                 'image-delete'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
 
