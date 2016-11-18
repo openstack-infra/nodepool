@@ -326,7 +326,7 @@ class NodePoolCmd(NodepoolApp):
         if not build:
             print("Build %s not found" % self.args.id)
             return
-        build.state = 'deleted'
+        build.state = zk.DELETING
         self.zk.storeBuild(image, build, build.id)
 
     def image_delete(self):

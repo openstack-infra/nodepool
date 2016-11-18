@@ -24,6 +24,19 @@ from kazoo.recipe.lock import Lock
 
 from nodepool import exceptions as npe
 
+# States:
+# We are building this image but it is not ready for use.
+BUILDING = 'building'
+# The image is being uploaded.
+UPLOADING = 'uploading'
+# The image/upload is ready for use.
+READY = 'ready'
+# The image/upload should be deleted.
+DELETING = 'deleting'
+# The build failed.
+FAILED = 'failed'
+
+STATES = set([BUILDING, UPLOADING, READY, DELETING, FAILED])
 
 class ZooKeeperConnectionConfig(object):
     '''
@@ -94,8 +107,6 @@ class ZooKeeperWatchEvent(object):
 
 
 class BaseBuilderModel(object):
-    STATES = ['building', 'uploading', 'ready', 'deleted', 'failed']
-
     def __init__(self, o_id):
         if o_id:
             self.id = o_id
@@ -118,7 +129,7 @@ class BaseBuilderModel(object):
 
     @state.setter
     def state(self, value):
-        if value not in self.STATES:
+        if value not in STATES:
             raise TypeError("'%s' is not a valid state" % value)
         self._state = value
         self.state_time = int(time.time())
