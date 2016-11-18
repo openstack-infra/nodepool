@@ -30,6 +30,7 @@ import uuid
 
 import fixtures
 import gear
+import lockfile
 import kazoo.client
 import testtools
 
@@ -354,14 +355,16 @@ class MySQLSchemaFixture(fixtures.Fixture):
         self.addCleanup(self.cleanup)
 
     def cleanup(self):
-        db = pymysql.connect(host="localhost",
-                             user="openstack_citest",
-                             passwd="openstack_citest",
-                             db="openstack_citest")
-        cur = db.cursor()
-        cur.execute("drop database %s" % self.name)
-        cur.execute("drop user '%s'@'localhost'" % self.name)
-        cur.execute("flush privileges")
+        lock = lockfile.LockFile('/tmp/nodepool-db-drop-lockfile')
+        with lock:
+            db = pymysql.connect(host="localhost",
+                                 user="openstack_citest",
+                                 passwd="openstack_citest",
+                                 db="openstack_citest")
+            cur = db.cursor()
+            cur.execute("drop database %s" % self.name)
+            cur.execute("drop user '%s'@'localhost'" % self.name)
+            cur.execute("flush privileges")
 
 
 class BuilderFixture(fixtures.Fixture):
