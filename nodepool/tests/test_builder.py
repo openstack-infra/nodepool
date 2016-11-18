@@ -164,3 +164,12 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.replace_config(configfile, 'node_two_image.yaml')
         self.waitForImage('fake-provider', 'fake-image2')
+
+    def test_image_removal(self):
+        configfile = self.setup_config('node_two_image.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image2')
+        self.replace_config(configfile, 'node_two_image_remove.yaml')
+        self.waitForImageDeletion('fake-provider', 'fake-image2')
+        self.waitForBuildDeletion('fake-image2', '0000000001')
