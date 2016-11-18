@@ -310,16 +310,31 @@ class CleanupWorker(BaseWorker):
             except Exception:
                 self.log.exception("Exception cleaning up image %s:", image)
 
+    def _filterLocalBuilds(self, image, builds):
+        '''Return the subset of builds that are local'''
+        ret = []
+        for build in builds:
+            base = "-".join([image, build.id])
+            files = DibImageFile.from_image_id(self._config.imagesdir, base)
+            if files:
+                ret.append(build)
+        return ret
+
     def _cleanupImage(self, known_providers, image):
         '''
         Clean up one image.
         '''
-        # Get the list of all builds before we get the list of
-        # builds to keep.  That way, if a build transitions to
-        # ready between the two calls, it will show up in the list
-        # of builds to keep.
+        # Get the list of all builds, then work from that so that we
+        # have a consistent view of the data.
         all_builds = self._zk.getBuilds(image)
-        builds_to_keep = self._zk.getMostRecentBuilds(2, image, 'ready')
+        builds_to_keep = set([b for b in sorted(all_builds) if b.state=='ready'][:2])
+        local_builds = set(self._filterLocalBuilds(image, all_builds))
+        # remove any local builds that are not in use
+        if image not in self._config.images_in_use:
+            builds_to_keep -= local_builds
+            # TODO(jeblair): When all builds for an image which is not
+            # in use are deleted, the image znode should be deleted as
+            # well.
 
         for build in all_builds:
             # Start by deleting any uploads that are no longer needed
@@ -343,7 +358,7 @@ class CleanupWorker(BaseWorker):
                 # if it is older than the most recent two ready
                 # builds, or is in the building state but not actually
                 # building.
-                if build.id in [b.id for b in builds_to_keep]:
+                if build in builds_to_keep:
                     continue
                 elif self._inProgressBuild(build, image):
                     continue
@@ -437,6 +452,9 @@ class BuildWorker(BaseWorker):
         .. note:: It's important to lock the image build before we check
             the state time and then build to eliminate any race condition.
         '''
+        if diskimage.name not in self._config.images_in_use:
+            return
+
         now = int(time.time())
         builds = self._zk.getMostRecentBuilds(1, diskimage.name, 'ready')
 
