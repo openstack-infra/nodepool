@@ -469,7 +469,13 @@ class DBTestCase(BaseTestCase):
                 break
             time.sleep(1)
 
-        self.assertIsNone(self.zk.getBuild(image_name, build_id))
+        while True:
+            self.wait_for_threads()
+            build = self.zk.getBuild(image_name, build_id)
+            if not build:
+                break
+            time.sleep(1)
+
         self.wait_for_threads()
 
     def waitForNodes(self, pool):
