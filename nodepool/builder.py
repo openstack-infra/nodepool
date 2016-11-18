@@ -827,6 +827,13 @@ class UploadWorker(BaseWorker):
                 image.name, build.id, provider.name,
                 blocking=False
             ):
+                # Verify once more that it hasn't been uploaded since the
+                # last check.
+                upload = self._zk.getMostRecentBuildImageUploads(
+                    1, image.name, build.id, provider.name, zk.READY)
+                if upload:
+                    return
+
                 # New upload number with initial state 'uploading'
                 data = zk.ImageUpload()
                 data.state = zk.UPLOADING
