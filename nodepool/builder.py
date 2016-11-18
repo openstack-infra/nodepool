@@ -887,10 +887,6 @@ class NodePoolBuilder(object):
 
     The builder has the responsibility to:
 
-        * Handle the image updating process as scheduled via the image-update
-          cron job defined within the `cron` config section.
-        * Register to receive all watch events from ZooKeeper and assign
-          workers for those events.
         * Start and maintain the working state of each worker thread.
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
