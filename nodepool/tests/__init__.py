@@ -337,16 +337,18 @@ class MySQLSchemaFixture(fixtures.Fixture):
                               for x in range(8))
         self.name = '%s_%s' % (random_bits, os.getpid())
         self.passwd = uuid.uuid4().hex
-        db = pymysql.connect(host="localhost",
-                             user="openstack_citest",
-                             passwd="openstack_citest",
-                             db="openstack_citest")
-        cur = db.cursor()
-        cur.execute("create database %s" % self.name)
-        cur.execute(
-            "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
-            (self.name, self.name, self.passwd))
-        cur.execute("flush privileges")
+        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
+        with lock:
+            db = pymysql.connect(host="localhost",
+                                 user="openstack_citest",
+                                 passwd="openstack_citest",
+                                 db="openstack_citest")
+            cur = db.cursor()
+            cur.execute("create database %s" % self.name)
+            cur.execute(
+                "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
+                (self.name, self.name, self.passwd))
+            cur.execute("flush privileges")
 
         self.dburi = 'mysql+pymysql://%s:%s@localhost/%s' % (self.name,
                                                              self.passwd,
@@ -355,7 +357,7 @@ class MySQLSchemaFixture(fixtures.Fixture):
         self.addCleanup(self.cleanup)
 
     def cleanup(self):
-        lock = lockfile.LockFile('/tmp/nodepool-db-drop-lockfile')
+        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
         with lock:
             db = pymysql.connect(host="localhost",
                                  user="openstack_citest",
