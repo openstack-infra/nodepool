@@ -524,6 +524,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertNotIn('id', d)
         self.assertNotIn('build_id', d)
         self.assertNotIn('provider_name', d)
+        self.assertNotIn('image_name', d)
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
 
@@ -538,10 +539,11 @@ class TestZKModel(tests.BaseTestCase):
             'state_time': now
         }
 
-        o = zk.ImageUpload.fromDict(d, build_id, 'rax', upload_id)
+        o = zk.ImageUpload.fromDict(d, build_id, 'rax', 'trusty', upload_id)
         self.assertEqual(o.id, upload_id)
         self.assertEqual(o.build_id, build_id)
         self.assertEqual(o.provider_name, 'rax')
+        self.assertEqual(o.image_name, 'trusty')
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])
