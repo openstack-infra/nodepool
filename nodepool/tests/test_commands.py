@@ -47,7 +47,7 @@ class TestNodepoolCMD(tests.DBTestCase):
             self.assertEquals(rows_with_val, count)
 
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
-        self.assert_listed(configfile, ['image-list'], 5, status, image_cnt)
+        self.assert_listed(configfile, ['image-list'], 6, status, image_cnt)
 
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
         self.assert_listed(configfile, ['list'], 10, status, node_cnt)
@@ -73,10 +73,13 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_image_delete_invalid(self):
         configfile = self.setup_config("node_cmd.yaml")
-        self.patch_argv("-c", configfile, "image-delete", "invalid-image")
+        self.patch_argv("-c", configfile, "image-delete",
+                        "--provider", "invalid-provider",
+                        "--image", "invalid-image",
+                        "--build-id", "invalid-build-id",
+                        "--upload-id", "invalid-upload-id")
         nodepoolcmd.main()
 
     @skip("Skipping until ZooKeeper is enabled")
