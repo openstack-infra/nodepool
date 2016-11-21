@@ -152,12 +152,12 @@ class CleanupWorker(BaseWorker):
                 for provider in self._zk.getBuildProviders(image, build.id):
                     if provider not in self._rtable[image]:
                         self._rtable[image][provider] = []
-                        uploads = self._zk.getMostRecentBuildImageUploads(
-                            2, image, build.id, provider, zk.READY)
-                        for upload in uploads:
-                            self._rtable[image][provider].append(
-                                (build.id, upload.id, upload.state_time)
-                            )
+                    uploads = self._zk.getMostRecentBuildImageUploads(
+                        2, image, build.id, provider, zk.READY)
+                    for upload in uploads:
+                        self._rtable[image][provider].append(
+                            (build.id, upload.id, upload.state_time)
+                        )
 
         # Sort uploads by state_time (upload time) and keep the 2 most recent
         for i in self._rtable.keys():
