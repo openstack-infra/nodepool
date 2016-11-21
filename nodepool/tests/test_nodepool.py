@@ -52,6 +52,22 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
 
+    def test_disabled_label(self):
+        """Test that an image and node are not created"""
+        configfile = self.setup_config('node_disabled_label.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForNodes(pool)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 0)
+
     def test_node_net_name(self):
         """Test that a node is created with a net name"""
         configfile = self.setup_config('node_net_name.yaml')
