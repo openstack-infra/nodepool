@@ -64,15 +64,6 @@ class NodePoolCmd(NodepoolApp):
             help='list images built with diskimage-builder')
         cmd_dib_image_list.set_defaults(func=self.dib_image_list)
 
-        cmd_image_update = subparsers.add_parser(
-            'image-update',
-            help='rebuild the image and upload to provider')
-        cmd_image_update.add_argument(
-            'provider',
-            help='provider name (`all` for uploading to all providers)')
-        cmd_image_update.add_argument('image', help='image name')
-        cmd_image_update.set_defaults(func=self.image_update)
-
         cmd_image_build = subparsers.add_parser(
             'image-build',
             help='build image using diskimage-builder')
@@ -185,44 +176,6 @@ class NodePoolCmd(NodepoolApp):
 
     def image_list(self):
         print status.image_list(self.zk)
-
-    def image_update(self):
-        threads = []
-        jobs = []
-
-        with self.pool.getDB().getSession() as session:
-            self.pool.reconfigureManagers(self.pool.config)
-            if self.args.image not in self.pool.config.images_in_use:
-                raise Exception("Image specified, %s, is not in use."
-                                % self.args.image)
-
-            if self.args.provider == 'all':
-                dib_images_built = set()
-                for provider in self.pool.config.providers.values():
-                    image = provider.images.get(self.args.image)
-                    if image:
-                        if image.name not in dib_images_built:
-                            self.image_build(image.name)
-                            dib_images_built.add(image.name)
-                        jobs.append(self.pool.uploadImage(
-                            session, provider.name, image.name))
-            else:
-                provider = self.pool.config.providers.get(self.args.provider)
-                if not provider:
-                    raise Exception("Provider %s does not exist"
-                                    % self.args.provider)
-                image = provider.images.get(self.args.image)
-                if image:
-                    self.image_build(image.name)
-                    jobs.append(self.pool.uploadImage(
-                        session, provider.name, image.name))
-                else:
-                    raise Exception("Image %s not in use by provider %s"
-                                    % (self.args.image, self.args.provider))
-
-        self._wait_for_threads(threads)
-        for job in jobs:
-            job.waitForCompletion()
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -394,7 +347,7 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('image-upload', 'image-update'):
+        if self.args.command in ('image-upload'):
             self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
