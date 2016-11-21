@@ -428,6 +428,7 @@ class DBTestCase(BaseTestCase):
         return path
 
     def replace_config(self, configfile, filename):
+        self.log.debug("Replacing config with %s", filename)
         new_configfile = self.setup_config(filename, self._config_images_dir)
         os.rename(new_configfile, configfile)
 

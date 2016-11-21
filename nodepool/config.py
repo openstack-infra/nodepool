@@ -265,11 +265,13 @@ def loadConfig(config_path):
                 d.env_vars = {}
             d.image_types = set()
             d.pause = bool(diskimage.get('pause', False))
+            d.in_use = False
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():
                 diskimage = newconfig.diskimages[image.name]
                 diskimage.image_types.add(provider.image_type)
+                diskimage.in_use = True
 
     for label in config.get('labels', []):
         l = Label()
@@ -308,14 +310,6 @@ def loadConfig(config_path):
             'subnode-hostname',
             '{label.name}-{provider.name}-{node_id}-{subnode_id}'
         )
-
-    # A set of image names that are in use by labels, to be
-    # used by the image update methods to determine whether
-    # a given image needs to be updated.
-    newconfig.images_in_use = set()
-    for label in newconfig.labels.values():
-        if label.min_ready >= 0:
-            newconfig.images_in_use.add(label.image)
 
     return newconfig
 
