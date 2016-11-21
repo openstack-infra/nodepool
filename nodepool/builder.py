@@ -327,7 +327,9 @@ class CleanupWorker(BaseWorker):
         # Get the list of all builds, then work from that so that we
         # have a consistent view of the data.
         all_builds = self._zk.getBuilds(image)
-        builds_to_keep = set([b for b in sorted(all_builds) if b.state==zk.READY][:2])
+        builds_to_keep = set([b for b in sorted(all_builds, reverse=True,
+                                                key=lambda y: y.state_time)
+                              if b.state==zk.READY][:2])
         local_builds = set(self._filterLocalBuilds(image, all_builds))
         # remove any local builds that are not in use
         if image not in self._config.images_in_use:
