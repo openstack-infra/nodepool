@@ -167,7 +167,9 @@ class ImageBuild(BaseBuilderModel):
         self.builder = None          # Builder hostname
 
     def __repr__(self):
-        return '<ImageBuild %s>' % self.toDict()
+        d = self.toDict()
+        d['id'] = self.id
+        return '<ImageBuild %s>' % d
 
     @property
     def formats(self):
@@ -227,7 +229,12 @@ class ImageUpload(BaseBuilderModel):
         self.external_name = None    # Provider name of the image
 
     def __repr__(self):
-        return '<ImageUpload %s>' % self.toDict()
+        d = self.toDict()
+        d['id'] = self.id
+        d['build_id'] = self.build_id
+        d['provider_name'] = self.provider_name
+        d['image_name'] = self.image_name
+        return '<ImageUpload %s>' % d
 
     def __eq__(self, other):
         if isinstance(other, ImageUpload):
