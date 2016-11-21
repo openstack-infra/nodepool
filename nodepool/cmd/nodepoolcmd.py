@@ -120,16 +120,6 @@ class NodePoolCmd(NodepoolApp):
         cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
         cmd_dib_image_delete.add_argument('id', help='dib image id')
 
-        cmd_image_upload = subparsers.add_parser(
-            'image-upload',
-            help='upload an image to a provider ')
-        cmd_image_upload.set_defaults(func=self.image_upload)
-        cmd_image_upload.add_argument(
-            'provider',
-            help='provider name (`all` for uploading to all providers)',
-            nargs='?', default='all')
-        cmd_image_upload.add_argument('image', help='image name')
-
         cmd_config_validate = subparsers.add_parser(
             'config-validate',
             help='Validate configuration file')
@@ -185,27 +175,6 @@ class NodePoolCmd(NodepoolApp):
                             "image: %s" % diskimage)
 
         self.zk.submitBuildRequest(diskimage)
-
-    def image_upload(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
-
-        jobs = []
-
-        with self.pool.getDB().getSession() as session:
-            if self.args.provider == 'all':
-                # iterate for all providers listed in label
-                for provider in self.pool.config.providers.values():
-                    image = provider.images[self.args.image]
-                    jobs.append(self.pool.uploadImage(
-                        session, provider.name, image.name))
-            else:
-                provider = self.pool.config.providers[self.args.provider]
-                image = provider.images[self.args.image]
-                jobs.append(self.pool.uploadImage(
-                    session, self.args.provider, image.name))
-
-        for job in jobs:
-            job.waitForCompletion()
 
     def alien_list(self):
         self.pool.reconfigureManagers(self.pool.config, False)
@@ -347,8 +316,6 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('image-upload'):
-            self.pool.reconfigureGearmanClient(config)
         self.pool.reconfigureDatabase(config)
         self.pool.setConfig(config)
 

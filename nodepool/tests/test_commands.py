@@ -142,42 +142,6 @@ class TestNodepoolCMD(tests.DBTestCase):
             configfile, ['dib-image-list'], 0, 'fake-image-0000000001', 0)
 
     @skip("Skipping until ZooKeeper is enabled")
-    def test_image_upload(self):
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-diskimage')
-        self.waitForNodes(pool)
-        # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
-        self.assert_images_listed(configfile, 1)
-        # Reupload the image
-        self.patch_argv('-c', configfile, 'image-upload',
-                        'fake-provider', 'fake-image')
-        nodepoolcmd.main()
-        # Check that two images are ready for it now.
-        self.assert_images_listed(configfile, 2)
-
-    @skip("Skipping until ZooKeeper is enabled")
-    def test_image_upload_all(self):
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        # Check dib image exists and a single upload is available for it.
-        self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
-        self.assert_images_listed(configfile, 1)
-        # Reupload the image
-        self.patch_argv('-c', configfile, 'image-upload',
-                        'all', 'fake-image')
-        nodepoolcmd.main()
-        # Check that two images are ready for it now.
-        self.assert_images_listed(configfile, 2)
-
-    @skip("Skipping until ZooKeeper is enabled")
     def test_hold(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

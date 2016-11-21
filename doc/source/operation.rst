@@ -96,11 +96,6 @@ image-build
 .. program-output:: nodepool image-build --help
    :nostderr:
 
-image-upload
-^^^^^^^^^^^^
-.. program-output:: nodepool image-upload --help
-   :nostderr:
-
 dib-image-delete
 ^^^^^^^^^^^^^^^^
 .. program-output:: nodepool dib-image-delete --help
