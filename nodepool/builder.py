@@ -741,11 +741,18 @@ class UploadWorker(BaseWorker):
                 "Could not find matching provider image for %s" % image_name
             )
 
-        external_id = manager.uploadImage(
-            ext_image_name, filename,
-            image_type=image.extension,
-            meta=provider_image.meta
-        )
+        try:
+            external_id = manager.uploadImage(
+                ext_image_name, filename,
+                image_type=image.extension,
+                meta=provider_image.meta
+            )
+        except Exception:
+            self.log.exception("Failed to upload image %s to provider %s" %
+                               (image_name, provider.name))
+            data = zk.ImageUpload()
+            data.state = zk.FAILED
+            return data
 
         if self._statsd:
             dt = int((time.time() - start_time) * 1000)

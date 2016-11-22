@@ -94,52 +94,33 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
-        self.skip("Skipping until ZooKeeper is enabled")
+
+        # Now swap out the upload fake so that the next uploads fail
+        fake_client = fakeprovider.FakeUploadFailCloud(times_to_fail=1)
+
+        def get_fake_client(*args, **kwargs):
+            return fake_client
+
+        self.useFixture(fixtures.MonkeyPatch(
+            'nodepool.provider_manager.FakeProviderManager._getClient',
+            get_fake_client))
+        self.useFixture(fixtures.MonkeyPatch(
+            'nodepool.nodepool._get_one_cloud',
+            fakeprovider.fake_get_one_cloud))
 
         # Enter a working state before we test that fails are handled.
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
-        # Now swap out the upload fake so that the next uploads fail
-        fake_client = fakeprovider.FakeUploadFailCloud()
-
-        def get_fake_client(*args, **kwargs):
-            return fake_client
-
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.provider_manager.ProviderManager._getClient',
-            get_fake_client))
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool._get_one_cloud',
-            fakeprovider.fake_get_one_cloud))
-
-        provider = pool.config.providers['fake-provider']
-        pool.getProviderManager(provider).resetClient()
-
-        # Delete our existing image forcing a reupload
-        with pool.getDB().getSession() as session:
-            images = session.getSnapshotImages()
-            self.assertEqual(len(images), 1)
-            pool.deleteImage(images[0].id)
-
-        # Now wait for image uploads to fail at least once
-        # cycling out the existing snap image and making a new one
-        first_fail_id = None
-        while True:
-            with pool.getDB().getSession() as session:
-                images = session.getSnapshotImages()
-                if not images:
-                    continue
-                elif images and not first_fail_id:
-                    first_fail_id = images[0].id
-                elif first_fail_id != images[0].id:
-                    # We failed to upload first_fail_id and have
-                    # moved onto another upload that will fail.
-                    break
+        newest = self.zk.getMostRecentImageUpload('fake-image',
+                                                  'fake-provider')
+        uploads = self.zk.getUploads('fake-image', newest.build_id,
+                                     'fake-provider', states=[zk.FAILED])
+        self.assertEqual(1, len(uploads))
 
     def test_provider_addition(self):
         configfile = self.setup_config('node.yaml')
