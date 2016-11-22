@@ -100,12 +100,12 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_list_nodes(self):
         configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
         self.assert_nodes_listed(configfile, 1)
 
