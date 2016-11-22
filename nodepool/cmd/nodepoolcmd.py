@@ -204,26 +204,47 @@ class NodePoolCmd(NodepoolApp):
 
         t = PrettyTable(["Provider", "Name", "Image ID"])
         t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for provider in self.pool.config.providers.values():
-                if (self.args.provider and
-                        provider.name != self.args.provider):
-                    continue
-                manager = self.pool.getProviderManager(provider)
 
-                images = []
-                try:
-                    images = manager.listImages()
-                except Exception as e:
-                    log.warning("Exception listing alien images for %s: %s"
-                                % (provider.name, str(e.message)))
+        for provider in self.pool.config.providers.values():
+            if (self.args.provider and
+                    provider.name != self.args.provider):
+                continue
+            manager = self.pool.getProviderManager(provider)
 
-                for image in images:
-                    if image['metadata'].get('image_type') == 'snapshot':
-                        if not session.getSnapshotImageByExternalID(
-                                provider.name, image['id']):
-                            t.add_row([provider.name, image['name'],
-                                       image['id']])
+            # Build list of provider images as known by the provider
+            provider_images = []
+            try:
+                # Only consider images marked as managed by nodepool.
+                # Prevent cloud-provider images from showing
+                # up in alien list since we can't do anything about them
+                # anyway.
+                provider_images = [
+                    image for image in manager.listImages()
+                    if 'nodepool_build_id' in image['properties']]
+            except Exception as e:
+                log.warning("Exception listing alien images for %s: %s"
+                            % (provider.name, str(e.message)))
+
+            alien_ids = []
+            uploads = []
+            for image in provider_images:
+                # Build list of provider images as recorded in ZK
+                for bnum in self.zk.getBuildNumbers(image['name']):
+                    uploads.extend(
+                        self.zk.getUploads(image['name'], bnum,
+                                           provider.name,
+                                           states=[zk.READY])
+                    )
+
+            # Calculate image IDs present in the provider, but not in ZK
+            provider_image_ids = set([img['id'] for img in provider_images])
+            zk_image_ids = set([img.external_id for img in uploads])
+            alien_ids = provider_image_ids - zk_image_ids
+
+            for image in provider_images:
+                if image['id'] in alien_ids:
+                    t.add_row([provider.name, image['name'], image['id']])
+
         print t
 
     def hold(self):
@@ -320,7 +341,7 @@ class NodePoolCmd(NodepoolApp):
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
-                                 'image-delete'):
+                                 'image-delete', 'alien-image-list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
         else:
