@@ -41,6 +41,7 @@ If the cloud being used has no default_floating_pool defined in nova.conf,
 you will need to define a pool name using the nodepool yaml file to use
 floating ips.
 
+
 Set up database for interactive testing:
 
 .. code-block:: bash
@@ -59,6 +60,9 @@ Set up database for unit tests:
     mysql> grant all privileges on *.* to 'openstack_citest'@'localhost' identified by 'openstack_citest' with grant option;
     mysql> flush privileges;
     mysql> create database openstack_citest;
+
+Note that the script tools/test-setup.sh can be used for the step
+above.
 
 Export variable for your ssh key so you can log into the created instances:
 
