@@ -60,6 +60,9 @@ Set up database for unit tests:
     mysql> flush privileges;
     mysql> create database openstack_citest;
 
+Note that the script tools/test-setup.sh can be used for the step
+above.
+
 Export variable for your ssh key so you can log into the created instances:
 
 .. code-block:: bash
