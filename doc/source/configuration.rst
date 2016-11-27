@@ -241,17 +241,25 @@ on this configuration. If no matching image is found, image
 will be built using the provider snapshot approach::
 
   diskimages:
-  - name: devstack-precise
+  - name: ubuntu-precise
     elements:
-      - ubuntu
+      - ubuntu-minimal
       - vm
-      - puppet
+      - simple-init
+      - openstack-repos
       - nodepool-base
-      - node-devstack
+      - cache-devstack
+      - cache-bindep
+      - growroot
+      - infra-package-needs
     release: precise
     env-vars:
-        DIB_DISTRIBUTION_MIRROR: http://archive.ubuntu.com
-        DIB_IMAGE_CACHE: /opt/dib_cache
+      TMPDIR: /opt/dib_tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      FS_TYPE: ext3
 
 
 **required**

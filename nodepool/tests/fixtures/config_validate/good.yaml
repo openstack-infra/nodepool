@@ -992,7 +992,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: trusty
     env-vars:
       TMPDIR: /opt/dib_tmp
@@ -1005,7 +1005,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: trusty
     env-vars:
       TMPDIR: /opt/dib_tmp
@@ -1018,7 +1018,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: precise
     env-vars:
       TMPDIR: /opt/dib_tmp
@@ -1031,7 +1031,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: precise
     env-vars:
       TMPDIR: /opt/dib_tmp
@@ -1044,7 +1044,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     env-vars:
       TMPDIR: /opt/dib_tmp
       DIB_IMAGE_CACHE: /opt/dib_cache
@@ -1055,7 +1055,7 @@ diskimages:
       - vm
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: 21
     env-vars:
       TMPDIR: /opt/dib_tmp
