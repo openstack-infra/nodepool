@@ -1076,6 +1076,9 @@ class NodePool(threading.Thread):
     def getDB(self):
         return self.config.db
 
+    def getZK(self):
+        return self.zk
+
     def getProviderManager(self, provider):
         return self.config.provider_managers[provider.name]
 
