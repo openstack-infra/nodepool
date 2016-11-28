@@ -237,6 +237,7 @@ on this configuration::
 
   diskimages:
   - name: devstack-precise
+    pause: False
     rebuild-age: 86400
       - ubuntu
       - vm
@@ -273,6 +274,9 @@ on this configuration::
   ``env-vars`` (dict)
     Arbitrary environment variables that will be available in the spawned
     diskimage-builder child process.
+
+  ``pause`` (bool)
+    When set to True, nodepool-builder will not build the diskimage.
 
 .. _provider:
 

@@ -264,6 +264,7 @@ def loadConfig(config_path):
                 #               "should be a dict" % d.name)
                 d.env_vars = {}
             d.image_types = set()
+            d.pause = bool(diskimage.get('pause', False))
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():

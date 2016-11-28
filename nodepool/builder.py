@@ -457,6 +457,10 @@ class BuildWorker(BaseWorker):
         if diskimage.name not in self._config.images_in_use:
             return
 
+        # Check if diskimage builds are paused.
+        if diskimage.pause:
+            return
+
         now = int(time.time())
         builds = self._zk.getMostRecentBuilds(1, diskimage.name, zk.READY)
 
@@ -512,6 +516,10 @@ class BuildWorker(BaseWorker):
         '''
         Query ZooKeeper for a manual image build request for one image.
         '''
+        # Check if diskimage builds are paused.
+        if diskimage.pause:
+            return
+
         # Reduce use of locks by adding an initial check here and
         # a redundant check after lock acquisition.
         if not self._zk.hasBuildRequest(diskimage.name):
