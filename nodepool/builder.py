@@ -84,10 +84,9 @@ class DibImageFile(object):
 
 
 class BaseWorker(threading.Thread):
-    log = logging.getLogger("nodepool.builder.BaseWorker")
-
     def __init__(self, config_path):
         super(BaseWorker, self).__init__()
+        self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
         self._running = False
         self._config = None
@@ -126,10 +125,10 @@ class CleanupWorker(BaseWorker):
     The janitor of nodepool-builder that will remove images from providers
     and any local DIB builds.
     '''
-    log = logging.getLogger("nodepool.builder.CleanupWorker")
 
-    def __init__(self, config_path, cleanup_interval):
+    def __init__(self, name, config_path, cleanup_interval):
         super(CleanupWorker, self).__init__(config_path)
+        self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
         self.cleanup_interval = cleanup_interval
 
     def _buildUploadRecencyTable(self):
@@ -425,11 +424,9 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    log = logging.getLogger("nodepool.builder.BuildWorker")
-
-    def __init__(self, config_path):
+    def __init__(self, name, config_path):
         super(BuildWorker, self).__init__(config_path)
-
+        self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -693,11 +690,9 @@ class BuildWorker(BaseWorker):
 
 
 class UploadWorker(BaseWorker):
-    log = logging.getLogger("nodepool.builder.UploadWorker")
-
-    def __init__(self, config_path):
+    def __init__(self, name, config_path):
         super(UploadWorker, self).__init__(config_path)
-
+        self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
 
     def _uploadImage(self, build_id, image_name, images, provider):
         '''
@@ -959,16 +954,16 @@ class NodePoolBuilder(object):
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(self._config_path)
+                w = BuildWorker(i, self._config_path)
                 w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker(self._config_path)
+                w = UploadWorker(i, self._config_path)
                 w.start()
                 self._upload_workers.append(w)
 
-            self._janitor = CleanupWorker(self._config_path,
+            self._janitor = CleanupWorker(0, self._config_path,
                                           self.cleanup_interval)
             self._janitor.start()
 
