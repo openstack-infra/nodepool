@@ -157,12 +157,12 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['list'], 0, 1, 1)
         self.assert_nodes_listed(configfile, 1, 'hold')
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Assert one node exists and it is node 1 in a ready state.
         self.assert_listed(configfile, ['list'], 0, 1, 1)
@@ -170,12 +170,12 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Delete node 1
         self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
 
-    @skip("Skipping until ZooKeeper is enabled")
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage( 'fake-provider', 'fake-image')
         self.waitForNodes(pool)
         # Assert one node exists and it is node 1 in a ready state.
         self.assert_listed(configfile, ['list'], 0, 1, 1)
