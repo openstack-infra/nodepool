@@ -316,8 +316,6 @@ class NodePoolCmd(NodepoolApp):
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        self.pool.reconfigureDatabase(config)
-        self.pool.setConfig(config)
 
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
@@ -325,7 +323,10 @@ class NodePoolCmd(NodepoolApp):
                                  'image-delete'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
+        else:
+            self.pool.reconfigureDatabase(config)
 
+        self.pool.setConfig(config)
         self.args.func()
 
         if self.zk:
