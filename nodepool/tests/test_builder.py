@@ -108,7 +108,6 @@ class TestNodePoolBuilder(tests.DBTestCase):
             'nodepool.nodepool._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
 
-        # Enter a working state before we test that fails are handled.
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
@@ -116,9 +115,11 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
-        newest = self.zk.getMostRecentImageUpload('fake-image',
-                                                  'fake-provider')
-        uploads = self.zk.getUploads('fake-image', newest.build_id,
+        newest_builds = self.zk.getMostRecentBuilds(1, 'fake-image',
+                                                    state=zk.READY)
+        self.assertEqual(1, len(newest_builds))
+
+        uploads = self.zk.getUploads('fake-image', newest_builds[0].id,
                                      'fake-provider', states=[zk.FAILED])
         self.assertEqual(1, len(uploads))
 
