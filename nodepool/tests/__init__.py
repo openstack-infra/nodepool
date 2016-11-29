@@ -379,6 +379,8 @@ class BuilderFixture(fixtures.Fixture):
         super(BuilderFixture, self).setUp()
         self.builder = builder.NodePoolBuilder(self.configfile)
         self.builder.cleanup_interval = .5
+        self.builder.build_interval = .1
+        self.builder.upload_interval = .1
         self.builder.start()
         self.addCleanup(self.cleanup)
 

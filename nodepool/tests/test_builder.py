@@ -89,6 +89,8 @@ class TestNodePoolBuilder(tests.DBTestCase):
         config = self.setup_config('node.yaml')
         nb = builder.NodePoolBuilder(config)
         nb.cleanup_interval = .5
+        nb.build_interval = .1
+        nb.upload_interval = .1
         nb.start()
         nb.stop()
 

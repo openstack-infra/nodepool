@@ -84,7 +84,7 @@ class DibImageFile(object):
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, config_path):
+    def __init__(self, config_path, interval):
         super(BaseWorker, self).__init__()
         self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
@@ -94,6 +94,7 @@ class BaseWorker(threading.Thread):
         self._zk = None
         self._hostname = socket.gethostname()
         self._statsd = stats.get_client()
+        self._interval = interval
 
     def _checkForZooKeeperChanges(self, new_config):
         '''
@@ -126,10 +127,9 @@ class CleanupWorker(BaseWorker):
     and any local DIB builds.
     '''
 
-    def __init__(self, name, config_path, cleanup_interval):
-        super(CleanupWorker, self).__init__(config_path)
+    def __init__(self, name, config_path, interval):
+        super(CleanupWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
-        self.cleanup_interval = cleanup_interval
 
     def _buildUploadRecencyTable(self):
         '''
@@ -404,7 +404,7 @@ class CleanupWorker(BaseWorker):
                 self.log.exception("Exception in CleanupWorker:")
                 time.sleep(10)
 
-            time.sleep(self.cleanup_interval)
+            time.sleep(self._interval)
 
         if self._zk:
             self._zk.disconnect()
@@ -424,8 +424,8 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    def __init__(self, name, config_path):
-        super(BuildWorker, self).__init__(config_path)
+    def __init__(self, name, config_path, interval):
+        super(BuildWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
 
     def _checkForScheduledImageUpdates(self):
@@ -674,8 +674,7 @@ class BuildWorker(BaseWorker):
                 self.log.exception("Exception in BuildWorker:")
                 time.sleep(10)
 
-            # TODO: Make this configurable
-            time.sleep(0.1)
+            time.sleep(self._interval)
 
         if self._zk:
             self._zk.disconnect()
@@ -694,8 +693,8 @@ class BuildWorker(BaseWorker):
 
 
 class UploadWorker(BaseWorker):
-    def __init__(self, name, config_path):
-        super(UploadWorker, self).__init__(config_path)
+    def __init__(self, name, config_path, interval):
+        super(UploadWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
 
     def _uploadImage(self, build_id, image_name, images, provider):
@@ -876,8 +875,7 @@ class UploadWorker(BaseWorker):
                 self.log.exception("Exception in UploadWorker:")
                 time.sleep(10)
 
-            # TODO: Make this configurable
-            time.sleep(0.1)
+            time.sleep(self._interval)
 
         if self._zk:
             self._zk.disconnect()
@@ -923,6 +921,8 @@ class NodePoolBuilder(object):
         self._janitor = None
         self._running = False
         self.cleanup_interval = 60
+        self.build_interval = 10
+        self.upload_interval = 10
 
         # This lock is needed because the run() method is started in a
         # separate thread of control, which can return before the scheduler
@@ -965,12 +965,12 @@ class NodePoolBuilder(object):
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(i, self._config_path)
+                w = BuildWorker(i, self._config_path, self.build_interval)
                 w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker(i, self._config_path)
+                w = UploadWorker(i, self._config_path, self.upload_interval)
                 w.start()
                 self._upload_workers.append(w)
 
