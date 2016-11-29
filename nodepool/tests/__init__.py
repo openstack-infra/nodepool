@@ -452,11 +452,11 @@ class DBTestCase(BaseTestCase):
             time.sleep(1)
         self.wait_for_threads()
 
-    def waitForImageDeletion(self, provider_name, image_name):
+    def waitForImageDeletion(self, provider_name, image_name, match=None):
         while True:
             self.wait_for_threads()
             image = self.zk.getMostRecentImageUpload(image_name, provider_name)
-            if not image:
+            if not image or (match and image != match):
                 break
             time.sleep(1)
         self.wait_for_threads()
