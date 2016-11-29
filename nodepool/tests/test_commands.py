@@ -20,6 +20,7 @@ from unittest import skip
 
 import fixtures
 import mock
+import testtools
 
 from nodepool.cmd import nodepoolcmd
 from nodepool import tests
@@ -123,6 +124,23 @@ class TestNodepoolCMD(tests.DBTestCase):
         self._useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
+
+    def test_dib_image_build_pause(self):
+        configfile = self.setup_config('node_diskimage_pause.yaml')
+        self._useBuilder(configfile)
+        self.patch_argv("-c", configfile, "image-build", "fake-image")
+        with testtools.ExpectedException(Exception):
+            nodepoolcmd.main()
+        self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
+
+    def test_dib_image_pause(self):
+        configfile = self.setup_config('node_diskimage_pause.yaml')
+        self._useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForNodes(pool)
+        self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
+        self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
 
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
