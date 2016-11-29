@@ -284,7 +284,8 @@ class ProviderManager(TaskManager):
         with shade_inner_exceptions():
             return self._client.get_image(image_id)
 
-    def uploadImage(self, image_name, filename, image_type=None, meta=None):
+    def uploadImage(self, image_name, filename, image_type=None, meta=None,
+            md5=None, sha256=None):
         # configure glance and upload image.  Note the meta flags
         # are provided as custom glance properties
         # NOTE: we have wait=True set here. This is not how we normally
@@ -305,6 +306,8 @@ class ProviderManager(TaskManager):
                 filename=filename,
                 is_public=False,
                 wait=True,
+                md5=md5,
+                sha256=sha256,
                 **meta)
         return image.id
 
