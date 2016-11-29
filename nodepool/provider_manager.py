@@ -32,14 +32,6 @@ from task_manager import TaskManager, ManagerStoppedException
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 
 
-def make_image_dict(image):
-    d = dict(id=str(image.id), name=image.name, status=image.status,
-             metadata=image.metadata)
-    if hasattr(image, 'progress'):
-        d['progress'] = image.progress
-    return d
-
-
 @contextmanager
 def shade_inner_exceptions():
     try:
