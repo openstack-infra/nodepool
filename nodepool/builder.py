@@ -499,10 +499,11 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    def __init__(self, name, config_path, interval):
+    def __init__(self, name, config_path, interval, dib_cmd):
         super(BuildWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
         self.name = 'BuildWorker.%s' % name
+        self.dib_cmd = dib_cmd
 
     def _running_under_virtualenv(self):
         # NOTE: borrowed from pip:locations.py
@@ -529,7 +530,6 @@ class BuildWorker(BaseWorker):
                 raise exceptions.BuilderError("Running in a virtualenv, but "
                                               "cannot find: %s" % activate_this)
             execfile(activate_this, dict(__file__=activate_this))
-
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -690,13 +690,9 @@ class BuildWorker(BaseWorker):
         if 'qcow2' in img_types:
             qemu_img_options = DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS
 
-        if 'fake-' in diskimage.name:
-            dib_cmd = 'nodepool/tests/fake-image-create'
-        else:
-            dib_cmd = 'disk-image-create'
-
         cmd = ('%s -x -t %s --checksum --no-tmpfs %s -o %s %s' %
-               (dib_cmd, img_types, qemu_img_options, filename, img_elements))
+               (self.dib_cmd, img_types, qemu_img_options, filename,
+                img_elements))
 
         log = logging.getLogger("nodepool.image.build.%s" %
                                 (diskimage.name,))
@@ -1042,6 +1038,7 @@ class NodePoolBuilder(object):
         self.cleanup_interval = 60
         self.build_interval = 10
         self.upload_interval = 10
+        self.dib_cmd = 'disk-image-create'
 
         # This lock is needed because the run() method is started in a
         # separate thread of control, which can return before the scheduler
@@ -1084,7 +1081,8 @@ class NodePoolBuilder(object):
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(i, self._config_path, self.build_interval)
+                w = BuildWorker(
+                    i, self._config_path, self.build_interval, self.dib_cmd)
                 w.start()
                 self._build_workers.append(w)
 

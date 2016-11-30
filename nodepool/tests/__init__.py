@@ -388,6 +388,7 @@ class BuilderFixture(fixtures.Fixture):
         self.builder.cleanup_interval = .5
         self.builder.build_interval = .1
         self.builder.upload_interval = .1
+        self.builder.dib_cmd = 'nodepool/tests/fake-image-create'
         self.builder.start()
         self.addCleanup(self.cleanup)
 
