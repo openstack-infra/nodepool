@@ -56,6 +56,7 @@ providers:
       - name: trusty
         min-ram: 8192
         username: jenkins
+        user-home: /home/jenkins
         private-key: /home/nodepool/.ssh/id_rsa
   - name: cloud2
     region-name: 'chocolate'
@@ -73,6 +74,7 @@ providers:
         pause: False
         min-ram: 8192
         username: jenkins
+        user-home: /home/jenkins
         private-key: /home/nodepool/.ssh/id_rsa
 
 targets:
