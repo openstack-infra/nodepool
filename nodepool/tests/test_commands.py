@@ -16,7 +16,6 @@
 import logging
 import os.path
 import sys  # noqa making sure its available for monkey patching
-from unittest import skip
 
 import fixtures
 import mock
@@ -46,6 +45,12 @@ class TestNodepoolCMD(tests.DBTestCase):
                 if row[col] == val:
                     rows_with_val += 1
             self.assertEquals(rows_with_val, count)
+
+    def assert_alien_images_listed(self, configfile, image_cnt, image_id):
+        self.assert_listed(configfile, ['alien-image-list'], 2, image_id, image_cnt)
+
+    def assert_alien_images_empty(self, configfile):
+        self.assert_alien_images_listed(configfile, 0, 0)
 
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
         self.assert_listed(configfile, ['image-list'], 6, status, image_cnt)
@@ -92,7 +97,14 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile, "alien-list")
         nodepoolcmd.main()
 
-    @skip("Skipping until ZooKeeper is enabled")
+    def test_alien_image_list_empty(self):
+        configfile = self.setup_config("node.yaml")
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        self.patch_argv("-c", configfile, "alien-image-list")
+        nodepoolcmd.main()
+        self.assert_alien_images_empty(configfile)
+
     def test_alien_image_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
