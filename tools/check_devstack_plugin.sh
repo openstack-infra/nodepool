@@ -1,8 +1,9 @@
 #!/bin/bash -x
 
+NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-/opt/stack/new/nodepool-venv}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
 NODEPOOL_SECURE=${NODEPOOL_SECURE:-/etc/nodepool/secure.conf}
-NODEPOOL="nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE"
+NODEPOOL="$NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE"
 
 function waitforimage {
     name=$1

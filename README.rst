@@ -41,6 +41,7 @@ If the cloud being used has no default_floating_pool defined in nova.conf,
 you will need to define a pool name using the nodepool yaml file to use
 floating ips.
 
+
 Set up database for interactive testing:
 
 .. code-block:: bash
