@@ -54,6 +54,11 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
         try:
             client = SSHClient(ip, username, **connect_kwargs)
             break
+        except paramiko.SSHException as e:
+            # NOTE(pabelanger): Currently paramiko only returns a string with
+            # error code. If we want finer granularity we'll need to regex the
+            # string.
+            log.exception('Failed to negotiate SSH: %s' % (e))
         except paramiko.AuthenticationException as e:
             # This covers the case where the cloud user is created
             # after sshd is up (Fedora for example)
@@ -61,7 +66,8 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
                      (username, ip, count))
         except socket.error as e:
             if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
-                log.exception('Exception while testing ssh access:')
+                log.exception(
+                    'Exception while testing ssh access to %s:' % ip)
 
     out = client.ssh("test ssh access", "echo access okay", output=True)
     if "access okay" in out:

@@ -103,6 +103,9 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('--upload-workers', dest='upload_workers',
                             default=4, help='number of upload workers',
                             type=int)
+        parser.add_argument('--no-deletes', action='store_true')
+        parser.add_argument('--no-launches', action='store_true')
+        parser.add_argument('--no-webapp', action='store_true')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
         self.args = parser.parse_args()
@@ -111,7 +114,8 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.pool.stop()
         if self.args.builder:
             self.builder.stop()
-        self.webapp.stop()
+        if not self.args.no_webapp:
+            self.webapp.stop()
         sys.exit(0)
 
     def term_handler(self, signum, frame):
@@ -120,13 +124,16 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
     def main(self):
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
-                                               self.args.config)
+                                               self.args.config,
+                                               self.args.no_deletes,
+                                               self.args.no_launches)
         if self.args.builder:
             self.builder = nodepool.builder.NodePoolBuilder(
                 self.args.config, self.args.build_workers,
                 self.args.upload_workers)
 
-        self.webapp = nodepool.webapp.WebApp(self.pool)
+        if not self.args.no_webapp:
+            self.webapp = nodepool.webapp.WebApp(self.pool)
 
         signal.signal(signal.SIGINT, self.exit_handler)
         # For back compatibility:
@@ -139,7 +146,8 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         if self.args.builder:
             self.builder.start()
 
-        self.webapp.start()
+        if not self.args.no_webapp:
+            self.webapp.start()
 
         while True:
             signal.pause()
