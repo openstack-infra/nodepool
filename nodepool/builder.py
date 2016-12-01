@@ -149,6 +149,7 @@ class CleanupWorker(BaseWorker):
     def __init__(self, name, config_path, interval):
         super(CleanupWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
+        self.name = 'CleanupWorker.%s' % name
 
     def _buildUploadRecencyTable(self):
         '''
@@ -446,6 +447,7 @@ class BuildWorker(BaseWorker):
     def __init__(self, name, config_path, interval):
         super(BuildWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
+        self.name = 'BuildWorker.%s' % name
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -715,6 +717,7 @@ class UploadWorker(BaseWorker):
     def __init__(self, name, config_path, interval):
         super(UploadWorker, self).__init__(config_path, interval)
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
+        self.name = 'UploadWorker.%s' % name
 
     def _uploadImage(self, build_id, upload_id, image_name, images, provider):
         '''

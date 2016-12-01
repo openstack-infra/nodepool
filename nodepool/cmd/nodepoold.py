@@ -23,37 +23,14 @@ import extras
 # instead it depends on lockfile-0.9.1 which uses pidfile.
 pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
 
-import logging.config
 import os
 import sys
 import signal
-import traceback
-import threading
 
 import nodepool.builder
 import nodepool.cmd
 import nodepool.nodepool
 import nodepool.webapp
-
-
-def stack_dump_handler(signum, frame):
-    signal.signal(signal.SIGUSR2, signal.SIG_IGN)
-    log_str = ""
-    threads = {}
-    for t in threading.enumerate():
-        threads[t.ident] = t
-    for thread_id, stack_frame in sys._current_frames().items():
-        thread = threads.get(thread_id)
-        if thread:
-            thread_name = thread.name
-        else:
-            thread_name = 'Unknown'
-        label = '%s (%s)' % (thread_name, thread_id)
-        log_str += "Thread: %s\n" % label
-        log_str += "".join(traceback.format_stack(stack_frame))
-    log = logging.getLogger("nodepool.stack_dump")
-    log.debug(log_str)
-    signal.signal(signal.SIGUSR2, stack_dump_handler)
 
 
 def is_pidfile_stale(pidfile):
@@ -139,7 +116,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         # For back compatibility:
         signal.signal(signal.SIGUSR1, self.exit_handler)
 
-        signal.signal(signal.SIGUSR2, stack_dump_handler)
+        signal.signal(signal.SIGUSR2, nodepool.cmd.stack_dump_handler)
         signal.signal(signal.SIGTERM, self.term_handler)
 
         self.pool.start()

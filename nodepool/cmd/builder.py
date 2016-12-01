@@ -61,6 +61,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
             self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
+        signal.signal(signal.SIGUSR2, nodepool.cmd.stack_dump_handler)
         self.nb.start()
 
         while True:

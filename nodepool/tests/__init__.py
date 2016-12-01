@@ -292,6 +292,12 @@ class BaseTestCase(testtools.TestCase):
                 if t.name.startswith("worker "):
                     # paste web server
                     continue
+                if t.name.startswith("UploadWorker"):
+                    continue
+                if t.name.startswith("BuildWorker"):
+                    continue
+                if t.name.startswith("CleanupWorker"):
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
