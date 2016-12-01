@@ -464,7 +464,8 @@ class CleanupWorker(BaseWorker):
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
         self._checkForZooKeeperChanges(new_config)
-        provider_manager.ProviderManager.reconfigure(self._config, new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config,
+                                                     use_taskmanager=False)
         self._config = new_config
 
         self._cleanup()
@@ -947,7 +948,8 @@ class UploadWorker(BaseWorker):
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
         self._checkForZooKeeperChanges(new_config)
-        provider_manager.ProviderManager.reconfigure(self._config, new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config,
+                                                     use_taskmanager=False)
         self._config = new_config
 
         self._checkForProviderUploads()
