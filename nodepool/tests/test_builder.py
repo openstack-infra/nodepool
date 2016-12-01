@@ -160,13 +160,29 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForBuildDeletion('fake-image2', '0000000001')
 
     def test_image_rebuild_age(self):
+        self._test_image_rebuild_age()
+
+    def _test_image_rebuild_age(self, expire=86400):
         configfile = self.setup_config('node.yaml')
         self._useBuilder(configfile)
         build = self.waitForBuild('fake-image', '0000000001')
         # Expire rebuild-age (default: 1day) to force a new build.
-        build.state_time -= 86400
+        build.state_time -= expire
         with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
             self.zk.storeBuild('fake-image', build, '0000000001')
         self.waitForBuild('fake-image', '0000000002')
+        builds = self.zk.getBuilds('fake-image', zk.READY)
+        self.assertEqual(len(builds), 2)
+
+    def test_image_rotation(self):
+        # Expire rebuild-age (2days), to avoid problems when expiring 2 images.
+        self._test_image_rebuild_age(expire=172800)
+        build = self.waitForBuild('fake-image', '0000000002')
+        # Expire rebuild-age (default: 1day) to force a new build.
+        build.state_time -= 86400
+        with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
+            self.zk.storeBuild('fake-image', build, '0000000002')
+        self.waitForBuildDeletion('fake-image', '0000000001')
+        self.waitForBuild('fake-image', '0000000003')
         builds = self.zk.getBuilds('fake-image', zk.READY)
         self.assertEqual(len(builds), 2)
