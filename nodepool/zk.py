@@ -112,6 +112,7 @@ class BaseBuilderModel(object):
             self.id = o_id
         self._state = None
         self.state_time = None
+        self.stat = None
 
     @property
     def id(self):
@@ -169,6 +170,7 @@ class ImageBuild(BaseBuilderModel):
     def __repr__(self):
         d = self.toDict()
         d['id'] = self.id
+        d['stat'] = self.stat
         return '<ImageBuild %s>' % d
 
     @property
@@ -234,6 +236,7 @@ class ImageUpload(BaseBuilderModel):
         d['build_id'] = self.build_id
         d['provider_name'] = self.provider_name
         d['image_name'] = self.image_name
+        d['stat'] = self.stat
         return '<ImageUpload %s>' % d
 
     def __eq__(self, other):
@@ -665,7 +668,9 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return None
 
-        return ImageBuild.fromDict(self._strToDict(data), build_number)
+        d = ImageBuild.fromDict(self._strToDict(data), build_number)
+        d.stat = stat
+        return d
 
     def getBuilds(self, image, states=None):
         '''
@@ -781,9 +786,11 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return None
 
-        return ImageUpload.fromDict(
+        d = ImageUpload.fromDict(
             self._strToDict(data), build_number, provider, image, upload_number
         )
+        d.stat = stat
+        return d
 
     def getUploads(self, image, build_number, provider, states=None):
         '''
