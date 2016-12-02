@@ -284,7 +284,14 @@ class CleanupWorker(BaseWorker):
         if upload.state == zk.DELETING or deleted:
             manager = self._config.provider_managers[provider.name]
             try:
-                manager.deleteImage(upload.external_name)
+                # It is possible we got this far, but don't actually have an
+                # external_name. This could mean that zookeeper and cloud
+                # provider are some how out of sync.
+                if upload.external_name:
+                    base = "-".join([image, upload.build_id])
+                    self.log.info("Deleting image build %s from %s" %
+                                  (base, provider.name))
+                    manager.deleteImage(upload.external_name)
             except Exception:
                 self.log.exception(
                     "Unable to delete image %s from %s: %s",
