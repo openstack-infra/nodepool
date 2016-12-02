@@ -183,6 +183,8 @@ class FakeOpenStackCloud(object):
         return self._image_list
 
     def delete_image(self, name_or_id):
+        if not name_or_id:
+            raise Exception('name_or_id is Empty')
         self._delete(name_or_id, self._image_list)
 
     def create_image_snapshot(self, name, server, **metadata):

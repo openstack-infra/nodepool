@@ -459,6 +459,7 @@ class DBTestCase(BaseTestCase):
                     break
             time.sleep(1)
         self.wait_for_threads()
+        return image
 
     def waitForImageDeletion(self, provider_name, image_name, match=None):
         while True:

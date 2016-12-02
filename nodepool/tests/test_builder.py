@@ -186,3 +186,52 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForBuild('fake-image', '0000000003')
         builds = self.zk.getBuilds('fake-image', zk.READY)
         self.assertEqual(len(builds), 2)
+
+    def test_image_rotation_invalid_external_name(self):
+        # NOTE(pabelanger): We are forcing fake-image to leak in fake-provider.
+        # We do this to test our CleanupWorker will properly delete diskimage
+        # builds from the HDD. For this test, we don't care about the leaked
+        # image.
+        #
+        # Ensure we have a total of 3 diskimages on disk, so we can confirm
+        # nodepool-builder will properly purge the 1 diskimage build leaving a
+        # total of 2 diskimages on disk at all times.
+
+        # Expire rebuild-age (2days), to avoid problems when expiring 2 images.
+        self._test_image_rebuild_age(expire=172800)
+        build = self.waitForBuild('fake-image', '0000000002')
+
+        # Make sure 2rd diskimage build was uploaded.
+        image = self.waitForImage('fake-provider', 'fake-image')
+        self.assertEqual(image.build_id, '0000000002')
+
+        # Delete external name / id so we can test exception handlers.
+        upload = self.zk.getUploads(
+            'fake-image', '0000000001', 'fake-provider', zk.READY)[0]
+        upload.external_name = None
+        upload.external_id = None
+        with self.zk.imageUploadLock(upload.image_name, upload.build_id,
+                                     upload.provider_name, blocking=True,
+                                     timeout=1):
+            self.zk.storeImageUpload(upload.image_name, upload.build_id,
+                                     upload.provider_name, upload, upload.id)
+
+        # Expire rebuild-age (default: 1day) to force a new build.
+        build.state_time -= 86400
+        with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
+            self.zk.storeBuild('fake-image', build, '0000000002')
+        self.waitForBuildDeletion('fake-image', '0000000001')
+
+        # Make sure fake-image for fake-provider is removed from zookeeper.
+        upload = self.zk.getUploads(
+            'fake-image', '0000000001', 'fake-provider')
+        self.assertEqual(len(upload), 0)
+        self.waitForBuild('fake-image', '0000000003')
+
+        # Ensure we only have 2 builds on disk.
+        builds = self.zk.getBuilds('fake-image', zk.READY)
+        self.assertEqual(len(builds), 2)
+
+        # Make sure 3rd diskimage build was uploaded.
+        image = self.waitForImage('fake-provider', 'fake-image', [image])
+        self.assertEqual(image.build_id, '0000000003')
