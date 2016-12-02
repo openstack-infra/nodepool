@@ -461,6 +461,16 @@ class DBTestCase(BaseTestCase):
         self.wait_for_threads()
         return image
 
+    def waitForUploadRecordDeletion(self, provider_name, image_name,
+                                    build_id, upload_id):
+        while True:
+            self.wait_for_threads()
+            uploads = self.zk.getUploads(image_name, build_id, provider_name)
+            if not uploads or upload_id not in [u.id for u in uploads]:
+                break
+            time.sleep(1)
+        self.wait_for_threads()
+
     def waitForImageDeletion(self, provider_name, image_name, match=None):
         while True:
             self.wait_for_threads()
