@@ -41,7 +41,7 @@ fi
 outfile=
 outtypes=("qcow2")
 
-TEMP=$(getopt -o xo:t: --long qemu-img-options:,no-tmpfs -- "$@")
+TEMP=$(getopt -o xo:t: --long qemu-img-options:,no-tmpfs,checksum -- "$@")
 if [ $? -ne 0 ]; then
     echo "Invalid option"
     exit 1
@@ -49,6 +49,8 @@ fi
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
+        --checksum)
+            echo " -> set --checksum"; shift 1;;
         --no-tmpfs)
             echo " -> set --no-tmpfs"; shift 1;;
         --qemu-img-options)
@@ -67,6 +69,8 @@ if [ -z "$outfile" ]; then
 else
     for outtype in ${outtypes[@]} ; do
         echo "fake-data" > $outfile.$outtype
+        echo "10da41d43d4bd6d67db763616c18b72f" > $outfile.$outtype.md5
+        echo "0033e9d444953d11689b5fa6a6dba32bf901582f62b0825bc35f593190b1f7dc" > $outfile.$outtype.sha256
     done
 fi
 
