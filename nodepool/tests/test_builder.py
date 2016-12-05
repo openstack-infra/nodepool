@@ -166,13 +166,16 @@ class TestNodePoolBuilder(tests.DBTestCase):
         configfile = self.setup_config('node.yaml')
         self._useBuilder(configfile)
         build = self.waitForBuild('fake-image', '0000000001')
+        image = self.waitForImage('fake-provider', 'fake-image')
         # Expire rebuild-age (default: 1day) to force a new build.
         build.state_time -= expire
         with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
             self.zk.storeBuild('fake-image', build, '0000000001')
         self.waitForBuild('fake-image', '0000000002')
+        self.waitForImage('fake-provider', 'fake-image', [image])
         builds = self.zk.getBuilds('fake-image', zk.READY)
         self.assertEqual(len(builds), 2)
+        return (build, image)
 
     def test_image_rotation(self):
         # Expire rebuild-age (2days), to avoid problems when expiring 2 images.
@@ -198,12 +201,12 @@ class TestNodePoolBuilder(tests.DBTestCase):
         # total of 2 diskimages on disk at all times.
 
         # Expire rebuild-age (2days), to avoid problems when expiring 2 images.
-        self._test_image_rebuild_age(expire=172800)
-        build = self.waitForBuild('fake-image', '0000000002')
+        build001, image001 = self._test_image_rebuild_age(expire=172800)
+        build002 = self.waitForBuild('fake-image', '0000000002')
 
         # Make sure 2rd diskimage build was uploaded.
-        image = self.waitForImage('fake-provider', 'fake-image')
-        self.assertEqual(image.build_id, '0000000002')
+        image002 = self.waitForImage('fake-provider', 'fake-image', [image001])
+        self.assertEqual(image002.build_id, '0000000002')
 
         # Delete external name / id so we can test exception handlers.
         upload = self.zk.getUploads(
@@ -217,9 +220,9 @@ class TestNodePoolBuilder(tests.DBTestCase):
                                      upload.provider_name, upload, upload.id)
 
         # Expire rebuild-age (default: 1day) to force a new build.
-        build.state_time -= 86400
+        build002.state_time -= 86400
         with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
-            self.zk.storeBuild('fake-image', build, '0000000002')
+            self.zk.storeBuild('fake-image', build002, '0000000002')
         self.waitForBuildDeletion('fake-image', '0000000001')
 
         # Make sure fake-image for fake-provider is removed from zookeeper.
@@ -233,8 +236,9 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.assertEqual(len(builds), 2)
 
         # Make sure 3rd diskimage build was uploaded.
-        image = self.waitForImage('fake-provider', 'fake-image', [image])
-        self.assertEqual(image.build_id, '0000000003')
+        image003 = self.waitForImage(
+            'fake-provider', 'fake-image', [image001, image002])
+        self.assertEqual(image003.build_id, '0000000003')
 
     def test_cleanup_hard_upload_fails(self):
         configfile = self.setup_config('node.yaml')
