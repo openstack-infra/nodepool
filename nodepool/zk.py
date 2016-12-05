@@ -593,7 +593,7 @@ class ZooKeeper(object):
             images = self.client.get_children(path)
         except kze.NoNodeError:
             return []
-        return images
+        return sorted(images)
 
     def getBuildNumbers(self, image):
         '''
@@ -629,7 +629,7 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return []
 
-        return providers
+        return sorted(providers)
 
     def getImageUploadNumbers(self, image, build_number, provider):
         '''
