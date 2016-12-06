@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import time
 import fixtures
 
 from nodepool import builder, exceptions, fakeprovider, tests
@@ -169,6 +170,14 @@ class TestNodePoolBuilder(tests.DBTestCase):
         image = self.waitForImage('fake-provider', 'fake-image')
         # Expire rebuild-age (default: 1day) to force a new build.
         build.state_time -= expire
+
+        # Introduce a short wait here to prevent the very rare occasion when
+        # build 001 and 002 would have the same upload state_time (which is
+        # lossy since we use int() on it), which could throw off the recency
+        # table creation in the CleanupWorker. With the same upload times,
+        # sorting could cause 001 to be seen as the more recent upload.
+        time.sleep(1)
+
         with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
             self.zk.storeBuild('fake-image', build, '0000000001')
         self.waitForBuild('fake-image', '0000000002')
