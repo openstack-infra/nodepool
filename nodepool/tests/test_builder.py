@@ -235,3 +235,28 @@ class TestNodePoolBuilder(tests.DBTestCase):
         # Make sure 3rd diskimage build was uploaded.
         image = self.waitForImage('fake-provider', 'fake-image', [image])
         self.assertEqual(image.build_id, '0000000003')
+
+    def test_cleanup_hard_upload_fails(self):
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        upload = self.zk.getUploads('fake-image', '0000000001',
+                                    'fake-provider', zk.READY)[0]
+
+        # Store a new ZK node as UPLOADING to represent a hard fail
+        upload.state = zk.UPLOADING
+
+        with self.zk.imageUploadLock(upload.image_name, upload.build_id,
+                                     upload.provider_name, blocking=True,
+                                     timeout=1):
+            upnum = self.zk.storeImageUpload(upload.image_name,
+                                             upload.build_id,
+                                             upload.provider_name,
+                                             upload)
+
+        # Now it should disappear from the current build set of uploads
+        self.waitForUploadRecordDeletion(upload.provider_name,
+                                         upload.image_name,
+                                         upload.build_id,
+                                         upnum)
