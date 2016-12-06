@@ -154,6 +154,19 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
 
+    def test_dib_image_upload_pause(self):
+        configfile = self.setup_config('node_image_upload_pause.yaml')
+        self._useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForNodes(pool)
+        # Make sure diskimages were built.
+        self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 1)
+        self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
+        # fake-image will be missing, since it is paused.
+        self.assert_listed(configfile, ['image-list'], 3, 'fake-image', 0)
+        self.assert_listed(configfile, ['image-list'], 3, 'fake-image2', 1)
+
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

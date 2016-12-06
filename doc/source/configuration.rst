@@ -466,6 +466,7 @@ Example::
 
   images:
     - name: precise
+      pause: False
       min-ram: 8192
       name-filter: 'something to match'
       username: jenkins
@@ -493,6 +494,10 @@ Example::
     the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
     `name-filter` to ``Performance`` will ensure the chosen flavor also
     contains this string as well as meeting `min-ram` requirements).
+
+  ``pause`` (bool)
+    When set to True, nodepool-builder will not upload the image to the
+    provider.
 
   ``username``
     Nodepool expects that user to exist after running the script indicated by

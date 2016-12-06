@@ -789,7 +789,6 @@ class UploadWorker(BaseWorker):
                       (build_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
-
         provider_image = provider.images.get(image_name)
         if provider_image is None:
             raise exceptions.BuilderInvalidCommandError(
@@ -861,6 +860,10 @@ class UploadWorker(BaseWorker):
         indepedently.
         '''
         if image.name not in self._config.images_in_use:
+            return
+
+        # Check if image uploads are paused.
+        if provider.images.get(image.name).pause:
             return
 
         # Search for the most recent 'ready' image build

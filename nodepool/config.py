@@ -226,6 +226,7 @@ def loadConfig(config_path):
             i.name_filter = image.get('name-filter', None)
             i.username = image.get('username', 'jenkins')
             i.user_home = image.get('user-home', '/home/jenkins')
+            i.pause = bool(image.get('pause', False))
             i.private_key = image.get('private-key',
                                       '/var/lib/jenkins/.ssh/id_rsa')
             i.config_drive = image.get('config-drive', None)
