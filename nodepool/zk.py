@@ -133,7 +133,7 @@ class BaseBuilderModel(object):
         if value not in STATES:
             raise TypeError("'%s' is not a valid state" % value)
         self._state = value
-        self.state_time = int(time.time())
+        self.state_time = time.time()
 
     def toDict(self):
         '''
