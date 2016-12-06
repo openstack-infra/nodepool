@@ -197,7 +197,7 @@ class CleanupWorker(BaseWorker):
                 return True
         return False
 
-    def _inProgressUpload(self, upload, image, provider):
+    def _inProgressUpload(self, upload):
         '''
         Determine if an upload is in progress.
         '''
@@ -205,8 +205,9 @@ class CleanupWorker(BaseWorker):
             return False
 
         try:
-            with self._zk.imageUploadLock(image, upload.build_id,
-                                          provider, blocking=False):
+            with self._zk.imageUploadLock(upload.image_name, upload.build_id,
+                                          upload.provider_name,
+                                          blocking=False):
                 pass
         except exceptions.ZKLockException:
             return True
@@ -258,7 +259,7 @@ class CleanupWorker(BaseWorker):
         for upload in all_uploads:
             if self._isRecentUpload(image, provider.name, build_id, upload.id):
                 continue
-            self._deleteUpload(upload, image, provider)
+            self._deleteUpload(upload)
 
     def _cleanupObsoleteProviderUploads(self, provider, image, build_id):
         image_names_for_provider = provider.images.keys()
@@ -268,37 +269,38 @@ class CleanupWorker(BaseWorker):
 
         all_uploads = self._zk.getUploads(image, build_id, provider.name)
         for upload in all_uploads:
-            self._deleteUpload(upload, image, provider)
+            self._deleteUpload(upload)
 
-    def _deleteUpload(self, upload, image, provider):
+    def _deleteUpload(self, upload):
         deleted = False
 
         if upload.state != zk.DELETING:
-            if not self._inProgressUpload(upload, image, provider.name):
+            if not self._inProgressUpload(upload):
                 data = zk.ImageUpload()
                 data.state = zk.DELETING
-                self._zk.storeImageUpload(image, upload.build_id,
-                                          provider.name, data, upload.id)
+                self._zk.storeImageUpload(upload.image_name, upload.build_id,
+                                          upload.provider_name, data,
+                                          upload.id)
                 deleted = True
 
         if upload.state == zk.DELETING or deleted:
-            manager = self._config.provider_managers[provider.name]
+            manager = self._config.provider_managers[upload.provider_name]
             try:
                 # It is possible we got this far, but don't actually have an
                 # external_name. This could mean that zookeeper and cloud
                 # provider are some how out of sync.
                 if upload.external_name:
-                    base = "-".join([image, upload.build_id])
+                    base = "-".join([upload.image_name, upload.build_id])
                     self.log.info("Deleting image build %s from %s" %
-                                  (base, provider.name))
+                                  (base, upload.provider_name))
                     manager.deleteImage(upload.external_name)
             except Exception:
                 self.log.exception(
                     "Unable to delete image %s from %s: %s",
-                    upload.external_name, provider.name)
+                    upload.external_name, upload.provider_name)
             else:
-                self._zk.deleteUpload(image, upload.build_id,
-                                      provider.name, upload.id)
+                self._zk.deleteUpload(upload.image_name, upload.build_id,
+                                      upload.provider_name, upload.id)
 
     def _inProgressBuild(self, build, image):
         '''
@@ -353,14 +355,20 @@ class CleanupWorker(BaseWorker):
         Current builds (the ones we want to keep) are treated special since
         we want to remove any ZK nodes for uploads that failed exceptionally
         hard (i.e., we could not set the state to FAILED and they remain as
-        UPLOADING).
+        UPLOADING), and we also want to remove any uploads that have been
+        marked for deleting.
         '''
-        uploading = self._zk.getUploads(image, build_id, provider,
-                                        states=[zk.UPLOADING])
-        for upload in uploading:
-            if not self._inProgressUpload(upload, image, provider):
+        cruft = self._zk.getUploads(image, build_id, provider,
+                                    states=[zk.UPLOADING, zk.DELETING])
+        for upload in cruft:
+            if (upload.state == zk.UPLOADING and
+                not self._inProgressUpload(upload)
+            ):
                 self.log.info("Removing failed upload record: %s" % upload)
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
+            elif upload.state == zk.DELETING:
+                self.log.info("Removing deleted upload and record: %s" % upload)
+                self._deleteUpload(upload)
 
     def _cleanupImage(self, known_providers, image):
         '''

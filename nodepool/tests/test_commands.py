@@ -81,10 +81,8 @@ class TestNodepoolCMD(tests.DBTestCase):
                         "--build-id", image.build_id,
                         "--upload-id", image.id)
         nodepoolcmd.main()
-
-        # We need to specify the exact image to wait for because it is
-        # possible that the image could be re-uploaded after the delete.
-        self.waitForImageDeletion('fake-provider', 'fake-image', image)
+        self.waitForUploadRecordDeletion('fake-provider', 'fake-image',
+                                         image.build_id, image.id)
 
     def test_alien_list_fail(self):
         def fail_list(self):
