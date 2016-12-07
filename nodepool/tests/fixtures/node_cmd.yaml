@@ -13,7 +13,9 @@ gearman-servers:
     port: {gearman_port}
 
 zookeeper-servers:
-  - host: localhost
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
   - name: fake-label1
