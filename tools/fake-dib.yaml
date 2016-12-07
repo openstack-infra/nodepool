@@ -20,7 +20,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: trusty
 
 labels:

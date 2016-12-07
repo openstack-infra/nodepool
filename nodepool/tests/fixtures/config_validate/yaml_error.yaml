@@ -85,7 +85,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: trusty
     rebuild-age: 3600
     env-vars:
@@ -100,7 +100,7 @@ diskimages:
       - openstack-repos
       - puppet
       - nodepool-base
-      - node-devstack
+      - cache-devstack
     release: trusty
     rebuild-age: 3600
     env-vars:
