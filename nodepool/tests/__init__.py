@@ -509,10 +509,15 @@ class DBTestCase(BaseTestCase):
             files = builder.DibImageFile.from_image_id(
                 self._config_images_dir.path, base)
             if not files:
-                # Now, check the disk to ensure we didn't leak any files.
-                matches = glob.glob('%s/%s.*' % (self._config_images_dir.path,
-                                                 base))
-                self.assertEqual(matches, [])
+                break
+            time.sleep(1)
+
+        while True:
+            self.wait_for_threads()
+            # Now, check the disk to ensure we didn't leak any files.
+            matches = glob.glob('%s/%s.*' % (self._config_images_dir.path,
+                                             base))
+            if not matches:
                 break
             time.sleep(1)
 
