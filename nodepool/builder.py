@@ -857,7 +857,7 @@ class UploadWorker(BaseWorker):
                 except Exception:
                     self.log.exception("Error uploading image %s "
                                        "to provider %s:",
-                                       image, provider)
+                                       image.name, provider.name)
 
     def _checkProviderImageUpload(self, provider, image):
         '''
