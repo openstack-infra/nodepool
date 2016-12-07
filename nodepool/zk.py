@@ -298,7 +298,7 @@ class ZooKeeper(object):
 
     log = logging.getLogger("nodepool.zk.ZooKeeper")
 
-    IMAGE_ROOT = "/nodepool/image"
+    IMAGE_ROOT = "/nodepool/images"
 
     def __init__(self, client=None):
         '''
@@ -341,13 +341,13 @@ class ZooKeeper(object):
                                build_number)
 
     def _imageProviderPath(self, image, build_number):
-        return "%s/%s/provider" % (self._imageBuildsPath(image),
-                                   build_number)
+        return "%s/%s/providers" % (self._imageBuildsPath(image),
+                                    build_number)
 
     def _imageUploadPath(self, image, build_number, provider):
-        return "%s/%s/provider/%s/images" % (self._imageBuildsPath(image),
-                                             build_number,
-                                             provider)
+        return "%s/%s/providers/%s/images" % (self._imageBuildsPath(image),
+                                              build_number,
+                                              provider)
 
     def _imageUploadLockPath(self, image, build_number, provider):
         return "%s/lock" % self._imageUploadPath(image, build_number,
