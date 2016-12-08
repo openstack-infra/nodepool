@@ -448,9 +448,14 @@ class CleanupWorker(BaseWorker):
                     break
 
             if not uploads_exist:
-                data = zk.ImageBuild()
-                data.state = zk.DELETING
-                self._zk.storeBuild(image, data, build.id)
+                if build.state != zk.DELETING:
+                    with self._zk.imageBuildNumberLock(
+                        image, build.id, blocking=False
+                    ):
+                        build.state = zk.DELETING
+                        self._zk.storeBuild(image, build, build.id)
+
+                # Release the lock here so we can delete the build znode
                 if self._deleteLocalBuild(image, build.id):
                     if not self._zk.deleteBuild(image, build.id):
                         self.log.error("Unable to delete build %s because"
