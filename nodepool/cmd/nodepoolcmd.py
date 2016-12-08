@@ -280,6 +280,11 @@ class NodePoolCmd(NodepoolApp):
         if not build:
             print("Build %s not found" % self.args.id)
             return
+
+        if build.state == zk.BUILDING:
+            print("Cannot delete a build in progress")
+            return
+
         build.state = zk.DELETING
         self.zk.storeBuild(image, build, build.id)
 
@@ -293,6 +298,10 @@ class NodePoolCmd(NodepoolApp):
                                        upload_id)
         if not image:
             print("Image upload not found")
+            return
+
+        if image.state == zk.UPLOADING:
+            print("Cannot delete because image upload in progress")
             return
 
         image.state = zk.DELETING
