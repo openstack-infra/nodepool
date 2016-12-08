@@ -72,41 +72,53 @@ class Provider(ConfigValue):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __repr__(self):
+        return "<Provider %s>" % self.name
+
 
 class ProviderImage(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<ProviderImage %s>" % self.name
 
 
 class Target(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Target %s>" % self.name
 
 
 class Label(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Label %s>" % self.name
 
 
 class LabelProvider(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<LabelProvider %s>" % self.name
 
 
 class Cron(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Cron %s>" % self.name
 
 
 class ZMQPublisher(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<ZMQPublisher %s>" % self.name
 
 
 class GearmanServer(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<GearmanServer %s>" % self.name
 
 
 class DiskImage(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<DiskImage %s>" % self.name
 
 
 class Network(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Network name:%s id:%s>" % (self.name, self.id)
 
 
 def loadConfig(config_path):
