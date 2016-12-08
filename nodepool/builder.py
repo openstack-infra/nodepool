@@ -540,7 +540,7 @@ class BuildWorker(BaseWorker):
             except Exception:
                 self.log.exception("Exception checking for scheduled "
                                    "update of diskimage %s",
-                                   diskimage)
+                                   diskimage.name)
 
     def _checkImageForScheduledImageUpdates(self, diskimage):
         '''
