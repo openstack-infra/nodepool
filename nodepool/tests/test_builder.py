@@ -264,3 +264,13 @@ class TestNodePoolBuilder(tests.DBTestCase):
                                          upload.image_name,
                                          upload.build_id,
                                          upnum)
+
+    def test_cleanup_failed_image_build(self):
+        configfile = self.setup_config('node_diskimage_fail.yaml')
+        self._useBuilder(configfile)
+        # NOTE(pabelanger): We are racing here, but don't really care. We just
+        # need our first image build to fail.
+        self.replace_config(configfile, 'node.yaml')
+        self.waitForImage('fake-provider', 'fake-image')
+        # Make sure our cleanup worker properly removes the first build.
+        self.waitForBuildDeletion('fake-image', '0000000001')

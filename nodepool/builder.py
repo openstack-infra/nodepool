@@ -228,18 +228,24 @@ class CleanupWorker(BaseWorker):
             if e.errno != 2:    # No such file or directory
                 raise e
 
-    def _deleteLocalBuild(self, image, build_id):
+    def _deleteLocalBuild(self, image, build_id, builder):
         '''
         Remove expired image build from local disk.
 
         :param str image: Name of the image whose build we are deleting.
         :param str build_id: ID of the build we want to delete.
+        :param str builder: hostname of the build.
 
         :returns: True if files were deleted, False if none were found.
         '''
         base = "-".join([image, build_id])
         files = DibImageFile.from_image_id(self._config.imagesdir, base)
         if not files:
+            # NOTE(pabelanger): It is possible we don't have any files because
+            # diskimage-builder failed. So, check to see if we have the correct
+            # builder so we can removed the data from zookeeper.
+            if builder == self._hostname:
+                return True
             return False
 
         self.log.info("Doing cleanup for %s:%s" % (image, build_id))
@@ -456,7 +462,7 @@ class CleanupWorker(BaseWorker):
                         self._zk.storeBuild(image, build, build.id)
 
                 # Release the lock here so we can delete the build znode
-                if self._deleteLocalBuild(image, build.id):
+                if self._deleteLocalBuild(image, build.id, build.builder):
                     if not self._zk.deleteBuild(image, build.id):
                         self.log.error("Unable to delete build %s because"
                                        " uploads still remain.", build)
