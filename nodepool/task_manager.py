@@ -74,6 +74,9 @@ class TaskManager(threading.Thread):
         self._client = None
         self.statsd = stats.get_client()
 
+    def setClient(self, client):
+        self._client = client
+
     def stop(self):
         self._running = False
         self.queue.put(None)

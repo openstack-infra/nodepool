@@ -25,12 +25,13 @@ class TestWebApp(tests.DBTestCase):
     def test_image_list(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
         pool.start()
         webapp = self.useWebApp(pool, port=0)
         webapp.start()
         port = webapp.server.socket.getsockname()[1]
 
-        self.waitForImage(pool, 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes(pool)
 
         req = urllib2.Request(

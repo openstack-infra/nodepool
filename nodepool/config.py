@@ -18,9 +18,11 @@
 
 import os_client_config
 from six.moves import configparser as ConfigParser
+import time
 import yaml
 
 import fakeprovider
+import zk
 
 
 class ConfigValue(object):
@@ -57,13 +59,10 @@ class Provider(ConfigValue):
             return False
         # check if existing images have been updated
         for k in new_images:
-            if (new_images[k].base_image != old_images[k].base_image or
-                new_images[k].min_ram != old_images[k].min_ram or
+            if (new_images[k].min_ram != old_images[k].min_ram or
                 new_images[k].name_filter != old_images[k].name_filter or
-                new_images[k].setup != old_images[k].setup or
                 new_images[k].username != old_images[k].username or
                 new_images[k].user_home != old_images[k].user_home or
-                new_images[k].diskimage != old_images[k].diskimage or
                 new_images[k].private_key != old_images[k].private_key or
                 new_images[k].meta != old_images[k].meta or
                 new_images[k].config_drive != old_images[k].config_drive):
@@ -73,49 +72,75 @@ class Provider(ConfigValue):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __repr__(self):
+        return "<Provider %s>" % self.name
+
 
 class ProviderImage(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<ProviderImage %s>" % self.name
 
 
 class Target(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Target %s>" % self.name
 
 
 class Label(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Label %s>" % self.name
 
 
 class LabelProvider(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<LabelProvider %s>" % self.name
 
 
 class Cron(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Cron %s>" % self.name
 
 
 class ZMQPublisher(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<ZMQPublisher %s>" % self.name
 
 
 class GearmanServer(ConfigValue):
-    pass
-
-
-class ZooKeeperServer(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<GearmanServer %s>" % self.name
 
 
 class DiskImage(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<DiskImage %s>" % self.name
 
 
 class Network(ConfigValue):
-    pass
+    def __repr__(self):
+        return "<Network name:%s id:%s>" % (self.name, self.id)
 
 
 def loadConfig(config_path):
-    config = yaml.load(open(config_path))
+    retry = 3
+
+    # Since some nodepool code attempts to dynamically re-read its config
+    # file, we need to handle the race that happens if an outside entity
+    # edits it (causing it to temporarily not exist) at the same time we
+    # attempt to reload it.
+    while True:
+        try:
+            config = yaml.load(open(config_path))
+            break
+        except IOError as e:
+            if e.errno == 2:
+                retry = retry - 1
+                time.sleep(.5)
+            else:
+                raise e
+            if retry == 0:
+                raise e
+
     cloud_config = os_client_config.OpenStackConfig()
 
     newconfig = Config()
@@ -137,7 +162,6 @@ def loadConfig(config_path):
     newconfig.crons = {}
 
     for name, default in [
-        ('image-update', '14 2 * * *'),
         ('cleanup', '* * * * *'),
         ('check', '*/15 * * * *'),
         ]:
@@ -161,12 +185,11 @@ def loadConfig(config_path):
         newconfig.gearman_servers[g.name] = g
 
     for server in config.get('zookeeper-servers', []):
-        z = ZooKeeperServer()
-        z.host = server['host']
-        z.port = server.get('port', 2181)
-        z.chroot = server.get('chroot', '')
-        z.name = z.host + '_' + str(z.port)
-        newconfig.zookeeper_servers[z.name] = z
+        z = zk.ZooKeeperConnectionConfig(server['host'],
+                                         server.get('port', 2181),
+                                         server.get('chroot', None))
+        name = z.host + '_' + str(z.port)
+        newconfig.zookeeper_servers[name] = z
 
     for provider in config.get('providers', []):
         p = Provider()
@@ -211,22 +234,17 @@ def loadConfig(config_path):
             i = ProviderImage()
             i.name = image['name']
             p.images[i.name] = i
-            i.base_image = image.get('base-image', None)
             i.min_ram = image['min-ram']
             i.name_filter = image.get('name-filter', None)
-            i.setup = image.get('setup', None)
-            i.diskimage = image.get('diskimage', None)
             i.username = image.get('username', 'jenkins')
             i.user_home = image.get('user-home', '/home/jenkins')
+            i.pause = bool(image.get('pause', False))
             i.private_key = image.get('private-key',
                                       '/var/lib/jenkins/.ssh/id_rsa')
             i.config_drive = image.get('config-drive', None)
 
-            # note this does "double-duty" -- for
-            # SnapshotImageUpdater the meta-data dict is passed to
-            # nova when the snapshot image is created.  For
-            # DiskImageUpdater, this dict is expanded and used as
-            # custom properties when the image is uploaded.
+            # This dict is expanded and used as custom properties when
+            # the image is uploaded.
             i.meta = image.get('meta', {})
             # 5 elements, and no key or value can be > 255 chars
             # per Nova API rules
@@ -252,19 +270,21 @@ def loadConfig(config_path):
             # d-i-b, but might be untyped in the yaml and
             # interpreted as a number (e.g. "21" for fedora)
             d.release = str(diskimage.get('release', ''))
+            d.rebuild_age = int(diskimage.get('rebuild-age', 86400))
             d.env_vars = diskimage.get('env-vars', {})
             if not isinstance(d.env_vars, dict):
                 #self.log.error("%s: ignoring env-vars; "
                 #               "should be a dict" % d.name)
                 d.env_vars = {}
             d.image_types = set()
+            d.pause = bool(diskimage.get('pause', False))
+            d.in_use = False
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():
-                if (image.diskimage and
-                    image.diskimage in newconfig.diskimages):
-                    diskimage = newconfig.diskimages[image.diskimage]
-                    diskimage.image_types.add(provider.image_type)
+                diskimage = newconfig.diskimages[image.name]
+                diskimage.image_types.add(provider.image_type)
+                diskimage.in_use = True
 
     for label in config.get('labels', []):
         l = Label()
@@ -303,14 +323,6 @@ def loadConfig(config_path):
             'subnode-hostname',
             '{label.name}-{provider.name}-{node_id}-{subnode_id}'
         )
-
-    # A set of image names that are in use by labels, to be
-    # used by the image update methods to determine whether
-    # a given image needs to be updated.
-    newconfig.images_in_use = set()
-    for label in newconfig.labels.values():
-        if label.min_ready >= 0:
-            newconfig.images_in_use.add(label.image)
 
     return newconfig
 

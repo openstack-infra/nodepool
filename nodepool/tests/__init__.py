@@ -16,6 +16,7 @@
 """Common utilities used in testing"""
 
 import errno
+import glob
 import logging
 import os
 import pymysql
@@ -30,10 +31,12 @@ import uuid
 
 import fixtures
 import gear
+import lockfile
 import kazoo.client
 import testtools
 
 from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
+from nodepool import zk
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -111,136 +114,68 @@ class GearmanServerFixture(fixtures.Fixture):
 
 
 class ZookeeperServerFixture(fixtures.Fixture):
-    def __init__(self, port=0):
-        self._port = port
-        self.log = logging.getLogger("tests.ZookeeperServerFixture")
+    def _setUp(self):
+        zk_host = os.environ.get('NODEPOOL_ZK_HOST', 'localhost')
+        if ':' in zk_host:
+            host, port = zk_host.split(':')
+        else:
+            host = zk_host
+            port = None
+
+        self.zookeeper_host = host
+
+        if not port:
+            self.zookeeper_port = 2181
+        else:
+            self.zookeeper_port = int(port)
+
+
+class ChrootedKazooFixture(fixtures.Fixture):
+    def __init__(self, zookeeper_host, zookeeper_port):
+        super(ChrootedKazooFixture, self).__init__()
+        self.zookeeper_host = zookeeper_host
+        self.zookeeper_port = zookeeper_port
 
     def _setUp(self):
-        if 'NODEPOOL_ZK_HOST' in os.environ:
-           if ':' in os.environ['NODEPOOL_ZK_HOST']:
-               host, port = os.environ['NODEPOOL_ZK_HOST'].split(':')
-           else:
-               host = os.environ['NODEPOOL_ZK_HOST']
-               port = None
+        # Make sure the test chroot paths do not conflict
+        random_bits = ''.join(random.choice(string.ascii_lowercase +
+                                            string.ascii_uppercase)
+                              for x in range(8))
 
-           self.zookeeper_host = host
+        rand_test_path = '%s_%s' % (random_bits, os.getpid())
+        self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
-           if not port:
-               self.zookeeper_port = 2181
-           else:
-               self.zookeeper_port = int(port)
+        # Ensure the chroot path exists and clean up an pre-existing znodes.
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+        _tmp_client.start()
 
-           return
+        if _tmp_client.exists(self.chroot_path):
+            _tmp_client.delete(self.chroot_path, recursive=True)
 
-        self.zookeeper_host = '127.0.0.1'
+        _tmp_client.ensure_path(self.chroot_path)
+        _tmp_client.stop()
 
-        # Get the local port range, we're going to pick one at a time
-        # at random to try.
-        with open('/proc/sys/net/ipv4/ip_local_port_range') as f:
-            line = f.readline()
-            begin, end = map(int, line.split())
+        # Create a chroot'ed client
+        self.zkclient = kazoo.client.KazooClient(
+            hosts='%s:%s%s' % (self.zookeeper_host,
+                               self.zookeeper_port,
+                               self.chroot_path)
+        )
+        self.zkclient.start()
 
-        zookeeper_fixtures = os.path.join(os.path.dirname(__file__),
-                                          'fixtures', 'zookeeper')
+        self.addCleanup(self._cleanup)
 
-        # Make a tmpdir to hold the config file, zookeeper data dir,
-        # and log file.
-        tmp_root = self.useFixture(fixtures.TempDir()).path
-        with open(os.path.join(zookeeper_fixtures, 'log4j.properties')) as i:
-            with open(os.path.join(tmp_root, 'log4j.properties'), 'w') as o:
-                o.write(i.read())
+    def _cleanup(self):
+        '''Stop the client and remove the chroot path.'''
+        self.zkclient.stop()
 
-        config_path = os.path.join(tmp_root, 'zoo.cfg')
-        log_path = os.path.join(tmp_root, 'zookeeper.log')
-
-        classpath = [
-            tmp_root,
-            '/usr/share/java/jline.jar',
-            '/usr/share/java/log4j-1.2.jar',
-            '/usr/share/java/xercesImpl.jar',
-            '/usr/share/java/xmlParserAPIs.jar',
-            '/usr/share/java/netty.jar',
-            '/usr/share/java/slf4j-api.jar',
-            '/usr/share/java/slf4j-log4j12.jar',
-            '/usr/share/java/zookeeper.jar',
-        ]
-        classpath = ':'.join(classpath)
-
-        args = ['/usr/bin/java', '-cp', classpath,
-                '-Dzookeeper.log.dir=%s' % (tmp_root,),
-                '-Dzookeeper.root.logger=INFO,ROLLINGFILE',
-                'org.apache.zookeeper.server.quorum.QuorumPeerMain',
-                config_path]
-
-        found_port = False
-
-        self.zookeeper_process = None
-        self.addCleanup(self.shutdownZookeeper)
-
-        # Try a random port in the local port range one at a time
-        # until we find one that's available.
-        while not found_port:
-            port = random.randrange(begin, end)
-
-            self.log.debug("Starting ZK on port %s", port)
-            # Write a config file with this port.
-            with open(os.path.join(zookeeper_fixtures, 'zoo.cfg')) as i:
-                with open(config_path, 'w') as o:
-                    o.write(i.read().format(datadir=os.path.join(tmp_root, 'data'),
-                                            port=port))
-
-            # Run zookeeper.
-            p = subprocess.Popen(args)
-            self.zookeeper_port = port
-            self.zookeeper_process = p
-            self.zookeeper_log_path = log_path
-
-            # Wait up to 30 seconds to figure out if it has started.
-            for x in range(30):
-                r = self._checkZKLog(log_path)
-                if r is True:
-                    found_port = True
-                    break
-                elif r is False:
-                    break
-                time.sleep(1)
-
-            if not found_port:
-                p.kill()
-                p.wait()
-                if os.path.exists(log_path):
-                    os.unlink(log_path)
-
-    def _checkZKLog(self, path):
-        if not os.path.exists(path):
-            return None
-        # Our return value starts as indeterminate.
-        bound = None
-        with open(path) as f:
-            for line in f:
-                # Note: success appears as "binding to port" when
-                # *not* followed by "Address already in use".  That
-                # makes this a little racy, but failure is generally
-                # fast, and this is called at 1 second intervals.
-                if 'binding to port' in line:
-                    bound = True
-                if 'Address already in use' in line:
-                    return False
-        return bound
-
-    def shutdownZookeeper(self):
-        if self.zookeeper_process:
-            try:
-                self.zookeeper_process.kill()
-                self.zookeeper_process.wait()
-            except OSError:
-                self.log.exception("Error stopping ZK (ignored)")
-                pass
-        if os.path.exists(self.zookeeper_log_path):
-            self.log.debug("Zookeeper log file:")
-            with open(self.zookeeper_log_path) as f:
-                for line in f:
-                    self.log.debug(line.strip())
+        # Need a non-chroot'ed client to remove the chroot path
+        _tmp_client = kazoo.client.KazooClient(
+            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
+        _tmp_client.start()
+        _tmp_client.delete(self.chroot_path, recursive=True)
+        _tmp_client.stop()
 
 
 class GearmanClient(gear.Client):
@@ -295,11 +230,14 @@ class BaseTestCase(testtools.TestCase):
             stderr = self.useFixture(fixtures.StringStream('stderr')).stream
             self.useFixture(fixtures.MonkeyPatch('sys.stderr', stderr))
         if os.environ.get('OS_LOG_CAPTURE') in TRUE_VALUES:
-            fs = '%(levelname)s [%(name)s] %(message)s'
+            fs = '%(asctime)s %(levelname)s [%(name)s] %(message)s'
             self.useFixture(fixtures.FakeLogger(level=logging.DEBUG,
                                                 format=fs))
         else:
             logging.basicConfig(level=logging.DEBUG)
+        l = logging.getLogger('kazoo')
+        l.setLevel(logging.INFO)
+        l.propagate=False
         self.useFixture(fixtures.NestedTempfile())
 
         self.subprocesses = []
@@ -355,6 +293,12 @@ class BaseTestCase(testtools.TestCase):
                 if t.name.startswith("worker "):
                     # paste web server
                     continue
+                if t.name.startswith("UploadWorker"):
+                    continue
+                if t.name.startswith("BuildWorker"):
+                    continue
+                if t.name.startswith("CleanupWorker"):
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
@@ -400,16 +344,18 @@ class MySQLSchemaFixture(fixtures.Fixture):
                               for x in range(8))
         self.name = '%s_%s' % (random_bits, os.getpid())
         self.passwd = uuid.uuid4().hex
-        db = pymysql.connect(host="localhost",
-                             user="openstack_citest",
-                             passwd="openstack_citest",
-                             db="openstack_citest")
-        cur = db.cursor()
-        cur.execute("create database %s" % self.name)
-        cur.execute(
-            "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
-            (self.name, self.name, self.passwd))
-        cur.execute("flush privileges")
+        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
+        with lock:
+            db = pymysql.connect(host="localhost",
+                                 user="openstack_citest",
+                                 passwd="openstack_citest",
+                                 db="openstack_citest")
+            cur = db.cursor()
+            cur.execute("create database %s" % self.name)
+            cur.execute(
+                "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
+                (self.name, self.name, self.passwd))
+            cur.execute("flush privileges")
 
         self.dburi = 'mysql+pymysql://%s:%s@localhost/%s' % (self.name,
                                                              self.passwd,
@@ -418,14 +364,16 @@ class MySQLSchemaFixture(fixtures.Fixture):
         self.addCleanup(self.cleanup)
 
     def cleanup(self):
-        db = pymysql.connect(host="localhost",
-                             user="openstack_citest",
-                             passwd="openstack_citest",
-                             db="openstack_citest")
-        cur = db.cursor()
-        cur.execute("drop database %s" % self.name)
-        cur.execute("drop user '%s'@'localhost'" % self.name)
-        cur.execute("flush privileges")
+        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
+        with lock:
+            db = pymysql.connect(host="localhost",
+                                 user="openstack_citest",
+                                 passwd="openstack_citest",
+                                 db="openstack_citest")
+            cur = db.cursor()
+            cur.execute("drop database %s" % self.name)
+            cur.execute("drop user '%s'@'localhost'" % self.name)
+            cur.execute("flush privileges")
 
 
 class BuilderFixture(fixtures.Fixture):
@@ -437,10 +385,12 @@ class BuilderFixture(fixtures.Fixture):
     def setUp(self):
         super(BuilderFixture, self).setUp()
         self.builder = builder.NodePoolBuilder(self.configfile)
-        nb_thread = threading.Thread(target=self.builder.runForever)
-        nb_thread.daemon = True
+        self.builder.cleanup_interval = .5
+        self.builder.build_interval = .1
+        self.builder.upload_interval = .1
+        self.builder.dib_cmd = 'nodepool/tests/fake-image-create'
+        self.builder.start()
         self.addCleanup(self.cleanup)
-        nb_thread.start()
 
     def cleanup(self):
         self.builder.stop()
@@ -449,6 +399,7 @@ class BuilderFixture(fixtures.Fixture):
 class DBTestCase(BaseTestCase):
     def setUp(self):
         super(DBTestCase, self).setUp()
+        self.log = logging.getLogger("tests")
         f = MySQLSchemaFixture()
         self.useFixture(f)
         self.dburi = f.dburi
@@ -458,18 +409,30 @@ class DBTestCase(BaseTestCase):
         self.useFixture(gearman_fixture)
         self.gearman_server = gearman_fixture.gearman_server
 
-    def setup_config(self, filename):
-        images_dir = fixtures.TempDir()
-        self.useFixture(images_dir)
+        self.setupZK()
+
+    def setup_config(self, filename, images_dir=None):
+        if images_dir is None:
+            images_dir = fixtures.TempDir()
+            self.useFixture(images_dir)
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
         with open(configfile) as conf_fd:
             config = conf_fd.read()
             os.write(fd, config.format(images_dir=images_dir.path,
-                                       gearman_port=self.gearman_server.port))
+                                       gearman_port=self.gearman_server.port,
+                                       zookeeper_host=self.zookeeper_host,
+                                       zookeeper_port=self.zookeeper_port,
+                                       zookeeper_chroot=self.zookeeper_chroot))
         os.close(fd)
+        self._config_images_dir = images_dir
         return path
+
+    def replace_config(self, configfile, filename):
+        self.log.debug("Replacing config with %s", filename)
+        new_configfile = self.setup_config(filename, self._config_images_dir)
+        os.rename(new_configfile, configfile)
 
     def _setup_secure(self):
         # replace entries in secure.conf
@@ -488,18 +451,84 @@ class DBTestCase(BaseTestCase):
                 return
             time.sleep(0.1)
 
-    def waitForImage(self, pool, provider_name, image_name):
-        self.wait_for_config(pool)
+    def waitForImage(self, provider_name, image_name, ignore_list=None):
         while True:
             self.wait_for_threads()
-            self.waitForJobs()
-            with pool.getDB().getSession() as session:
-                image = session.getCurrentSnapshotImage(provider_name,
-                                                        image_name)
-
-                if image:
+            image = self.zk.getMostRecentImageUpload(image_name, provider_name)
+            if image:
+                if ignore_list and image not in ignore_list:
                     break
-                time.sleep(1)
+                elif not ignore_list:
+                    break
+            time.sleep(1)
+        self.wait_for_threads()
+        return image
+
+    def waitForUploadRecordDeletion(self, provider_name, image_name,
+                                    build_id, upload_id):
+        while True:
+            self.wait_for_threads()
+            uploads = self.zk.getUploads(image_name, build_id, provider_name)
+            if not uploads or upload_id not in [u.id for u in uploads]:
+                break
+            time.sleep(1)
+        self.wait_for_threads()
+
+    def waitForImageDeletion(self, provider_name, image_name, match=None):
+        while True:
+            self.wait_for_threads()
+            image = self.zk.getMostRecentImageUpload(image_name, provider_name)
+            if not image or (match and image != match):
+                break
+            time.sleep(1)
+        self.wait_for_threads()
+
+    def waitForBuild(self, image_name, build_id):
+        base = "-".join([image_name, build_id])
+        while True:
+            self.wait_for_threads()
+            files = builder.DibImageFile.from_image_id(
+                self._config_images_dir.path, base)
+            if files:
+                break
+            time.sleep(1)
+
+        while True:
+            self.wait_for_threads()
+            build = self.zk.getBuild(image_name, build_id)
+            if build and build.state == zk.READY:
+                break
+            time.sleep(1)
+
+        self.wait_for_threads()
+        return build
+
+    def waitForBuildDeletion(self, image_name, build_id):
+        base = "-".join([image_name, build_id])
+        while True:
+            self.wait_for_threads()
+            files = builder.DibImageFile.from_image_id(
+                self._config_images_dir.path, base)
+            if not files:
+                break
+            time.sleep(1)
+
+        while True:
+            self.wait_for_threads()
+            # Now, check the disk to ensure we didn't leak any files.
+            matches = glob.glob('%s/%s.*' % (self._config_images_dir.path,
+                                             base))
+            if not matches:
+                break
+            time.sleep(1)
+
+        while True:
+            self.wait_for_threads()
+            build = self.zk.getBuild(image_name, build_id)
+            if not build:
+                break
+            time.sleep(1)
+
         self.wait_for_threads()
 
     def waitForNodes(self, pool):
@@ -542,58 +571,34 @@ class DBTestCase(BaseTestCase):
     def _useBuilder(self, configfile):
         self.useFixture(BuilderFixture(configfile))
 
-
-class IntegrationTestCase(DBTestCase):
-    def setUpFakes(self):
-        pass
-
-
-class ZKTestCase(BaseTestCase):
-    def setUp(self):
-        super(ZKTestCase, self).setUp()
+    def setupZK(self):
         f = ZookeeperServerFixture()
         self.useFixture(f)
         self.zookeeper_host = f.zookeeper_host
         self.zookeeper_port = f.zookeeper_port
-        # Make sure the test chroot paths do not conflict
-        random_bits = ''.join(random.choice(string.ascii_lowercase +
-                                            string.ascii_uppercase)
-                              for x in range(8))
-        rand_test_path = '%s_%s' % (random_bits, os.getpid())
-        self.chroot_path = "/nodepool_test/%s" % rand_test_path
 
-        # Ensure the chroot path exists and clean up an pre-existing znodes.
-        # Allow extra time for the very first connection because we might
-        # be waiting for the ZooKeeper server to be started from the
-        # ZookeeperServerFixture fixture.
-        _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port),
-            timeout=60)
-        _tmp_client.start()
+        kz_fxtr = self.useFixture(ChrootedKazooFixture(
+            self.zookeeper_host,
+            self.zookeeper_port))
+        self.zkclient = kz_fxtr.zkclient
+        self.zk = zk.ZooKeeper(self.zkclient)
+        self.zookeeper_chroot = kz_fxtr.chroot_path
 
-        if _tmp_client.exists(self.chroot_path):
-            _tmp_client.delete(self.chroot_path, recursive=True)
+    def printZKTree(self, node):
+        def join(a, b):
+            if a.endswith('/'):
+                return a+b
+            return a+'/'+b
 
-        _tmp_client.ensure_path(self.chroot_path)
-        _tmp_client.stop()
+        data, stat = self.zk.client.get(node)
+        self.log.debug("Node: %s" % (node,))
+        if data:
+            self.log.debug(data)
 
-        # Create a chroot'ed client
-        self.zkclient = kazoo.client.KazooClient(
-            hosts='%s:%s%s' % (self.zookeeper_host,
-                               self.zookeeper_port,
-                               self.chroot_path)
-        )
-        self.zkclient.start()
+        for child in self.zk.client.get_children(node):
+            self.printZKTree(join(node, child))
 
-        self.addCleanup(self._cleanup)
 
-    def _cleanup(self):
-        '''Stop the client and remove the chroot path.'''
-        self.zkclient.stop()
-
-        # Need a non-chroot'ed client to remove the chroot path
-        _tmp_client = kazoo.client.KazooClient(
-            hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
-        _tmp_client.start()
-        _tmp_client.delete(self.chroot_path, recursive=True)
-        _tmp_client.stop()
+class IntegrationTestCase(DBTestCase):
+    def setUpFakes(self):
+        pass

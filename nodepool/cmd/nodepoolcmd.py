@@ -21,6 +21,7 @@ import sys
 from nodepool import nodedb
 from nodepool import nodepool
 from nodepool import status
+from nodepool import zk
 from nodepool.cmd import NodepoolApp
 from nodepool.version import version_info as npc_version_info
 from config_validator import ConfigValidator
@@ -63,15 +64,6 @@ class NodePoolCmd(NodepoolApp):
             help='list images built with diskimage-builder')
         cmd_dib_image_list.set_defaults(func=self.dib_image_list)
 
-        cmd_image_update = subparsers.add_parser(
-            'image-update',
-            help='rebuild the image and upload to provider')
-        cmd_image_update.add_argument(
-            'provider',
-            help='provider name (`all` for uploading to all providers)')
-        cmd_image_update.add_argument('image', help='image name')
-        cmd_image_update.set_defaults(func=self.image_update)
-
         cmd_image_build = subparsers.add_parser(
             'image-build',
             help='build image using diskimage-builder')
@@ -113,26 +105,20 @@ class NodePoolCmd(NodepoolApp):
             'image-delete',
             help='delete an image')
         cmd_image_delete.set_defaults(func=self.image_delete)
-        cmd_image_delete.add_argument('id', help='image id')
-        cmd_image_delete.add_argument('--force',
-                                      help='Ignore failure to remove image'
-                                      'from cloud', action='store_true')
+        cmd_image_delete.add_argument('--provider', help='provider name',
+                                      required=True)
+        cmd_image_delete.add_argument('--image', help='image name',
+                                      required=True)
+        cmd_image_delete.add_argument('--upload-id', help='image upload id',
+                                      required=True)
+        cmd_image_delete.add_argument('--build-id', help='image build id',
+                                      required=True)
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
             help='delete image built with diskimage-builder')
         cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
         cmd_dib_image_delete.add_argument('id', help='dib image id')
-
-        cmd_image_upload = subparsers.add_parser(
-            'image-upload',
-            help='upload an image to a provider ')
-        cmd_image_upload.set_defaults(func=self.image_upload)
-        cmd_image_upload.add_argument(
-            'provider',
-            help='provider name (`all` for uploading to all providers)',
-            nargs='?', default='all')
-        cmd_image_upload.add_argument('image', help='image name')
 
         cmd_config_validate = subparsers.add_parser(
             'config-validate',
@@ -169,59 +155,17 @@ class NodePoolCmd(NodepoolApp):
             logging.basicConfig(level=logging.INFO,
                                 format='%(asctime)s %(levelname)s %(name)s: '
                                        '%(message)s')
+            l = logging.getLogger('kazoo')
+            l.setLevel(logging.WARNING)
 
     def list(self, node_id=None):
         print status.node_list(self.pool.getDB(), node_id)
 
     def dib_image_list(self):
-        print status.dib_image_list(self.pool.getDB())
+        print status.dib_image_list(self.zk)
 
     def image_list(self):
-        print status.image_list(self.pool.getDB())
-
-    def image_update(self):
-        threads = []
-        jobs = []
-
-        with self.pool.getDB().getSession() as session:
-            self.pool.reconfigureManagers(self.pool.config)
-            if self.args.image not in self.pool.config.images_in_use:
-                raise Exception("Image specified, %s, is not in use."
-                                % self.args.image)
-
-            if self.args.provider == 'all':
-                dib_images_built = set()
-                for provider in self.pool.config.providers.values():
-                    image = provider.images.get(self.args.image)
-                    if image and image.diskimage:
-                        if image.diskimage not in dib_images_built:
-                            self.image_build(image.diskimage)
-                            dib_images_built.add(image.diskimage)
-                        jobs.append(self.pool.uploadImage(
-                            session, provider.name, image.name))
-                    elif image:
-                        threads.append(self.pool.updateImage(
-                            session, provider.name, image.name))
-            else:
-                provider = self.pool.config.providers.get(self.args.provider)
-                if not provider:
-                    raise Exception("Provider %s does not exist"
-                                    % self.args.provider)
-                image = provider.images.get(self.args.image)
-                if image and image.diskimage:
-                    self.image_build(image.diskimage)
-                    jobs.append(self.pool.uploadImage(
-                        session, provider.name, image.name))
-                elif image:
-                    threads.append(self.pool.updateImage(
-                        session, provider.name, image.name))
-                else:
-                    raise Exception("Image %s not in use by provider %s"
-                                    % (self.args.image, self.args.provider))
-
-        self._wait_for_threads(threads)
-        for job in jobs:
-            job.waitForCompletion()
+        print status.image_list(self.zk)
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -230,37 +174,11 @@ class NodePoolCmd(NodepoolApp):
             raise Exception("Trying to build a non disk-image-builder "
                             "image: %s" % diskimage)
 
-        self.pool.buildImage(self.pool.config.diskimages[diskimage])
-        self.pool.waitForBuiltImages()
+        if self.pool.config.diskimages[diskimage].pause:
+            raise Exception(
+                "Skipping build request for image %s; paused" % diskimage)
 
-    def image_upload(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
-
-        jobs = []
-
-        with self.pool.getDB().getSession() as session:
-            if self.args.provider == 'all':
-                # iterate for all providers listed in label
-                for provider in self.pool.config.providers.values():
-                    image = provider.images[self.args.image]
-                    if not image.diskimage:
-                        self.log.warning("Trying to upload a non "
-                                         "disk-image-builder image: %s",
-                                         self.args.image)
-                    else:
-                        jobs.append(self.pool.uploadImage(
-                            session, provider.name, self.args.image))
-            else:
-                provider = self.pool.config.providers[self.args.provider]
-                if not provider.images[self.args.image].diskimage:
-                    raise Exception("Trying to upload a non "
-                                    "disk-image-builder image: %s",
-                                    self.args.image)
-                jobs.append(self.pool.uploadImage(
-                    session, self.args.provider, self.args.image))
-
-        for job in jobs:
-            job.waitForCompletion()
+        self.zk.submitBuildRequest(diskimage)
 
     def alien_list(self):
         self.pool.reconfigureManagers(self.pool.config, False)
@@ -290,26 +208,47 @@ class NodePoolCmd(NodepoolApp):
 
         t = PrettyTable(["Provider", "Name", "Image ID"])
         t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for provider in self.pool.config.providers.values():
-                if (self.args.provider and
-                        provider.name != self.args.provider):
-                    continue
-                manager = self.pool.getProviderManager(provider)
 
-                images = []
-                try:
-                    images = manager.listImages()
-                except Exception as e:
-                    log.warning("Exception listing alien images for %s: %s"
-                                % (provider.name, str(e.message)))
+        for provider in self.pool.config.providers.values():
+            if (self.args.provider and
+                    provider.name != self.args.provider):
+                continue
+            manager = self.pool.getProviderManager(provider)
 
-                for image in images:
-                    if image['metadata'].get('image_type') == 'snapshot':
-                        if not session.getSnapshotImageByExternalID(
-                                provider.name, image['id']):
-                            t.add_row([provider.name, image['name'],
-                                       image['id']])
+            # Build list of provider images as known by the provider
+            provider_images = []
+            try:
+                # Only consider images marked as managed by nodepool.
+                # Prevent cloud-provider images from showing
+                # up in alien list since we can't do anything about them
+                # anyway.
+                provider_images = [
+                    image for image in manager.listImages()
+                    if 'nodepool_build_id' in image['properties']]
+            except Exception as e:
+                log.warning("Exception listing alien images for %s: %s"
+                            % (provider.name, str(e.message)))
+
+            alien_ids = []
+            uploads = []
+            for image in provider_images:
+                # Build list of provider images as recorded in ZK
+                for bnum in self.zk.getBuildNumbers(image['name']):
+                    uploads.extend(
+                        self.zk.getUploads(image['name'], bnum,
+                                           provider.name,
+                                           states=[zk.READY])
+                    )
+
+            # Calculate image IDs present in the provider, but not in ZK
+            provider_image_ids = set([img['id'] for img in provider_images])
+            zk_image_ids = set([img.external_id for img in uploads])
+            alien_ids = provider_image_ids - zk_image_ids
+
+            for image in provider_images:
+                if image['id'] in alien_ids:
+                    t.add_row([provider.name, image['name'], image['id']])
+
         print t
 
     def hold(self):
@@ -336,17 +275,38 @@ class NodePoolCmd(NodepoolApp):
                 self.list(node_id=node.id)
 
     def dib_image_delete(self):
-        job = None
-        self.pool.reconfigureManagers(self.pool.config, False)
-        with self.pool.getDB().getSession() as session:
-            dib_image = session.getDibImage(self.args.id)
-            job = self.pool.deleteDibImage(dib_image)
-        job.waitForCompletion()
+        (image, build_num) = self.args.id.rsplit('-', 1)
+        build = self.zk.getBuild(image, build_num)
+        if not build:
+            print("Build %s not found" % self.args.id)
+            return
+
+        if build.state == zk.BUILDING:
+            print("Cannot delete a build in progress")
+            return
+
+        build.state = zk.DELETING
+        self.zk.storeBuild(image, build, build.id)
 
     def image_delete(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
-        thread = self.pool.deleteImage(self.args.id, self.args.force)
-        self._wait_for_threads((thread, ))
+        provider_name = self.args.provider
+        image_name = self.args.image
+        build_id = self.args.build_id
+        upload_id = self.args.upload_id
+
+        image = self.zk.getImageUpload(image_name, build_id, provider_name,
+                                       upload_id)
+        if not image:
+            print("Image upload not found")
+            return
+
+        if image.state == zk.UPLOADING:
+            print("Cannot delete because image upload in progress")
+            return
+
+        image.state = zk.DELETING
+        self.zk.storeImageUpload(image.image_name, image.build_id,
+                                 image.provider_name, image, image.id)
 
     def config_validate(self):
         validator = ConfigValidator(self.args.config)
@@ -382,20 +342,29 @@ class NodePoolCmd(NodepoolApp):
                 t.join()
 
     def main(self):
+        self.zk = None
+
         # commands which do not need to start-up or parse config
         if self.args.command in ('config-validate'):
             return self.args.func()
 
         self.pool = nodepool.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
-        if self.args.command in ('dib-image-delete', 'dib-image-list',
-                                 'image-build', 'image-delete',
-                                 'image-upload', 'image-update'):
-            self.pool.reconfigureGearmanClient(config)
-        self.pool.reconfigureDatabase(config)
+
+        # commands needing ZooKeeper
+        if self.args.command in ('image-build', 'dib-image-list',
+                                 'image-list', 'dib-image-delete',
+                                 'image-delete', 'alien-image-list'):
+            self.zk = zk.ZooKeeper()
+            self.zk.connect(config.zookeeper_servers.values())
+        else:
+            self.pool.reconfigureDatabase(config)
+
         self.pool.setConfig(config)
         self.args.func()
 
+        if self.zk:
+            self.zk.disconnect()
 
 def main():
     npc = NodePoolCmd()

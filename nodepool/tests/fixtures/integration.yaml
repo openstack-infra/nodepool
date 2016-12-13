@@ -4,7 +4,6 @@ images-dir: '{images_dir}'
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881
@@ -13,9 +12,12 @@ gearman-servers:
   - host: localhost
     port: {gearman_port}
 
+zookeeper-servers:
+  - host: localhost
+
 labels:
   - name: real-label
-    image: real-image
+    image: fake-image
     min-ready: 1
     providers:
       - name: real-provider
@@ -34,14 +36,12 @@ providers:
       - net-id: 'some-uuid'
     rate: 0.0001
     images:
-      - name: real-image
-        base-image: 'Real Precise'
+      - name: fake-image
         min-ram: 8192
         name-filter: 'Real'
         meta:
           key: value
           key2: value
-        setup: prepare_node_devstack.sh
 
 targets:
   - name: fake-target
@@ -49,3 +49,6 @@ targets:
       url: https://jenkins.example.org/
       user: fake
       apikey: fake
+
+diskimages:
+  - name: fake-image

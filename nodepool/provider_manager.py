@@ -32,14 +32,6 @@ from task_manager import TaskManager, ManagerStoppedException
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 
 
-def make_image_dict(image):
-    d = dict(id=str(image.id), name=image.name, status=image.status,
-             metadata=image.metadata)
-    if hasattr(image, 'progress'):
-        d['progress'] = image.progress
-    return d
-
-
 @contextmanager
 def shade_inner_exceptions():
     try:
@@ -53,18 +45,18 @@ class NotFound(Exception):
     pass
 
 
-def get_provider_manager(provider):
+def get_provider_manager(provider, use_taskmanager):
     if (provider.cloud_config.get_auth_args().get('auth_url') == 'fake'):
-        return FakeProviderManager(provider)
+        return FakeProviderManager(provider, use_taskmanager)
     else:
-        return ProviderManager(provider)
+        return ProviderManager(provider, use_taskmanager)
 
 
-class ProviderManager(TaskManager):
+class ProviderManager(object):
     log = logging.getLogger("nodepool.ProviderManager")
 
     @staticmethod
-    def reconfigure(old_config, new_config):
+    def reconfigure(old_config, new_config, use_taskmanager=True):
         stop_managers = []
         for p in new_config.providers.values():
             oldmanager = None
@@ -79,7 +71,7 @@ class ProviderManager(TaskManager):
                 ProviderManager.log.debug("Creating new ProviderManager object"
                                           " for %s" % p.name)
                 new_config.provider_managers[p.name] = \
-                    get_provider_manager(p)
+                    get_provider_manager(p, use_taskmanager)
                 new_config.provider_managers[p.name].start()
 
         for stop_manager in stop_managers:
@@ -91,14 +83,28 @@ class ProviderManager(TaskManager):
             m.stop()
             m.join()
 
-    def __init__(self, provider):
-        super(ProviderManager, self).__init__(None, provider.name,
-                                              provider.rate)
+    def __init__(self, provider, use_taskmanager):
         self.provider = provider
-        self.resetClient()
         self._images = {}
         self._networks = {}
         self.__flavors = {}
+        self._use_taskmanager = use_taskmanager
+        self._taskmanager = None
+
+    def start(self):
+        if self._use_taskmanager:
+            self._taskmanager = TaskManager(None, self.provider.name,
+                                            self.provider.rate)
+            self._taskmanager.start()
+        self.resetClient()
+
+    def stop(self):
+        if self._taskmanager:
+            self._taskmanager.stop()
+
+    def join(self):
+        if self._taskmanager:
+            self._taskmanager.join()
 
     @property
     def _flavors(self):
@@ -107,19 +113,19 @@ class ProviderManager(TaskManager):
         return self.__flavors
 
     def _getClient(self):
+        if self._use_taskmanager:
+            manager = self._taskmanager
+        else:
+            manager = None
         return shade.OpenStackCloud(
             cloud_config=self.provider.cloud_config,
-            manager=self,
+            manager=manager,
             **self.provider.cloud_config.config)
-
-    def runTask(self, task):
-        # Run the given task in the TaskManager passed to shade. It turns
-        # out that this provider manager is the TaskManager we pass, so
-        # this is a way of running each cloud operation in its own thread
-        task.run(self._client)
 
     def resetClient(self):
         self._client = self._getClient()
+        if self._use_taskmanager:
+            self._taskmanager.setClient(self._client)
 
     def _getFlavors(self):
         flavors = self.listFlavors()
@@ -292,7 +298,8 @@ class ProviderManager(TaskManager):
         with shade_inner_exceptions():
             return self._client.get_image(image_id)
 
-    def uploadImage(self, image_name, filename, image_type=None, meta=None):
+    def uploadImage(self, image_name, filename, image_type=None, meta=None,
+            md5=None, sha256=None):
         # configure glance and upload image.  Note the meta flags
         # are provided as custom glance properties
         # NOTE: we have wait=True set here. This is not how we normally
@@ -313,6 +320,8 @@ class ProviderManager(TaskManager):
                 filename=filename,
                 is_public=False,
                 wait=True,
+                md5=md5,
+                sha256=sha256,
                 **meta)
         return image.id
 
@@ -352,9 +361,9 @@ class ProviderManager(TaskManager):
 
 
 class FakeProviderManager(ProviderManager):
-    def __init__(self, provider):
+    def __init__(self, provider, use_taskmanager):
         self.__client = fakeprovider.FakeOpenStackCloud()
-        super(FakeProviderManager, self).__init__(provider)
+        super(FakeProviderManager, self).__init__(provider, use_taskmanager)
 
     def _getClient(self):
         return self.__client

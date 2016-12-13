@@ -1,11 +1,7 @@
 NODEPOOL_CONFIG=/etc/nodepool/nodepool.yaml
 NODEPOOL_LOGGING=/etc/nodepool/logging.conf
 NODEPOOL_SECURE=/etc/nodepool/secure.conf
-NODEPOOL_IMAGE_URL=https://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
-NODEPOOL_IMAGE=$(basename "$NODEPOOL_IMAGE_URL" ".img")
 NODEPOOL_DIB_BASE_PATH=/opt/dib
-
-IMAGE_URLS+=",$NODEPOOL_IMAGE_URL"
 
 SHADE_REPO_URL=${SHADE_REPO_URL:-https://git.openstack.org/openstack-infra/shade}
 SHADE_REPO_REF=${SHADE_REPO_REF:-master}

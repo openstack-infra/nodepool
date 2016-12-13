@@ -5,7 +5,6 @@ images-dir: '{images_dir}'
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881
@@ -14,9 +13,14 @@ gearman-servers:
   - host: localhost
     port: {gearman_port}
 
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
 labels:
   - name: fake-label
-    image: fake-dib-image
+    image: fake-image
     min-ready: 2
     providers:
       - name: fake-provider1
@@ -24,6 +28,7 @@ labels:
 
 providers:
   - name: fake-provider1
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -35,11 +40,15 @@ providers:
       - net-id: 'some-uuid'
     rate: 0.0001
     images:
-      - name: fake-dib-image
-        base-image: 'Fake Precise'
+      - name: fake-image
         min-ram: 8192
-        diskimage: fake-dib-image
+        name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
+          SHOULD_FAIL: 'true'
   - name: fake-provider2
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -51,18 +60,20 @@ providers:
       - net-id: 'some-uuid'
     rate: 0.0001
     images:
-      - name: fake-dib-image
-        base-image: 'Fake Precise'
+      - name: fake-image
         min-ram: 8192
-        setup: prepare_node_devstack.sh
+        name-filter: 'Fake'
+        meta:
+          key: value
+          key2: value
 
 targets:
   - name: fake-target
 
 diskimages:
-  - name: fake-dib-image
+  - name: fake-image
     elements:
-      - ubuntu
+      - fedora
       - vm
     release: 21
     env-vars:
@@ -70,5 +81,3 @@ diskimages:
       DIB_IMAGE_CACHE: /opt/dib_cache
       DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
       BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
-      # Fail the build
-      SHOULD_FAIL: 'true'
