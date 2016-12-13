@@ -4,7 +4,6 @@ images-dir: '{images_dir}'
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881
@@ -12,6 +11,11 @@ zmq-publishers:
 gearman-servers:
   - host: localhost
     port: {gearman_port}
+
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
   - name: fake-label1
@@ -39,13 +43,11 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image1
-        base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
         meta:
           key: value
           key2: value
-        setup: prepare_node_devstack.sh
   - name: fake-provider2
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
@@ -59,13 +61,15 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image2
-        base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
         meta:
           key: value
           key2: value
-        setup: prepare_node_devstack.sh
 
 targets:
   - name: fake-target
+
+diskimages:
+  - name: fake-image1
+  - name: fake-image2

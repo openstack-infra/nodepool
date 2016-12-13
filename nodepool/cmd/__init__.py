@@ -17,6 +17,30 @@
 import logging
 import logging.config
 import os
+import signal
+import sys
+import threading
+import traceback
+
+
+def stack_dump_handler(signum, frame):
+    signal.signal(signal.SIGUSR2, signal.SIG_IGN)
+    log_str = ""
+    threads = {}
+    for t in threading.enumerate():
+        threads[t.ident] = t
+    for thread_id, stack_frame in sys._current_frames().items():
+        thread = threads.get(thread_id)
+        if thread:
+            thread_name = thread.name
+        else:
+            thread_name = 'Unknown'
+        label = '%s (%s)' % (thread_name, thread_id)
+        log_str += "Thread: %s\n" % label
+        log_str += "".join(traceback.format_stack(stack_frame))
+    log = logging.getLogger("nodepool.stack_dump")
+    log.debug(log_str)
+    signal.signal(signal.SIGUSR2, stack_dump_handler)
 
 
 class NodepoolApp(object):

@@ -183,6 +183,8 @@ class FakeOpenStackCloud(object):
         return self._image_list
 
     def delete_image(self, name_or_id):
+        if not name_or_id:
+            raise Exception('name_or_id is Empty')
         self._delete(name_or_id, self._image_list)
 
     def create_image_snapshot(self, name, server, **metadata):
@@ -233,8 +235,21 @@ class FakeOpenStackCloud(object):
 
 
 class FakeUploadFailCloud(FakeOpenStackCloud):
+    log = logging.getLogger("nodepool.FakeUploadFailCloud")
+
+    def __init__(self, times_to_fail=None):
+        super(FakeUploadFailCloud, self).__init__()
+        self.times_to_fail = times_to_fail
+        self.times_failed = 0
+
     def create_image(self, **kwargs):
-        raise exceptions.BuilderError("Test fail image upload.")
+        if self.times_to_fail is None:
+            raise exceptions.BuilderError("Test fail image upload.")
+        self.times_failed += 1
+        if self.times_failed <= self.times_to_fail:
+            raise exceptions.BuilderError("Test fail image upload.")
+        else:
+            return super(FakeUploadFailCloud, self).create_image(**kwargs)
 
 
 class FakeFile(StringIO.StringIO):

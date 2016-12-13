@@ -118,7 +118,7 @@ function nodepool_write_config {
 keys=simple
 
 [loggers]
-keys=root,nodepool,shade
+keys=root,nodepool,shade,kazoo
 
 [handlers]
 keys=console
@@ -137,6 +137,12 @@ propagate=0
 level=DEBUG
 handlers=console
 qualname=shade
+propagate=0
+
+[logger_kazoo]
+level=INFO
+handlers=console
+qualname=kazoo
 propagate=0
 
 [handler_console]
@@ -175,6 +181,10 @@ images-dir: $NODEPOOL_DIB_BASE_PATH/images
 # the value).
 dburi: '$dburi'
 
+zookeeper-servers:
+  - host: localhost
+    port: 2181
+
 gearman-servers:
   - host: localhost
     port: 8991
@@ -188,18 +198,8 @@ targets:
 cron:
   cleanup: '*/1 * * * *'
   check: '*/15 * * * *'
-  image-update: '14 14 * * *'
 
-# Devstack does not make an Ubuntu image by default. You can
-# grab one from Ubuntu and upload it yourself. Note that we
-# cannot use devstack's cirros default because cirros does not
-# support sftp.
 labels:
-  - name: $NODEPOOL_IMAGE
-    image: $NODEPOOL_IMAGE
-    min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-dib
     image: ubuntu-dib
     min-ready: 1
@@ -217,26 +217,15 @@ providers:
     max-servers: 2
     rate: 0.25
     images:
-      - name: $NODEPOOL_IMAGE
-        base-image: '$NODEPOOL_IMAGE'
-        min-ram: 1024
-        # This script should setup the jenkins user to accept
-        # the ssh key configured below. It goes in the script-dir
-        # configured above and an example is below.
-        setup: prepare_node_ubuntu.sh
-        username: jenkins
-        # Alter below to point to your local user private key
-        private-key: $NODEPOOL_KEY
-        config-drive: true
       - name: ubuntu-dib
         min-ram: 1024
-        diskimage: ubuntu-dib
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
 
 diskimages:
   - name: ubuntu-dib
+    rebuild-age: 86400
     elements:
       - ubuntu-minimal
       - vm
@@ -246,6 +235,7 @@ diskimages:
     release: trusty
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -315,7 +305,7 @@ function start_nodepool {
     run_process statsd "socat -u udp-recv:$STATSD_PORT -"
 
     run_process nodepool "$NODEPOOL_INSTALL/bin/nodepoold --no-builder -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
-    run_process nodepool-builder "$NODEPOOL_INSTALL/bin/nodepool-builder -c $NODEPOOL_CONFIG -d"
+    run_process nodepool-builder "$NODEPOOL_INSTALL/bin/nodepool-builder -c $NODEPOOL_CONFIG -l $NODEPOOL_LOGGING -d"
     :
 }
 

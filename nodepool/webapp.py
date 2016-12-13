@@ -75,9 +75,9 @@ class WebApp(threading.Thread):
         if result:
             return result
         if path == '/image-list':
-            table = status.image_list(self.nodepool.getDB())
+            table = status.image_list(self.nodepool.getZK())
         elif path == '/dib-image-list':
-            table = status.dib_image_list(self.nodepool.getDB())
+            table = status.dib_image_list(self.nodepool.getZK())
         else:
             return None
         return self.cache.put(path, table)

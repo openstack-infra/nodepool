@@ -1,10 +1,10 @@
 script-dir: .
+elements-dir: .
 images-dir: '{images_dir}'
 
 cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
-  image-update: '14 2 * * *'
 
 zmq-publishers:
   - tcp://localhost:8881
@@ -12,6 +12,11 @@ zmq-publishers:
 gearman-servers:
   - host: localhost
     port: {gearman_port}
+
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
   - name: fake-label
@@ -29,6 +34,7 @@ labels:
 
 providers:
   - name: fake-provider
+    region-name: fake-region
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
@@ -41,10 +47,23 @@ providers:
     rate: 0.0001
     images:
       - name: fake-image
-        base-image: 'Fake Precise'
         min-ram: 8192
         name-filter: 'Fake'
-        setup: prepare_node_devstack.sh
+        meta:
+          key: value
+          key2: value
 
 targets:
   - name: fake-target
+
+diskimages:
+  - name: fake-image
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2

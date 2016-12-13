@@ -16,7 +16,6 @@ import argparse
 import extras
 import signal
 import sys
-import threading
 
 import daemon
 
@@ -28,7 +27,7 @@ import nodepool.cmd
 # instead it depends on lockfile-0.9.1 which uses pidfile.
 pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
 
-class NodePoolBuilder(nodepool.cmd.NodepoolApp):
+class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
     def sigint_handler(self, signal, frame):
         self.nb.stop()
@@ -62,24 +61,23 @@ class NodePoolBuilder(nodepool.cmd.NodepoolApp):
             self.args.upload_workers)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
-
-        nb_thread = threading.Thread(target=self.nb.runForever)
-        nb_thread.start()
+        signal.signal(signal.SIGUSR2, nodepool.cmd.stack_dump_handler)
+        self.nb.start()
 
         while True:
             signal.pause()
 
 
 def main():
-    nb = NodePoolBuilder()
-    nb.parse_arguments()
+    app = NodePoolBuilderApp()
+    app.parse_arguments()
 
-    if nb.args.nodaemon:
-        nb.main()
+    if app.args.nodaemon:
+        app.main()
     else:
-        pid = pid_file_module.TimeoutPIDLockFile(nb.args.pidfile, 10)
+        pid = pid_file_module.TimeoutPIDLockFile(app.args.pidfile, 10)
         with daemon.DaemonContext(pidfile=pid):
-            nb.main()
+            app.main()
 
 
 if __name__ == "__main__":

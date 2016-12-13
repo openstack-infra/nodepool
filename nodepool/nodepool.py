@@ -25,10 +25,8 @@ import os.path
 import paramiko
 import pprint
 import random
-import re
 import threading
 import time
-from uuid import uuid4
 import zmq
 
 import allocation
@@ -41,6 +39,7 @@ import stats
 import config as nodepool_config
 
 import jobs
+import zk
 
 MINS = 60
 HOURS = 60 * MINS
@@ -246,19 +245,6 @@ class NodeUpdateListener(threading.Thread):
         t = NodeCompleteThread(self.nodepool, nodename, jobname, result,
                                branch)
         t.start()
-
-
-class JobTracker(object):
-    def __init__(self):
-        self._running_jobs = set()
-
-    @property
-    def running_jobs(self):
-        return list(self._running_jobs)
-
-    def addJob(self, job):
-        self._running_jobs.add(job)
-        job.addCompletionHandler(self._running_jobs.remove)
 
 
 class GearmanClient(gear.Client):
@@ -479,10 +465,10 @@ class NodeLauncher(threading.Thread):
         self.node.nodename = hostname.split('.')[0]
         self.node.target_name = self.target.name
 
-        snap_image = session.getCurrentSnapshotImage(
-            self.provider.name, self.image.name)
-        if not snap_image:
-            raise LaunchNodepoolException("Unable to find current snapshot "
+        cloud_image = self.nodepool.zk.getMostRecentImageUpload(
+            self.image.name, self.provider.name)
+        if not cloud_image:
+            raise LaunchNodepoolException("Unable to find current cloud"
                                           "image %s in %s" %
                                           (self.image.name,
                                            self.provider.name))
@@ -491,7 +477,7 @@ class NodeLauncher(threading.Thread):
                       "for node id: %s" % (hostname, self.provider.name,
                                            self.image.name, self.node_id))
         server = self.manager.createServer(
-            hostname, self.image.min_ram, snap_image.external_id,
+            hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node.az,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
@@ -799,10 +785,10 @@ class SubNodeLauncher(threading.Thread):
         self.subnode.hostname = hostname
         self.subnode.nodename = hostname.split('.')[0]
 
-        snap_image = session.getCurrentSnapshotImage(
-            self.provider.name, self.image.name)
-        if not snap_image:
-            raise LaunchNodepoolException("Unable to find current snapshot "
+        cloud_image = self.nodepool.zk.getMostRecentImageUpload(
+            self.image.name, self.provider.name)
+        if not cloud_image:
+            raise LaunchNodepoolException("Unable to find current cloud "
                                           "image %s in %s" %
                                           (self.image.name,
                                            self.provider.name))
@@ -812,7 +798,7 @@ class SubNodeLauncher(threading.Thread):
                       % (hostname, self.provider.name,
                          self.image.name, self.subnode_id, self.node_id))
         server = self.manager.createServer(
-            hostname, self.image.min_ram, snap_image.external_id,
+            hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node_az,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
@@ -874,282 +860,28 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
-class ImageDeleter(threading.Thread):
-    log = logging.getLogger("nodepool.ImageDeleter")
-
-    def __init__(self, nodepool, snap_image_id, force):
-        threading.Thread.__init__(self,
-                                  name='ImageDeleter for %s' % snap_image_id)
-        self.snap_image_id = snap_image_id
-        self.force = force
-        self.nodepool = nodepool
-
-    def run(self):
-        try:
-            with self.nodepool.getDB().getSession() as session:
-                snap_image = session.getSnapshotImage(self.snap_image_id)
-                self.nodepool._deleteImage(session, snap_image, self.force)
-        except Exception:
-            self.log.exception("Exception deleting image %s:" %
-                               self.snap_image_id)
-
-
-class ImageUpdater(threading.Thread):
-    log = logging.getLogger("nodepool.ImageUpdater")
-
-    def __init__(self, nodepool, provider, image, snap_image_id):
-        threading.Thread.__init__(self, name='ImageUpdater for %s' %
-                                  snap_image_id)
-        self.provider = provider
-        self.image = image
-        self.snap_image_id = snap_image_id
-        self.nodepool = nodepool
-        self.scriptdir = self.nodepool.config.scriptdir
-        self.elementsdir = self.nodepool.config.elementsdir
-        self.imagesdir = self.nodepool.config.imagesdir
-        self.statsd = stats.get_client()
-
-    def run(self):
-        try:
-            self._run()
-        except Exception:
-            self.log.exception("Exception in run method:")
-
-    def _run(self):
-        with self.nodepool.getDB().getSession() as session:
-            self.log.debug("Updating image %s in %s " % (self.image.name,
-                                                         self.provider.name))
-            try:
-                self.snap_image = session.getSnapshotImage(
-                    self.snap_image_id)
-                self.manager = self.nodepool.getProviderManager(self.provider)
-            except Exception:
-                self.log.exception("Exception preparing to update image %s "
-                                   "in %s:" % (self.image.name,
-                                               self.provider.name))
-                return
-
-            try:
-                self.updateImage(session)
-            except Exception:
-                self.log.exception("Exception updating image %s in %s:" %
-                                   (self.image.name, self.provider.name))
-                try:
-                    if self.snap_image:
-                        self.nodepool.deleteImage(self.snap_image.id)
-                except Exception:
-                    self.log.exception("Exception deleting image id: %s:" %
-                                       self.snap_image.id)
-                    return
-
-
-class SnapshotImageUpdater(ImageUpdater):
-
-    log = logging.getLogger("nodepool.SnapshotImageUpdater")
-
-    def updateImage(self, session):
-        start_time = time.time()
-        timestamp = int(start_time)
-
-        hostname = self.provider.template_hostname.format(
-            provider=self.provider, image=self.image, timestamp=str(timestamp))
-        self.log.info("Creating image id: %s with hostname %s for %s in %s" %
-                      (self.snap_image.id, hostname, self.image.name,
-                       self.provider.name))
-        if self.provider.keypair:
-            key_name = self.provider.keypair
-            key = None
-            use_password = False
-        else:
-            try:
-                key_name = hostname.split('.')[0]
-                key = self.manager.addKeypair(key_name)
-                use_password = False
-            except Exception:
-                key_name = None
-                key = None
-                use_password = True
-
-        uuid_pattern = 'hex{8}-(hex{4}-){3}hex{12}'.replace('hex',
-                                                            '[0-9a-fA-F]')
-        if re.match(uuid_pattern, self.image.base_image):
-            image_name = None
-            image_id = self.image.base_image
-        else:
-            image_name = self.image.base_image
-            image_id = None
-        try:
-            server = self.manager.createServer(
-                hostname, self.image.min_ram, image_name=image_name,
-                key_name=key_name, name_filter=self.image.name_filter,
-                image_id=image_id, config_drive=self.image.config_drive,
-                nodepool_snapshot_image_id=self.snap_image.id)
-            server_id = server['id']
-        except Exception:
-            if self.manager.deleteKeypair(key_name):
-                # Only log success - failure is logged inside of shade
-                self.log.debug(
-                    'Deleted keypair for failed image build %s' %
-                    self.snap_image.id)
-            raise
-
-        self.snap_image.hostname = hostname
-        self.snap_image.version = timestamp
-        self.snap_image.server_external_id = server_id
-        session.commit()
-
-        self.log.debug("Image id: %s waiting for server %s" %
-                       (self.snap_image.id, server_id))
-        server = self.manager.waitForServer(server)
-        if server['status'] != 'ACTIVE':
-            raise Exception("Server %s for image id: %s status: %s" %
-                            (server_id, self.snap_image.id, server['status']))
-
-        ip = server.get('public_v4')
-        ip_v6 = server.get('public_v6')
-        if self.provider.ipv6_preferred:
-            if ip_v6:
-                ip = ip_v6
-            else:
-                self.log.warning('Preferred ipv6 not available, '
-                                 'falling back to ipv4.')
-        if not ip:
-            self.log.error("Server dict {server}".format(
-                server=pprint.pformat(dict(server))))
-            raise Exception("Unable to find public IP of server")
-        server['public_ip'] = ip
-
-        self.bootstrapServer(server, key, use_password=use_password)
-
-        image_id = self.manager.createImage(server, hostname,
-                                            self.image.meta)['id']
-        self.snap_image.external_id = image_id
-        session.commit()
-        self.log.debug("Image id: %s building image %s" %
-                       (self.snap_image.id, image_id))
-        # It can take a _very_ long time for Rackspace 1.0 to save an image
-        image = self.manager.waitForImage(image_id, IMAGE_TIMEOUT)
-        # Throw exception here and not in waitForImage so that we can log
-        # the snap_image.id as well, which waitForImage does not know
-        if image['status'].lower() != 'active':
-            raise Exception("Image %s for image id: %s status: %s" %
-                            (image_id, self.snap_image.id, image['status']))
-
-        if self.statsd:
-            dt = int((time.time() - start_time) * 1000)
-            key = 'nodepool.image_update.%s.%s' % (self.image.name,
-                                                   self.provider.name)
-            self.statsd.timing(key, dt)
-            self.statsd.incr(key)
-
-        self.snap_image.state = nodedb.READY
-        session.commit()
-        self.log.info("Image %s in %s is ready" % (hostname,
-                                                   self.provider.name))
-
-        try:
-            # We made the snapshot, try deleting the server, but it's okay
-            # if we fail.  The reap script will find it and try again.
-            self.manager.cleanupServer(server_id)
-            self.manager.waitForServerDeletion(server_id)
-        except:
-            self.log.exception("Exception encountered deleting server"
-                               " %s for image id: %s" %
-                               (server_id, self.snap_image.id))
-
-    def bootstrapServer(self, server, key, use_password=False):
-        log = logging.getLogger("nodepool.image.build.%s.%s" %
-                                (self.provider.name, self.image.name))
-
-        ssh_kwargs = dict(log=log)
-        if not use_password:
-            ssh_kwargs['pkey'] = key
-        else:
-            ssh_kwargs['password'] = server['admin_pass']
-
-        host = utils.ssh_connect(server['public_ip'], 'root', ssh_kwargs,
-                                 timeout=CONNECT_TIMEOUT)
-
-        if not host:
-            # We have connected to the node but couldn't do anything as root
-            # try distro specific users, since we know ssh is up (a timeout
-            # didn't occur), we can connect with a very sort timeout.
-            for username in ['ubuntu', 'fedora', 'cloud-user', 'centos',
-                             'debian']:
-                try:
-                    host = utils.ssh_connect(server['public_ip'], username,
-                                             ssh_kwargs,
-                                             timeout=10)
-                    if host:
-                        break
-                except:
-                    continue
-
-        if not host:
-            raise Exception("Unable to log in via SSH")
-
-        # /etc/nodepool is world writable because by the time we write
-        # the contents after the node is launched, we may not have
-        # sudo access any more.
-        host.ssh("make config dir", "sudo mkdir -p /etc/nodepool")
-        host.ssh("chmod config dir", "sudo chmod 0777 /etc/nodepool")
-        if self.scriptdir:
-            host.ssh("make scripts dir", "mkdir -p scripts")
-            for fname in os.listdir(self.scriptdir):
-                path = os.path.join(self.scriptdir, fname)
-                if not os.path.isfile(path):
-                    continue
-                host.scp(path, 'scripts/%s' % fname)
-            host.ssh("move scripts to opt",
-                     "sudo mv scripts /opt/nodepool-scripts")
-            host.ssh("set scripts permissions",
-                     "sudo chmod -R a+rx /opt/nodepool-scripts")
-
-        if self.image.setup:
-            env_vars = ''
-            for k, v in os.environ.items():
-                if k.startswith('NODEPOOL_'):
-                    env_vars += ' %s="%s"' % (k, v)
-
-            # non-interactive "cloud-user" type logins can have very
-            # restrictive paths of just /bin:/usr/bin.  Because on
-            # some hosts we log-in as root and others as a user, we
-            # standarise the path here
-            set_path = "export PATH=" \
-                       "/usr/local/sbin:/sbin:/usr/sbin:" \
-                       "/usr/local/bin:/bin:/usr/bin"
-            host.ssh("run setup script",
-                     "%s; cd /opt/nodepool-scripts "
-                     "&& %s ./%s %s && sync && sleep 5" %
-                     (set_path, env_vars, self.image.setup, server['name']))
-
-
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
     def __init__(self, securefile, configfile, no_deletes=False,
-                 no_launches=False, no_images=False,
-                 watermark_sleep=WATERMARK_SLEEP):
+                 no_launches=False, watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
         self.no_deletes = no_deletes
         self.no_launches = no_launches
-        self.no_images = no_images
         self.watermark_sleep = watermark_sleep
         self._stopped = False
         self.config = None
         self.zmq_context = None
         self.gearman_client = None
         self.apsched = None
+        self.zk = None
         self.statsd = stats.get_client()
         self._delete_threads = {}
         self._delete_threads_lock = threading.Lock()
-        self._image_delete_threads = {}
-        self._image_delete_threads_lock = threading.Lock()
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
-        self._image_build_jobs = JobTracker()
         self._wake_condition = threading.Condition()
 
     def stop(self):
@@ -1169,12 +901,6 @@ class NodePool(threading.Thread):
         if self.gearman_client:
             self.gearman_client.shutdown()
         self.log.debug("finished stopping")
-
-    def waitForBuiltImages(self):
-        self.log.debug("Waiting for images to complete building.")
-        for job in self._image_build_jobs.running_jobs:
-            job.waitForCompletion()
-        self.log.debug("Done waiting for images to complete building.")
 
     def loadConfig(self):
         self.log.debug("Loading configuration")
@@ -1231,7 +957,6 @@ class NodePool(threading.Thread):
 
     def reconfigureCrons(self, config):
         cron_map = {
-            'image-update': self._doUpdateImages,
             'cleanup': self._doPeriodicCleanup,
             'check': self._doPeriodicCheck,
             }
@@ -1307,11 +1032,36 @@ class NodePool(threading.Thread):
                 self.gearman_client.addServer(g.host, g.port)
             self.gearman_client.waitForServer()
 
+    def reconfigureZooKeeper(self, config):
+        if self.config:
+            running = self.config.zookeeper_servers.values()
+        else:
+            running = None
+
+        configured = config.zookeeper_servers.values()
+        if running == configured:
+            self.log.debug("Zookeeper client does not need to be updated")
+            if self.config:
+                config.zookeeper_servers = self.config.zookeeper_servers
+            return
+
+        if not self.zk:
+            self.log.debug("Connecting to ZooKeeper servers")
+            self.zk = zk.ZooKeeper()
+        else:
+            self.log.debug("Detected ZooKeeper server changes")
+            self.zk.disconnect()
+        if configured:
+            self.zk.connect(config.zookeeper_servers.values())
+
     def setConfig(self, config):
         self.config = config
 
     def getDB(self):
         return self.config.db
+
+    def getZK(self):
+        return self.zk
 
     def getProviderManager(self, provider):
         return self.config.provider_managers[provider.name]
@@ -1436,8 +1186,8 @@ class NodePool(threading.Thread):
                 allocation_requests[label.name] = ar
                 ar.addTarget(at, len(nodes))
                 for provider in label.providers.values():
-                    image = session.getCurrentSnapshotImage(
-                        provider.name, label.image)
+                    image = self.zk.getMostRecentImageUpload(
+                        label.image, provider.name)
                     if image:
                         # This request may be supplied by this provider
                         # (and nodes from this provider supplying this
@@ -1494,6 +1244,7 @@ class NodePool(threading.Thread):
     def updateConfig(self):
         config = self.loadConfig()
         self.reconfigureDatabase(config)
+        self.reconfigureZooKeeper(config)
         self.reconfigureManagers(config)
         self.reconfigureUpdateListeners(config)
         self.reconfigureGearmanClient(config)
@@ -1507,23 +1258,10 @@ class NodePool(threading.Thread):
         # after a restart.  To clean up, mark all building node and
         # images for deletion when the daemon starts.
         with self.getDB().getSession() as session:
-            if not self.no_deletes:
-                for node in session.getNodes(state=nodedb.BUILDING):
-                    self.log.info("Setting building node id: %s to delete "
-                                  "on startup" % node.id)
-                    node.state = nodedb.DELETE
-
-            if not self.no_images:
-                for image in session.getSnapshotImages(state=nodedb.BUILDING):
-                    self.log.info("Setting building image id: %s to delete "
-                                  "on startup" % image.id)
-                    image.state = nodedb.DELETE
-
-            if not self.no_images:
-                for dib_image in session.getDibImages(state=nodedb.BUILDING):
-                    self.log.info("Setting building dib image id: %s to delete "
-                                  "on startup" % dib_image.id)
-                    dib_image.state = nodedb.DELETE
+            for node in session.getNodes(state=nodedb.BUILDING):
+                self.log.info("Setting building node id: %s to delete "
+                              "on startup" % node.id)
+                node.state = nodedb.DELETE
 
     def run(self):
         try:
@@ -1545,8 +1283,6 @@ class NodePool(threading.Thread):
     def _run(self, session, allocation_history):
         if self.no_launches:
             return
-        self.checkForMissingImages(session)
-
         # Make up the subnode deficit first to make sure that an
         # already allocated node has priority in filling its subnodes
         # ahead of new nodes.
@@ -1567,225 +1303,13 @@ class NodePool(threading.Thread):
                           (num_to_launch, label.name,
                            target.name, provider.name))
             for i in range(num_to_launch):
-                snap_image = session.getCurrentSnapshotImage(
-                    provider.name, label.image)
-                if not snap_image:
+                cloud_image = self.zk.getMostRecentImageUpload(
+                    label.image, provider.name)
+                if not cloud_image:
                     self.log.debug("No current image for %s on %s"
                                    % (label.image, provider.name))
                 else:
                     self.launchNode(session, provider, label, target)
-
-    def checkForMissingSnapshotImage(self, session, provider, image):
-        found = False
-        for snap_image in session.getSnapshotImages():
-            if (snap_image.provider_name == provider.name and
-                snap_image.image_name == image.name and
-                snap_image.state in [nodedb.READY,
-                                     nodedb.BUILDING]):
-                found = True
-        if not found:
-            self.log.warning("Missing image %s on %s" %
-                             (image.name, provider.name))
-            self.updateImage(session, provider.name, image.name)
-
-    def checkForMissingDiskImage(self, session, provider, image):
-        found = False
-        for dib_image in session.getDibImages():
-            if dib_image.image_name != image.diskimage:
-                continue
-            if dib_image.state != nodedb.READY:
-                # This is either building or in an error state
-                # that will be handled by periodic cleanup
-                return
-            found = True
-        if not found:
-            # only build the image, we'll recheck again
-            self.log.warning("Missing disk image %s" % image.name)
-            self.buildImage(self.config.diskimages[image.diskimage])
-        else:
-            found = False
-            for snap_image in session.getSnapshotImages():
-                if (snap_image.provider_name == provider.name and
-                    snap_image.image_name == image.name and
-                    snap_image.state in [nodedb.READY,
-                                         nodedb.BUILDING]):
-                    found = True
-                    break
-            if not found:
-                self.log.warning("Missing image %s on %s" %
-                                 (image.name, provider.name))
-                self.uploadImage(session, provider.name,
-                                 image.name)
-
-    def checkForMissingImage(self, session, provider, image):
-        if image.name in self.config.images_in_use:
-            if not image.diskimage:
-                self.checkForMissingSnapshotImage(session, provider, image)
-            else:
-                self.checkForMissingDiskImage(session, provider, image)
-
-    def checkForMissingImages(self, session):
-        if self.no_images:
-            return
-        # If we are missing an image, run the image update function
-        # outside of its schedule.
-        self.log.debug("Checking missing images.")
-
-        # this is sorted so we can have a deterministic pass on providers
-        # (very useful for testing/debugging)
-        providers = sorted(self.config.providers.values(),
-                           key=lambda x: x.name)
-        for provider in providers:
-            for image in provider.images.values():
-                try:
-                    self.checkForMissingImage(session, provider, image)
-                except Exception:
-                    self.log.exception("Exception in missing image check:")
-
-    def _doUpdateImages(self):
-        if self.no_images:
-            return
-        try:
-            with self.getDB().getSession() as session:
-                self.updateImages(session)
-        except Exception:
-            self.log.exception("Exception in periodic image update:")
-
-    def updateImages(self, session):
-        self.log.debug("Updating all images.")
-
-        # first run the snapshot image updates
-        for provider in self.config.providers.values():
-            for image in provider.images.values():
-                if image.name not in self.config.images_in_use:
-                    continue
-                if image.diskimage:
-                    continue
-                self.updateImage(session, provider.name, image.name)
-
-        needs_build = False
-        for diskimage in self.config.diskimages.values():
-            if diskimage.name not in self.config.images_in_use:
-                continue
-            self.buildImage(diskimage)
-            needs_build = True
-        if needs_build:
-            # wait for all builds to finish, to have updated images to upload
-            self.waitForBuiltImages()
-
-        for provider in self.config.providers.values():
-            for image in provider.images.values():
-                if image.name not in self.config.images_in_use:
-                    continue
-                if not image.diskimage:
-                    continue
-                self.uploadImage(session, provider.name, image.name)
-
-    def updateImage(self, session, provider_name, image_name):
-        try:
-            return self._updateImage(session, provider_name, image_name)
-        except Exception:
-            self.log.exception(
-                "Could not update image %s on %s", image_name, provider_name)
-
-    def _updateImage(self, session, provider_name, image_name):
-        provider = self.config.providers[provider_name]
-        image = provider.images[image_name]
-        # check type of image depending on diskimage flag
-        if image.diskimage:
-            raise Exception(
-                "Cannot update disk image images. "
-                "Please build and upload images")
-
-        if not image.setup:
-            raise Exception(
-                "Invalid image config. Must specify either "
-                "a setup script, or a diskimage to use.")
-        snap_image = session.createSnapshotImage(
-            provider_name=provider.name,
-            image_name=image_name)
-
-        t = SnapshotImageUpdater(self, provider, image, snap_image.id)
-        t.start()
-        # Enough time to give them different timestamps (versions)
-        # Just to keep things clearer.
-        time.sleep(2)
-        return t
-
-    def buildImage(self, image):
-        # check if we already have this item in the queue
-        with self.getDB().getSession() as session:
-            queued_images = session.getBuildingDibImagesByName(image.name)
-            if queued_images:
-                self.log.error('Image %s is already being built' %
-                               image.name)
-                return
-            else:
-                try:
-                    start_time = time.time()
-                    timestamp = int(start_time)
-
-                    filename = os.path.join(self.config.imagesdir,
-                                            '%s-%s' %
-                                            (image.name, str(timestamp)))
-                    dib_image = session.createDibImage(image_name=image.name,
-                                                       filename=filename,
-                                                       version=timestamp)
-                    self.log.debug("Created DibImage record %s with state %s",
-                                   dib_image.image_name, dib_image.state)
-
-                    # Submit image-build job
-                    gearman_job = jobs.ImageBuildJob(image.name, dib_image.id,
-                                                     self)
-                    self._image_build_jobs.addJob(gearman_job)
-
-                    try:
-                        self.gearman_client.submitJob(gearman_job, timeout=300)
-                    except Exception:
-                        self.log.warning("Failed to submit build job for "
-                                         "DibImage record %s with id %d",
-                                         dib_image.image_name, dib_image.id)
-                        # Remove job from _image_build_jobs
-                        gearman_job.onFailed()
-                        raise
-                    else:
-                        self.log.debug("Queued image building task for %s" %
-                                       image.name)
-                except Exception:
-                    self.log.exception(
-                        "Could not build image %s", image.name)
-
-    def uploadImage(self, session, provider, image_name):
-        try:
-            provider_entity = self.config.providers[provider]
-            provider_image = provider_entity.images[image_name]
-            images = session.getOrderedReadyDibImages(provider_image.diskimage)
-            image_id = images[0].id
-            timestamp = int(time.time())
-            job_uuid = str(uuid4().hex)
-
-            snap_image = session.createSnapshotImage(
-                provider_name=provider, image_name=provider_image.name)
-            self.log.debug('Created snapshot image id: %s for upload of '
-                           'DIB image id: %s with job uuid: %s ' %
-                           (snap_image.id, image_id, job_uuid))
-
-            # TODO(mordred) abusing the hostname field
-            snap_image.hostname = image_name
-            snap_image.version = timestamp
-            session.commit()
-
-            # Submit image-upload job
-            gearman_job = jobs.ImageUploadJob(image_id, provider, image_name,
-                                              snap_image.id, self)
-            self.log.debug('Submitting image-upload job uuid: %s' %
-                           (gearman_job.unique,))
-            self.gearman_client.submitJob(gearman_job, timeout=300)
-
-            return gearman_job
-        except Exception:
-            self.log.exception(
-                "Could not upload image %s on %s", image_name, provider)
 
     def launchNode(self, session, provider, label, target):
         try:
@@ -1930,79 +1454,6 @@ class NodePool(threading.Thread):
             self.statsd.incr(key)
         self.updateStats(session, node.provider_name)
 
-    def deleteImage(self, snap_image_id, force):
-        try:
-            self._image_delete_threads_lock.acquire()
-
-            snap_image = None
-            with self.getDB().getSession() as session:
-                snap_image = session.getSnapshotImage(snap_image_id)
-            if snap_image is None:
-                self.log.error("No image '%s' found.", snap_image_id)
-                return
-
-            if snap_image_id in self._image_delete_threads:
-                return
-            t = ImageDeleter(self, snap_image_id, force)
-            self._image_delete_threads[snap_image_id] = t
-            t.start()
-            return t
-        except Exception:
-            self.log.exception("Could not delete image %s", snap_image_id)
-        finally:
-            self._image_delete_threads_lock.release()
-
-    def _deleteImage(self, session, snap_image, force):
-        # Delete an image (and its associated server)
-        snap_image.state = nodedb.DELETE
-
-        try:
-            provider = self.config.providers[snap_image.provider_name]
-            manager = self.getProviderManager(provider)
-
-            if snap_image.server_external_id:
-                try:
-                    server = manager.getServer(snap_image.server_external_id)
-                    if server:
-                        self.log.debug('Deleting server %s for image id: %s' %
-                                       (snap_image.server_external_id,
-                                        snap_image.id))
-                        manager.cleanupServer(server['id'])
-                        manager.waitForServerDeletion(server['id'])
-                    else:
-                        raise provider_manager.NotFound
-                except provider_manager.NotFound:
-                    self.log.warning('Image server id %s not found' %
-                                     snap_image.server_external_id)
-
-            if snap_image.external_id:
-                remote_image = manager.getImage(snap_image.external_id)
-                if remote_image is None:
-                    self.log.warning('Image id %s not found' %
-                                     snap_image.external_id)
-                else:
-                    self.log.debug('Deleting image %s' % remote_image['id'])
-                    manager.deleteImage(remote_image['id'])
-        except Exception:
-            if not force:
-                raise
-            else:
-                self.log.info("Ignoring image delete errors")
-
-        snap_image.delete()
-        self.log.info("Deleted image id: %s" % snap_image.id)
-
-    def deleteDibImage(self, dib_image):
-        try:
-            # Submit image-delete job
-            gearman_job = jobs.ImageDeleteJob(dib_image.id, self)
-            self.gearman_client.submitJob(gearman_job, timeout=300)
-            dib_image.delete()
-            return gearman_job
-        except Exception:
-            self.log.exception('Could not submit delete job for image id %s',
-                               dib_image.id)
-
     def deleteInstance(self, provider_name, external_id):
         key = (provider_name, external_id)
         try:
@@ -2042,24 +1493,14 @@ class NodePool(threading.Thread):
             if not t.isAlive():
                 del self._delete_threads[k]
 
-        for k, t in self._image_delete_threads.items()[:]:
-            if not t.isAlive():
-                del self._image_delete_threads[k]
-
         for k, t in self._instance_delete_threads.items()[:]:
             if not t.isAlive():
                 del self._instance_delete_threads[k]
 
         node_ids = []
-        image_ids = []
-        dib_image_ids = []
         with self.getDB().getSession() as session:
             for node in session.getNodes():
                 node_ids.append(node.id)
-            for image in session.getSnapshotImages():
-                image_ids.append(image.id)
-            for dib_image in session.getDibImages():
-                dib_image_ids.append(dib_image.id)
 
         for node_id in node_ids:
             try:
@@ -2070,25 +1511,6 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception cleaning up node id %s:" %
                                    node_id)
-
-        for image_id in image_ids:
-            try:
-                with self.getDB().getSession() as session:
-                    image = session.getSnapshotImage(image_id)
-                    self.cleanupOneImage(session, image)
-            except Exception:
-                self.log.exception("Exception cleaning up image id %s:" %
-                                   image_id)
-
-        for dib_image_id in dib_image_ids:
-            try:
-                with self.getDB().getSession() as session:
-                    dib_image = session.getDibImage(dib_image_id)
-                    if dib_image:
-                        self.cleanupOneDibImage(session, dib_image)
-            except Exception:
-                self.log.exception("Exception cleaning up image id %s:" %
-                                   dib_image_id)
 
         try:
             self.cleanupLeakedInstances()
@@ -2120,18 +1542,8 @@ class NodePool(threading.Thread):
                                            provider.name,
                                            meta['provider_name']))
                         continue
-                    snap_image_id = meta.get('snapshot_image_id')
                     node_id = meta.get('node_id')
-                    if snap_image_id:
-                        if session.getSnapshotImage(snap_image_id):
-                            continue
-                        self.log.warning("Deleting leaked instance %s (%s) "
-                                         "in %s for snapshot image id: %s" % (
-                                             server['name'], server['id'],
-                                             provider.name,
-                                             snap_image_id))
-                        self.deleteInstance(provider.name, server['id'])
-                    elif node_id:
+                    if node_id:
                         if session.getNode(node_id):
                             continue
                         self.log.warning("Deleting leaked instance %s (%s) "
@@ -2167,80 +1579,6 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception deleting node id: "
                                    "%s" % node.id)
-
-    def cleanupOneImage(self, session, image):
-        # Normally, reap images that have sat in their current state
-        # for 8 hours, unless the image is the current or previous
-        # snapshot.
-        delete = False
-        now = time.time()
-        if image.provider_name not in self.config.providers:
-            delete = True
-            self.log.info("Deleting image id: %s which has no current "
-                          "provider" % image.id)
-        elif (image.image_name not in
-              self.config.providers[image.provider_name].images):
-            delete = True
-            self.log.info("Deleting image id: %s which has no current "
-                          "base image" % image.id)
-        elif (image.state == nodedb.DELETE):
-            delete = True
-            self.log.info("Deleting image id: %s which is in delete state "
-                          % image.id)
-        else:
-            images = session.getOrderedReadySnapshotImages(
-                image.provider_name, image.image_name)
-            current = previous = None
-            if len(images) > 0:
-                current = images[0]
-            if len(images) > 1:
-                previous = images[1]
-            if (image != current and image != previous and
-                    image.state != nodedb.BUILDING and
-                    (now - image.state_time) > IMAGE_CLEANUP):
-                self.log.info("Deleting image id: %s which is "
-                              "%s hours old" %
-                              (image.id,
-                               (now - image.state_time) / (60 * 60)))
-                delete = True
-        if delete:
-            try:
-                self.deleteImage(image.id, force=False)
-            except Exception:
-                self.log.exception("Exception deleting image id: %s:" %
-                                   image.id)
-
-    def cleanupOneDibImage(self, session, image):
-        delete = False
-        now = time.time()
-        if (image.image_name not in self.config.diskimages):
-            delete = True
-            self.log.info("Deleting image id: %s which has no current "
-                          "base image" % image.id)
-        else:
-            images = session.getOrderedReadyDibImages(
-                image.image_name)
-            current = previous = None
-            if len(images) > 0:
-                current = images[0]
-            if len(images) > 1:
-                previous = images[1]
-            if (image != current and image != previous and
-                    image.state != nodedb.BUILDING and
-                    (now - image.state_time) > IMAGE_CLEANUP):
-                self.log.info("Deleting image id: %s which is "
-                              "%s hours old" %
-                              (image.id,
-                               (now - image.state_time) / (60 * 60)))
-                delete = True
-            if image.state == nodedb.DELETE:
-                delete = True
-        if delete:
-            try:
-                self.deleteDibImage(image)
-            except Exception:
-                self.log.exception("Exception deleting image id: %s:" %
-                                   image.id)
 
     def _doPeriodicCheck(self):
         if self.no_deletes:

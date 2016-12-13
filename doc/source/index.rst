@@ -15,6 +15,7 @@ Contents:
    configuration
    scripts
    operation
+   devguide
 
 Indices and tables
 ==================
