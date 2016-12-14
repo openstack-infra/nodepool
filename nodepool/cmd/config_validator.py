@@ -31,6 +31,7 @@ class ConfigValidator:
 
         images = {
             'name': str,
+            'pause': bool,
             'min-ram': int,
             'name-filter': str,
             'diskimage': str,
@@ -104,6 +105,7 @@ class ConfigValidator:
 
         diskimages = {
             'name': str,
+            'pause': bool,
             'elements': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
