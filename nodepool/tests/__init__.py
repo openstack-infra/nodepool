@@ -37,6 +37,7 @@ import testtools
 
 from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
 from nodepool import zk
+from nodepool.cmd.config_validator import ConfigValidator
 
 TRUE_VALUES = ('true', '1', 'yes')
 
@@ -427,6 +428,8 @@ class DBTestCase(BaseTestCase):
                                        zookeeper_chroot=self.zookeeper_chroot))
         os.close(fd)
         self._config_images_dir = images_dir
+        validator = ConfigValidator(path)
+        validator.validate()
         return path
 
     def replace_config(self, configfile, filename):
