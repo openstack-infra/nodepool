@@ -70,6 +70,7 @@ providers:
     rate: 0.001
     images:
       - name: trusty
+        pause: False
         min-ram: 8192
         username: jenkins
         private-key: /home/nodepool/.ssh/id_rsa
@@ -79,6 +80,7 @@ targets:
 
 diskimages:
   - name: trusty
+    pause: False
     elements:
       - ubuntu
       - vm
