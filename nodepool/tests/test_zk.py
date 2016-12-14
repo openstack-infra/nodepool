@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 import testtools
 import time
 
@@ -46,104 +45,77 @@ class TestZooKeeper(tests.DBTestCase):
     def test_imageBuildLock(self):
         path = self.zk._imageBuildLockPath("ubuntu-trusty")
         with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
-            self.assertIsNotNone(self.zk._current_build_lock)
             self.assertIsNotNone(self.zk.client.exists(path))
-        self.assertIsNone(self.zk._current_build_lock)
 
     def test_imageBuildLock_exception_nonblocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
-                                                  port=self.zookeeper_port,
-                                                  chroot=self.zookeeper_chroot)])
-        with zk2.imageBuildLock("ubuntu-trusty", blocking=False):
-            with testtools.ExpectedException(npe.ZKLockException):
-                with self.zk.imageBuildLock("ubuntu-trusty", blocking=False):
+        image = "ubuntu-trusty"
+        with self.zk.imageBuildLock(image, blocking=False):
+            with testtools.ExpectedException(
+                npe.ZKLockException, "Did not get lock on .*"
+            ):
+                with self.zk.imageBuildLock(image, blocking=False):
                     pass
-        zk2.disconnect()
 
     def test_imageBuildLock_exception_blocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
-                                                  port=self.zookeeper_port,
-                                                  chroot=self.zookeeper_chroot)])
-        with zk2.imageBuildLock("ubuntu-trusty", blocking=False):
+        image = "ubuntu-trusty"
+        with self.zk.imageBuildLock(image, blocking=False):
             with testtools.ExpectedException(npe.TimeoutException):
-                with self.zk.imageBuildLock("ubuntu-trusty",
-                                            blocking=True,
-                                            timeout=1):
+                with self.zk.imageBuildLock(image, blocking=True, timeout=1):
                     pass
-        zk2.disconnect()
 
     def test_imageBuildNumberLock(self):
         path = self.zk._imageBuildNumberLockPath("ubuntu-trusty", "0000")
         with self.zk.imageBuildNumberLock(
             "ubuntu-trusty", "0000", blocking=False
         ):
-            self.assertIsNotNone(self.zk._current_build_number_lock)
             self.assertIsNotNone(self.zk.client.exists(path))
-        self.assertIsNone(self.zk._current_build_number_lock)
 
     def test_imageBuildNumberLock_exception_nonblocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(
-            self.zookeeper_host,
-            port=self.zookeeper_port,
-            chroot=self.zookeeper_chroot)])
-        with zk2.imageBuildNumberLock("ubuntu-trusty", "0000", blocking=False):
-            with testtools.ExpectedException(npe.ZKLockException):
-                with self.zk.imageBuildNumberLock(
-                    "ubuntu-trusty", "0000", blocking=False
-                ):
+        image = "ubuntu-trusty"
+        bnum = "0000000000"
+        with self.zk.imageBuildNumberLock(image, bnum, blocking=False):
+            with testtools.ExpectedException(
+                npe.ZKLockException, "Did not get lock on .*"
+            ):
+                with self.zk.imageBuildNumberLock(image, bnum, blocking=False):
                     pass
-        zk2.disconnect()
 
     def test_imageBuildNumberLock_exception_blocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(
-            self.zookeeper_host,
-            port=self.zookeeper_port,
-            chroot=self.zookeeper_chroot)])
-        with zk2.imageBuildNumberLock("ubuntu-trusty", "0000", blocking=False):
+        image = "ubuntu-trusty"
+        bnum = "0000000000"
+        with self.zk.imageBuildNumberLock(image, bnum, blocking=False):
             with testtools.ExpectedException(npe.TimeoutException):
                 with self.zk.imageBuildNumberLock(
-                    "ubuntu-trusty", "0000", blocking=True, timeout=1
+                    image, bnum, blocking=True, timeout=1
                 ):
                     pass
-        zk2.disconnect()
 
     def test_imageUploadLock(self):
         path = self.zk._imageUploadLockPath("ubuntu-trusty", "0000", "prov1")
         with self.zk.imageUploadLock("ubuntu-trusty", "0000", "prov1",
                                      blocking=False):
-            self.assertIsNotNone(self.zk._current_upload_lock)
             self.assertIsNotNone(self.zk.client.exists(path))
-        self.assertIsNone(self.zk._current_upload_lock)
 
     def test_imageUploadLock_exception_nonblocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
-                                                  port=self.zookeeper_port,
-                                                  chroot=self.zookeeper_chroot)])
-        with zk2.imageUploadLock("ubuntu-trusty", "0000", "prov1",
-                                blocking=False):
-            with testtools.ExpectedException(npe.ZKLockException):
-                with self.zk.imageUploadLock("ubuntu-trusty", "0000", "prov1",
-                                             blocking=False):
+        image = "ubuntu-trusty"
+        bnum = "0000000000"
+        prov = "rax"
+        with self.zk.imageUploadLock(image, bnum, prov, blocking=False):
+            with testtools.ExpectedException(
+                npe.ZKLockException, "Did not get lock on .*"
+            ):
+                with self.zk.imageUploadLock(image, bnum, prov, blocking=False):
                     pass
-        zk2.disconnect()
 
     def test_imageUploadLock_exception_blocking(self):
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
-                                                  port=self.zookeeper_port,
-                                                  chroot=self.zookeeper_chroot)])
-        with zk2.imageUploadLock("ubuntu-trusty", "0000", "prov1",
-                                 blocking=False):
+        image = "ubuntu-trusty"
+        bnum = "0000000000"
+        prov = "rax"
+        with self.zk.imageUploadLock(image, bnum, prov, blocking=False):
             with testtools.ExpectedException(npe.TimeoutException):
-                with self.zk.imageUploadLock("ubuntu-trusty", "0000", "prov1",
+                with self.zk.imageUploadLock(image, bnum, prov,
                                              blocking=True, timeout=1):
                     pass
-        zk2.disconnect()
 
     def test_storeBuild(self):
         image = "ubuntu-trusty"
@@ -231,32 +203,6 @@ class TestZooKeeper(tests.DBTestCase):
                                                        build_number,
                                                        provider),
                          [upload_id])
-
-    def test_registerBuildRequestWatch(self):
-        func = mock.MagicMock()
-        image = "ubuntu-trusty"
-        watch_path = self.zk._imageBuildRequestPath(image)
-
-        zk2 = zk.ZooKeeper()
-        zk2.connect([zk.ZooKeeperConnectionConfig(self.zookeeper_host,
-                                                  self.zookeeper_port,
-                                                  self.zookeeper_chroot)])
-
-        # First client registers the watch
-        self.zk.registerBuildRequestWatch(image, func)
-        self.assertIn(watch_path, self.zk._data_watches)
-
-        # Second client triggers the watch. Give ZK time to dispatch the event
-        # to the other client.
-        zk2.submitBuildRequest(image)
-        time.sleep(1)
-        zk2.disconnect()
-
-        # Make sure the registered function was called.
-        func.assert_called_once_with(mock.ANY)
-
-        # The watch should be unregistered now.
-        self.assertNotIn(watch_path, self.zk._data_watches)
 
     def test_build_request(self):
         '''Test the build request API methods (has/submit/remove)'''
