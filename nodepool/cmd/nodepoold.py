@@ -23,14 +23,16 @@ import extras
 # instead it depends on lockfile-0.9.1 which uses pidfile.
 pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
 
+import logging
 import os
 import sys
 import signal
 
-import nodepool.builder
 import nodepool.cmd
 import nodepool.nodepool
 import nodepool.webapp
+
+log = logging.getLogger(__name__)
 
 
 def is_pidfile_stale(pidfile):
@@ -72,11 +74,14 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('-p', dest='pidfile',
                             help='path to pid file',
                             default='/var/run/nodepool/nodepool.pid')
+        # TODO(pabelanger): Deprecated flag, remove in the future.
         parser.add_argument('--no-builder', dest='builder',
                             action='store_false')
+        # TODO(pabelanger): Deprecated flag, remove in the future.
         parser.add_argument('--build-workers', dest='build_workers',
                             default=1, help='number of build workers',
                             type=int)
+        # TODO(pabelanger): Deprecated flag, remove in the future.
         parser.add_argument('--upload-workers', dest='upload_workers',
                             default=4, help='number of upload workers',
                             type=int)
@@ -89,8 +94,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
 
     def exit_handler(self, signum, frame):
         self.pool.stop()
-        if self.args.builder:
-            self.builder.stop()
         if not self.args.no_webapp:
             self.webapp.stop()
         sys.exit(0)
@@ -105,9 +108,14 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
                                                self.args.no_deletes,
                                                self.args.no_launches)
         if self.args.builder:
-            self.builder = nodepool.builder.NodePoolBuilder(
-                self.args.config, self.args.build_workers,
-                self.args.upload_workers)
+            log.warning(
+                "Note: nodepool no longer automatically builds images, "
+                "please ensure the separate nodepool-builder process is "
+                "running if you haven't already")
+        else:
+            log.warning(
+                "--no-builder is deprecated and will be removed in the near "
+                "future. Update your service scripts to avoid a breakage.")
 
         if not self.args.no_webapp:
             self.webapp = nodepool.webapp.WebApp(self.pool)
@@ -120,8 +128,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         signal.signal(signal.SIGTERM, self.term_handler)
 
         self.pool.start()
-        if self.args.builder:
-            self.builder.start()
 
         if not self.args.no_webapp:
             self.webapp.start()
