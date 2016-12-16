@@ -200,8 +200,8 @@ cron:
   check: '*/15 * * * *'
 
 labels:
-  - name: ubuntu-dib
-    image: ubuntu-dib
+  - name: ubuntu-trusty
+    image: ubuntu-trusty
     min-ready: 1
     providers:
       - name: devstack
@@ -217,14 +217,14 @@ providers:
     max-servers: 2
     rate: 0.25
     images:
-      - name: ubuntu-dib
+      - name: ubuntu-trusty
         min-ram: 1024
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
 
 diskimages:
-  - name: ubuntu-dib
+  - name: ubuntu-trusty
     rebuild-age: 86400
     elements:
       - ubuntu-minimal
