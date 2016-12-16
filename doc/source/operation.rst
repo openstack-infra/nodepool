@@ -3,41 +3,65 @@
 Operation
 =========
 
-Nodepool generally runs as a daemon under the command ``nodepoold``.
-Once started, it will frequently re-read the configuration file and
-make any changes necessary (such as adding or removing a provider, or
-altering image or quota configuration).  If any needed images are
-missing, it will immediately begin trying to build those images.
-Periodically (once a day by default but configurable in the ``cron:``
-section of the config file) it will attempt to create new versions of
-each image.
+Nodepool has two components which run as daemons.  The
+``nodepool-builder`` daemon is responsible for building diskimages and
+uploading them to providers, and the ``nodepoold`` daemon is
+responsible for launching and deleting nodes.
 
-If a new image creation is successful, it will immediately start using
-it when launching nodes (Nodepool always uses the most recent image in
-the ``ready`` state).  Nodepool will delete images that are older than
-8 hours if they are not the most recent or second most recent
-``ready`` images.  In other words, Nodepool will always make sure that
-in addition to the current image, it keeps the previous image around.
-This way if you find that a newly created image is problematic, you
-may simply delete it and Nodepool will revert to using the previous
-image.
+Both daemons frequently re-read their configuration file after
+starting to support adding or removing new images and providers, or
+otherwise altering the configuration.
+
+Nodepool-builder
+----------------
+
+The ``nodepool-builder`` daemon builds and uploads images to
+providers.  It may be run on the same or a separate host as the main
+nodepool daemon.  Multiple instances of ``nodepool-builder`` may be
+run on the same or separate hosts in order to speed up image builds
+across many machines, or supply high-availability or redundancy.
+However, since ``nodepool-builder`` allows specification of the number
+of both build and upload threads, it is usually not advantageous to
+run more than a single instance on one machine.  Note that while
+diskimage-builder (which is responsible for building the underlying
+images) generally supports executing multiple builds on a single
+machine simultaneously, some of the elements it uses may not.  To be
+safe, it is recommended to run a single instance of
+``nodepool-builder`` on a machine, and configure that instance to run
+only a single build thread (the default).
+
+
+Nodepoold
+---------
+
+The main nodepool daemon is named ``nodepoold`` and is responsible for
+launching instances from the images created and uploaded by
+``nodepool-builder``.
+
+When a new image is created and uploaded, ``nodepoold`` will
+immediately start using it when launching nodes (Nodepool always uses
+the most recent image for a given provider in the ``ready`` state).
+Nodepool will delete images if they are not the most recent or second
+most recent ``ready`` images.  In other words, Nodepool will always
+make sure that in addition to the current image, it keeps the previous
+image around.  This way if you find that a newly created image is
+problematic, you may simply delete it and Nodepool will revert to
+using the previous image.
 
 Daemon usage
 ------------
 
-To start Nodepool daemon, run **nodepoold**:
+To start the main Nodepool daemon, run **nodepoold**:
 
 .. program-output:: nodepoold --help
    :nostderr:
 
-If you send a SIGINT to the nodepoold process, Nodepool will wait for
-diskimages to finish building (if any) and disconnect all its internal
-process.
+To start the nodepool-builder daemon, run **nodepool--builder**:
 
-If you send a SIGUSR2 to the nodepoold process, Nodepool  will dump a
-stack trace for each running thread into its debug log. It is written
-under the log bucket ``nodepool.stack_dump``.  This is useful for
-tracking down deadlock or otherwise slow threads.
+.. program-output:: nodepool-builder --help
+   :nostderr:
+
+To stop a daemon, send SIGINT to the process.
 
 When `yappi <https://code.google.com/p/yappi/>`_ (Yet Another Python
 Profiler) is available, additional functions' and threads' stats are
@@ -49,7 +73,7 @@ system.
 Metadata
 --------
 
-When nodepool creates instances, it will assign the following nova
+When Nodepool creates instances, it will assign the following nova
 metadata:
 
   groups
@@ -70,10 +94,10 @@ metadata:
       The nodepool id of the node as an integer.
 
 Command Line Tools
-==================
+------------------
 
 Usage
------
+~~~~~
 The general options that apply to all subcommands are:
 
 .. program-output:: nodepool --help
@@ -160,16 +184,18 @@ job-delete
    :nostderr:
 
 Removing a Provider
-===================
+-------------------
 
-To remove a provider set that providers max-servers to -1. This will
-prevent nodepool from booting new nodes and building new images on that
-provider. You can then let the nodes do their normal ready -> used ->
-delete -> deleted lifecycle. Once all nodes are gone you can then
-image-delete the remaining images and remove the config from nodepool
-for that provider entirely (though leaving it in this state is effectively
-the same and makes it easy to turn the provider back on).
+To remove a provider, remove all of the images from that provider`s
+configuration (and remove all instances of that provider from any
+labels) and set that provider's max-servers to -1.  This will instruct
+Nodepool to delete any images uploaded to that provider, not upload
+any new ones, and stop booting new nodes on the provider.  You can
+then let the nodes go through their normal lifecycle.  Once all nodes
+hove been deleted you remove the config from nodepool for that
+provider entirely (though leaving it in this state is effectively the
+same and makes it easy to turn the provider back on).
 
 If urgency is required you can delete the nodes directly instead of
-waiting for them to go through their normal lifecycle but the effect is
-the same.
+waiting for them to go through their normal lifecycle but the effect
+is the same.
