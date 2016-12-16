@@ -3,8 +3,9 @@
 Installation
 ============
 
-Nodepool consists of a long-running daemon which uses an SQL database
-and communicates with Jenkins using ZeroMQ.
+Nodepool consists of a set of long-running daemons which use an SQL
+database, a ZooKeeper cluster, and communicates with Jenkins using
+ZeroMQ.
 
 External Requirements
 ---------------------
@@ -46,6 +47,18 @@ MySQL Example::
   CREATE USER 'nodepool'@'localhost' IDENTIFIED BY '<password>';
   CREATE DATABASE nodepooldb;
   GRANT ALL ON nodepooldb.* TO 'nodepool'@'localhost';
+
+ZooKeeper
+~~~~~~~~~
+
+Nodepool uses ZooKeeper to coordinate image builds with its separate
+image builder component.  A single ZooKeeper instance running on the
+Nodepool server is fine.  Larger installations may wish to use a
+multi-node ZooKeeper installation, in which case three nodes are
+usually recommended.
+
+Nodepool only needs to be told how to contact the ZooKeeper cluster;
+it will automatically populate the ZNode structure as needed.
 
 Statsd and Graphite
 ~~~~~~~~~~~~~~~~~~~
