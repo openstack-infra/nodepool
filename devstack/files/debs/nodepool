@@ -1,4 +1,5 @@
 qemu-utils
 kpartx
 debootstrap
+yum-utils
 zookeeperd
