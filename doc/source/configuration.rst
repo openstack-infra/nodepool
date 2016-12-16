@@ -72,19 +72,6 @@ full configuration file may have the ``diskimages``, ``labels``,
 The following sections are available.  All are required unless
 otherwise indicated.
 
-script-dir
-----------
-When creating an image to use when launching new nodes, Nodepool will
-run a script that is expected to prepare the machine before the
-snapshot image is created.  The ``script-dir`` parameter indicates a
-directory that holds all of the scripts needed to accomplish this.
-Nodepool will copy the entire directory to the machine before invoking
-the appropriate script for the image being created.
-
-Example::
-
-  script-dir: /path/to/script/dir
-
 .. _elements-dir:
 
 elements-dir

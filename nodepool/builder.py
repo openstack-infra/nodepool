@@ -682,8 +682,6 @@ class BuildWorker(BaseWorker):
         # values in this thread.
         if self._config.elementsdir:
             env['ELEMENTS_PATH'] = self._config.elementsdir
-        if self._config.scriptdir:
-            env['NODEPOOL_SCRIPTDIR'] = self._config.scriptdir
 
         # send additional env vars if needed
         for k, v in diskimage.env_vars.items():

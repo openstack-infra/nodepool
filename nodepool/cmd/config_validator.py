@@ -113,7 +113,6 @@ class ConfigValidator:
         }
 
         top_level = {
-            'script-dir': str,
             'elements-dir': str,
             'images-dir': str,
             'dburi': str,
