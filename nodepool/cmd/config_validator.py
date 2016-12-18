@@ -108,6 +108,7 @@ class ConfigValidator:
             'name': str,
             'pause': bool,
             'elements': [str],
+            'formats': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
             'env-vars': dict,

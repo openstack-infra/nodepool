@@ -275,15 +275,13 @@ def loadConfig(config_path):
                 #self.log.error("%s: ignoring env-vars; "
                 #               "should be a dict" % d.name)
                 d.env_vars = {}
-            d.image_types = set()
+            d.image_types = set(diskimage.get('formats', []))
             d.pause = bool(diskimage.get('pause', False))
-            d.in_use = False
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():
                 diskimage = newconfig.diskimages[image.name]
                 diskimage.image_types.add(provider.image_type)
-                diskimage.in_use = True
 
     for label in config.get('labels', []):
         l = Label()

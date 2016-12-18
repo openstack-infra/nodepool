@@ -252,6 +252,30 @@ Example configuration::
         DIB_APT_LOCAL_CACHE: '0'
         DIB_DISABLE_APT_CLEANUP: '1'
         FS_TYPE: ext3
+    - name: ubuntu-xenial
+      pause: True
+      rebuild-age: 86400
+      formats:
+        - raw
+        - tar
+      elements:
+        - ubuntu-minimal
+        - vm
+        - simple-init
+        - openstack-repos
+        - nodepool-base
+        - cache-devstack
+        - cache-bindep
+        - growroot
+        - infra-package-needs
+      release: precise
+      env-vars:
+        TMPDIR: /opt/dib_tmp
+        DIB_CHECKSUM: '1'
+        DIB_IMAGE_CACHE: /opt/dib_cache
+        DIB_APT_LOCAL_CACHE: '0'
+        DIB_DISABLE_APT_CLEANUP: '1'
+        FS_TYPE: ext3
 
 
 **required**
@@ -260,6 +284,12 @@ Example configuration::
     Identifier to reference the disk image in :ref:`images` and :ref:`labels`.
 
 **optional**
+
+  ``formats`` (list)
+    The list of formats to build is normally automatically created based on the
+    needs of the providers to which the image is uploaded.  To build images even
+    when no providers are configured or to build additional formats which you
+    know you may need in the future, list those formats here.
 
   ``rebuild-age``
     If the current diskimage is older than this value (in seconds),
