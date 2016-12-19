@@ -6,6 +6,14 @@ Developer's Guide
 The following guide is intended for those interested in the inner workings
 of nodepool and its various processes.
 
+Operation
+---------
+
+If you send a SIGUSR2 to one of the daemon processes, Nodepool will
+dump a stack trace for each running thread into its debug log.  It is
+written under the log bucket ``nodepool.stack_dump``.  This is useful
+for tracking down deadlock or otherwise slow threads.
+
 Nodepool Builder
 ----------------
 
