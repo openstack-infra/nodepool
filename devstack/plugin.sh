@@ -92,7 +92,6 @@ EOF
 
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
     cat > /tmp/01-nodepool-setup <<EOF
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
 sudo mkdir -p /etc/nodepool
 # Make it world writeable so nodepool can write here later.
 sudo chmod 777 /etc/nodepool
@@ -168,6 +167,9 @@ dburi: $dburi
 EOF
     sudo mv /tmp/secure.conf $NODEPOOL_SECURE
 
+    if [ -f $NODEPOOL_CACHE_GET_PIP ] ; then
+        DIB_GET_PIP="DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP"
+    fi
     cat > /tmp/nodepool.yaml <<EOF
 # You will need to make and populate these two paths as necessary,
 # cloning nodepool does not do this. Further in this doc we have an
@@ -200,8 +202,28 @@ cron:
   check: '*/15 * * * *'
 
 labels:
+  - name: centos-7
+    image: centos-7
+    min-ready: 1
+    providers:
+      - name: devstack
+  - name: fedora-24
+    image: fedora-24
+    min-ready: 1
+    providers:
+      - name: devstack
+  - name: ubuntu-precise
+    image: ubuntu-precise
+    min-ready: 1
+    providers:
+      - name: devstack
   - name: ubuntu-trusty
     image: ubuntu-trusty
+    min-ready: 1
+    providers:
+      - name: devstack
+  - name: ubuntu-xenial
+    image: ubuntu-xenial
     min-ready: 1
     providers:
       - name: devstack
@@ -217,20 +239,94 @@ providers:
     max-servers: 2
     rate: 0.25
     images:
+      - name: centos-7
+        min-ram: 1024
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+      - name: fedora-24
+        min-ram: 1024
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+      - name: ubuntu-precise
+        min-ram: 1024
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
       - name: ubuntu-trusty
+        min-ram: 1024
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+      - name: ubuntu-xenial
         min-ram: 1024
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
 
 diskimages:
-  - name: ubuntu-trusty
+  - name: centos-7
+    pause: $NODEPOOL_PAUSE_CENTOS_7_DIB
+    rebuild-age: 86400
+    elements:
+      - centos-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+  - name: fedora-24
+    pause: $NODEPOOL_PAUSE_FEDORA_24_DIB
+    rebuild-age: 86400
+    elements:
+      - fedora-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: 24
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+  - name: ubuntu-precise
+    pause: $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB
     rebuild-age: 86400
     elements:
       - ubuntu-minimal
       - vm
       - simple-init
       - devuser
+      - openssh-server
+      - nodepool-setup
+    release: precise
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+  - name: ubuntu-trusty
+    pause: $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB
+    rebuild-age: 86400
+    elements:
+      - ubuntu-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
       - nodepool-setup
     release: trusty
     env-vars:
@@ -240,12 +336,27 @@ diskimages:
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+  - name: ubuntu-xenial
+    pause: $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB
+    rebuild-age: 86400
+    elements:
+      - ubuntu-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: xenial
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
 EOF
-    if [ -f $NODEPOOL_CACHE_GET_PIP ] ; then
-        cat >> /tmp/nodepool.yaml <<EOF
-      DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP
-EOF
-    fi
 
     sudo mv /tmp/nodepool.yaml $NODEPOOL_CONFIG
     cp /etc/openstack/clouds.yaml /tmp

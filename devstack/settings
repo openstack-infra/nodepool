@@ -3,6 +3,15 @@ NODEPOOL_LOGGING=/etc/nodepool/logging.conf
 NODEPOOL_SECURE=/etc/nodepool/secure.conf
 NODEPOOL_DIB_BASE_PATH=/opt/dib
 
+# Flags to control which images we build.
+# NOTE(pabelanger): Be sure to also update tools/check_devstack_plugin.sh if you
+# change the defaults.
+NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-true}
+NODEPOOL_PAUSE_FEDORA_24_DIB=${NODEPOOL_PAUSE_FEDORA_24_DIB:-true}
+NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB=${NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB:-true}
+NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
+NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-true}
+
 SHADE_REPO_URL=${SHADE_REPO_URL:-https://git.openstack.org/openstack-infra/shade}
 SHADE_REPO_REF=${SHADE_REPO_REF:-master}
 
