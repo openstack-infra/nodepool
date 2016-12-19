@@ -32,10 +32,10 @@ function waitfornode {
 }
 
 # check that image built
-waitforimage ubuntu-dib
+waitforimage ubuntu-trusty
 
 # check image was bootable
-waitfornode ubuntu-dib
+waitfornode ubuntu-trusty
 
 set -o errexit
 # Show the built nodes
