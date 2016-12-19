@@ -192,7 +192,7 @@ labels) and set that provider's max-servers to -1.  This will instruct
 Nodepool to delete any images uploaded to that provider, not upload
 any new ones, and stop booting new nodes on the provider.  You can
 then let the nodes go through their normal lifecycle.  Once all nodes
-hove been deleted you remove the config from nodepool for that
+have been deleted you remove the config from nodepool for that
 provider entirely (though leaving it in this state is effectively the
 same and makes it easy to turn the provider back on).
 

@@ -225,8 +225,8 @@ which formats to build, if the diskimage will only be built if it
 appears in at least one provider.
 
 To remove a diskimage from the system entirely, remove all associated
-entries in :ref:`images` and remove its entry from `diskimages`
-entirely.  All uploads will be deleted as well as the files on disk.
+entries in :ref:`images` and remove its entry from `diskimages`.  All
+uploads will be deleted as well as the files on disk.
 
 Example configuration::
 
