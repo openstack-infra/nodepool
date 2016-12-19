@@ -1,4 +1,3 @@
-script-dir: .
 images-dir: '{images_dir}'
 
 cron:

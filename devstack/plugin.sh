@@ -67,29 +67,7 @@ function nodepool_create_keypairs {
     fi
 }
 
-function nodepool_write_prepare {
-    sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/scripts
-    local pub_key=$(cat $NODEPOOL_PUBKEY)
-
-    cat > /tmp/prepare_node_ubuntu.sh <<EOF
-#!/bin/bash -x
-sudo adduser --disabled-password --gecos "" jenkins
-sudo mkdir -p /home/jenkins/.ssh
-cat > tmp_authorized_keys << INNEREOF
-  $pub_key
-INNEREOF
-sudo mv tmp_authorized_keys /home/jenkins/.ssh/authorized_keys
-sudo chmod 700 /home/jenkins/.ssh
-sudo chmod 600 /home/jenkins/.ssh/authorized_keys
-sudo chown -R jenkins:jenkins /home/jenkins
-sleep 5
-sync
-EOF
-    sudo mv /tmp/prepare_node_ubuntu.sh \
-         $(dirname $NODEPOOL_CONFIG)/scripts/prepare_node_ubuntu.sh
-
-    sudo chmod a+x $(dirname $NODEPOOL_CONFIG)/scripts/prepare_node_ubuntu.sh
-
+function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
     cat > /tmp/01-nodepool-setup <<EOF
 sudo mkdir -p /etc/nodepool
@@ -171,10 +149,9 @@ EOF
         DIB_GET_PIP="DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP"
     fi
     cat > /tmp/nodepool.yaml <<EOF
-# You will need to make and populate these two paths as necessary,
+# You will need to make and populate this path as necessary,
 # cloning nodepool does not do this. Further in this doc we have an
-# example script for /path/to/nodepool/things/scripts.
-script-dir: $(dirname $NODEPOOL_CONFIG)/scripts
+# example element.
 elements-dir: $(dirname $NODEPOOL_CONFIG)/elements
 images-dir: $NODEPOOL_DIB_BASE_PATH/images
 # The mysql password here may be different depending on your
@@ -381,8 +358,8 @@ function configure_nodepool {
     # write the nodepool config
     nodepool_write_config
 
-    # write the prepare node script
-    nodepool_write_prepare
+    # write the elements
+    nodepool_write_elements
 
     # builds a fresh db
     recreate_database nodepool
