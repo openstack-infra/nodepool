@@ -226,31 +226,36 @@ providers:
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
     launch-timeout: 900
-    max-servers: 2
+    max-servers: 5
     rate: 0.25
     images:
       - name: centos-7
         min-ram: 1024
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: fedora-24
         min-ram: 1024
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-precise
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-trusty
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-xenial
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
@@ -382,8 +387,11 @@ function configure_nodepool {
 function start_nodepool {
     # build a custom flavor that's more friendly to nodepool
     local available_flavors=$(nova flavor-list)
-    if [[ ! ( $available_flavors =~ 'm1.nodepool' ) ]]; then
-        nova flavor-create m1.nodepool 64 1024 0 1
+    if [[ ! ( $available_flavors =~ 'nodepool-512' ) ]]; then
+        nova flavor-create nodepool-512 64 512 0 1
+    fi
+    if [[ ! ( $available_flavors =~ 'nodepool-1024' ) ]]; then
+        nova flavor-create nodepool-1024 128 1024 0 1
     fi
 
     # build sec group rules to reach the nodes, we need to do this

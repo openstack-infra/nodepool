@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -ex
 
 NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-/opt/stack/new/nodepool-venv}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
@@ -68,7 +68,7 @@ if [ $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB = 'false' ]; then
     waitfornode ubuntu-trusty
 fi
 
-if [ $NODEPOOL_PAUSE_UBUNTU_XENIAL = 'false' ]; then
+if [ $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB = 'false' ]; then
     # check that image built
     waitforimage ubuntu-xenial
     # check image was bootable
