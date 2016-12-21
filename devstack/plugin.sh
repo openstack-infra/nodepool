@@ -48,11 +48,24 @@ function install_diskimage_builder {
     fi
 }
 
+function install_glean {
+    if use_library_from_git "glean"; then
+        GITREPO["glean"]=$GLEAN_REPO_URL
+        GITDIR["glean"]=$DEST/glean
+        GITBRANCH["glean"]=$GLEAN_REPO_REF
+        git_clone_by_name "glean"
+        setup_dev_lib "glean"
+        $NODEPOOL_INSTALL/bin/pip install -e $DEST/glean
+    fi
+}
+
+
 # Install nodepool code
 function install_nodepool {
     virtualenv $NODEPOOL_INSTALL
     install_shade
     install_diskimage_builder
+    install_glean
 
     setup_develop $DEST/nodepool
     $NODEPOOL_INSTALL/bin/pip install -e $DEST/nodepool

@@ -18,6 +18,9 @@ SHADE_REPO_REF=${SHADE_REPO_REF:-master}
 DISKIMAGE_BUILDER_REPO_URL=${DISKIMAGE_BUILDER_REPO_URL:-https://git.openstack.org/openstack/diskimage-builder}
 DISKIMAGE_BUILDER_REPO_REF=${DISKIMAGE_BUILDER_REPO_REF:-master}
 
+GLEAN_REPO_URL=${GLEAN_REPO_URL:-https://git.openstack.org/openstack/glean}
+GLEAN_REPO_REF=${GLEAN_REPO_REF:-master}
+
 enable_service geard
 enable_service statsd
 enable_service nodepool
