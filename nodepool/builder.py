@@ -797,6 +797,19 @@ class UploadWorker(BaseWorker):
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
         self.name = 'UploadWorker.%s' % name
 
+    def _reloadConfig(self):
+        '''
+        Reload the nodepool configuration file.
+        '''
+        new_config = nodepool_config.loadConfig(self._config_path)
+        if not self._config:
+            self._config = new_config
+
+        self._checkForZooKeeperChanges(new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config,
+                                                     use_taskmanager=False)
+        self._config = new_config
+
     def _uploadImage(self, build_id, upload_id, image_name, images, provider):
         '''
         Upload a local DIB image build to a provider.
@@ -891,16 +904,25 @@ class UploadWorker(BaseWorker):
         '''
         for provider in self._config.providers.values():
             for image in provider.images.values():
+                uploaded = False
+
                 # Check if we've been told to shutdown
                 # or if ZK connection is suspended
                 if not self.running or self._zk.suspended or self._zk.lost:
                     return
                 try:
-                    self._checkProviderImageUpload(provider, image)
+                    uploaded = self._checkProviderImageUpload(provider, image)
                 except Exception:
                     self.log.exception("Error uploading image %s "
                                        "to provider %s:",
                                        image.name, provider.name)
+
+                # NOTE: Due to the configuration file disagreement issue
+                # (the copy we have may not be current), if we took the time
+                # to attempt to upload an image, let's short-circuit this loop
+                # to give us a chance to reload the configuration file.
+                if uploaded:
+                    return
 
     def _checkProviderImageUpload(self, provider, image):
         '''
@@ -909,18 +931,18 @@ class UploadWorker(BaseWorker):
         and performing the upload.  It is a separate function so that
         exception handling can treat all provider-image uploads
         indepedently.
-        '''
-        # TODO(jeblair): check for pause here
 
+        :returns: True if an upload was attempted, False otherwise.
+        '''
         # Check if image uploads are paused.
         if provider.images.get(image.name).pause:
-            return
+            return False
 
         # Search for the most recent 'ready' image build
         builds = self._zk.getMostRecentBuilds(1, image.name,
                                               zk.READY)
         if not builds:
-            return
+            return False
 
         build = builds[0]
 
@@ -929,17 +951,17 @@ class UploadWorker(BaseWorker):
         local_images = DibImageFile.from_image_id(
             self._config.imagesdir, "-".join([image.name, build.id]))
         if not local_images:
-            return
+            return False
 
         # See if this image has already been uploaded
         upload = self._zk.getMostRecentBuildImageUploads(
             1, image.name, build.id, provider.name, zk.READY)
         if upload:
-            return
+            return False
 
         # See if this provider supports the available image formats
         if provider.image_type not in build.formats:
-            return
+            return False
 
         try:
             with self._zk.imageUploadLock(
@@ -951,7 +973,15 @@ class UploadWorker(BaseWorker):
                 upload = self._zk.getMostRecentBuildImageUploads(
                     1, image.name, build.id, provider.name, zk.READY)
                 if upload:
-                    return
+                    return False
+
+                # NOTE: Due to the configuration file disagreement issue
+                # (the copy we have may not be current), we try to verify
+                # that another thread isn't trying to delete this build just
+                # before we upload.
+                b = self._zk.getBuild(image.name, build.id)
+                if b.state == zk.DELETING:
+                    return False
 
                 # New upload number with initial state 'uploading'
                 data = zk.ImageUpload()
@@ -965,9 +995,10 @@ class UploadWorker(BaseWorker):
                 # Set final state
                 self._zk.storeImageUpload(image.name, build.id,
                                           provider.name, data, upnum)
+                return True
         except exceptions.ZKLockException:
             # Lock is already held. Skip it.
-            pass
+            return False
 
     def run(self):
 
@@ -982,7 +1013,8 @@ class UploadWorker(BaseWorker):
                 time.sleep(SUSPEND_WAIT_TIME)
 
             try:
-                self._run()
+                self._reloadConfig()
+                self._checkForProviderUploads()
             except Exception:
                 self.log.exception("Exception in UploadWorker:")
                 time.sleep(10)
@@ -990,21 +1022,6 @@ class UploadWorker(BaseWorker):
             time.sleep(self._interval)
 
         provider_manager.ProviderManager.stopProviders(self._config)
-
-    def _run(self):
-        '''
-        Body of run method for exception handling purposes.
-        '''
-        new_config = nodepool_config.loadConfig(self._config_path)
-        if not self._config:
-            self._config = new_config
-
-        self._checkForZooKeeperChanges(new_config)
-        provider_manager.ProviderManager.reconfigure(self._config, new_config,
-                                                     use_taskmanager=False)
-        self._config = new_config
-
-        self._checkForProviderUploads()
 
 
 class NodePoolBuilder(object):
