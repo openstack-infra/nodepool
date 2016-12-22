@@ -75,21 +75,28 @@ class WebApp(threading.Thread):
         if result:
             return result
         if path == '/image-list':
-            table = status.image_list(self.nodepool.getZK())
+            output = status.image_list(self.nodepool.getZK())
         elif path == '/dib-image-list':
-            table = status.dib_image_list(self.nodepool.getZK())
+            output = status.dib_image_list(self.nodepool.getZK())
+        elif path == '/dib-image-list.json':
+            output = status.dib_image_list_json(self.nodepool.getZK())
         else:
             return None
-        return self.cache.put(path, table)
+        return self.cache.put(path, output)
 
     def app(self, request):
         result = self.get_cache(request.path)
         if result is None:
             raise webob.exc.HTTPNotFound()
-        last_modified, table = result
+        last_modified, output = result
 
-        response = webob.Response(body=table,
-                                  content_type='text/plain')
+        if request.path.endswith('.json'):
+            content_type = 'application/json'
+        else:
+            content_type = 'application/text'
+
+        response = webob.Response(body=output,
+                                  content_type=content_type)
         response.headers['Access-Control-Allow-Origin'] = '*'
 
         response.cache_control.public = True
