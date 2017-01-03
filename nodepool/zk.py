@@ -299,6 +299,7 @@ class ZooKeeper(object):
     log = logging.getLogger("nodepool.zk.ZooKeeper")
 
     IMAGE_ROOT = "/nodepool/images"
+    LAUNCHER_ROOT = "/nodepool/launchers"
 
     def __init__(self, client=None):
         '''
@@ -352,6 +353,9 @@ class ZooKeeper(object):
     def _imageUploadLockPath(self, image, build_number, provider):
         return "%s/lock" % self._imageUploadPath(image, build_number,
                                                  provider)
+
+    def _launcherPath(self, launcher):
+        return "%s/%s" % (self.LAUNCHER_ROOT, launcher)
 
     def _dictToStr(self, data):
         return json.dumps(data)
@@ -1030,3 +1034,33 @@ class ZooKeeper(object):
             self.client.delete(path)
         except kze.NoNodeError:
             pass
+
+    def registerLauncher(self, launcher):
+        '''
+        Register an active node launcher.
+
+        The launcher is automatically de-registered once it terminates or
+        otherwise disconnects from ZooKeeper. It will need to re-register
+        after a lost connection. This method is safe to call multiple times.
+
+        :param str launcher: Unique name for the launcher.
+        '''
+        path = self._launcherPath(launcher)
+
+        try:
+            self.client.create(path, makepath=True, ephemeral=True)
+        except kze.NodeExistsError:
+            pass
+
+    def getRegisteredLaunchers(self):
+        '''
+        Get a list of all launchers that have registered with ZooKeeper.
+
+        :returns: A list of launcher names, or empty list if none are found.
+        '''
+        try:
+            launchers = self.client.get_children(self.LAUNCHER_ROOT)
+        except kze.NoNodeError:
+            return []
+
+        return launchers

@@ -476,6 +476,21 @@ class TestZooKeeper(tests.DBTestCase):
         self.zk.deleteUpload("trusty", "000", "rax", "000001")
         self.assertIsNone(self.zk.client.exists(path))
 
+    def test_registerLauncher(self):
+        name = "launcher-000-001"
+        self.zk.registerLauncher(name)
+        launchers = self.zk.getRegisteredLaunchers()
+        self.assertEqual(1, len(launchers))
+        self.assertEqual(name, launchers[0])
+
+    def test_registerLauncher_safe_repeat(self):
+        name = "launcher-000-001"
+        self.zk.registerLauncher(name)
+        self.zk.registerLauncher(name)
+        launchers = self.zk.getRegisteredLaunchers()
+        self.assertEqual(1, len(launchers))
+        self.assertEqual(name, launchers[0])
+
 
 class TestZKModel(tests.BaseTestCase):
 

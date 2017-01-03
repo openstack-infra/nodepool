@@ -21,10 +21,12 @@ import apscheduler.triggers.cron
 import gear
 import json
 import logging
+import os
 import os.path
 import paramiko
 import pprint
 import random
+import socket
 import threading
 import time
 import zmq
@@ -883,6 +885,9 @@ class NodePool(threading.Thread):
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
         self._wake_condition = threading.Condition()
+        self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
+                                         os.getpid(),
+                                         self.ident)
 
     def stop(self):
         self._stopped = True
@@ -1253,6 +1258,7 @@ class NodePool(threading.Thread):
 
     def startup(self):
         self.updateConfig()
+        self.zk.registerLauncher(self.launcher_id)
 
         # Currently nodepool can not resume building a node or image
         # after a restart.  To clean up, mark all building node and
