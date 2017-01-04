@@ -110,7 +110,7 @@ class ConfigValidator:
             'elements': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
-            'env-vars': dict,
+            'env-vars': {str: str},
         }
 
         top_level = {
