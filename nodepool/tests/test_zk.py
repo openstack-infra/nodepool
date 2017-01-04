@@ -437,27 +437,58 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(1, len(launchers))
         self.assertEqual(name, launchers[0])
 
+    def test_getNodeRequests_empty(self):
+        self.assertEqual([], self.zk.getNodeRequests())
+
+    def test_getNodeRequests(self):
+        r1 = self.zk._requestPath("500-123")
+        r2 = self.zk._requestPath("100-456")
+        r3 = self.zk._requestPath("100-123")
+        r4 = self.zk._requestPath("400-123")
+        self.zk.client.create(r1, makepath=True, ephemeral=True)
+        self.zk.client.create(r2, makepath=True, ephemeral=True)
+        self.zk.client.create(r3, makepath=True, ephemeral=True)
+        self.zk.client.create(r4, makepath=True, ephemeral=True)
+
+        self.assertEqual(
+            ["100-123", "100-456", "400-123", "500-123"],
+            self.zk.getNodeRequests()
+        )
+
+    def test_getNodeRequest(self):
+        r = zk.NodeRequest("500-123")
+        r.state = zk.READY
+        path = self.zk._requestPath(r.id)
+        self.zk.client.create(path, value=self.zk._dictToStr(r.toDict()),
+                              makepath=True, ephemeral=True)
+        o = self.zk.getNodeRequest(r.id)
+        self.assertIsInstance(o, zk.NodeRequest)
+        self.assertEqual(r.id, o.id)
+
+    def test_getNodeRequest_not_found(self):
+        self.assertIsNone(self.zk.getNodeRequest("invalid"))
+
 
 class TestZKModel(tests.BaseTestCase):
 
     def setUp(self):
         super(TestZKModel, self).setUp()
 
-    def test_BaseBuilderModel_bad_id(self):
+    def test_BaseModel_bad_id(self):
         with testtools.ExpectedException(
             TypeError, "'id' attribute must be a string type"
         ):
-            zk.BaseBuilderModel(123)
+            zk.BaseModel(123)
 
-    def test_BaseBuilderModel_bad_state(self):
+    def test_BaseModel_bad_state(self):
         with testtools.ExpectedException(
             TypeError, "'blah' is not a valid state"
         ):
-            o = zk.BaseBuilderModel('0001')
+            o = zk.BaseModel('0001')
             o.state = 'blah'
 
-    def test_BaseBuilderModel_toDict(self):
-        o = zk.BaseBuilderModel('0001')
+    def test_BaseModel_toDict(self):
+        o = zk.BaseModel('0001')
         o.state = zk.BUILDING
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -524,3 +555,23 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
+
+    def test_NodeRequest_toDict(self):
+        o = zk.NodeRequest("500-123")
+        d = o.toDict()
+        self.assertNotIn('id', d)
+        self.assertIn('state', d)
+        self.assertIn('state_time', d)
+
+    def test_NodeRequest_fromDict(self):
+        now = int(time.time())
+        req_id = "500-123"
+        d = {
+            'state': zk.READY,
+            'state_time': now
+        }
+
+        o = zk.NodeRequest.fromDict(d, req_id)
+        self.assertEqual(o.id, req_id)
+        self.assertEqual(o.state, d['state'])
+        self.assertEqual(o.state_time, d['state_time'])

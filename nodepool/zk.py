@@ -106,7 +106,7 @@ class ZooKeeperWatchEvent(object):
         self.image = image
 
 
-class BaseBuilderModel(object):
+class BaseModel(object):
     def __init__(self, o_id):
         if o_id:
             self.id = o_id
@@ -137,7 +137,7 @@ class BaseBuilderModel(object):
 
     def toDict(self):
         '''
-        Convert a BaseBuilderModel object's attributes to a dictionary.
+        Convert a BaseModel object's attributes to a dictionary.
         '''
         d = {}
         d['state'] = self.state
@@ -157,7 +157,7 @@ class BaseBuilderModel(object):
             self.state_time = d['state_time']
 
 
-class ImageBuild(BaseBuilderModel):
+class ImageBuild(BaseModel):
     '''
     Class representing a DIB image build within the ZooKeeper cluster.
     '''
@@ -216,7 +216,7 @@ class ImageBuild(BaseBuilderModel):
         return o
 
 
-class ImageUpload(BaseBuilderModel):
+class ImageUpload(BaseModel):
     '''
     Class representing a provider image upload within the ZooKeeper cluster.
     '''
@@ -277,6 +277,42 @@ class ImageUpload(BaseBuilderModel):
         return o
 
 
+class NodeRequest(BaseModel):
+    '''
+    Class representing a node request.
+    '''
+
+    def __init__(self, id=None):
+        super(NodeRequest, self).__init__(id)
+
+    def __repr__(self):
+        d = self.toDict()
+        d['id'] = self.id
+        d['stat'] = self.stat
+        return '<NodeRequest %s>' % d
+
+    def toDict(self):
+        '''
+        Convert a NodeRequest object's attributes to a dictionary.
+        '''
+        d = super(NodeRequest, self).toDict()
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create a NodeRequest object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized ImageBuild object.
+        '''
+        o = NodeRequest(o_id)
+        super(NodeRequest, o).fromDict(d)
+        return o
+
+
 class ZooKeeper(object):
     '''
     Class implementing the ZooKeeper interface.
@@ -297,6 +333,7 @@ class ZooKeeper(object):
 
     IMAGE_ROOT = "/nodepool/images"
     LAUNCHER_ROOT = "/nodepool/launchers"
+    REQUEST_ROOT = "/nodepool/requests"
 
     def __init__(self):
         '''
@@ -340,6 +377,9 @@ class ZooKeeper(object):
 
     def _launcherPath(self, launcher):
         return "%s/%s" % (self.LAUNCHER_ROOT, launcher)
+
+    def _requestPath(self, request):
+        return "%s/%s" % (self.REQUEST_ROOT, request)
 
     def _dictToStr(self, data):
         return json.dumps(data)
@@ -1024,3 +1064,32 @@ class ZooKeeper(object):
             return []
 
         return launchers
+
+    def getNodeRequests(self):
+        '''
+        Get the current list of all node requests in priority sorted order.
+
+        :returns: A list of request nodes.
+        '''
+        try:
+            requests = self.client.get_children(self.REQUEST_ROOT)
+        except kze.NoNodeError:
+            return []
+
+        return sorted(requests)
+
+    def getNodeRequest(self, request):
+        '''
+        Get the data for a specific node request.
+
+        :returns: The request data, or None if the request was not found.
+        '''
+        path = self._requestPath(request)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+
+        d = NodeRequest.fromDict(self._strToDict(data), request)
+        d.stat = stat
+        return d
