@@ -15,13 +15,11 @@
 
 """Common utilities used in testing"""
 
-import errno
 import glob
 import logging
 import os
 import pymysql
 import random
-import re
 import string
 import subprocess
 import threading
@@ -30,7 +28,6 @@ import time
 import uuid
 
 import fixtures
-import gear
 import lockfile
 import kazoo.client
 import testtools
@@ -44,74 +41,6 @@ TRUE_VALUES = ('true', '1', 'yes')
 
 class LoggingPopen(subprocess.Popen):
     pass
-
-
-class FakeGearmanServer(gear.Server):
-    def __init__(self, port=0):
-        self.hold_jobs_in_queue = False
-        super(FakeGearmanServer, self).__init__(port)
-
-    def getJobForConnection(self, connection, peek=False):
-        for queue in [self.high_queue, self.normal_queue, self.low_queue]:
-            for job in queue:
-                if not hasattr(job, 'waiting'):
-                    if job.name.startswith('build:'):
-                        job.waiting = self.hold_jobs_in_queue
-                    else:
-                        job.waiting = False
-                if job.waiting:
-                    continue
-                if job.name in connection.functions:
-                    if not peek:
-                        queue.remove(job)
-                        connection.related_jobs[job.handle] = job
-                        job.worker_connection = connection
-                    job.running = True
-                    return job
-        return None
-
-    def release(self, regex=None):
-        released = False
-        qlen = (len(self.high_queue) + len(self.normal_queue) +
-                len(self.low_queue))
-        self.log.debug("releasing queued job %s (%s)" % (regex, qlen))
-        for job in self.getQueue():
-            cmd, name = job.name.split(':')
-            if cmd != 'build':
-                continue
-            if not regex or re.match(regex, name):
-                self.log.debug("releasing queued job %s" %
-                               job.unique)
-                job.waiting = False
-                released = True
-            else:
-                self.log.debug("not releasing queued job %s" %
-                               job.unique)
-        if released:
-            self.wakeConnections()
-        qlen = (len(self.high_queue) + len(self.normal_queue) +
-                len(self.low_queue))
-        self.log.debug("done releasing queued jobs %s (%s)" % (regex, qlen))
-
-
-class GearmanServerFixture(fixtures.Fixture):
-    def __init__(self, port=0):
-        self._port = port
-
-    def setUp(self):
-        super(GearmanServerFixture, self).setUp()
-        self.gearman_server = FakeGearmanServer(self._port)
-        self.addCleanup(self.shutdownGearman)
-
-    def shutdownGearman(self):
-        #TODO:greghaynes remove try once gear client protects against this
-        try:
-            self.gearman_server.shutdown()
-        except OSError as e:
-            if e.errno == errno.EBADF:
-                pass
-            else:
-                raise
 
 
 class ZookeeperServerFixture(fixtures.Fixture):
@@ -169,37 +98,6 @@ class ChrootedKazooFixture(fixtures.Fixture):
         _tmp_client.delete(self.zookeeper_chroot, recursive=True)
         _tmp_client.stop()
         _tmp_client.close()
-
-
-class GearmanClient(gear.Client):
-    def __init__(self):
-        super(GearmanClient, self).__init__(client_id='test_client')
-        self.__log = logging.getLogger("tests.GearmanClient")
-
-    def get_queued_image_jobs(self):
-        'Count the number of image-build and upload jobs queued.'
-        queued = 0
-        for connection in self.active_connections:
-            try:
-                req = gear.StatusAdminRequest()
-                connection.sendAdminRequest(req)
-            except Exception:
-                self.__log.exception("Exception while listing functions")
-                self._lostConnection(connection)
-                continue
-            for line in req.response.split('\n'):
-                parts = [x.strip() for x in line.split('\t')]
-                # parts[0] - function name
-                # parts[1] - total jobs queued (including building)
-                # parts[2] - jobs building
-                # parts[3] - workers registered
-                if not parts or parts[0] == '.':
-                    continue
-                if (not parts[0].startswith('image-build:') and
-                    not parts[0].startswith('image-upload:')):
-                    continue
-                queued += int(parts[1])
-        return queued
 
 
 class BaseTestCase(testtools.TestCase):
@@ -265,8 +163,6 @@ class BaseTestCase(testtools.TestCase):
                      'NodePool',
                      'NodePool Builder',
                      'NodeUpdateListener',
-                     'Gearman client connect',
-                     'Gearman client poll',
                      'fake-provider',
                      'fake-provider1',
                      'fake-provider2',
@@ -397,11 +293,6 @@ class DBTestCase(BaseTestCase):
         self.useFixture(f)
         self.dburi = f.dburi
         self.secure_conf = self._setup_secure()
-
-        gearman_fixture = GearmanServerFixture()
-        self.useFixture(gearman_fixture)
-        self.gearman_server = gearman_fixture.gearman_server
-
         self.setupZK()
 
     def setup_config(self, filename, images_dir=None):
@@ -414,7 +305,6 @@ class DBTestCase(BaseTestCase):
         with open(configfile) as conf_fd:
             config = conf_fd.read()
             os.write(fd, config.format(images_dir=images_dir.path,
-                                       gearman_port=self.gearman_server.port,
                                        zookeeper_host=self.zookeeper_host,
                                        zookeeper_port=self.zookeeper_port,
                                        zookeeper_chroot=self.zookeeper_chroot))
@@ -539,18 +429,6 @@ class DBTestCase(BaseTestCase):
                         break
             time.sleep(1)
         self.wait_for_threads()
-
-    def waitForJobs(self):
-        # XXX:greghaynes - There is a very narrow race here where nodepool
-        # is who actually updates the database so this may return before the
-        # image rows are updated.
-        client = GearmanClient()
-        client.addServer('localhost', self.gearman_server.port)
-        client.waitForServer()
-
-        while client.get_queued_image_jobs() > 0:
-            time.sleep(.2)
-        client.shutdown()
 
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args

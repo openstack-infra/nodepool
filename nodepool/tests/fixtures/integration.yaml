@@ -4,13 +4,6 @@ cron:
   check: '*/15 * * * *'
   cleanup: '*/1 * * * *'
 
-zmq-publishers:
-  - tcp://localhost:8881
-
-gearman-servers:
-  - host: localhost
-    port: {gearman_port}
-
 zookeeper-servers:
   - host: localhost
 

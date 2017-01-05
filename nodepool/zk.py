@@ -35,8 +35,15 @@ READY = 'ready'
 DELETING = 'deleting'
 # The build failed.
 FAILED = 'failed'
+# Node request is submitted/unhandled.
+REQUESTED = 'requested'
+# Node request has been processed successfully.
+FULFILLED = 'fulfilled'
+# Node request is being worked.
+PENDING = 'pending'
 
-STATES = set([BUILDING, UPLOADING, READY, DELETING, FAILED])
+STATES = set([BUILDING, UPLOADING, READY, DELETING, FAILED,
+              REQUESTED, FULFILLED, PENDING])
 
 class ZooKeeperConnectionConfig(object):
     '''

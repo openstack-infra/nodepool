@@ -94,7 +94,6 @@ class ConfigValidator:
             'name': str,
             'hostname': str,
             'subnode-hostname': str,
-            'assign-via-gearman': bool,
             'jenkins': {
                 'url': str,
                 'user': str,
@@ -117,11 +116,6 @@ class ConfigValidator:
             'elements-dir': str,
             'images-dir': str,
             'dburi': str,
-            'zmq-publishers': [str],
-            'gearman-servers': [{
-                'host': str,
-                'port': int,
-            }],
             'zookeeper-servers': [{
                 'host': str,
                 'port': int,

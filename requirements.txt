@@ -1,6 +1,5 @@
 pbr>=1.3
 
-gear
 PyYAML
 python-jenkins
 paramiko>1.11.6,<2.0.0
@@ -9,7 +8,6 @@ extras
 statsd>=3.0
 apscheduler>=3.0
 sqlalchemy>=0.8.2,<1.1.0
-pyzmq>=13.1.0
 PyMySQL
 PrettyTable>=0.6,<0.8
 # shade has a looser requirement on six than nodepool, so install six first

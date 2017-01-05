@@ -18,7 +18,6 @@
 
 import apscheduler.schedulers.background
 import apscheduler.triggers.cron
-import gear
 import json
 import logging
 import os
@@ -29,7 +28,6 @@ import random
 import socket
 import threading
 import time
-import zmq
 
 import allocation
 import jenkins_manager
@@ -40,7 +38,6 @@ import provider_manager
 import stats
 import config as nodepool_config
 
-import jobs
 import zk
 
 MINS = 60
@@ -57,6 +54,8 @@ IMAGE_CLEANUP = 8 * HOURS    # When to start deleting an image that is not
                              # READY or is not the current or previous image
 DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
                              # its job.
+SUSPEND_WAIT_TIME = 30       # How long to wait between checks for ZooKeeper
+                             # connectivity if it disappears.
 
 
 class LaunchNodepoolException(Exception):
@@ -170,174 +169,6 @@ class NodeCompleteThread(threading.Thread):
 
         time.sleep(DELETE_DELAY)
         self.nodepool.deleteNode(node.id)
-
-
-class NodeUpdateListener(threading.Thread):
-    log = logging.getLogger("nodepool.NodeUpdateListener")
-
-    def __init__(self, nodepool, addr):
-        threading.Thread.__init__(self, name='NodeUpdateListener')
-        self.nodepool = nodepool
-        self.socket = self.nodepool.zmq_context.socket(zmq.SUB)
-        self.socket.RCVTIMEO = 1000
-        event_filter = b""
-        self.socket.setsockopt(zmq.SUBSCRIBE, event_filter)
-        self.socket.connect(addr)
-        self._stopped = False
-
-    def run(self):
-        while not self._stopped:
-            try:
-                m = self.socket.recv().decode('utf-8')
-            except zmq.error.Again:
-                continue
-            try:
-                topic, data = m.split(None, 1)
-                self.handleEvent(topic, data)
-            except Exception:
-                self.log.exception("Exception handling job:")
-
-    def stop(self):
-        self._stopped = True
-
-    def handleEvent(self, topic, data):
-        self.log.debug("Received: %s %s" % (topic, data))
-        args = json.loads(data)
-        build = args['build']
-        if 'node_name' not in build:
-            return
-        jobname = args['name']
-        nodename = args['build']['node_name']
-        if topic == 'onStarted':
-            self.handleStartPhase(nodename, jobname)
-        elif topic == 'onCompleted':
-            pass
-        elif topic == 'onFinalized':
-            result = args['build'].get('status')
-            params = args['build'].get('parameters')
-            if params:
-                branch = params.get('ZUUL_BRANCH', 'unknown_branch')
-            else:
-                branch = 'unknown_branch'
-            self.handleCompletePhase(nodename, jobname, result, branch)
-        else:
-            raise Exception("Received job for unhandled phase: %s" %
-                            topic)
-
-    def handleStartPhase(self, nodename, jobname):
-        with self.nodepool.getDB().getSession() as session:
-            node = session.getNodeByNodename(nodename)
-            if not node:
-                self.log.debug("Unable to find node with nodename: %s" %
-                               nodename)
-                return
-
-            target = self.nodepool.config.targets[node.target_name]
-            if jobname == target.jenkins_test_job:
-                self.log.debug("Test job for node id: %s started" % node.id)
-                return
-
-            # Preserve the HOLD state even if a job starts on the node.
-            if node.state != nodedb.HOLD:
-                self.log.info("Setting node id: %s to USED" % node.id)
-                node.state = nodedb.USED
-            self.nodepool.updateStats(session, node.provider_name)
-
-    def handleCompletePhase(self, nodename, jobname, result, branch):
-        t = NodeCompleteThread(self.nodepool, nodename, jobname, result,
-                               branch)
-        t.start()
-
-
-class GearmanClient(gear.Client):
-    def __init__(self):
-        super(GearmanClient, self).__init__(client_id='nodepool')
-        self.__log = logging.getLogger("nodepool.GearmanClient")
-
-    def getNeededWorkers(self):
-        needed_workers = {}
-        job_worker_map = {}
-        unspecified_jobs = {}
-        for connection in self.active_connections:
-            try:
-                req = gear.StatusAdminRequest()
-                connection.sendAdminRequest(req, timeout=300)
-            except Exception:
-                self.__log.exception("Exception while listing functions")
-                self._lostConnection(connection)
-                continue
-            for line in req.response.split('\n'):
-                parts = [x.strip() for x in line.split('\t')]
-                # parts[0] - function name
-                # parts[1] - total jobs queued (including building)
-                # parts[2] - jobs building
-                # parts[3] - workers registered
-                if not parts or parts[0] == '.':
-                    continue
-                if not parts[0].startswith('build:'):
-                    continue
-                function = parts[0][len('build:'):]
-                # total jobs in queue (including building jobs)
-                # NOTE(jhesketh): Jobs that are being built are accounted for
-                # in the demand algorithm by subtracting the running nodes.
-                # If there are foreign (to nodepool) workers accepting jobs
-                # the demand will be higher than actually required. However
-                # better to have too many than too few and if you have a
-                # foreign worker this may be desired.
-                try:
-                    queued = int(parts[1])
-                except ValueError as e:
-                    self.__log.warn(
-                        'Server returned non-integer value in status. (%s)' %
-                        str(e))
-                    queued = 0
-                if queued > 0:
-                    self.__log.debug("Function: %s queued: %s" % (function,
-                                                                  queued))
-                if ':' in function:
-                    fparts = function.split(':')
-                    # fparts[0] - function name
-                    # fparts[1] - target node [type]
-                    job = fparts[-2]
-                    worker = fparts[-1]
-                    workers = job_worker_map.get(job, [])
-                    workers.append(worker)
-                    job_worker_map[job] = workers
-                    if queued > 0:
-                        needed_workers[worker] = (
-                            needed_workers.get(worker, 0) + queued)
-                elif queued > 0:
-                    job = function
-                    unspecified_jobs[job] = (unspecified_jobs.get(job, 0) +
-                                             queued)
-        for job, queued in unspecified_jobs.items():
-            workers = job_worker_map.get(job)
-            if not workers:
-                continue
-            worker = workers[0]
-            needed_workers[worker] = (needed_workers.get(worker, 0) +
-                                      queued)
-        return needed_workers
-
-    def handleWorkComplete(self, packet):
-        job = super(GearmanClient, self).handleWorkComplete(packet)
-        job.onCompleted()
-
-    def handleWorkFail(self, packet):
-        job = super(GearmanClient, self).handleWorkFail(packet)
-        job.onFailed()
-
-    def handleWorkException(self, packet):
-        job = super(GearmanClient, self).handleWorkException(packet)
-        job.onFailed()
-
-    def handleDisconnect(self, job):
-        super(GearmanClient, self).handleDisconnect(job)
-        job.onDisconnect()
-
-    def handleWorkStatus(self, packet):
-        job = super(GearmanClient, self).handleWorkStatus(packet)
-        job.onWorkStatus()
 
 
 class InstanceDeleter(threading.Thread):
@@ -569,10 +400,6 @@ class NodeLauncher(threading.Thread):
             self.createJenkinsNode()
             self.log.info("Node id: %s added to jenkins" % self.node.id)
 
-        if self.target.assign_via_gearman:
-            self.log.info("Node id: %s assigning via gearman" % self.node.id)
-            self.assignViaGearman()
-
         return dt
 
     def createJenkinsNode(self):
@@ -596,24 +423,6 @@ class NodeLauncher(threading.Thread):
         if self.target.jenkins_test_job:
             params = dict(NODE=self.node.nodename)
             jenkins.startBuild(self.target.jenkins_test_job, params)
-
-    def assignViaGearman(self):
-        args = dict(name=self.node.nodename,
-                    host=self.node.ip,
-                    description='Dynamic single use %s node' % self.label.name,
-                    labels=self.label.name,
-                    root=self.image.user_home)
-        job = jobs.NodeAssignmentJob(self.node.id, self.node.target_name,
-                                     args, self.nodepool)
-        self.nodepool.gearman_client.submitJob(job, timeout=300)
-        job.waitForCompletion()
-        self.log.info("Node id: %s received %s from assignment" % (
-            self.node.id, job.data))
-        if job.failure:
-            raise Exception("Node id: %s received job failure on assignment" %
-                            self.node.id)
-        data = json.loads(job.data[-1])
-        self.node.manager_name = data['manager']
 
     def writeNodepoolInfo(self, nodelist):
         key = paramiko.RSAKey.generate(2048)
@@ -862,6 +671,20 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
+class RequestWorker(threading.Thread):
+    log = logging.getLogger("nodepool.RequestWorker")
+
+    def __init__(self, request, zk):
+        threading.Thread.__init__(
+            self, name='RequestWorker for %s' % request.id
+        )
+        self.request = request
+        self.zk = zk
+
+    def run(self):
+        self.log.info("Handling node request %s" % self.request.id)
+
+
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
@@ -875,8 +698,6 @@ class NodePool(threading.Thread):
         self.watermark_sleep = watermark_sleep
         self._stopped = False
         self.config = None
-        self.zmq_context = None
-        self.gearman_client = None
         self.apsched = None
         self.zk = None
         self.statsd = stats.get_client()
@@ -895,16 +716,9 @@ class NodePool(threading.Thread):
         self._wake_condition.notify()
         self._wake_condition.release()
         if self.config:
-            for z in self.config.zmq_publishers.values():
-                z.listener.stop()
-                z.listener.join()
             provider_manager.ProviderManager.stopProviders(self.config)
-        if self.zmq_context:
-            self.zmq_context.destroy()
         if self.apsched and self.apsched.running:
             self.apsched.shutdown()
-        if self.gearman_client:
-            self.gearman_client.shutdown()
         self.log.debug("finished stopping")
 
     def loadConfig(self):
@@ -912,12 +726,6 @@ class NodePool(threading.Thread):
         config = nodepool_config.loadConfig(self.configfile)
         nodepool_config.loadSecureConfig(config, self.securefile)
         return config
-
-    def reconfigureDatabase(self, config):
-        if (not self.config) or config.dburi != self.config.dburi:
-            config.db = nodedb.NodeDatabase(config.dburi)
-        else:
-            config.db = self.config.db
 
     def reconfigureManagers(self, config, check_targets=True):
         provider_manager.ProviderManager.reconfigure(self.config, config)
@@ -989,54 +797,6 @@ class NodePool(threading.Thread):
             else:
                 c.job = self.config.crons[c.name].job
 
-    def reconfigureUpdateListeners(self, config):
-        if self.no_deletes:
-            return
-        if self.config:
-            running = set(self.config.zmq_publishers.keys())
-        else:
-            running = set()
-
-        configured = set(config.zmq_publishers.keys())
-        if running == configured:
-            self.log.debug("ZMQ Listeners do not need to be updated")
-            if self.config:
-                config.zmq_publishers = self.config.zmq_publishers
-            return
-
-        if self.zmq_context:
-            self.log.debug("Stopping listeners")
-            self.zmq_context.destroy()
-        self.zmq_context = zmq.Context()
-        for z in config.zmq_publishers.values():
-            self.log.debug("Starting listener for %s" % z.name)
-            z.listener = NodeUpdateListener(self, z.name)
-            z.listener.start()
-
-    def reconfigureGearmanClient(self, config):
-        if self.config:
-            running = set(self.config.gearman_servers.keys())
-        else:
-            running = set()
-
-        configured = set(config.gearman_servers.keys())
-        if running == configured:
-            self.log.debug("Gearman client does not need to be updated")
-            if self.config:
-                config.gearman_servers = self.config.gearman_servers
-            return
-
-        if self.gearman_client:
-            self.log.debug("Stopping gearman client")
-            self.gearman_client.shutdown()
-            self.gearman_client = None
-        if configured:
-            self.gearman_client = GearmanClient()
-            for g in config.gearman_servers.values():
-                self.log.debug("Adding gearman server %s" % g.name)
-                self.gearman_client.addServer(g.host, g.port)
-            self.gearman_client.waitForServer()
-
     def reconfigureZooKeeper(self, config):
         if self.config:
             running = self.config.zookeeper_servers.values()
@@ -1078,10 +838,7 @@ class NodePool(threading.Thread):
     def getNeededNodes(self, session, allocation_history):
         self.log.debug("Beginning node launch calculation")
         # Get the current demand for nodes.
-        if self.gearman_client:
-            label_demand = self.gearman_client.getNeededWorkers()
-        else:
-            label_demand = {}
+        label_demand = {}
 
         for name, demand in label_demand.items():
             self.log.debug("  Demand from gearman: %s: %s" % (name, demand))
@@ -1245,45 +1002,49 @@ class NodePool(threading.Thread):
 
     def updateConfig(self):
         config = self.loadConfig()
-        self.reconfigureDatabase(config)
         self.reconfigureZooKeeper(config)
         self.reconfigureManagers(config)
-        self.reconfigureUpdateListeners(config)
-        self.reconfigureGearmanClient(config)
         self.reconfigureCrons(config)
         self.setConfig(config)
 
-    def startup(self):
-        self.updateConfig()
-        self.zk.registerLauncher(self.launcher_id)
-
-        # Currently nodepool can not resume building a node or image
-        # after a restart.  To clean up, mark all building node and
-        # images for deletion when the daemon starts.
-        with self.getDB().getSession() as session:
-            for node in session.getNodes(state=nodedb.BUILDING):
-                self.log.info("Setting building node id: %s to delete "
-                              "on startup" % node.id)
-                node.state = nodedb.DELETE
-
     def run(self):
-        try:
-            self.startup()
-        except Exception:
-            self.log.exception("Exception in startup:")
+        '''
+        Start point for the NodePool thread.
+        '''
         allocation_history = allocation.AllocationHistory()
+
         while not self._stopped:
             try:
                 self.updateConfig()
-                with self.getDB().getSession() as session:
-                    self._run(session, allocation_history)
+
+                # Don't do work if we've lost communication with the ZK cluster
+                while self.zk and (self.zk.suspended or self.zk.lost):
+                    self.log.info("ZooKeeper suspended. Waiting")
+                    time.sleep(SUSPEND_WAIT_TIME)
+
+                # Make sure we're always registered with ZK
+                self.zk.registerLauncher(self.launcher_id)
+                self._run(allocation_history)
             except Exception:
                 self.log.exception("Exception in main loop:")
+
             self._wake_condition.acquire()
             self._wake_condition.wait(self.watermark_sleep)
             self._wake_condition.release()
 
-    def _run(self, session, allocation_history):
+    def _run(self, allocation_history):
+        if self.no_launches:
+            return
+
+        for req_id in self.zk.getNodeRequests():
+            request = self.zk.getNodeRequest(req_id)
+            if request.state != zk.REQUESTED:
+                continue
+
+            worker = RequestWorker(request, self.zk)
+            worker.start()
+
+    def _run_OLD(self, session, allocation_history):
         if self.no_launches:
             return
         # Make up the subnode deficit first to make sure that an
@@ -1379,13 +1140,6 @@ class NodePool(threading.Thread):
             self.log.exception("Could not delete node %s", node_id)
         finally:
             self._delete_threads_lock.release()
-
-    def revokeAssignedNode(self, node):
-        args = dict(name=node.nodename)
-        job = jobs.NodeRevokeJob(node.id, node.manager_name,
-                                 args, self)
-        self.gearman_client.submitJob(job, timeout=300)
-        # Do not wait for completion in case the manager is offline
 
     def _deleteNode(self, session, node):
         self.log.debug("Deleting node id: %s which has been in %s "

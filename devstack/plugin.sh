@@ -184,15 +184,10 @@ zookeeper-servers:
   - host: localhost
     port: 2181
 
-gearman-servers:
-  - host: localhost
-    port: 8991
-zmq-publishers: []
 # Need to have at least one target for node allocations, but
 # this does not need to be a jenkins target.
 targets:
   - name: dummy
-    assign-via-gearman: True
 
 cron:
   cleanup: '*/1 * * * *'
@@ -418,9 +413,6 @@ function start_nodepool {
     fi
 
     export PATH=$NODEPOOL_INSTALL/bin:$PATH
-
-    # start gearman server
-    run_process geard "$NODEPOOL_INSTALL/bin/geard -p 8991 -d"
 
     # run a fake statsd so we test stats sending paths
     export STATSD_HOST=localhost

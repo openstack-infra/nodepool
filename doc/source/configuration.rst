@@ -112,29 +112,6 @@ and also indicates their default values::
     cleanup: '27 */6 * * *'
     check: '*/15 * * * *'
 
-zmq-publishers
---------------
-Lists the ZeroMQ endpoints for the Jenkins masters.  Nodepool uses
-this to receive real-time notification that jobs are running on nodes
-or are complete and nodes may be deleted.  Example::
-
-  zmq-publishers:
-    - tcp://jenkins1.example.com:8888
-    - tcp://jenkins2.example.com:8888
-
-gearman-servers
----------------
-Lists the Zuul Gearman servers that should be consulted for real-time
-demand.  Nodepool will use information from these servers to determine
-if additional nodes should be created to satisfy current demand.
-Example::
-
-  gearman-servers:
-    - host: zuul.example.com
-      port: 4730
-
-The ``port`` key is optional (default: 4730).
-
 zookeeper-servers
 -----------------
 Lists the ZooKeeper servers uses for coordinating information between
