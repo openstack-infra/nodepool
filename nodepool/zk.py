@@ -42,8 +42,6 @@ FULFILLED = 'fulfilled'
 # Node request is being worked.
 PENDING = 'pending'
 
-STATES = set([BUILDING, UPLOADING, READY, DELETING, FAILED,
-              REQUESTED, FULFILLED, PENDING])
 
 class ZooKeeperConnectionConfig(object):
     '''
@@ -114,6 +112,8 @@ class ZooKeeperWatchEvent(object):
 
 
 class BaseModel(object):
+    VALID_STATES = set([])
+
     def __init__(self, o_id):
         if o_id:
             self.id = o_id
@@ -137,7 +137,7 @@ class BaseModel(object):
 
     @state.setter
     def state(self, value):
-        if value not in STATES:
+        if value not in self.VALID_STATES:
             raise TypeError("'%s' is not a valid state" % value)
         self._state = value
         self.state_time = time.time()
@@ -168,6 +168,7 @@ class ImageBuild(BaseModel):
     '''
     Class representing a DIB image build within the ZooKeeper cluster.
     '''
+    VALID_STATES = set([BUILDING, READY, DELETING, FAILED])
 
     def __init__(self, build_id=None):
         super(ImageBuild, self).__init__(build_id)
@@ -227,6 +228,7 @@ class ImageUpload(BaseModel):
     '''
     Class representing a provider image upload within the ZooKeeper cluster.
     '''
+    VALID_STATES = set([UPLOADING, READY, DELETING, FAILED])
 
     def __init__(self, build_id=None, provider_name=None, image_name=None,
                  upload_id=None):
@@ -288,6 +290,7 @@ class NodeRequest(BaseModel):
     '''
     Class representing a node request.
     '''
+    VALID_STATES = set([REQUESTED, PENDING, FULFILLED, FAILED])
 
     def __init__(self, id=None):
         super(NodeRequest, self).__init__(id)
