@@ -7,14 +7,20 @@ of devstack images on a cloud server for use in OpenStack project testing.
 Developer setup
 ===============
 
+Make sure you have pip installed:
+
+.. code-block:: bash
+
+    wget https://bootstrap.pypa.io/get-pip.py
+    sudo python get-pip.py
+
 Install dependencies:
 
 .. code-block:: bash
 
-    sudo apt-get update
-    sudo apt-get -qy install git mysql-server libmysqlclient-dev g++\
-                     python-dev python-pip libffi-dev libssl-dev qemu-utils\
-                     libxml2-dev libxslt1-dev python-lxml
+    sudo pip install bindep
+    sudo apt-get install $(bindep -b nodepool)
+
     mkdir src
     cd ~/src
     git clone git://git.openstack.org/openstack-infra/system-config
