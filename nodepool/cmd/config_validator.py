@@ -49,7 +49,7 @@ class ConfigValidator:
 
         network = {
             'name': v.Required(str),
-            'public': bool,
+            'public': bool,  # Ignored, but kept for backwards compat
         }
 
         providers = {
@@ -66,7 +66,7 @@ class ConfigValidator:
             'project-id': str,
             'project-name': str,
             'max-servers': int,
-            'pool': str,
+            'pool': str,  # Ignored, but kept for backwards compat
             'image-type': str,
             'networks': [v.Any(old_network, network)],
             'ipv6-preferred': bool,
