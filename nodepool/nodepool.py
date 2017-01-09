@@ -672,7 +672,7 @@ class SubNodeLauncher(threading.Thread):
 
 
 class ProviderWorker(threading.Thread):
-    def __init__(self, zk, provider):
+    def __init__(self, configfile, zk, provider):
         threading.Thread.__init__(
             self, name='ProviderWorker.%s' % provider.name
         )
@@ -680,13 +680,44 @@ class ProviderWorker(threading.Thread):
         self.provider = provider
         self.zk = zk
         self.running = False
+        self.configfile = configfile
+
+    #----------------------------------------------------------------
+    # Private methods
+    #----------------------------------------------------------------
+
+    def _updateProvider(self):
+        '''
+        Update the provider definition from the config file.
+
+        If this provider has been removed from the config, we need to
+        stop processing the request queue. This will effectively cause
+        this thread to terminate.
+        '''
+        config = nodepool_config.loadConfig(self.configfile)
+
+        if self.provider.name not in config.providers.keys():
+            self.log.info("Provider %s removed from config"
+                          % self.provider.name)
+            self.stop()
+
+            # TODO(Shrews): Should we remove any existing nodes from the
+            # provider here?
+        else:
+            self.provider = config.providers[self.provider.name]
+
+    #----------------------------------------------------------------
+    # Public methods
+    #----------------------------------------------------------------
 
     def run(self):
         self.running = True
 
         while self.running:
             self.log.debug("Getting job from ZK queue")
+            # TODO(Shrews): Actually do queue work here
             time.sleep(10)
+            self._updateProvider()
 
     def stop(self):
         self.log.info("%s received stop" % self.name)
@@ -1033,11 +1064,19 @@ class NodePool(threading.Thread):
                 # Make sure we're always registered with ZK
                 self.zk.registerLauncher(self.launcher_id)
 
-                # Start provider threads for each provider in the config
+                # Start (or restart) provider threads for each provider in
+                # the config. Removing a provider from the config and then
+                # adding it back would cause a restart.
                 for p in self.config.providers.values():
                     if p.name not in provider_threads.keys():
-                        t = ProviderWorker(self.zk, p)
+                        t = ProviderWorker(self.configfile, self.zk, p)
                         self.log.info( "Starting %s" % t.name)
+                        t.start()
+                        provider_threads[p.name] = t
+                    elif not provider_threads[p.name].isAlive():
+                        provider_threads[p.name].join()
+                        t = ProviderWorker(self.configfile, self.zk, p)
+                        self.log.info( "Restarting %s" % t.name)
                         t.start()
                         provider_threads[p.name] = t
             except Exception:
