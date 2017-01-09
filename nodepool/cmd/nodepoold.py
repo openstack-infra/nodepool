@@ -74,17 +74,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('-p', dest='pidfile',
                             help='path to pid file',
                             default='/var/run/nodepool/nodepool.pid')
-        # TODO(pabelanger): Deprecated flag, remove in the future.
-        parser.add_argument('--no-builder', dest='builder',
-                            action='store_false')
-        # TODO(pabelanger): Deprecated flag, remove in the future.
-        parser.add_argument('--build-workers', dest='build_workers',
-                            default=1, help='number of build workers',
-                            type=int)
-        # TODO(pabelanger): Deprecated flag, remove in the future.
-        parser.add_argument('--upload-workers', dest='upload_workers',
-                            default=4, help='number of upload workers',
-                            type=int)
         parser.add_argument('--no-deletes', action='store_true')
         parser.add_argument('--no-webapp', action='store_true')
         parser.add_argument('--version', dest='version', action='store_true',
@@ -105,16 +94,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
                                                self.args.config,
                                                self.args.no_deletes)
-        if self.args.builder:
-            log.warning(
-                "Note: nodepool no longer automatically builds images, "
-                "please ensure the separate nodepool-builder process is "
-                "running if you haven't already")
-        else:
-            log.warning(
-                "--no-builder is deprecated and will be removed in the near "
-                "future. Update your service scripts to avoid a breakage.")
-
         if not self.args.no_webapp:
             self.webapp = nodepool.webapp.WebApp(self.pool)
 
