@@ -86,7 +86,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
                             default=4, help='number of upload workers',
                             type=int)
         parser.add_argument('--no-deletes', action='store_true')
-        parser.add_argument('--no-launches', action='store_true')
         parser.add_argument('--no-webapp', action='store_true')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
@@ -105,8 +104,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
                                                self.args.config,
-                                               self.args.no_deletes,
-                                               self.args.no_launches)
+                                               self.args.no_deletes)
         if self.args.builder:
             log.warning(
                 "Note: nodepool no longer automatically builds images, "

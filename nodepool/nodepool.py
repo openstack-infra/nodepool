@@ -697,12 +697,11 @@ class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
     def __init__(self, securefile, configfile, no_deletes=False,
-                 no_launches=False, watermark_sleep=WATERMARK_SLEEP):
+                 watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
         self.no_deletes = no_deletes
-        self.no_launches = no_launches
         self.watermark_sleep = watermark_sleep
         self._stopped = False
         self.config = None
@@ -1019,10 +1018,6 @@ class NodePool(threading.Thread):
         '''
         Start point for the NodePool thread.
         '''
-
-        if self.no_launches:
-            return
-
         # Provider threads keyed by provider name
         provider_threads = {}
 
@@ -1060,8 +1055,6 @@ class NodePool(threading.Thread):
             thd.join()
 
     def _run(self, session, allocation_history):
-        if self.no_launches:
-            return
         # Make up the subnode deficit first to make sure that an
         # already allocated node has priority in filling its subnodes
         # ahead of new nodes.
