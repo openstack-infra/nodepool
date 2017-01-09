@@ -671,18 +671,26 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
-class RequestWorker(threading.Thread):
-    log = logging.getLogger("nodepool.RequestWorker")
-
-    def __init__(self, request, zk):
+class ProviderWorker(threading.Thread):
+    def __init__(self, zk, provider):
         threading.Thread.__init__(
-            self, name='RequestWorker for %s' % request.id
+            self, name='ProviderWorker.%s' % provider.name
         )
-        self.request = request
+        self.log = logging.getLogger("nodepool.%s" % self.name)
+        self.provider = provider
         self.zk = zk
+        self.running = False
 
     def run(self):
-        self.log.info("Handling node request %s" % self.request.id)
+        self.running = True
+
+        while self.running:
+            self.log.debug("Getting job from ZK queue")
+            time.sleep(10)
+
+    def stop(self):
+        self.log.info("%s received stop" % self.name)
+        self.running = False
 
 
 class NodePool(threading.Thread):
@@ -1011,7 +1019,12 @@ class NodePool(threading.Thread):
         '''
         Start point for the NodePool thread.
         '''
-        allocation_history = allocation.AllocationHistory()
+
+        if self.no_launches:
+            return
+
+        # Provider threads keyed by provider name
+        provider_threads = {}
 
         while not self._stopped:
             try:
@@ -1024,7 +1037,14 @@ class NodePool(threading.Thread):
 
                 # Make sure we're always registered with ZK
                 self.zk.registerLauncher(self.launcher_id)
-                self._run(allocation_history)
+
+                # Start provider threads for each provider in the config
+                for p in self.config.providers.values():
+                    if p.name not in provider_threads.keys():
+                        t = ProviderWorker(self.zk, p)
+                        self.log.info( "Starting %s" % t.name)
+                        t.start()
+                        provider_threads[p.name] = t
             except Exception:
                 self.log.exception("Exception in main loop:")
 
@@ -1032,19 +1052,14 @@ class NodePool(threading.Thread):
             self._wake_condition.wait(self.watermark_sleep)
             self._wake_condition.release()
 
-    def _run(self, allocation_history):
-        if self.no_launches:
-            return
+        # Stop provider threads
+        for thd in provider_threads.values():
+            if thd.isAlive():
+                thd.stop()
+            self.log.info("Waiting for %s" % thd.name)
+            thd.join()
 
-        for req_id in self.zk.getNodeRequests():
-            request = self.zk.getNodeRequest(req_id)
-            if request.state != zk.REQUESTED:
-                continue
-
-            worker = RequestWorker(request, self.zk)
-            worker.start()
-
-    def _run_OLD(self, session, allocation_history):
+    def _run(self, session, allocation_history):
         if self.no_launches:
             return
         # Make up the subnode deficit first to make sure that an
