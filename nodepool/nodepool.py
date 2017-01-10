@@ -671,7 +671,54 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
+class NodeRequestWorker(threading.Thread):
+    '''
+    Class to process a single node request.
+
+    The ProviderWorker thread will instantiate a class of this type for each
+    node request that it pulls from ZooKeeper. That request will be assigned
+    to this thread for it to process.
+    '''
+
+    def __init__(self, zk, request):
+        threading.Thread.__init__(
+            self, name='NodeRequestWorker.%s' % request.id
+        )
+        self.log = logging.getLogger("nodepool.%s" % self.name)
+        self.zk = zk
+        self.request = request
+
+    def run(self):
+        self.log.debug("Handling request %s" % self.request)
+        try:
+            self._run()
+        except Exception:
+            self.log.exception("Exception in NodeRequestWorker:")
+            self.request.state = zk.FAILED
+            self.zk.updateNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+
+    def _run(self):
+        self.request.state = zk.PENDING
+        self.zk.updateNodeRequest(self.request)
+
+        # TODO(Shrews): Make magic happen here
+
+        self.request.state = zk.FULFILLED
+        self.zk.updateNodeRequest(self.request)
+        self.zk.unlockNodeRequest(self.request)
+
+
 class ProviderWorker(threading.Thread):
+    '''
+    Class that manages node requests for a single provider.
+
+    The NodePool thread will instantiate a class of this type for each
+    provider found in the nodepool configuration file. If the provider to
+    which this thread is assigned is removed from the configuration file, then
+    that will be recognized and this thread will shut itself down.
+    '''
+
     def __init__(self, configfile, zk, provider):
         threading.Thread.__init__(
             self, name='ProviderWorker.%s' % provider.name
@@ -714,8 +761,32 @@ class ProviderWorker(threading.Thread):
         self.running = True
 
         while self.running:
-            self.log.debug("Getting job from ZK queue")
-            # TODO(Shrews): Actually do queue work here
+            self.log.debug("Getting node request from ZK queue")
+
+            for req_id in self.zk.getNodeRequests():
+                req = self.zk.getNodeRequest(req_id)
+                if not req:
+                    continue
+
+                # Only interested in unhandled requests
+                if req.state != zk.REQUESTED:
+                    continue
+
+                try:
+                    self.zk.lockNodeRequest(req, blocking=False)
+                except exceptions.ZKLockException:
+                    continue
+
+                # Make sure the state didn't change on us
+                if req.state != zk.REQUESTED:
+                    self.zk.unlockNodeRequest(req)
+                    continue
+
+                # Got a lock, so assign it
+                self.log.info("Assigning node request %s" % req.id)
+                t = NodeRequestWorker(self.zk, req)
+                t.start()
+
             time.sleep(10)
             self._updateProvider()
 

@@ -294,6 +294,7 @@ class NodeRequest(BaseModel):
 
     def __init__(self, id=None):
         super(NodeRequest, self).__init__(id)
+        self.lock = None
 
     def __repr__(self):
         d = self.toDict()
@@ -344,6 +345,7 @@ class ZooKeeper(object):
     IMAGE_ROOT = "/nodepool/images"
     LAUNCHER_ROOT = "/nodepool/launchers"
     REQUEST_ROOT = "/nodepool/requests"
+    REQUEST_LOCK_ROOT = "/nodepool/requests-lock"
 
     def __init__(self):
         '''
@@ -390,6 +392,9 @@ class ZooKeeper(object):
 
     def _requestPath(self, request):
         return "%s/%s" % (self.REQUEST_ROOT, request)
+
+    def _requestLockPath(self, request):
+        return "%s/%s" % (self.REQUEST_LOCK_ROOT, request)
 
     def _dictToStr(self, data):
         return json.dumps(data)
@@ -1103,3 +1108,70 @@ class ZooKeeper(object):
         d = NodeRequest.fromDict(self._strToDict(data), request)
         d.stat = stat
         return d
+
+    def updateNodeRequest(self, request):
+        '''
+        Update a node request.
+
+        The request must already be locked before updating.
+
+        :param NodeRequest request: The node request to update.
+        '''
+        if request.lock is None:
+            raise Exception("%s must be locked before updating." % request)
+
+        # Validate it still exists before updating
+        if not self.getNodeRequest(request.id):
+            raise Exception(
+                "Attempt to update non-existing request %s" % request)
+
+        path = self._requestPath(request.id)
+        data = request.toDict()
+        self.client.set(path, self._dictToStr(data))
+
+    def lockNodeRequest(self, request, blocking=True, timeout=None):
+        '''
+        Lock a node request.
+
+        This will set the `lock` attribute of the request object when the
+        lock is successfully acquired.
+
+        :param NodeRequest request: The request to lock.
+        :param bool blocking: Whether or not to block on trying to
+            acquire the lock
+        :param int timeout: When blocking, how long to wait for the lock
+            to get acquired. None, the default, waits forever.
+
+        :raises: TimeoutException if we failed to acquire the lock when
+            blocking with a timeout. ZKLockException if we are not blocking
+            and could not get the lock, or a lock is already held.
+        '''
+        path = self._requestLockPath(request.id)
+        try:
+            lock = Lock(self.client, path)
+            have_lock = lock.acquire(blocking, timeout)
+        except kze.LockTimeout:
+            raise npe.TimeoutException(
+                "Timeout trying to acquire lock %s" % path)
+
+        # If we aren't blocking, it's possible we didn't get the lock
+        # because someone else has it.
+        if not have_lock:
+            raise npe.ZKLockException("Did not get lock on %s" % path)
+
+        request.lock = lock
+
+    def unlockNodeRequest(self, request):
+        '''
+        Unlock a node request.
+
+        The request must already have been locked.
+
+        :param NodeRequest request: The request to unlock.
+
+        :raises: ZKLockException if the request is not currently locked.
+        '''
+        if request.lock is None:
+            raise npe.ZKLockException("Request %s does not hold a lock" % request)
+        request.lock.release()
+        request.lock = None
