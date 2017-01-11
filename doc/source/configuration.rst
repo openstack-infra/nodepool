@@ -302,11 +302,9 @@ provider, the Nodepool image types are also defined (see
       boot-timeout: 120
       launch-timeout: 900
       template-hostname: 'template-{image.name}-{timestamp}'
-      pool: 'public'
       ipv6-preferred: False
       networks:
         - name: 'some-network-name'
-          public: True
       images:
         - name: trusty
           min-ram: 8192
@@ -423,19 +421,13 @@ provider, the Nodepool image types are also defined (see
 
   ``networks`` (dict)
     Specify custom Neutron networks that get attached to each
-    node. Specify the ``name`` of the network (a string) and if the
-    network routes to the Internet, set the boolean ``public`` to
-    true.
+    node. Specify the ``name`` of the network (a string).
 
   ``ipv6-preferred``
     If it is set to True, nodepool will try to find ipv6 in public net first
     as the ip address for ssh connection to build snapshot images and create
     jenkins slave definition. If ipv6 is not found or the key is not
     specified or set to False, ipv4 address will be used.
-
-  ``pool``
-    Specify a floating ip pool in cases where the 'public' pool is unavailable
-    or undesirable.
 
   ``api-timeout`` (compatability)
     Timeout for the OpenStack API calls client in seconds. Prefer setting

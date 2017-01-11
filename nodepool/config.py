@@ -218,7 +218,6 @@ def loadConfig(config_path):
             else:
                 n.name = network.get('name')
                 n.id = None
-            n.public = network.get('public', False)
         p.ipv6_preferred = provider.get('ipv6-preferred')
         p.clean_floating_ips = provider.get('clean-floating-ips')
         p.azs = provider.get('availability-zones')
