@@ -1046,18 +1046,15 @@ class NodePool(threading.Thread):
         configured = config.zookeeper_servers.values()
         if running == configured:
             self.log.debug("Zookeeper client does not need to be updated")
-            if self.config:
-                config.zookeeper_servers = self.config.zookeeper_servers
             return
 
-        if not self.zk:
+        if not self.zk and configured:
             self.log.debug("Connecting to ZooKeeper servers")
             self.zk = zk.ZooKeeper()
+            self.zk.connect(configured)
         else:
             self.log.debug("Detected ZooKeeper server changes")
-            self.zk.disconnect()
-        if configured:
-            self.zk.connect(config.zookeeper_servers.values())
+            self.zk.resetHosts(configured)
 
     def setConfig(self, config):
         self.config = config

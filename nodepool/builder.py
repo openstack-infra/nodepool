@@ -108,34 +108,28 @@ class DibImageFile(object):
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, config_path, interval):
+    def __init__(self, config_path, interval, zk):
         super(BaseWorker, self).__init__()
         self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
         self._running = False
         self._config = None
         self._config_path = config_path
-        self._zk = None
+        self._zk = zk
         self._hostname = socket.gethostname()
         self._statsd = stats.get_client()
         self._interval = interval
 
     def _checkForZooKeeperChanges(self, new_config):
         '''
-        Connect to ZooKeeper cluster.
+        Check config for ZooKeeper cluster changes.
 
-        Makes the initial connection to the ZooKeeper cluster. If the defined
-        set of ZooKeeper servers changes, the connection will be reestablished
-        using the new server set.
+        If the defined set of ZooKeeper servers changes, the connection
+        will use the new server set.
         '''
-        if self._zk is None:
-            self.log.debug("Connecting to ZooKeeper servers")
-            self._zk = zk.ZooKeeper()
-            self._zk.connect(new_config.zookeeper_servers.values())
-        elif self._config.zookeeper_servers != new_config.zookeeper_servers:
+        if self._config.zookeeper_servers != new_config.zookeeper_servers:
             self.log.debug("Detected ZooKeeper server changes")
-            self._zk.disconnect()
-            self._zk.connect(new_config.zookeeper_servers.values())
+            self._zk.resetHosts(new_config.zookeeper_servers.values())
 
     @property
     def running(self):
@@ -151,8 +145,8 @@ class CleanupWorker(BaseWorker):
     and any local DIB builds.
     '''
 
-    def __init__(self, name, config_path, interval):
-        super(CleanupWorker, self).__init__(config_path, interval)
+    def __init__(self, name, config_path, interval, zk):
+        super(CleanupWorker, self).__init__(config_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
         self.name = 'CleanupWorker.%s' % name
 
@@ -486,9 +480,6 @@ class CleanupWorker(BaseWorker):
 
             time.sleep(self._interval)
 
-        if self._zk:
-            self._zk.disconnect()
-
         provider_manager.ProviderManager.stopProviders(self._config)
 
     def _run(self):
@@ -496,6 +487,9 @@ class CleanupWorker(BaseWorker):
         Body of run method for exception handling purposes.
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
+        if not self._config:
+            self._config = new_config
+
         self._checkForZooKeeperChanges(new_config)
         provider_manager.ProviderManager.reconfigure(self._config, new_config,
                                                      use_taskmanager=False)
@@ -505,8 +499,8 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    def __init__(self, name, config_path, interval, dib_cmd):
-        super(BuildWorker, self).__init__(config_path, interval)
+    def __init__(self, name, config_path, interval, zk, dib_cmd):
+        super(BuildWorker, self).__init__(config_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
         self.name = 'BuildWorker.%s' % name
         self.dib_cmd = dib_cmd
@@ -682,8 +676,6 @@ class BuildWorker(BaseWorker):
         # values in this thread.
         if self._config.elementsdir:
             env['ELEMENTS_PATH'] = self._config.elementsdir
-        if self._config.scriptdir:
-            env['NODEPOOL_SCRIPTDIR'] = self._config.scriptdir
 
         # send additional env vars if needed
         for k, v in diskimage.env_vars.items():
@@ -783,15 +775,15 @@ class BuildWorker(BaseWorker):
 
             time.sleep(self._interval)
 
-        if self._zk:
-            self._zk.disconnect()
-
     def _run(self):
         '''
         Body of run method for exception handling purposes.
         '''
         # NOTE: For the first iteration, we expect self._config to be None
         new_config = nodepool_config.loadConfig(self._config_path)
+        if not self._config:
+            self._config = new_config
+
         self._checkForZooKeeperChanges(new_config)
         self._config = new_config
 
@@ -800,10 +792,23 @@ class BuildWorker(BaseWorker):
 
 
 class UploadWorker(BaseWorker):
-    def __init__(self, name, config_path, interval):
-        super(UploadWorker, self).__init__(config_path, interval)
+    def __init__(self, name, config_path, interval, zk):
+        super(UploadWorker, self).__init__(config_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
         self.name = 'UploadWorker.%s' % name
+
+    def _reloadConfig(self):
+        '''
+        Reload the nodepool configuration file.
+        '''
+        new_config = nodepool_config.loadConfig(self._config_path)
+        if not self._config:
+            self._config = new_config
+
+        self._checkForZooKeeperChanges(new_config)
+        provider_manager.ProviderManager.reconfigure(self._config, new_config,
+                                                     use_taskmanager=False)
+        self._config = new_config
 
     def _uploadImage(self, build_id, upload_id, image_name, images, provider):
         '''
@@ -899,16 +904,25 @@ class UploadWorker(BaseWorker):
         '''
         for provider in self._config.providers.values():
             for image in provider.images.values():
+                uploaded = False
+
                 # Check if we've been told to shutdown
                 # or if ZK connection is suspended
                 if not self.running or self._zk.suspended or self._zk.lost:
                     return
                 try:
-                    self._checkProviderImageUpload(provider, image)
+                    uploaded = self._checkProviderImageUpload(provider, image)
                 except Exception:
                     self.log.exception("Error uploading image %s "
                                        "to provider %s:",
                                        image.name, provider.name)
+
+                # NOTE: Due to the configuration file disagreement issue
+                # (the copy we have may not be current), if we took the time
+                # to attempt to upload an image, let's short-circuit this loop
+                # to give us a chance to reload the configuration file.
+                if uploaded:
+                    return
 
     def _checkProviderImageUpload(self, provider, image):
         '''
@@ -917,18 +931,18 @@ class UploadWorker(BaseWorker):
         and performing the upload.  It is a separate function so that
         exception handling can treat all provider-image uploads
         indepedently.
-        '''
-        # TODO(jeblair): check for pause here
 
+        :returns: True if an upload was attempted, False otherwise.
+        '''
         # Check if image uploads are paused.
         if provider.images.get(image.name).pause:
-            return
+            return False
 
         # Search for the most recent 'ready' image build
         builds = self._zk.getMostRecentBuilds(1, image.name,
                                               zk.READY)
         if not builds:
-            return
+            return False
 
         build = builds[0]
 
@@ -937,17 +951,17 @@ class UploadWorker(BaseWorker):
         local_images = DibImageFile.from_image_id(
             self._config.imagesdir, "-".join([image.name, build.id]))
         if not local_images:
-            return
+            return False
 
         # See if this image has already been uploaded
         upload = self._zk.getMostRecentBuildImageUploads(
             1, image.name, build.id, provider.name, zk.READY)
         if upload:
-            return
+            return False
 
         # See if this provider supports the available image formats
         if provider.image_type not in build.formats:
-            return
+            return False
 
         try:
             with self._zk.imageUploadLock(
@@ -959,7 +973,15 @@ class UploadWorker(BaseWorker):
                 upload = self._zk.getMostRecentBuildImageUploads(
                     1, image.name, build.id, provider.name, zk.READY)
                 if upload:
-                    return
+                    return False
+
+                # NOTE: Due to the configuration file disagreement issue
+                # (the copy we have may not be current), we try to verify
+                # that another thread isn't trying to delete this build just
+                # before we upload.
+                b = self._zk.getBuild(image.name, build.id)
+                if b.state == zk.DELETING:
+                    return False
 
                 # New upload number with initial state 'uploading'
                 data = zk.ImageUpload()
@@ -973,9 +995,10 @@ class UploadWorker(BaseWorker):
                 # Set final state
                 self._zk.storeImageUpload(image.name, build.id,
                                           provider.name, data, upnum)
+                return True
         except exceptions.ZKLockException:
             # Lock is already held. Skip it.
-            pass
+            return False
 
     def run(self):
 
@@ -990,29 +1013,15 @@ class UploadWorker(BaseWorker):
                 time.sleep(SUSPEND_WAIT_TIME)
 
             try:
-                self._run()
+                self._reloadConfig()
+                self._checkForProviderUploads()
             except Exception:
                 self.log.exception("Exception in UploadWorker:")
                 time.sleep(10)
 
             time.sleep(self._interval)
 
-        if self._zk:
-            self._zk.disconnect()
-
         provider_manager.ProviderManager.stopProviders(self._config)
-
-    def _run(self):
-        '''
-        Body of run method for exception handling purposes.
-        '''
-        new_config = nodepool_config.loadConfig(self._config_path)
-        self._checkForZooKeeperChanges(new_config)
-        provider_manager.ProviderManager.reconfigure(self._config, new_config,
-                                                     use_taskmanager=False)
-        self._config = new_config
-
-        self._checkForProviderUploads()
 
 
 class NodePoolBuilder(object):
@@ -1045,6 +1054,7 @@ class NodePoolBuilder(object):
         self.build_interval = 10
         self.upload_interval = 10
         self.dib_cmd = 'disk-image-create'
+        self.zk = None
 
         # This lock is needed because the run() method is started in a
         # separate thread of control, which can return before the scheduler
@@ -1083,22 +1093,27 @@ class NodePoolBuilder(object):
             self._config = self._getAndValidateConfig()
             self._running = True
 
+            # All worker threads share a single ZooKeeper instance/connection.
+            self.zk = zk.ZooKeeper()
+            self.zk.connect(self._config.zookeeper_servers.values())
+
             self.log.debug('Starting listener for build jobs')
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(
-                    i, self._config_path, self.build_interval, self.dib_cmd)
+                w = BuildWorker(i, self._config_path, self.build_interval,
+                                self.zk, self.dib_cmd)
                 w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker(i, self._config_path, self.upload_interval)
+                w = UploadWorker(i, self._config_path, self.upload_interval,
+                                 self.zk)
                 w.start()
                 self._upload_workers.append(w)
 
             self._janitor = CleanupWorker(0, self._config_path,
-                                          self.cleanup_interval)
+                                          self.cleanup_interval, self.zk)
             self._janitor.start()
 
             # Wait until all threads are running. Otherwise, we have a race
@@ -1137,6 +1152,9 @@ class NodePoolBuilder(object):
                        + [self._janitor]
         ):
             worker.join()
+
+        self.log.debug('Terminating ZooKeeper connection')
+        self.zk.disconnect()
 
         self.log.debug('Stopping providers')
         provider_manager.ProviderManager.stopProviders(self._config)

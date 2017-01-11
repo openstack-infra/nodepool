@@ -72,19 +72,6 @@ full configuration file may have the ``diskimages``, ``labels``,
 The following sections are available.  All are required unless
 otherwise indicated.
 
-script-dir
-----------
-When creating an image to use when launching new nodes, Nodepool will
-run a script that is expected to prepare the machine before the
-snapshot image is created.  The ``script-dir`` parameter indicates a
-directory that holds all of the scripts needed to accomplish this.
-Nodepool will copy the entire directory to the machine before invoking
-the appropriate script for the image being created.
-
-Example::
-
-  script-dir: /path/to/script/dir
-
 .. _elements-dir:
 
 elements-dir
@@ -229,34 +216,42 @@ providers or images are used to create them).  Example::
 diskimages
 ----------
 
-Lists the images that are going to be built using diskimage-builder.
-Image keyword defined on labels section will be mapped to the
-images listed on diskimages. If an entry matching the image is found
-this will be built using diskimage-builder and the settings found
-on this configuration::
+This section lists the images to be built using diskimage-builder. The
+name of the diskimage is mapped to the :ref:`images` section of the
+provider, to determine which providers should received uploads of each
+image.  The diskimage will be built in every format required by the
+providers with which it is associated.  Because Nodepool needs to know
+which formats to build, if the diskimage will only be built if it
+appears in at least one provider.
+
+To remove a diskimage from the system entirely, remove all associated
+entries in :ref:`images` and remove its entry from `diskimages`.  All
+uploads will be deleted as well as the files on disk.
+
+Example configuration::
 
   diskimages:
-  - name: ubuntu-precise
-    pause: False
-    rebuild-age: 86400
-    elements:
-      - ubuntu-minimal
-      - vm
-      - simple-init
-      - openstack-repos
-      - nodepool-base
-      - cache-devstack
-      - cache-bindep
-      - growroot
-      - infra-package-needs
-    release: precise
-    env-vars:
-      TMPDIR: /opt/dib_tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: /opt/dib_cache
-      DIB_APT_LOCAL_CACHE: '0'
-      DIB_DISABLE_APT_CLEANUP: '1'
-      FS_TYPE: ext3
+    - name: ubuntu-precise
+      pause: False
+      rebuild-age: 86400
+      elements:
+        - ubuntu-minimal
+        - vm
+        - simple-init
+        - openstack-repos
+        - nodepool-base
+        - cache-devstack
+        - cache-bindep
+        - growroot
+        - infra-package-needs
+      release: precise
+      env-vars:
+        TMPDIR: /opt/dib_tmp
+        DIB_CHECKSUM: '1'
+        DIB_IMAGE_CACHE: /opt/dib_cache
+        DIB_APT_LOCAL_CACHE: '0'
+        DIB_DISABLE_APT_CLEANUP: '1'
+        FS_TYPE: ext3
 
 
 **required**
@@ -471,7 +466,16 @@ provider, the Nodepool image types are also defined (see
 images
 ~~~~~~
 
-Example::
+Each entry in a provider's `images` section must correspond to an
+entry in :ref:`diskimages`.  Such an entry indicates that the
+corresponding diskimage should be uploaded for use in this provider.
+Additionally, any nodes that are created using the uploaded image will
+have the associated attributes (such as flavor or metadata).
+
+If an image is removed from this section, any previously uploaded
+images will be deleted from the provider.
+
+Example configuration::
 
   images:
     - name: precise

@@ -37,6 +37,7 @@ class ConfigValidator:
             'diskimage': str,
             'meta': dict,
             'username': str,
+            'user-home': str,
             'private-key': str,
             'config-drive': bool,
         }
@@ -113,7 +114,6 @@ class ConfigValidator:
         }
 
         top_level = {
-            'script-dir': str,
             'elements-dir': str,
             'images-dir': str,
             'dburi': str,

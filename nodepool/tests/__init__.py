@@ -144,39 +144,31 @@ class ChrootedKazooFixture(fixtures.Fixture):
                               for x in range(8))
 
         rand_test_path = '%s_%s' % (random_bits, os.getpid())
-        self.chroot_path = "/nodepool_test/%s" % rand_test_path
+        self.zookeeper_chroot = "/nodepool_test/%s" % rand_test_path
 
-        # Ensure the chroot path exists and clean up an pre-existing znodes.
+        # Ensure the chroot path exists and clean up any pre-existing znodes.
         _tmp_client = kazoo.client.KazooClient(
             hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
         _tmp_client.start()
 
-        if _tmp_client.exists(self.chroot_path):
-            _tmp_client.delete(self.chroot_path, recursive=True)
+        if _tmp_client.exists(self.zookeeper_chroot):
+            _tmp_client.delete(self.zookeeper_chroot, recursive=True)
 
-        _tmp_client.ensure_path(self.chroot_path)
+        _tmp_client.ensure_path(self.zookeeper_chroot)
         _tmp_client.stop()
-
-        # Create a chroot'ed client
-        self.zkclient = kazoo.client.KazooClient(
-            hosts='%s:%s%s' % (self.zookeeper_host,
-                               self.zookeeper_port,
-                               self.chroot_path)
-        )
-        self.zkclient.start()
+        _tmp_client.close()
 
         self.addCleanup(self._cleanup)
 
     def _cleanup(self):
-        '''Stop the client and remove the chroot path.'''
-        self.zkclient.stop()
-
+        '''Remove the chroot path.'''
         # Need a non-chroot'ed client to remove the chroot path
         _tmp_client = kazoo.client.KazooClient(
             hosts='%s:%s' % (self.zookeeper_host, self.zookeeper_port))
         _tmp_client.start()
-        _tmp_client.delete(self.chroot_path, recursive=True)
+        _tmp_client.delete(self.zookeeper_chroot, recursive=True)
         _tmp_client.stop()
+        _tmp_client.close()
 
 
 class GearmanClient(gear.Client):
@@ -583,9 +575,13 @@ class DBTestCase(BaseTestCase):
         kz_fxtr = self.useFixture(ChrootedKazooFixture(
             self.zookeeper_host,
             self.zookeeper_port))
-        self.zkclient = kz_fxtr.zkclient
-        self.zk = zk.ZooKeeper(self.zkclient)
-        self.zookeeper_chroot = kz_fxtr.chroot_path
+        self.zookeeper_chroot = kz_fxtr.zookeeper_chroot
+        self.zk = zk.ZooKeeper()
+        host = zk.ZooKeeperConnectionConfig(
+            self.zookeeper_host, self.zookeeper_port, self.zookeeper_chroot
+        )
+        self.zk.connect([host])
+        self.addCleanup(self.zk.disconnect)
 
     def printZKTree(self, node):
         def join(a, b):
