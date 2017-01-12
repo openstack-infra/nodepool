@@ -728,6 +728,7 @@ class ProviderWorker(threading.Thread):
         self.zk = zk
         self.running = False
         self.configfile = configfile
+        self.workers = []
 
     #----------------------------------------------------------------
     # Private methods
@@ -753,6 +754,54 @@ class ProviderWorker(threading.Thread):
         else:
             self.provider = config.providers[self.provider.name]
 
+    def _processRequests(self):
+        self.log.debug("Getting node request from ZK queue")
+
+        for req_id in self.zk.getNodeRequests():
+            # Short-circuit for limited request handling
+            if (self.provider.max_concurrency > 0
+                and self._activeWorkers() >= self.provider.max_concurrency
+            ):
+                return
+
+            req = self.zk.getNodeRequest(req_id)
+            if not req:
+                continue
+
+            # Only interested in unhandled requests
+            if req.state != zk.REQUESTED:
+                continue
+
+            try:
+                self.zk.lockNodeRequest(req, blocking=False)
+            except exceptions.ZKLockException:
+                continue
+
+            # Make sure the state didn't change on us
+            if req.state != zk.REQUESTED:
+                self.zk.unlockNodeRequest(req)
+                continue
+
+            # Got a lock, so assign it
+            self.log.info("Assigning node request %s" % req.id)
+            t = NodeRequestWorker(self.zk, req)
+            t.start()
+            self.workers.append(t)
+
+    def _activeWorkers(self):
+        '''
+        Return a count of the number of requests actively being handled.
+
+        This serves the dual-purpose of also removing completed requests from
+        our list of tracked threads.
+        '''
+        active = []
+        for w in self.workers:
+            if w.isAlive():
+                active.append(w)
+        self.workers = active
+        return len(self.workers)
+
     #----------------------------------------------------------------
     # Public methods
     #----------------------------------------------------------------
@@ -761,31 +810,11 @@ class ProviderWorker(threading.Thread):
         self.running = True
 
         while self.running:
-            self.log.debug("Getting node request from ZK queue")
+            if self.provider.max_concurrency == -1 and self.workers:
+                self.workers = []
 
-            for req_id in self.zk.getNodeRequests():
-                req = self.zk.getNodeRequest(req_id)
-                if not req:
-                    continue
-
-                # Only interested in unhandled requests
-                if req.state != zk.REQUESTED:
-                    continue
-
-                try:
-                    self.zk.lockNodeRequest(req, blocking=False)
-                except exceptions.ZKLockException:
-                    continue
-
-                # Make sure the state didn't change on us
-                if req.state != zk.REQUESTED:
-                    self.zk.unlockNodeRequest(req)
-                    continue
-
-                # Got a lock, so assign it
-                self.log.info("Assigning node request %s" % req.id)
-                t = NodeRequestWorker(self.zk, req)
-                t.start()
+            if self.provider.max_concurrency != 0:
+                self._processRequests()
 
             time.sleep(10)
             self._updateProvider()

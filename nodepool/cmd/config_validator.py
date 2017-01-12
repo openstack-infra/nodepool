@@ -66,6 +66,7 @@ class ConfigValidator:
             'project-id': str,
             'project-name': str,
             'max-servers': int,
+            'max-concurrency': int,
             'pool': str,
             'image-type': str,
             'networks': [v.Any(old_network, network)],

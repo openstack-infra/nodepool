@@ -50,6 +50,7 @@ class Provider(ConfigValue):
             other.networks != self.networks or
             other.ipv6_preferred != self.ipv6_preferred or
             other.clean_floating_ips != self.clean_floating_ips or
+            other.max_concurrency != self.max_concurrency or
             other.azs != self.azs):
             return False
         new_images = other.images
@@ -174,6 +175,7 @@ def loadConfig(config_path):
         p.cloud_config = _get_one_cloud(cloud_config, cloud_kwargs)
         p.region_name = provider.get('region-name')
         p.max_servers = provider['max-servers']
+        p.max_concurrency = provider.get('max-concurrency', -1)
         p.keypair = provider.get('keypair', None)
         p.pool = provider.get('pool', None)
         p.rate = provider.get('rate', 1.0)
