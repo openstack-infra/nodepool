@@ -680,13 +680,59 @@ class NodeRequestWorker(threading.Thread):
     to this thread for it to process.
     '''
 
-    def __init__(self, zk, request):
+    def __init__(self, zk, launcher_id, provider, request):
+        '''
+        :param ZooKeeper zk: Connected ZooKeeper object.
+        :param str launcher_id: ID of the launcher handling the request.
+        :param Provider provider: Provider object from the config file.
+        :param NodeRequest request: The request to handle.
+        '''
         threading.Thread.__init__(
             self, name='NodeRequestWorker.%s' % request.id
         )
         self.log = logging.getLogger("nodepool.%s" % self.name)
         self.zk = zk
+        self.launcher_id = launcher_id
+        self.provider = provider
         self.request = request
+
+    def _imagesAvailable(self):
+        '''
+        Determines if the requested images are available for this provider.
+
+        :returns: True if it is available, False otherwise.
+        '''
+        provider_images = self.provider.images.keys()
+        for node_type in self.request.node_types:
+            if node_type not in provider_images:
+                return False
+        return True
+
+    def _countNodes(self):
+        '''
+        Query ZooKeeper to determine the number of provider nodes launched.
+
+        :returns: An integer for the number launched for this provider.
+        '''
+        count = 0
+        for node_id in self.zk.getNodes():
+            node = self.zk.getNode(node_id)
+            if node.provider == self.provider.name:
+                count += 1
+        return count
+
+    def _wouldExceedQuota(self):
+        '''
+        Determines if request would exceed provider quota.
+
+        :returns: True if quota would be exceeded, False otherwise.
+        '''
+        provider_max = self.provider.max_servers
+        num_requested = len(self.request.node_types)
+        num_in_use = self._countNodes()
+        if num_requested + num_in_use > provider_max:
+            return True
+        return False
 
     def run(self):
         self.log.debug("Handling request %s" % self.request)
@@ -699,6 +745,41 @@ class NodeRequestWorker(threading.Thread):
             self.zk.unlockNodeRequest(self.request)
 
     def _run(self):
+        '''
+        Main body for the NodeRequestWorker.
+
+        note:: This code is a bit racey in its calculation of the number of
+            nodes in use for quota purposes. It is possible for multiple
+            launchers to be doing this calculation at the same time. Since we
+            currently have no locking mechanism around the "in use"
+            calculation, if we are at the edge of the quota, one of the
+            launchers could attempt to launch a new node after the other
+            launcher has already started doing so. This would cause an
+            expected failure from the underlying library, which is ok for now.
+
+        Algorithm from spec::
+
+           # If image not available, decline
+           # If request > quota, decline
+           # If request < quota and request > available nodes (due to current
+             usage), begin satisfying the request and do not process further
+             requests until satisfied
+           # If request < quota and request < available nodes, satisfy the
+             request and continue processing further requests
+        '''
+        if not self._imagesAvailable() or self._wouldExceedQuota():
+            self.request.declined_by.append(self.launcher_id)
+            launchers = set(self.zk.getRegisteredLaunchers())
+            if launchers.issubset(set(self.request.declined_by)):
+                # All launchers have declined it
+                self.request.state = zk.FAILED
+            self.zk.updateNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+            return
+
+        # TODO(Shrews): Determine node availability and if we need to launch
+        # new nodes, or reuse existing nodes.
+
         self.request.state = zk.PENDING
         self.zk.updateNodeRequest(self.request)
 
@@ -729,6 +810,9 @@ class ProviderWorker(threading.Thread):
         self.running = False
         self.configfile = configfile
         self.workers = []
+        self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
+                                         os.getpid(),
+                                         self.ident)
 
     #----------------------------------------------------------------
     # Private methods
@@ -772,6 +856,10 @@ class ProviderWorker(threading.Thread):
             if req.state != zk.REQUESTED:
                 continue
 
+            # Skip it if we've already declined
+            if self.launcher_id in req.declined_by:
+                continue
+
             try:
                 self.zk.lockNodeRequest(req, blocking=False)
             except exceptions.ZKLockException:
@@ -784,7 +872,8 @@ class ProviderWorker(threading.Thread):
 
             # Got a lock, so assign it
             self.log.info("Assigning node request %s" % req.id)
-            t = NodeRequestWorker(self.zk, req)
+            t = NodeRequestWorker(self.zk, self.launcher_id,
+                                  self.provider, req)
             t.start()
             self.workers.append(t)
 
@@ -810,6 +899,14 @@ class ProviderWorker(threading.Thread):
         self.running = True
 
         while self.running:
+            # Don't do work if we've lost communication with the ZK cluster
+            while self.zk and (self.zk.suspended or self.zk.lost):
+                self.log.info("ZooKeeper suspended. Waiting")
+                time.sleep(SUSPEND_WAIT_TIME)
+
+            # Make sure we're always registered with ZK
+            self.zk.registerLauncher(self.launcher_id)
+
             if self.provider.max_concurrency == -1 and self.workers:
                 self.workers = []
 
@@ -844,9 +941,6 @@ class NodePool(threading.Thread):
         self._instance_delete_threads = {}
         self._instance_delete_threads_lock = threading.Lock()
         self._wake_condition = threading.Condition()
-        self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
-                                         os.getpid(),
-                                         self.ident)
 
     def stop(self):
         self._stopped = True
@@ -1160,9 +1254,6 @@ class NodePool(threading.Thread):
                 while self.zk and (self.zk.suspended or self.zk.lost):
                     self.log.info("ZooKeeper suspended. Waiting")
                     time.sleep(SUSPEND_WAIT_TIME)
-
-                # Make sure we're always registered with ZK
-                self.zk.registerLauncher(self.launcher_id)
 
                 # Start (or restart) provider threads for each provider in
                 # the config. Removing a provider from the config and then
