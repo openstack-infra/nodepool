@@ -1034,13 +1034,15 @@ class NodePoolBuilder(object):
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
-    def __init__(self, config_path, num_builders=1, num_uploaders=4):
+    def __init__(self, config_path, num_builders=1, num_uploaders=4,
+                 fake=False):
         '''
         Initialize the NodePoolBuilder object.
 
         :param str config_path: Path to configuration file.
         :param int num_builders: Number of build workers to start.
         :param int num_uploaders: Number of upload workers to start.
+        :param bool fake: Whether to fake the image builds.
         '''
         self._config_path = config_path
         self._config = None
@@ -1053,7 +1055,11 @@ class NodePoolBuilder(object):
         self.cleanup_interval = 60
         self.build_interval = 10
         self.upload_interval = 10
-        self.dib_cmd = 'disk-image-create'
+        if fake:
+            self.dib_cmd = os.path.join(os.path.dirname(__file__), '..',
+                                        'nodepool/tests/fake-image-create')
+        else:
+            self.dib_cmd = 'disk-image-create'
         self.zk = None
 
         # This lock is needed because the run() method is started in a

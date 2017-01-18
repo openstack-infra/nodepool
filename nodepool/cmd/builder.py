@@ -52,13 +52,16 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
         parser.add_argument('--upload-workers', dest='upload_workers',
                             default=4, help='number of upload workers',
                             type=int)
+        parser.add_argument('--fake', action='store_true',
+                            help='Do not actually run diskimage-builder '
+                            '(used for testing)')
         self.args = parser.parse_args()
 
     def main(self):
         self.setup_logging()
         self.nb = builder.NodePoolBuilder(
             self.args.config, self.args.build_workers,
-            self.args.upload_workers)
+            self.args.upload_workers, self.args.fake)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
         signal.signal(signal.SIGUSR2, nodepool.cmd.stack_dump_handler)
