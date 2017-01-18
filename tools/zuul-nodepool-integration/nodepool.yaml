@@ -1,0 +1,32 @@
+images-dir: /tmp/nodepool/images
+
+zookeeper-servers:
+  - host: localhost
+
+diskimages:
+  - name: fake-nodepool
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
+
+labels:
+  - name: fake-label
+    image: fake-nodepool
+    min-ready: 2
+    providers:
+      - name: fake-provider
+
+providers:
+  - name: fake-provider
+    max-servers: 96
+    auth-url: 'fake'
+    images:
+      - name: fake-nodepool
+        min-ram: 8192
+        diskimage: fake-nodepool
