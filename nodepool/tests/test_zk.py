@@ -307,44 +307,38 @@ class TestZooKeeper(tests.DBTestCase):
     def test_getBuilds_any(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildsPath(image)
-        v1 = {'state': zk.READY}
-        v2 = {'state': zk.BUILDING}
-        v3 = {'state': zk.FAILED}
-        v4 = {'state': zk.DELETING}
-        v5 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
-                              makepath=True)
-        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
+        v1 = zk.ImageBuild()
+        v1.state = zk.READY
+        v2 = zk.ImageBuild()
+        v2.state = zk.BUILDING
+        v3 = zk.ImageBuild()
+        v3.state = zk.FAILED
+        v4 = zk.ImageBuild()
+        v4.state = zk.DELETING
+        self.zk.client.create(path + "/1", value=v1.serialize(), makepath=True)
+        self.zk.client.create(path + "/2", value=v2.serialize(), makepath=True)
+        self.zk.client.create(path + "/3", value=v3.serialize(), makepath=True)
+        self.zk.client.create(path + "/4", value=v4.serialize(), makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getBuilds(image, None)
-        self.assertEqual(5, len(matches))
+        self.assertEqual(4, len(matches))
 
     def test_getBuilds(self):
         image = "ubuntu-trusty"
         path = self.zk._imageBuildsPath(image)
-        v1 = {'state': zk.BUILDING}
-        v2 = {'state': zk.READY}
-        v3 = {'state': zk.FAILED}
-        v4 = {'state': zk.DELETING}
-        v5 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
-                              makepath=True)
-        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
+        v1 = zk.ImageBuild()
+        v1.state = zk.READY
+        v2 = zk.ImageBuild()
+        v2.state = zk.BUILDING
+        v3 = zk.ImageBuild()
+        v3.state = zk.FAILED
+        v4 = zk.ImageBuild()
+        v4.state = zk.DELETING
+        self.zk.client.create(path + "/1", value=v1.serialize(), makepath=True)
+        self.zk.client.create(path + "/2", value=v2.serialize(), makepath=True)
+        self.zk.client.create(path + "/3", value=v3.serialize(), makepath=True)
+        self.zk.client.create(path + "/4", value=v4.serialize(), makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getBuilds(image, [zk.DELETING, zk.FAILED])
@@ -352,21 +346,18 @@ class TestZooKeeper(tests.DBTestCase):
 
     def test_getUploads(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
-        v1 = {'state': zk.READY}
-        v2 = {'state': zk.UPLOADING}
-        v3 = {'state': zk.FAILED}
-        v4 = {'state': zk.DELETING}
-        v5 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
-                              makepath=True)
-        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
+        v1 = zk.ImageUpload()
+        v1.state = zk.READY
+        v2 = zk.ImageUpload()
+        v2.state = zk.UPLOADING
+        v3 = zk.ImageUpload()
+        v3.state = zk.FAILED
+        v4 = zk.ImageUpload()
+        v4.state = zk.DELETING
+        self.zk.client.create(path + "/1", value=v1.serialize(), makepath=True)
+        self.zk.client.create(path + "/2", value=v2.serialize(), makepath=True)
+        self.zk.client.create(path + "/3", value=v3.serialize(), makepath=True)
+        self.zk.client.create(path + "/4", value=v4.serialize(), makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getUploads("trusty", "000", "rax",
@@ -375,25 +366,22 @@ class TestZooKeeper(tests.DBTestCase):
 
     def test_getUploads_any(self):
         path = self.zk._imageUploadPath("trusty", "000", "rax")
-        v1 = {'state': zk.READY}
-        v2 = {'state': zk.UPLOADING}
-        v3 = {'state': zk.FAILED}
-        v4 = {'state': zk.DELETING}
-        v5 = {}
-        self.zk.client.create(path + "/1", value=self.zk._dictToStr(v1),
-                              makepath=True)
-        self.zk.client.create(path + "/2", value=self.zk._dictToStr(v2),
-                              makepath=True)
-        self.zk.client.create(path + "/3", value=self.zk._dictToStr(v3),
-                              makepath=True)
-        self.zk.client.create(path + "/4", value=self.zk._dictToStr(v4),
-                              makepath=True)
-        self.zk.client.create(path + "/5", value=self.zk._dictToStr(v5),
-                              makepath=True)
+        v1 = zk.ImageUpload()
+        v1.state = zk.READY
+        v2 = zk.ImageUpload()
+        v2.state = zk.UPLOADING
+        v3 = zk.ImageUpload()
+        v3.state = zk.FAILED
+        v4 = zk.ImageUpload()
+        v4.state = zk.DELETING
+        self.zk.client.create(path + "/1", value=v1.serialize(), makepath=True)
+        self.zk.client.create(path + "/2", value=v2.serialize(), makepath=True)
+        self.zk.client.create(path + "/3", value=v3.serialize(), makepath=True)
+        self.zk.client.create(path + "/4", value=v4.serialize(), makepath=True)
         self.zk.client.create(path + "/lock", makepath=True)
 
         matches = self.zk.getUploads("trusty", "000", "rax", None)
-        self.assertEqual(5, len(matches))
+        self.assertEqual(4, len(matches))
 
     def test_deleteBuild(self):
         image = 'trusty'
@@ -459,7 +447,7 @@ class TestZooKeeper(tests.DBTestCase):
         r = zk.NodeRequest("500-123")
         r.state = zk.REQUESTED
         path = self.zk._requestPath(r.id)
-        self.zk.client.create(path, value=self.zk._dictToStr(r.toDict()),
+        self.zk.client.create(path, value=r.serialize(),
                               makepath=True, ephemeral=True)
         o = self.zk.getNodeRequest(r.id)
         self.assertIsInstance(o, zk.NodeRequest)
@@ -479,8 +467,7 @@ class TestZooKeeper(tests.DBTestCase):
         n = zk.Node('100')
         n.state = zk.BUILDING
         path = self.zk._nodePath(n.id)
-        self.zk.client.create(path, value=self.zk._dictToStr(n.toDict()),
-                              makepath=True)
+        self.zk.client.create(path, value=n.serialize(), makepath=True)
         o = self.zk.getNode(n.id)
         self.assertIsInstance(o, zk.Node)
         self.assertEqual(n.id, o.id)

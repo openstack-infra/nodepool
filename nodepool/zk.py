@@ -171,6 +171,14 @@ class BaseModel(object):
         if 'state_time' in d:
             self.state_time = d['state_time']
 
+    def serialize(self):
+        '''
+        Return a representation of the object as a string.
+
+        Used for storing the object data in ZooKeeper.
+        '''
+        return json.dumps(self.toDict())
+
 
 class ImageBuild(BaseModel):
     '''
@@ -454,9 +462,6 @@ class ZooKeeper(object):
 
     def _requestLockPath(self, request):
         return "%s/%s" % (self.REQUEST_LOCK_ROOT, request)
-
-    def _dictToStr(self, data):
-        return json.dumps(data)
 
     def _strToDict(self, data):
         return json.loads(data)
@@ -850,13 +855,13 @@ class ZooKeeper(object):
         if build_number is None:
             path = self.client.create(
                 build_path,
-                value=self._dictToStr(build_data.toDict()),
+                value=build_data.serialize(),
                 sequence=True,
                 makepath=True)
             build_number = path.split("/")[-1]
         else:
             path = build_path + build_number
-            self.client.set(path, self._dictToStr(build_data.toDict()))
+            self.client.set(path, build_data.serialize())
 
         return build_number
 
@@ -1020,13 +1025,13 @@ class ZooKeeper(object):
         if upload_number is None:
             path = self.client.create(
                 upload_path,
-                value=self._dictToStr(image_data.toDict()),
+                value=image_data.serialize(),
                 sequence=True,
                 makepath=True)
             upload_number = path.split("/")[-1]
         else:
             path = upload_path + upload_number
-            self.client.set(path, self._dictToStr(image_data.toDict()))
+            self.client.set(path, image_data.serialize())
 
         return upload_number
 
@@ -1185,8 +1190,7 @@ class ZooKeeper(object):
                 "Attempt to update non-existing request %s" % request)
 
         path = self._requestPath(request.id)
-        data = request.toDict()
-        self.client.set(path, self._dictToStr(data))
+        self.client.set(path, request.serialize())
 
     def lockNodeRequest(self, request, blocking=True, timeout=None):
         '''
