@@ -468,6 +468,26 @@ class TestZooKeeper(tests.DBTestCase):
     def test_getNodeRequest_not_found(self):
         self.assertIsNone(self.zk.getNodeRequest("invalid"))
 
+    def test_getNodes(self):
+        self.zk.client.create(self.zk._nodePath('100'), makepath=True)
+        self.zk.client.create(self.zk._nodePath('200'), makepath=True)
+        nodes = self.zk.getNodes()
+        self.assertIn('100', nodes)
+        self.assertIn('200', nodes)
+
+    def test_getNode(self):
+        n = zk.Node('100')
+        n.state = zk.BUILDING
+        path = self.zk._nodePath(n.id)
+        self.zk.client.create(path, value=self.zk._dictToStr(n.toDict()),
+                              makepath=True)
+        o = self.zk.getNode(n.id)
+        self.assertIsInstance(o, zk.Node)
+        self.assertEqual(n.id, o.id)
+
+    def test_getNode_not_found(self):
+        self.assertIsNone(self.zk.getNode("invalid"))
+
 
 class TestZKModel(tests.BaseTestCase):
 
@@ -561,20 +581,51 @@ class TestZKModel(tests.BaseTestCase):
 
     def test_NodeRequest_toDict(self):
         o = zk.NodeRequest("500-123")
+        o.declined_by.append("abc")
+        o.node_types.append('trusty')
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertIn('state', d)
         self.assertIn('state_time', d)
+        self.assertEqual(d['declined_by'], ['abc'])
+        self.assertEqual(d['node_types'], ['trusty'])
 
     def test_NodeRequest_fromDict(self):
         now = int(time.time())
         req_id = "500-123"
         d = {
             'state': zk.REQUESTED,
-            'state_time': now
+            'state_time': now,
+            'declined_by': ['abc'],
+            'node_types': ['trusty'],
         }
 
         o = zk.NodeRequest.fromDict(d, req_id)
         self.assertEqual(o.id, req_id)
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
+        self.assertEqual(o.declined_by, d['declined_by'])
+
+    def test_Node_toDict(self):
+        o = zk.Node('123')
+        o.provider = 'rax'
+        d = o.toDict()
+        self.assertNotIn('id', d)
+        self.assertIn('state', d)
+        self.assertIn('state_time', d)
+        self.assertEqual(d['provider'], 'rax')
+
+    def test_Node_fromDict(self):
+        now = int(time.time())
+        node_id = '123'
+        d = {
+            'state': zk.READY,
+            'state_time': now,
+            'provider': 'rax',
+        }
+
+        o = zk.Node.fromDict(d, node_id)
+        self.assertEqual(o.id, node_id)
+        self.assertEqual(o.state, d['state'])
+        self.assertEqual(o.state_time, d['state_time'])
+        self.assertEqual(o.provider, 'rax')

@@ -25,13 +25,13 @@ from kazoo.recipe.lock import Lock
 from nodepool import exceptions as npe
 
 # States:
-# We are building this image but it is not ready for use.
+# We are building this image (or node) but it is not ready for use.
 BUILDING = 'building'
 # The image is being uploaded.
 UPLOADING = 'uploading'
-# The image/upload is ready for use.
+# The image/upload/node is ready for use.
 READY = 'ready'
-# The image/upload should be deleted.
+# The image/upload/node should be deleted.
 DELETING = 'deleting'
 # The build failed.
 FAILED = 'failed'
@@ -41,6 +41,14 @@ REQUESTED = 'requested'
 FULFILLED = 'fulfilled'
 # Node request is being worked.
 PENDING = 'pending'
+# Node is being tested
+TESTING = 'testing'
+# Node is being used
+IN_USE = 'in-use'
+# Node has been used
+USED = 'used'
+# Node is being held
+HOLD = 'hold'
 
 
 class ZooKeeperConnectionConfig(object):
@@ -295,6 +303,8 @@ class NodeRequest(BaseModel):
     def __init__(self, id=None):
         super(NodeRequest, self).__init__(id)
         self.lock = None
+        self.declined_by = []
+        self.node_types = []
 
     def __repr__(self):
         d = self.toDict()
@@ -307,6 +317,8 @@ class NodeRequest(BaseModel):
         Convert a NodeRequest object's attributes to a dictionary.
         '''
         d = super(NodeRequest, self).toDict()
+        d['declined_by'] = self.declined_by
+        d['node_types'] = self.node_types
         return d
 
     @staticmethod
@@ -317,10 +329,53 @@ class NodeRequest(BaseModel):
         :param dict d: The dictionary.
         :param str o_id: The object ID.
 
-        :returns: An initialized ImageBuild object.
+        :returns: An initialized NodeRequest object.
         '''
         o = NodeRequest(o_id)
         super(NodeRequest, o).fromDict(d)
+        o.declined_by = d.get('declined_by', [])
+        o.node_types = d.get('node_types', [])
+        return o
+
+
+class Node(BaseModel):
+    '''
+    Class representing a launched node.
+    '''
+    VALID_STATES = set([BUILDING, TESTING, READY, IN_USE, USED,
+                        HOLD, DELETING])
+
+    def __init__(self, id=None):
+        super(Node, self).__init__(id)
+        self.provider = None
+
+    def __repr__(self):
+        d = self.toDict()
+        d['id'] = self.id
+        d['stat'] = self.stat
+        return '<Node %s>' % d
+
+    def toDict(self):
+        '''
+        Convert a Node object's attributes to a dictionary.
+        '''
+        d = super(Node, self).toDict()
+        d['provider'] = self.provider
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create a Node object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized Node object.
+        '''
+        o = Node(o_id)
+        super(Node, o).fromDict(d)
+        o.provider = d.get('provider')
         return o
 
 
@@ -344,6 +399,7 @@ class ZooKeeper(object):
 
     IMAGE_ROOT = "/nodepool/images"
     LAUNCHER_ROOT = "/nodepool/launchers"
+    NODE_ROOT = "/nodepool/nodes"
     REQUEST_ROOT = "/nodepool/requests"
     REQUEST_LOCK_ROOT = "/nodepool/requests-lock"
 
@@ -389,6 +445,9 @@ class ZooKeeper(object):
 
     def _launcherPath(self, launcher):
         return "%s/%s" % (self.LAUNCHER_ROOT, launcher)
+
+    def _nodePath(self, node):
+        return "%s/%s" % (self.NODE_ROOT, node)
 
     def _requestPath(self, request):
         return "%s/%s" % (self.REQUEST_ROOT, request)
@@ -1175,3 +1234,32 @@ class ZooKeeper(object):
             raise npe.ZKLockException("Request %s does not hold a lock" % request)
         request.lock.release()
         request.lock = None
+
+    def getNodes(self):
+        '''
+        Get the current list of all nodes.
+
+        :returns: A list of nodes.
+        '''
+        try:
+            return self.client.get_children(self.NODE_ROOT)
+        except kze.NoNodeError:
+            return []
+
+    def getNode(self, node):
+        '''
+        Get the data for a specific node.
+
+        :param str node: The node ID.
+
+        :returns: The node data, or None if the node was not found.
+        '''
+        path = self._nodePath(node)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+
+        d = Node.fromDict(self._strToDict(data), node)
+        d.stat = stat
+        return d
