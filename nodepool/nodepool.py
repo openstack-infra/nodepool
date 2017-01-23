@@ -702,11 +702,9 @@ class NodeRequestWorker(threading.Thread):
 
         :returns: True if it is available, False otherwise.
         '''
-        provider_images = self.provider.images.keys()
-        for node_type in self.request.node_types:
-            if node_type not in provider_images:
-                return False
-        return True
+        provider_images = set(self.provider.images.keys())
+        requested_images = set(self.request.node_types)
+        return requested_images.issubset(provider_images)
 
     def _countNodes(self):
         '''
@@ -717,7 +715,7 @@ class NodeRequestWorker(threading.Thread):
         count = 0
         for node_id in self.zk.getNodes():
             node = self.zk.getNode(node_id)
-            if node.provider == self.provider.name:
+            if node and node.provider == self.provider.name:
                 count += 1
         return count
 
@@ -730,9 +728,7 @@ class NodeRequestWorker(threading.Thread):
         provider_max = self.provider.max_servers
         num_requested = len(self.request.node_types)
         num_in_use = self._countNodes()
-        if num_requested + num_in_use > provider_max:
-            return True
-        return False
+        return num_requested + num_in_use > provider_max
 
     def run(self):
         self.log.debug("Handling request %s" % self.request)
