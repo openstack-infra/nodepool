@@ -355,6 +355,7 @@ class Node(BaseModel):
 
     def __init__(self, id=None):
         super(Node, self).__init__(id)
+        self.lock = None
         self.provider = None
 
     def __repr__(self):
@@ -456,6 +457,9 @@ class ZooKeeper(object):
 
     def _nodePath(self, node):
         return "%s/%s" % (self.NODE_ROOT, node)
+
+    def _nodeLockPath(self, node):
+        return "%s/%s/lock" % (self.NODE_ROOT, node)
 
     def _requestPath(self, request):
         return "%s/%s" % (self.REQUEST_ROOT, request)
@@ -1238,6 +1242,53 @@ class ZooKeeper(object):
             raise npe.ZKLockException("Request %s does not hold a lock" % request)
         request.lock.release()
         request.lock = None
+
+    def lockNode(self, node, blocking=True, timeout=None):
+        '''
+        Lock a node.
+
+        This will set the `lock` attribute of the Node object when the
+        lock is successfully acquired.
+
+        :param Node node: The node to lock.
+        :param bool blocking: Whether or not to block on trying to
+            acquire the lock
+        :param int timeout: When blocking, how long to wait for the lock
+            to get acquired. None, the default, waits forever.
+
+        :raises: TimeoutException if we failed to acquire the lock when
+            blocking with a timeout. ZKLockException if we are not blocking
+            and could not get the lock, or a lock is already held.
+        '''
+        path = self._nodeLockPath(node.id)
+        try:
+            lock = Lock(self.client, path)
+            have_lock = lock.acquire(blocking, timeout)
+        except kze.LockTimeout:
+            raise npe.TimeoutException(
+                "Timeout trying to acquire lock %s" % path)
+
+        # If we aren't blocking, it's possible we didn't get the lock
+        # because someone else has it.
+        if not have_lock:
+            raise npe.ZKLockException("Did not get lock on %s" % path)
+
+        node.lock = lock
+
+    def unlockNode(self, node):
+        '''
+        Unlock a node.
+
+        The node must already have been locked.
+
+        :param Node node: The node to unlock.
+
+        :raises: ZKLockException if the node is not currently locked.
+        '''
+        if node.lock is None:
+            raise npe.ZKLockException("Node %s does not hold a lock" % node)
+        node.lock.release()
+        node.lock = None
 
     def getNodes(self):
         '''

@@ -475,6 +475,29 @@ class TestZooKeeper(tests.DBTestCase):
     def test_getNode_not_found(self):
         self.assertIsNone(self.zk.getNode("invalid"))
 
+    def test_lockNode_multi(self):
+        node = zk.Node('100')
+        self.zk.lockNode(node)
+        with testtools.ExpectedException(
+            npe.ZKLockException, "Did not get lock on .*"
+        ):
+            self.zk.lockNode(node, blocking=False)
+
+    def test_lockNode_unlockNode(self):
+        node = zk.Node('100')
+        self.zk.lockNode(node)
+        self.assertIsNotNone(node.lock)
+        self.assertIsNotNone(
+            self.zk.client.exists(self.zk._nodeLockPath(node.id))
+        )
+        self.zk.unlockNode(node)
+        self.assertIsNone(node.lock)
+
+    def test_unlockNode_not_locked(self):
+        node = zk.Node('100')
+        with testtools.ExpectedException(npe.ZKLockException):
+            self.zk.unlockNode(node)
+
 
 class TestZKModel(tests.BaseTestCase):
 
