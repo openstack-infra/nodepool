@@ -700,11 +700,15 @@ class NodeRequestWorker(threading.Thread):
         '''
         Determines if the requested images are available for this provider.
 
+        ZooKeeper is queried for an image uploaded to the provider that is
+        in the READY state.
+
         :returns: True if it is available, False otherwise.
         '''
-        provider_images = set(self.provider.images.keys())
-        requested_images = set(self.request.node_types)
-        return requested_images.issubset(provider_images)
+        for img in self.request.node_types:
+            if not self.zk.getMostRecentImageUpload(img, self.provider.name):
+                return False
+        return True
 
     def _countNodes(self):
         '''
