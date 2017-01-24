@@ -204,8 +204,8 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
-  - name: fedora-24
-    image: fedora-24
+  - name: fedora-25
+    image: fedora-25
     min-ready: 1
     providers:
       - name: devstack
@@ -242,7 +242,7 @@ providers:
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
-      - name: fedora-24
+      - name: fedora-25
         min-ram: 1024
         name-filter: 'nodepool'
         username: devuser
@@ -287,8 +287,8 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
-  - name: fedora-24
-    pause: $NODEPOOL_PAUSE_FEDORA_24_DIB
+  - name: fedora-25
+    pause: $NODEPOOL_PAUSE_FEDORA_25_DIB
     rebuild-age: 86400
     elements:
       - fedora-minimal
@@ -297,7 +297,7 @@ diskimages:
       - devuser
       - openssh-server
       - nodepool-setup
-    release: 24
+    release: 25
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
