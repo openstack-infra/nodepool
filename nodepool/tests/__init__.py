@@ -430,6 +430,28 @@ class DBTestCase(BaseTestCase):
             time.sleep(1)
         self.wait_for_threads()
 
+    def submitNodeRequest(self, req):
+        '''
+        Very simple submit of a node request to ZooKeeper.
+        '''
+        priority = 100
+        req.state = zk.REQUESTED
+        path = '%s/%s-' % (self.zk.REQUEST_ROOT, priority)
+        path = self.zk.client.create(path, req.serialize(), makepath=True,
+                                     sequence=True, ephemeral=True)
+        req.id = path.split("/")[-1]
+
+    def waitForNodeRequest(self, req):
+        '''
+        Wait for a node request to transition out of REQUESTED state.
+        '''
+        while True:
+            req = self.zk.getNodeRequest(req.id)
+            if req.state != zk.REQUESTED:
+                break
+            time.sleep(1)
+        return req
+
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args
         pool = nodepool.NodePool(*args, **kwargs)

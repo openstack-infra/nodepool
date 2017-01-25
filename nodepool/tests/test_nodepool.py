@@ -22,12 +22,27 @@ import fixtures
 
 from nodepool import tests
 from nodepool import nodedb
+from nodepool import zk
 import nodepool.fakeprovider
 import nodepool.nodepool
 
 
 class TestNodepool(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestNodepool")
+
+    def test_decline_and_fail(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        req = zk.NodeRequest()
+        req.node_types.append("zorky-zumba")
+        self.submitNodeRequest(req)
+        self.assertEqual(req.state, zk.REQUESTED)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FAILED)
+        self.assertNotEqual(req.declined_by, [])
 
     @skip("Disabled for early v3 development")
     def test_node(self):
