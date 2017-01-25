@@ -49,7 +49,7 @@ class ConfigValidator:
 
         network = {
             'name': v.Required(str),
-            'public': bool,
+            'public': bool,  # Ignored, but kept for backwards compat
         }
 
         providers = {
@@ -67,7 +67,7 @@ class ConfigValidator:
             'project-name': str,
             'max-servers': int,
             'max-concurrency': int,
-            'pool': str,
+            'pool': str,  # Ignored, but kept for backwards compat
             'image-type': str,
             'networks': [v.Any(old_network, network)],
             'ipv6-preferred': bool,
@@ -108,6 +108,7 @@ class ConfigValidator:
             'name': str,
             'pause': bool,
             'elements': [str],
+            'formats': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
             'env-vars': dict,

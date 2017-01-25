@@ -278,3 +278,8 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         # Make sure our cleanup worker properly removes the first build.
         self.waitForBuildDeletion('fake-image', '0000000001')
+
+    def test_diskimage_build_only(self):
+        configfile = self.setup_config('node_diskimage_only.yaml')
+        self._useBuilder(configfile)
+        self.waitForBuild('fake-image', '0000000001')

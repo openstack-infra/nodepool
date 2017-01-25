@@ -396,7 +396,7 @@ class CleanupWorker(BaseWorker):
             # so ignore it.
             return
         # Remove any local builds that are not in use.
-        if not diskimage or (diskimage and not diskimage.in_use):
+        if not diskimage or (diskimage and not diskimage.image_types):
             builds_to_keep -= local_builds
             # TODO(jeblair): When all builds for an image which is not
             # in use are deleted, the image znode should be deleted as

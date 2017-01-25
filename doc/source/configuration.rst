@@ -229,6 +229,30 @@ Example configuration::
         DIB_APT_LOCAL_CACHE: '0'
         DIB_DISABLE_APT_CLEANUP: '1'
         FS_TYPE: ext3
+    - name: ubuntu-xenial
+      pause: True
+      rebuild-age: 86400
+      formats:
+        - raw
+        - tar
+      elements:
+        - ubuntu-minimal
+        - vm
+        - simple-init
+        - openstack-repos
+        - nodepool-base
+        - cache-devstack
+        - cache-bindep
+        - growroot
+        - infra-package-needs
+      release: precise
+      env-vars:
+        TMPDIR: /opt/dib_tmp
+        DIB_CHECKSUM: '1'
+        DIB_IMAGE_CACHE: /opt/dib_cache
+        DIB_APT_LOCAL_CACHE: '0'
+        DIB_DISABLE_APT_CLEANUP: '1'
+        FS_TYPE: ext3
 
 
 **required**
@@ -237,6 +261,12 @@ Example configuration::
     Identifier to reference the disk image in :ref:`images` and :ref:`labels`.
 
 **optional**
+
+  ``formats`` (list)
+    The list of formats to build is normally automatically created based on the
+    needs of the providers to which the image is uploaded.  To build images even
+    when no providers are configured or to build additional formats which you
+    know you may need in the future, list those formats here.
 
   ``rebuild-age``
     If the current diskimage is older than this value (in seconds),
@@ -279,11 +309,9 @@ provider, the Nodepool image types are also defined (see
       boot-timeout: 120
       launch-timeout: 900
       template-hostname: 'template-{image.name}-{timestamp}'
-      pool: 'public'
       ipv6-preferred: False
       networks:
         - name: 'some-network-name'
-          public: True
       images:
         - name: trusty
           min-ram: 8192
@@ -400,19 +428,13 @@ provider, the Nodepool image types are also defined (see
 
   ``networks`` (dict)
     Specify custom Neutron networks that get attached to each
-    node. Specify the ``name`` of the network (a string) and if the
-    network routes to the Internet, set the boolean ``public`` to
-    true.
+    node. Specify the ``name`` of the network (a string).
 
   ``ipv6-preferred``
     If it is set to True, nodepool will try to find ipv6 in public net first
     as the ip address for ssh connection to build snapshot images and create
     jenkins slave definition. If ipv6 is not found or the key is not
     specified or set to False, ipv4 address will be used.
-
-  ``pool``
-    Specify a floating ip pool in cases where the 'public' pool is unavailable
-    or undesirable.
 
   ``api-timeout`` (compatability)
     Timeout for the OpenStack API calls client in seconds. Prefer setting
