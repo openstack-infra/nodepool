@@ -111,7 +111,7 @@ class ConfigValidator:
             'formats': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
-            'env-vars': dict,
+            'env-vars': {str: str},
         }
 
         top_level = {
