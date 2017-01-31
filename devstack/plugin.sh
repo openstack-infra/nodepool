@@ -462,7 +462,7 @@ if is_service_enabled nodepool; then
         echo_summary "Configuring nodepool"
         configure_nodepool
 
-    elif [[ "$1" == "stack" && "$2" == "extra" ]]; then
+    elif [[ "$1" == "stack" && "$2" == "test-config" ]]; then
         # Initialize and start the nodepool service
         echo_summary "Initializing nodepool"
         start_nodepool
