@@ -195,7 +195,6 @@ def loadConfig(config_path):
             else:
                 n.name = network.get('name')
                 n.id = None
-            n.public = network.get('public', False)
         p.ipv6_preferred = provider.get('ipv6-preferred')
         p.clean_floating_ips = provider.get('clean-floating-ips')
         p.azs = provider.get('availability-zones')
@@ -252,15 +251,13 @@ def loadConfig(config_path):
                 #self.log.error("%s: ignoring env-vars; "
                 #               "should be a dict" % d.name)
                 d.env_vars = {}
-            d.image_types = set()
+            d.image_types = set(diskimage.get('formats', []))
             d.pause = bool(diskimage.get('pause', False))
-            d.in_use = False
         # Do this after providers to build the image-types
         for provider in newconfig.providers.values():
             for image in provider.images.values():
                 diskimage = newconfig.diskimages[image.name]
                 diskimage.image_types.add(provider.image_type)
-                diskimage.in_use = True
 
     for label in config.get('labels', []):
         l = Label()

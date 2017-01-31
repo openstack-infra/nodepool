@@ -199,8 +199,8 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
-  - name: fedora-24
-    image: fedora-24
+  - name: fedora-25
+    image: fedora-25
     min-ready: 1
     providers:
       - name: devstack
@@ -228,31 +228,36 @@ providers:
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
     launch-timeout: 900
-    max-servers: 2
+    max-servers: 5
     rate: 0.25
     images:
       - name: centos-7
         min-ram: 1024
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
-      - name: fedora-24
+      - name: fedora-25
         min-ram: 1024
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-precise
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-trusty
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-xenial
-        min-ram: 1024
+        min-ram: 512
+        name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
@@ -277,8 +282,8 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
-  - name: fedora-24
-    pause: $NODEPOOL_PAUSE_FEDORA_24_DIB
+  - name: fedora-25
+    pause: $NODEPOOL_PAUSE_FEDORA_25_DIB
     rebuild-age: 86400
     elements:
       - fedora-minimal
@@ -287,7 +292,7 @@ diskimages:
       - devuser
       - openssh-server
       - nodepool-setup
-    release: 24
+    release: 25
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
@@ -399,8 +404,11 @@ function configure_nodepool {
 function start_nodepool {
     # build a custom flavor that's more friendly to nodepool
     local available_flavors=$(nova flavor-list)
-    if [[ ! ( $available_flavors =~ 'm1.nodepool' ) ]]; then
-        nova flavor-create m1.nodepool 64 1024 0 1
+    if [[ ! ( $available_flavors =~ 'nodepool-512' ) ]]; then
+        nova flavor-create nodepool-512 64 512 0 1
+    fi
+    if [[ ! ( $available_flavors =~ 'nodepool-1024' ) ]]; then
+        nova flavor-create nodepool-1024 128 1024 0 1
     fi
 
     # build sec group rules to reach the nodes, we need to do this

@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import json
 import time
 
 from nodepool import nodedb
@@ -60,6 +61,20 @@ def dib_image_list(zk):
                        build.state, age(build.state_time)])
     return str(t)
 
+
+def dib_image_list_json(zk):
+    objs = []
+    for image_name in zk.getImageNames():
+        for build_no in zk.getBuildNumbers(image_name):
+            build = zk.getBuild(image_name, build_no)
+            objs.append({'id' : '-'.join([image_name, build_no]),
+                         'image': image_name,
+                         'builder': build.builder,
+                         'formats': build.formats,
+                         'state': build.state,
+                         'age': int(build.state_time)
+            })
+    return json.dumps(objs)
 
 def image_list(zk):
     t = PrettyTable(["Build ID", "Upload ID", "Provider", "Image",
