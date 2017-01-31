@@ -498,6 +498,21 @@ class TestZooKeeper(tests.DBTestCase):
         with testtools.ExpectedException(npe.ZKLockException):
             self.zk.unlockNode(node)
 
+    def test_storeNode(self):
+        node = zk.Node()
+        node.state = zk.BUILDING
+        node.provider = 'rax'
+
+        self.assertIsNone(node.id)
+        self.zk.storeNode(node)
+        self.assertIsNotNone(node.id)
+        self.assertIsNotNone(
+            self.zk.client.exists(self.zk._nodePath(node.id))
+        )
+
+        node2 = self.zk.getNode(node.id)
+        self.assertEqual(node, node2)
+
 
 class TestZKModel(tests.BaseTestCase):
 
@@ -619,11 +634,13 @@ class TestZKModel(tests.BaseTestCase):
     def test_Node_toDict(self):
         o = zk.Node('123')
         o.provider = 'rax'
+        o.allocated_to = '456-789'
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertIn('state', d)
         self.assertIn('state_time', d)
-        self.assertEqual(d['provider'], 'rax')
+        self.assertEqual(d['provider'], o.provider)
+        self.assertEqual(d['allocated_to'], o.allocated_to)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -632,10 +649,12 @@ class TestZKModel(tests.BaseTestCase):
             'state': zk.READY,
             'state_time': now,
             'provider': 'rax',
+            'allocated_to': '456-789',
         }
 
         o = zk.Node.fromDict(d, node_id)
         self.assertEqual(o.id, node_id)
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
-        self.assertEqual(o.provider, 'rax')
+        self.assertEqual(o.provider, d['provider'])
+        self.assertEqual(o.allocated_to, d['allocated_to'])
