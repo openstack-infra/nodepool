@@ -208,7 +208,7 @@ class NodeDeleter(threading.Thread):
                                self.node_id)
 
 
-class NodeLauncher(threading.Thread):
+class OLDNodeLauncher(threading.Thread):
     log = logging.getLogger("nodepool.NodeLauncher")
 
     def __init__(self, nodepool, provider, label, target, node_id, timeout,
@@ -671,6 +671,103 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
+class NodeLauncher(threading.Thread):
+    def __init__(self, zk, node, retries):
+        threading.Thread.__init__(self)
+        self._zk = zk
+        self._node = node
+        self._retries = retries
+
+    def _launchNode(self):
+        # TODO(Shrews): Use self._retries here
+        pass
+
+    def run(self):
+        try:
+            self._run()
+        except Exception:
+            self._node.state = zk.FAILED
+            self._zk.storeNode(self._node)
+
+    def _run(self):
+        self._launchNode()
+        self._node.state = zk.READY
+        self._zk.storeNode(self._node)
+
+
+class NodeLaunchManager(object):
+    '''
+    Handle launching multiple nodes in parallel.
+    '''
+    def __init__(self, zk, retries):
+        self._zk = zk
+        self._retries = retries
+        self._nodes = []
+        self._failed_nodes = []
+        self._ready_nodes = []
+        self._threads = []
+
+    @property
+    def alive_thread_count(self):
+        count = 0
+        for t in self._threads:
+            if t.isAlive():
+                count += 1
+        return count
+
+    @property
+    def failed_nodes(self):
+        return self._failed_nodes
+
+    @property
+    def ready_nodes(self):
+        return self._ready_nodes
+
+    def launch(self, node):
+        '''
+        Launch a new node as described by the supplied Node.
+
+        We expect each NodeLauncher thread to directly modify the node that
+        is passed to it. The poll() method will expect to see the node.state
+        attribute to change as the node is processed.
+
+        :param Node node: The node object.
+        '''
+        self._nodes.append(node)
+        t = NodeLauncher(self._zk, node, self._retries)
+        t.start()
+        self._threads.append(t)
+
+    def poll(self):
+        '''
+        Check if all launch requests have completed.
+
+        When all of the Node objects have reached a final state (READY or
+        FAILED), we'll know all threads have finished the launch process.
+        '''
+        if not self._threads:
+            return True
+
+        # Give the NodeLaunch threads time to finish.
+        if self.alive_thread_count:
+            return False
+
+        node_states = [node.state for node in self._nodes]
+
+        # NOTE: It very important that NodeLauncher always sets one of
+        # these states, no matter what.
+        if not all(s in (zk.READY, zk.FAILED) for s in node_states):
+            return False
+
+        for node in self._nodes:
+            if node.state == zk.READY:
+                self._ready_nodes.append(node)
+            else:
+                self._failed_nodes.append(node)
+
+        return True
+
+
 class NodeRequestHandler(object):
     '''
     Class to process a single node request.
@@ -690,6 +787,8 @@ class NodeRequestHandler(object):
         self.manager = pw.manager
         self.launcher_id = pw.launcher_id
         self.request = request
+        self.launch_manager = None
+        self.nodeset = []
         self.done = False
 
     def _imagesAvailable(self):
@@ -730,15 +829,37 @@ class NodeRequestHandler(object):
         num_in_use = self._countNodes()
         return num_requested + num_in_use > provider_max
 
-    def run(self):
-        self.log.debug("Handling request %s" % self.request)
-        try:
-            self._run()
-        except Exception:
-            self.log.exception("Exception in NodeRequestHandler:")
-            self.request.state = zk.FAILED
-            self.zk.updateNodeRequest(self.request)
-            self.zk.unlockNodeRequest(self.request)
+    def _unlockNodeSet(self):
+        '''
+        Attempt unlocking all Nodes in the object node set.
+        '''
+        for node in self.nodeset:
+            if not node.lock:
+                continue
+            try:
+                self.zk.unlockNode(node)
+            except Exception:
+                self.log.exception("Error unlocking node:")
+
+    def _getReadyNodesOfTypes(self, ntypes):
+        '''
+        Query ZooKeeper for unused/ready nodes.
+
+        :param str ntypes: The node types we want.
+
+        :returns: A dictionary, keyed by node type, with lists of Node objects
+            that are ready, or an empty dict if none are found.
+        '''
+        ret = {}
+        for node_id in self.zk.getNodes():
+            node = self.zk.getNode(node_id)
+            if (node and node.state == zk.READY and
+                not node.allocated_to and node.type in ntypes
+            ):
+                if node.type not in ret:
+                    ret[node.type] = []
+                ret[node.type].append(node)
+        return ret
 
     def _run(self):
         '''
@@ -752,16 +873,6 @@ class NodeRequestHandler(object):
             launchers could attempt to launch a new node after the other
             launcher has already started doing so. This would cause an
             expected failure from the underlying library, which is ok for now.
-
-        Algorithm from spec::
-
-           # If image not available, decline
-           # If request > quota, decline
-           # If request < quota and request > available nodes (due to current
-             usage), begin satisfying the request and do not process further
-             requests until satisfied
-           # If request < quota and request < available nodes, satisfy the
-             request and continue processing further requests
         '''
         if not self._imagesAvailable() or self._wouldExceedQuota():
             self.request.declined_by.append(self.launcher_id)
@@ -774,17 +885,104 @@ class NodeRequestHandler(object):
             self.done = True
             return
 
-        # TODO(Shrews): Determine node availability and if we need to launch
-        # new nodes, or reuse existing nodes.
-
         self.request.state = zk.PENDING
         self.zk.updateNodeRequest(self.request)
 
-        # TODO(Shrews): Make magic happen here
+        self.launch_manager = NodeLaunchManager(self.zk, retries=3)
+        ready_nodes = self._getReadyNodesOfTypes(self.request.node_types)
 
-        self.request.state = zk.FULFILLED
+        for ntype in self.request.node_types:
+            # First try to grab from the list of already available nodes.
+            got_a_node = False
+            if ntype in ready_nodes:
+                for node in ready_nodes[ntype]:
+                    try:
+                        self.zk.lockNode(node, blocking=False)
+                    except exceptions.ZKLockException:
+                        # It's already locked so skip it.
+                        continue
+                    else:
+                        got_a_node = True
+                        node.allocated_to = self.request.id
+                        self.zk.storeNode(node)
+                        self.nodeset.append(node)
+                        break
+
+            # Could not grab an existing node, so launch a new one.
+            if not got_a_node:
+                node = zk.Node()
+                node.state = zk.INIT
+                node.type = ntype
+                node.provider = self.provider.name
+                node.allocated_to = self.request.id
+
+                # Note: It should be safe (i.e., no race) to lock the node
+                # *after* it is stored since nodes in BUILDING state are not
+                # locked anywhere.
+                self.zk.storeNode(node)
+                self.zk.lockNode(node, blocking=False)
+
+                # Set state AFTER lock so sthat it isn't accidentally cleaned
+                # up (unlocked BUILDING nodes will be deleted).
+                node.state = zk.BUILDING
+                self.zk.storeNode(node)
+
+                # NOTE: We append the node to nodeset if it successfully
+                # launches.
+                self.launch_manager.launch(node)
+
+    @property
+    def alive_thread_count(self):
+        return self.launch_manager.alive_thread_count
+
+    def run(self):
+        try:
+            self._run()
+        except Exception:
+            self.log.exception("Exception in NodeRequestHandler:")
+            self.request.state = zk.FAILED
+            self.zk.updateNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+            self.done = True
+
+    def poll(self):
+        '''
+        Check if the request has been handled.
+
+        Once the request has been handled, the 'nodeset' attribute will be
+        filled with the list of nodes assigned to the request, or it will be
+        empty if the request could not be fulfilled.
+
+        :returns: True if we are done with the request, False otherwise.
+        '''
+        if self.done:
+            return True
+
+        if not self.launch_manager.poll():
+            return False
+
+        # TODO(Shrews): Verify the request still exists before updating it.
+
+        if self.launch_manager.failed_nodes:
+            self.nodeset = []
+            self.request.declined_by.append(self.launcher_id)
+            launchers = set(self.zk.getRegisteredLaunchers())
+            if launchers.issubset(set(self.request.declined_by)):
+                # All launchers have declined it
+                self.request.state = zk.FAILED
+            else:
+                self.request.state = zk.REQUESTED
+        else:
+            self.nodeset.extend(self.launch_manager.ready_nodes)
+            for node in self.nodeset:
+                # Record node ID in the request
+                self.request.nodes.append(node.id)
+            self.request.state = zk.FULFILLED
+
+        self._unlockNodeSet()
         self.zk.updateNodeRequest(self.request)
         self.zk.unlockNodeRequest(self.request)
+        return True
 
 
 class ProviderWorker(threading.Thread):
@@ -847,10 +1045,16 @@ class ProviderWorker(threading.Thread):
             self.manager.start()
 
     def _activeThreads(self):
+        '''
+        Return the number of alive threads in use by this provider.
+
+        This is an approximate, top-end number for alive threads, since some
+        threads obviously may have finished by the time we finish the
+        calculation.
+        '''
         total = 0
-        # TODO(Shrews): return a count of active threads
-        #for r in self.request_handlers:
-        #    total += r.alive_thread_count
+        for r in self.request_handlers:
+            total += r.alive_thread_count
         return total
 
     def _assignHandlers(self):
@@ -904,10 +1108,9 @@ class ProviderWorker(threading.Thread):
         Poll handlers to see which have completed.
         '''
         active_handlers = []
-        # TODO(Shrews): implement handler polling
-        #for r in self.request_handlers:
-        #    if not r.poll():
-        #        active_handlers.append(r)
+        for r in self.request_handlers:
+            if not r.poll():
+                active_handlers.append(r)
         self.request_handlers = active_handlers
 
     #----------------------------------------------------------------
@@ -935,8 +1138,16 @@ class ProviderWorker(threading.Thread):
             time.sleep(self.watermark_sleep)
 
     def stop(self):
+        '''
+        Shutdown the ProviderWorker thread.
+
+        Do not wait for the request handlers to finish. Any nodes
+        that are in the process of launching will be cleaned up on a
+        restart. They will be unlocked and BUILDING in ZooKeeper.
+        '''
         self.log.info("%s received stop" % self.name)
         self.running = False
+
         if self.manager:
             self.manager.stop()
             self.manager.join()

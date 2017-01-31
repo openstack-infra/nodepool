@@ -49,6 +49,8 @@ IN_USE = 'in-use'
 USED = 'used'
 # Node is being held
 HOLD = 'hold'
+# Initial node state
+INIT = 'init'
 
 
 class ZooKeeperConnectionConfig(object):
@@ -358,7 +360,7 @@ class Node(BaseModel):
     Class representing a launched node.
     '''
     VALID_STATES = set([BUILDING, TESTING, READY, IN_USE, USED,
-                        HOLD, DELETING, FAILED])
+                        HOLD, DELETING, FAILED, INIT])
 
     def __init__(self, id=None):
         super(Node, self).__init__(id)

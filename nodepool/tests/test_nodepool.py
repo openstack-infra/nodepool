@@ -15,6 +15,7 @@
 
 import json
 import logging
+import mock
 import time
 from unittest import skip
 
@@ -30,7 +31,63 @@ import nodepool.nodepool
 class TestNodepool(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestNodepool")
 
-    def test_decline_and_fail(self):
+    def test_node_assignment(self):
+        '''
+        Successful node launch should have unlocked nodes in READY state
+        and assigned to the request.
+        '''
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        req = zk.NodeRequest()
+        req.node_types.append('fake-image')
+        self.submitNodeRequest(req)
+        self.assertEqual(req.state, zk.REQUESTED)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
+        self.assertNotEqual(req.nodes, [])
+        for node_id in req.nodes:
+            node = self.zk.getNode(node_id)
+            self.assertEqual(node.allocated_to, req.id)
+            self.assertEqual(node.state, zk.READY)
+            self.zk.lockNode(node, blocking=False)
+            self.zk.unlockNode(node)
+
+
+    @mock.patch('nodepool.nodepool.NodeLauncher._launchNode')
+    def test_fail_request_on_launch_failure(self, mock_launch):
+        '''
+        Test that provider launch error fails the request.
+        '''
+        mock_launch.side_effect = Exception()
+
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        req = zk.NodeRequest()
+        req.node_types.append('fake-image')
+        self.submitNodeRequest(req)
+        self.assertEqual(req.state, zk.REQUESTED)
+
+        req = self.waitForNodeRequest(req)
+        self.assertTrue(mock_launch.called)
+        self.assertEqual(req.state, zk.FAILED)
+        self.assertNotEqual(req.declined_by, [])
+
+    def test_invalid_image_fails(self):
+        '''
+        Test that an invalid image declines and fails the request.
+        '''
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
