@@ -625,6 +625,9 @@ class NodeLauncher(threading.Thread):
             if not host:
                 raise Exception("Unable to log in via SSH")
 
+            # This is a test for the existence and not a creation on purpose.
+            # Current requirements for nodepool nodes are that nodepool can log
+            # in and that it can write to /etc/nodepool.
             host.ssh("test for config dir", "ls /etc/nodepool")
 
             ftp = host.client.open_sftp()
