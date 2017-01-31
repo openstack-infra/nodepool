@@ -625,7 +625,9 @@ class NodeLauncher(threading.Thread):
             if not host:
                 raise Exception("Unable to log in via SSH")
 
-            host.ssh("test for config dir", "ls /etc/nodepool")
+            host.ssh("Create config dir", "sudo mkdir -p /etc/nodepool")
+            host.ssh("Change config dir owner",
+                     "sudo chown %s -R /etc/nodepool" % self.image.username)
 
             ftp = host.client.open_sftp()
 
