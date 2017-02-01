@@ -676,8 +676,7 @@ class NodeRequestHandler(object):
     Class to process a single node request.
 
     The ProviderWorker thread will instantiate a class of this type for each
-    node request that it pulls from ZooKeeper. That request will be assigned
-    to this thread for it to process.
+    node request that it pulls from ZooKeeper.
     '''
 
     def __init__(self, pw, request):

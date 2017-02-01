@@ -124,8 +124,10 @@ class BaseModel(object):
 
     def __init__(self, o_id):
         if o_id:
+            # Call the setter for id so we can validate the incoming type.
             self.id = o_id
         else:
+            # Bypass the setter for id to set the default.
             self._id = None
         self._state = None
         self.state_time = None
