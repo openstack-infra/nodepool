@@ -680,20 +680,19 @@ class NodeRequestWorker(threading.Thread):
     to this thread for it to process.
     '''
 
-    def __init__(self, zk, launcher_id, provider, request):
+    def __init__(self, pw, request):
         '''
-        :param ZooKeeper zk: Connected ZooKeeper object.
-        :param str launcher_id: ID of the launcher handling the request.
-        :param Provider provider: Provider object from the config file.
+        :param ProviderWorker pw: The parent ProviderWorker object.
         :param NodeRequest request: The request to handle.
         '''
         threading.Thread.__init__(
             self, name='NodeRequestWorker.%s' % request.id
         )
         self.log = logging.getLogger("nodepool.%s" % self.name)
-        self.zk = zk
-        self.launcher_id = launcher_id
-        self.provider = provider
+        self.provider = pw.provider
+        self.zk = pw.zk
+        self.manager = pw.manager
+        self.launcher_id = pw.launcher_id
         self.request = request
 
     def _imagesAvailable(self):
@@ -806,12 +805,15 @@ class ProviderWorker(threading.Thread):
             self, name='ProviderWorker.%s' % provider.name
         )
         self.log = logging.getLogger("nodepool.%s" % self.name)
-        self.provider = provider
-        self.zk = zk
         self.running = False
         self.configfile = configfile
         self.workers = []
         self.watermark_sleep = watermark_sleep
+
+        # These attributes will be used by NodeRequestWorker children
+        self.zk = zk
+        self.manager = None
+        self.provider = provider
         self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
                                          os.getpid(),
                                          self.ident)
@@ -834,11 +836,17 @@ class ProviderWorker(threading.Thread):
             self.log.info("Provider %s removed from config"
                           % self.provider.name)
             self.stop()
-
-            # TODO(Shrews): Should we remove any existing nodes from the
-            # provider here?
-        else:
+        elif self.provider != config.providers[self.provider.name]:
             self.provider = config.providers[self.provider.name]
+            if self.manager:
+                self.manager.stop()
+                self.manager = None
+
+        if not self.manager:
+            self.log.debug("Creating new ProviderManager")
+            self.manager = provider_manager.ProviderManager(
+                self.provider, use_taskmanager=True)
+            self.manager.start()
 
     def _processRequests(self):
         self.log.debug("Getting node request from ZK queue")
@@ -874,8 +882,7 @@ class ProviderWorker(threading.Thread):
 
             # Got a lock, so assign it
             self.log.info("Assigning node request %s" % req.id)
-            t = NodeRequestWorker(self.zk, self.launcher_id,
-                                  self.provider, req)
+            t = NodeRequestWorker(self, req)
             t.start()
             self.workers.append(t)
 
@@ -909,6 +916,10 @@ class ProviderWorker(threading.Thread):
             # Make sure we're always registered with ZK
             self.zk.registerLauncher(self.launcher_id)
 
+            self._updateProvider()
+            if not self.running:
+                break
+
             if self.provider.max_concurrency == -1 and self.workers:
                 self.workers = []
 
@@ -916,11 +927,13 @@ class ProviderWorker(threading.Thread):
                 self._processRequests()
 
             time.sleep(self.watermark_sleep)
-            self._updateProvider()
 
     def stop(self):
         self.log.info("%s received stop" % self.name)
         self.running = False
+        if self.manager:
+            self.manager.stop()
+            self.manager.join()
 
 
 class NodePool(threading.Thread):
@@ -1248,7 +1261,6 @@ class NodePool(threading.Thread):
     def updateConfig(self):
         config = self.loadConfig()
         self.reconfigureZooKeeper(config)
-        self.reconfigureManagers(config)
         self.reconfigureCrons(config)
         self.setConfig(config)
 
