@@ -125,6 +125,8 @@ class BaseModel(object):
     def __init__(self, o_id):
         if o_id:
             self.id = o_id
+        else:
+            self._id = None
         self._state = None
         self.state_time = None
         self.stat = None
@@ -351,12 +353,13 @@ class Node(BaseModel):
     Class representing a launched node.
     '''
     VALID_STATES = set([BUILDING, TESTING, READY, IN_USE, USED,
-                        HOLD, DELETING])
+                        HOLD, DELETING, FAILED])
 
     def __init__(self, id=None):
         super(Node, self).__init__(id)
         self.lock = None
         self.provider = None
+        self.allocated_to = None
 
     def __repr__(self):
         d = self.toDict()
@@ -364,12 +367,23 @@ class Node(BaseModel):
         d['stat'] = self.stat
         return '<Node %s>' % d
 
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return (self.id == other.id and
+                    self.state == other.state and
+                    self.state_time == other.state_time and
+                    self.provider == other.provider and
+                    self.allocated_to == other.allocated_to)
+        else:
+            return False
+
     def toDict(self):
         '''
         Convert a Node object's attributes to a dictionary.
         '''
         d = super(Node, self).toDict()
         d['provider'] = self.provider
+        d['allocated_to'] = self.allocated_to
         return d
 
     @staticmethod
@@ -385,6 +399,7 @@ class Node(BaseModel):
         o = Node(o_id)
         super(Node, o).fromDict(d)
         o.provider = d.get('provider')
+        o.allocated_to = d.get('allocated_to')
         return o
 
 
@@ -1316,5 +1331,28 @@ class ZooKeeper(object):
             return None
 
         d = Node.fromDict(self._strToDict(data), node)
+        d.id = node
         d.stat = stat
         return d
+
+    def storeNode(self, node):
+        '''
+        Store an new or existing node.
+
+        If this is a new node, then node.id will be set with the newly created
+        node identifier. Otherwise, node.id is used to identify the node to
+        update.
+
+        :param Node node: The Node object to store.
+        '''
+        if not node.id:
+            node_path = "%s/" % self.NODE_ROOT
+            path = self.client.create(
+                node_path,
+                value=node.serialize(),
+                sequence=True,
+                makepath=True)
+            node.id = path.split("/")[-1]
+        else:
+            path = self._nodePath(node)
+            self.client.set(path, node.serialize())
