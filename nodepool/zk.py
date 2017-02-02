@@ -1356,5 +1356,5 @@ class ZooKeeper(object):
                 makepath=True)
             node.id = path.split("/")[-1]
         else:
-            path = self._nodePath(node)
+            path = self._nodePath(node.id)
             self.client.set(path, node.serialize())

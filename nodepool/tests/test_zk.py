@@ -498,7 +498,7 @@ class TestZooKeeper(tests.DBTestCase):
         with testtools.ExpectedException(npe.ZKLockException):
             self.zk.unlockNode(node)
 
-    def test_storeNode(self):
+    def _create_node(self):
         node = zk.Node()
         node.state = zk.BUILDING
         node.provider = 'rax'
@@ -509,7 +509,17 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertIsNotNone(
             self.zk.client.exists(self.zk._nodePath(node.id))
         )
+        return node
 
+    def test_storeNode(self):
+        node = self._create_node()
+        node2 = self.zk.getNode(node.id)
+        self.assertEqual(node, node2)
+
+    def test_storeNode_update(self):
+        node = self._create_node()
+        node.state = zk.READY
+        self.zk.storeNode(node)
         node2 = self.zk.getNode(node.id)
         self.assertEqual(node, node2)
 
