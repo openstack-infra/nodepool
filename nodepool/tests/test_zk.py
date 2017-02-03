@@ -618,12 +618,14 @@ class TestZKModel(tests.BaseTestCase):
         o = zk.NodeRequest("500-123")
         o.declined_by.append("abc")
         o.node_types.append('trusty')
+        o.nodes.append('100')
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertIn('state', d)
         self.assertIn('state_time', d)
-        self.assertEqual(d['declined_by'], ['abc'])
-        self.assertEqual(d['node_types'], ['trusty'])
+        self.assertEqual(d['declined_by'], o.declined_by)
+        self.assertEqual(d['node_types'], o.node_types)
+        self.assertEqual(d['nodes'], o.nodes)
 
     def test_NodeRequest_fromDict(self):
         now = int(time.time())
@@ -633,6 +635,7 @@ class TestZKModel(tests.BaseTestCase):
             'state_time': now,
             'declined_by': ['abc'],
             'node_types': ['trusty'],
+            'nodes': ['100'],
         }
 
         o = zk.NodeRequest.fromDict(d, req_id)
@@ -640,16 +643,20 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.declined_by, d['declined_by'])
+        self.assertEqual(o.node_types, d['node_types'])
+        self.assertEqual(o.nodes, d['nodes'])
 
     def test_Node_toDict(self):
         o = zk.Node('123')
         o.provider = 'rax'
+        o.type = 'trusty'
         o.allocated_to = '456-789'
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertIn('state', d)
         self.assertIn('state_time', d)
         self.assertEqual(d['provider'], o.provider)
+        self.assertEqual(d['type'], o.type)
         self.assertEqual(d['allocated_to'], o.allocated_to)
 
     def test_Node_fromDict(self):
@@ -659,6 +666,7 @@ class TestZKModel(tests.BaseTestCase):
             'state': zk.READY,
             'state_time': now,
             'provider': 'rax',
+            'type': 'trusty',
             'allocated_to': '456-789',
         }
 
@@ -667,4 +675,5 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.provider, d['provider'])
+        self.assertEqual(o.type, d['type'])
         self.assertEqual(o.allocated_to, d['allocated_to'])

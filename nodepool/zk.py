@@ -317,6 +317,7 @@ class NodeRequest(BaseModel):
         self.lock = None
         self.declined_by = []
         self.node_types = []
+        self.nodes = []
 
     def __repr__(self):
         d = self.toDict()
@@ -331,6 +332,7 @@ class NodeRequest(BaseModel):
         d = super(NodeRequest, self).toDict()
         d['declined_by'] = self.declined_by
         d['node_types'] = self.node_types
+        d['nodes'] = self.nodes
         return d
 
     @staticmethod
@@ -347,6 +349,7 @@ class NodeRequest(BaseModel):
         super(NodeRequest, o).fromDict(d)
         o.declined_by = d.get('declined_by', [])
         o.node_types = d.get('node_types', [])
+        o.nodes = d.get('nodes', [])
         return o
 
 
@@ -361,6 +364,7 @@ class Node(BaseModel):
         super(Node, self).__init__(id)
         self.lock = None
         self.provider = None
+        self.type = None
         self.allocated_to = None
 
     def __repr__(self):
@@ -375,6 +379,7 @@ class Node(BaseModel):
                     self.state == other.state and
                     self.state_time == other.state_time and
                     self.provider == other.provider and
+                    self.type == other.type and
                     self.allocated_to == other.allocated_to)
         else:
             return False
@@ -385,6 +390,7 @@ class Node(BaseModel):
         '''
         d = super(Node, self).toDict()
         d['provider'] = self.provider
+        d['type'] = self.type
         d['allocated_to'] = self.allocated_to
         return d
 
@@ -401,6 +407,7 @@ class Node(BaseModel):
         o = Node(o_id)
         super(Node, o).fromDict(d)
         o.provider = d.get('provider')
+        o.type = d.get('type')
         o.allocated_to = d.get('allocated_to')
         return o
 
