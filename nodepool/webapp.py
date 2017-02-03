@@ -93,7 +93,7 @@ class WebApp(threading.Thread):
         if request.path.endswith('.json'):
             content_type = 'application/json'
         else:
-            content_type = 'application/text'
+            content_type = 'text/plain'
 
         response = webob.Response(body=output,
                                   content_type=content_type)
