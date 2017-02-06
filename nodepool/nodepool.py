@@ -671,7 +671,7 @@ class SubNodeLauncher(threading.Thread):
         return dt
 
 
-class NodeRequestWorker(threading.Thread):
+class NodeRequestHandler(object):
     '''
     Class to process a single node request.
 
@@ -685,15 +685,13 @@ class NodeRequestWorker(threading.Thread):
         :param ProviderWorker pw: The parent ProviderWorker object.
         :param NodeRequest request: The request to handle.
         '''
-        threading.Thread.__init__(
-            self, name='NodeRequestWorker.%s' % request.id
-        )
-        self.log = logging.getLogger("nodepool.%s" % self.name)
+        self.log = logging.getLogger("nodepool.NodeRequestHandler")
         self.provider = pw.provider
         self.zk = pw.zk
         self.manager = pw.manager
         self.launcher_id = pw.launcher_id
         self.request = request
+        self.done = False
 
     def _imagesAvailable(self):
         '''
@@ -738,14 +736,14 @@ class NodeRequestWorker(threading.Thread):
         try:
             self._run()
         except Exception:
-            self.log.exception("Exception in NodeRequestWorker:")
+            self.log.exception("Exception in NodeRequestHandler:")
             self.request.state = zk.FAILED
             self.zk.updateNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
 
     def _run(self):
         '''
-        Main body for the NodeRequestWorker.
+        Main body for the NodeRequestHandler.
 
         note:: This code is a bit racey in its calculation of the number of
             nodes in use for quota purposes. It is possible for multiple
@@ -774,6 +772,7 @@ class NodeRequestWorker(threading.Thread):
                 self.request.state = zk.FAILED
             self.zk.updateNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
+            self.done = True
             return
 
         # TODO(Shrews): Determine node availability and if we need to launch
@@ -807,10 +806,10 @@ class ProviderWorker(threading.Thread):
         self.log = logging.getLogger("nodepool.%s" % self.name)
         self.running = False
         self.configfile = configfile
-        self.workers = []
+        self.request_handlers = []
         self.watermark_sleep = watermark_sleep
 
-        # These attributes will be used by NodeRequestWorker children
+        # These attributes will be used by NodeRequestHandler
         self.zk = zk
         self.manager = None
         self.provider = provider
@@ -848,13 +847,28 @@ class ProviderWorker(threading.Thread):
                 self.provider, use_taskmanager=True)
             self.manager.start()
 
-    def _processRequests(self):
-        self.log.debug("Getting node request from ZK queue")
+    def _activeThreads(self):
+        total = 0
+        # TODO(Shrews): return a count of active threads
+        #for r in self.request_handlers:
+        #    total += r.alive_thread_count
+        return total
+
+    def _assignHandlers(self):
+        '''
+        For each request we can grab, create a NodeRequestHandler for it.
+
+        The NodeRequestHandler object will kick off any threads needed to
+        satisfy the request, then return. We will need to periodically poll
+        the handler for completion.
+        '''
+        if self.provider.max_concurrency == 0:
+            return
 
         for req_id in self.zk.getNodeRequests():
             # Short-circuit for limited request handling
             if (self.provider.max_concurrency > 0
-                and self._activeWorkers() >= self.provider.max_concurrency
+                and self._activeThreads() >= self.provider.max_concurrency
             ):
                 return
 
@@ -882,23 +896,20 @@ class ProviderWorker(threading.Thread):
 
             # Got a lock, so assign it
             self.log.info("Assigning node request %s" % req.id)
-            t = NodeRequestWorker(self, req)
-            t.start()
-            self.workers.append(t)
+            rh = NodeRequestHandler(self, req)
+            rh.run()
+            self.request_handlers.append(rh)
 
-    def _activeWorkers(self):
+    def _removeCompletedHandlers(self):
         '''
-        Return a count of the number of requests actively being handled.
-
-        This serves the dual-purpose of also removing completed requests from
-        our list of tracked threads.
+        Poll handlers to see which have completed.
         '''
-        active = []
-        for w in self.workers:
-            if w.isAlive():
-                active.append(w)
-        self.workers = active
-        return len(self.workers)
+        active_handlers = []
+        # TODO(Shrews): implement handler polling
+        #for r in self.request_handlers:
+        #    if not r.poll():
+        #        active_handlers.append(r)
+        self.request_handlers = active_handlers
 
     #----------------------------------------------------------------
     # Public methods
@@ -920,12 +931,8 @@ class ProviderWorker(threading.Thread):
             if not self.running:
                 break
 
-            if self.provider.max_concurrency == -1 and self.workers:
-                self.workers = []
-
-            if self.provider.max_concurrency != 0:
-                self._processRequests()
-
+            self._assignHandlers()
+            self._removeCompletedHandlers()
             time.sleep(self.watermark_sleep)
 
     def stop(self):
