@@ -733,7 +733,7 @@ class BuildWorker(BaseWorker):
             self._zk.resetLostFlag()
             build_data.state = zk.FAILED
         elif p.returncode:
-            self.log.info("DIB failed creating %s" % diskimage.name)
+            self.log.info("DIB failed creating %s (%s)" % (diskimage.name, p.returncode))
             build_data.state = zk.FAILED
         else:
             self.log.info("DIB image %s is built" % diskimage.name)
