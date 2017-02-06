@@ -443,11 +443,11 @@ class DBTestCase(BaseTestCase):
 
     def waitForNodeRequest(self, req):
         '''
-        Wait for a node request to transition out of REQUESTED state.
+        Wait for a node request to transition to a final state.
         '''
         while True:
             req = self.zk.getNodeRequest(req.id)
-            if req.state != zk.REQUESTED:
+            if req.state in (zk.FULFILLED, zk.FAILED):
                 break
             time.sleep(1)
         return req
