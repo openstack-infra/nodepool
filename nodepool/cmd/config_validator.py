@@ -76,7 +76,8 @@ class ConfigValidator:
             'launch-timeout': int,
             'rate': float,
             'images': [images],
-            'template-hostname': str,
+            'hostname-format': str,
+            'image-name-format': str,
             'clean-floating-ips': bool,
         }
 
@@ -93,8 +94,6 @@ class ConfigValidator:
 
         targets = {
             'name': str,
-            'hostname': str,
-            'subnode-hostname': str,
             'jenkins': {
                 'url': str,
                 'user': str,

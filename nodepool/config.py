@@ -198,9 +198,13 @@ def loadConfig(config_path):
         p.ipv6_preferred = provider.get('ipv6-preferred')
         p.clean_floating_ips = provider.get('clean-floating-ips')
         p.azs = provider.get('availability-zones')
-        p.template_hostname = provider.get(
-            'template-hostname',
-            'template-{image.name}-{timestamp}'
+        p.hostname_format = provider.get(
+            'hostname-format',
+            '{label.name}-{provider.name}-{node.id}'
+        )
+        p.image_name_format = provider.get(
+            'image-name-format',
+            'template-{image_name}-{timestamp}'
         )
         p.image_type = provider.get(
             'image-type', p.cloud_config.config['image_format'])
@@ -285,15 +289,6 @@ def loadConfig(config_path):
         t.jenkins_user = None
         t.jenkins_apikey = None
         t.jenkins_credentials_id = None
-
-        t.hostname = target.get(
-            'hostname',
-            '{label.name}-{provider.name}-{node_id}'
-        )
-        t.subnode_hostname = target.get(
-            'subnode-hostname',
-            '{label.name}-{provider.name}-{node_id}-{subnode_id}'
-        )
 
     return newconfig
 

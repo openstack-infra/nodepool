@@ -308,7 +308,8 @@ provider, the Nodepool image types are also defined (see
         - az1
       boot-timeout: 120
       launch-timeout: 900
-      template-hostname: 'template-{image.name}-{timestamp}'
+      image-name-format: 'template-{image_name}-{timestamp}'
+      hostname-format: '{label.name}-{provider.name}-{node.id}'
       ipv6-preferred: False
       networks:
         - name: 'some-network-name'
@@ -341,7 +342,8 @@ provider, the Nodepool image types are also defined (see
       region-name: 'region1'
       max-servers: 96
       rate: 1.0
-      template-hostname: '{image.name}-{timestamp}-nodepool-template'
+      image-name-format: 'template-{image_name}-{timestamp}'
+      hostname-format: '{label.name}-{provider.name}-{node.id}'
       images:
         - name: precise
           min-ram: 8192
@@ -448,9 +450,13 @@ provider, the Nodepool image types are also defined (see
 
   ``region-name``
 
-  ``template-hostname``
+  ``hostname-format``
     Hostname template to use for the spawned instance.
-    Default ``template-{image.name}-{timestamp}``
+    Default ``{label.name}-{provider.name}-{node.id}``
+
+  ``image-name-format``
+    Format for image names that are uploaded to providers.
+    Default ``template-{image_name}-{timestamp}``
 
   ``rate``
     In seconds. Default 1.0.
@@ -543,11 +549,7 @@ across all of the targets which are on-line::
 
   targets:
     - name: jenkins1
-      hostname: '{label.name}-{provider.name}-{node_id}'
-      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}'
     - name: jenkins2
-      hostname: '{label.name}-{provider.name}-{node_id}'
-      subnode-hostname: '{label.name}-{provider.name}-{node_id}-{subnode_id}'
 
 **required**
 
@@ -555,12 +557,6 @@ across all of the targets which are on-line::
   Identifier for the system an instance is attached to.
 
 **optional**
-
-  ``hostname``
-    Default ``{label.name}-{provider.name}-{node_id}``
-
-  ``subnode-hostname``
-    Default ``{label.name}-{provider.name}-{node_id}-{subnode_id}``
 
   ``rate``
     In seconds. Default 1.0

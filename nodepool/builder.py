@@ -841,12 +841,8 @@ class UploadWorker(BaseWorker):
 
         filename = image.to_path(self._config.imagesdir, with_extension=True)
 
-        dummy_image = type('obj', (object,),
-                           {'name': image_name, 'id': image.image_id})
-
-        ext_image_name = provider.template_hostname.format(
-            provider=provider, image=dummy_image,
-            timestamp=str(timestamp)
+        ext_image_name = provider.image_name_format.format(
+            image_name=image_name, timestamp=str(timestamp)
         )
 
         self.log.info("Uploading DIB image build %s from %s to %s" %
