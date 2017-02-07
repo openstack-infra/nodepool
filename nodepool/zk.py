@@ -1191,6 +1191,8 @@ class ZooKeeper(object):
         '''
         Get the data for a specific node request.
 
+        :param str request: The request ID.
+
         :returns: The request data, or None if the request was not found.
         '''
         path = self._requestPath(request)

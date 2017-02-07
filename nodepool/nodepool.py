@@ -961,7 +961,15 @@ class NodeRequestHandler(object):
         if not self.launch_manager.poll():
             return False
 
-        # TODO(Shrews): Verify the request still exists before updating it.
+        # If the request has been pulled, unallocate the node set so other
+        # requests can use them.
+        if not self.zk.getNodeRequest(self.request.id):
+            self.log.info("Node request %s disappeared", self.request.id)
+            for node in self.nodeset:
+                node.allocated_to = None
+                self.zk.storeNode(node)
+            self._unlockNodeSet()
+            return True
 
         if self.launch_manager.failed_nodes:
             self.nodeset = []
