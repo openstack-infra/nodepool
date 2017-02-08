@@ -368,6 +368,13 @@ class Node(BaseModel):
         self.provider = None
         self.type = None
         self.allocated_to = None
+        self.az = None
+        self.public_ipv4 = None
+        self.private_ipv4 = None
+        self.public_ipv6 = None
+        self.image_id = None
+        self.launcher = None
+        self.created_time = None
 
     def __repr__(self):
         d = self.toDict()
@@ -382,7 +389,14 @@ class Node(BaseModel):
                     self.state_time == other.state_time and
                     self.provider == other.provider and
                     self.type == other.type and
-                    self.allocated_to == other.allocated_to)
+                    self.allocated_to == other.allocated_to and
+                    self.az == other.az and
+                    self.public_ipv4 == other.public_ipv4 and
+                    self.private_ipv4 == other.private_ipv4 and
+                    self.public_ipv6 == other.public_ipv6 and
+                    self.image_id == other.image_id and
+                    self.launcher == other.launcher and
+                    self.created_time == other.created_time)
         else:
             return False
 
@@ -394,6 +408,13 @@ class Node(BaseModel):
         d['provider'] = self.provider
         d['type'] = self.type
         d['allocated_to'] = self.allocated_to
+        d['az'] = self.az
+        d['public_ipv4'] = self.public_ipv4
+        d['private_ipv4'] = self.private_ipv4
+        d['public_ipv6'] = self.public_ipv6
+        d['image_id'] = self.image_id
+        d['launcher'] = self.launcher
+        d['created_time'] = self.created_time
         return d
 
     @staticmethod
@@ -411,6 +432,13 @@ class Node(BaseModel):
         o.provider = d.get('provider')
         o.type = d.get('type')
         o.allocated_to = d.get('allocated_to')
+        o.az = d.get('az')
+        o.public_ipv4 = d.get('public_ipv4')
+        o.private_ipv4 = d.get('private_ipv4')
+        o.public_ipv6 = d.get('public_ipv6')
+        o.image_id = d.get('image_id')
+        o.launcher = d.get('launcher')
+        o.created_time = d.get('created_time')
         return o
 
 
@@ -1360,6 +1388,15 @@ class ZooKeeper(object):
         '''
         if not node.id:
             node_path = "%s/" % self.NODE_ROOT
+
+            # We expect a new node to always have a state already set, so
+            # use that state_time for created_time for consistency. But have
+            # this check, just in case.
+            if node.state_time:
+                node.created_time = node.state_time
+            else:
+                node.created_time = time.time()
+
             path = self.client.create(
                 node_path,
                 value=node.serialize(),

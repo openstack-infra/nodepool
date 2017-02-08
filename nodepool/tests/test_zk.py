@@ -648,16 +648,31 @@ class TestZKModel(tests.BaseTestCase):
 
     def test_Node_toDict(self):
         o = zk.Node('123')
+        o.state = zk.INIT
         o.provider = 'rax'
         o.type = 'trusty'
         o.allocated_to = '456-789'
+        o.az = 'RegionOne'
+        o.public_ipv4 = '<ipv4>'
+        o.private_ipv4 = '<pvt-ipv4>'
+        o.public_ipv6 = '<ipv6>'
+        o.image_id = 'image-id'
+        o.launcher = 'launcher-id'
+
         d = o.toDict()
         self.assertNotIn('id', d)
-        self.assertIn('state', d)
+        self.assertEqual(d['state'], o.state)
         self.assertIn('state_time', d)
+        self.assertIn('created_time', d)
         self.assertEqual(d['provider'], o.provider)
         self.assertEqual(d['type'], o.type)
         self.assertEqual(d['allocated_to'], o.allocated_to)
+        self.assertEqual(d['az'], o.az)
+        self.assertEqual(d['public_ipv4'], o.public_ipv4)
+        self.assertEqual(d['private_ipv4'], o.private_ipv4)
+        self.assertEqual(d['public_ipv6'], o.public_ipv6)
+        self.assertEqual(d['image_id'], o.image_id)
+        self.assertEqual(d['launcher'], o.launcher)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -665,15 +680,29 @@ class TestZKModel(tests.BaseTestCase):
         d = {
             'state': zk.READY,
             'state_time': now,
+            'created_time': now - 2,
             'provider': 'rax',
             'type': 'trusty',
             'allocated_to': '456-789',
+            'az': 'RegionOne',
+            'public_ipv4': '<ipv4>',
+            'private_ipv4': '<pvt-ipv4>',
+            'public_ipv6': '<ipv6>',
+            'image_id': 'image-id',
+            'launcher': 'launcher-id',
         }
 
         o = zk.Node.fromDict(d, node_id)
         self.assertEqual(o.id, node_id)
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
+        self.assertEqual(o.created_time, d['created_time'])
         self.assertEqual(o.provider, d['provider'])
         self.assertEqual(o.type, d['type'])
         self.assertEqual(o.allocated_to, d['allocated_to'])
+        self.assertEqual(o.az, d['az'])
+        self.assertEqual(o.public_ipv4, d['public_ipv4'])
+        self.assertEqual(o.private_ipv4, d['private_ipv4'])
+        self.assertEqual(o.public_ipv6, d['public_ipv6'])
+        self.assertEqual(o.image_id, d['image_id'])
+        self.assertEqual(o.launcher, d['launcher'])
