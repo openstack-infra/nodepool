@@ -428,6 +428,7 @@ class DBTestCase(BaseTestCase):
                 break
             time.sleep(1)
         self.wait_for_threads()
+        return ready_nodes[label]
 
     def waitForNodeRequest(self, req):
         '''
@@ -438,6 +439,7 @@ class DBTestCase(BaseTestCase):
             if req.state in (zk.FULFILLED, zk.FAILED):
                 break
             time.sleep(1)
+
         return req
 
     def useNodepool(self, *args, **kwargs):

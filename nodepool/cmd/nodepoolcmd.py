@@ -89,8 +89,8 @@ class NodePoolCmd(NodepoolApp):
             help='place a node in the HOLD state')
         cmd_hold.set_defaults(func=self.hold)
         cmd_hold.add_argument('id', help='node id')
-        cmd_hold.add_argument('--reason',
-                              help='Optional reason this node is held')
+        cmd_hold.add_argument('--reason', help='Reason this node is held',
+                              required=True)
 
         cmd_delete = subparsers.add_parser(
             'delete',
@@ -252,14 +252,13 @@ class NodePoolCmd(NodepoolApp):
         print t
 
     def hold(self):
-        node_id = None
-        with self.pool.getDB().getSession() as session:
-            node = session.getNode(self.args.id)
-            node.state = nodedb.HOLD
-            if self.args.reason:
-                node.comment = self.args.reason
-            node_id = node.id
-        self.list(node_id=node_id)
+        node = self.zk.getNode(self.args.id)
+        node.state = zk.HOLD
+        node.comment = self.args.reason
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        self.list(node_id=self.args.id)
 
     def delete(self):
         if self.args.now:
@@ -355,7 +354,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
-                                 'list'):
+                                 'list', 'hold'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
         else:
