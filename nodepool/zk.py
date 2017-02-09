@@ -327,6 +327,15 @@ class NodeRequest(BaseModel):
         d['stat'] = self.stat
         return '<NodeRequest %s>' % d
 
+    def __eq__(self, other):
+        if isinstance(other, NodeRequest):
+            return (self.id == other.id and
+                    self.declined_by == other.declined_by and
+                    self.node_types == other.node_types and
+                    self.nodes == other.nodes)
+        else:
+            return False
+
     def toDict(self):
         '''
         Convert a NodeRequest object's attributes to a dictionary.
@@ -375,6 +384,8 @@ class Node(BaseModel):
         self.image_id = None
         self.launcher = None
         self.created_time = None
+        self.external_id = None
+        self.hostname = None
 
     def __repr__(self):
         d = self.toDict()
@@ -396,7 +407,9 @@ class Node(BaseModel):
                     self.public_ipv6 == other.public_ipv6 and
                     self.image_id == other.image_id and
                     self.launcher == other.launcher and
-                    self.created_time == other.created_time)
+                    self.created_time == other.created_time and
+                    self.external_id == other.external_id and
+                    self.hostname == other.hostname)
         else:
             return False
 
@@ -415,6 +428,8 @@ class Node(BaseModel):
         d['image_id'] = self.image_id
         d['launcher'] = self.launcher
         d['created_time'] = self.created_time
+        d['external_id'] = self.external_id
+        d['hostname'] = self.hostname
         return d
 
     @staticmethod
@@ -439,6 +454,8 @@ class Node(BaseModel):
         o.image_id = d.get('image_id')
         o.launcher = d.get('launcher')
         o.created_time = d.get('created_time')
+        o.external_id = d.get('external_id')
+        o.hostname = d.get('hostname')
         return o
 
 
@@ -1233,24 +1250,45 @@ class ZooKeeper(object):
         d.stat = stat
         return d
 
-    def updateNodeRequest(self, request):
+    def storeNodeRequest(self, request, priority="100"):
         '''
-        Update a node request.
-
-        The request must already be locked before updating.
+        Store a new or existing node request.
 
         :param NodeRequest request: The node request to update.
+        :param str priority: Priority of a new request. Ignored on updates.
         '''
-        if request.lock is None:
-            raise Exception("%s must be locked before updating." % request)
+        if not request.id:
+            path = "%s/%s-" % (self.REQUEST_ROOT, priority)
+            path = self.client.create(
+                path,
+                value=request.serialize(),
+                sequence=True,
+                makepath=True)
+            request.id = path.split("/")[-1]
 
         # Validate it still exists before updating
-        if not self.getNodeRequest(request.id):
-            raise Exception(
-                "Attempt to update non-existing request %s" % request)
+        else:
+            if not self.getNodeRequest(request.id):
+                raise Exception(
+                    "Attempt to update non-existing request %s" % request)
+
+            path = self._requestPath(request.id)
+            self.client.set(path, request.serialize())
+
+    def deleteNodeRequest(self, request):
+        '''
+        Delete a node request.
+
+        :param NodeRequest request: The request to delete.
+        '''
+        if not request.id:
+            return
 
         path = self._requestPath(request.id)
-        self.client.set(path, request.serialize())
+        try:
+            self.client.delete(path)
+        except kze.NoNodeError:
+            pass
 
     def lockNodeRequest(self, request, blocking=True, timeout=None):
         '''
@@ -1406,3 +1444,23 @@ class ZooKeeper(object):
         else:
             path = self._nodePath(node.id)
             self.client.set(path, node.serialize())
+
+    def getReadyNodesOfTypes(self, labels):
+        '''
+        Query ZooKeeper for unused/ready nodes.
+
+        :param list labels: The node types we want.
+
+        :returns: A dictionary, keyed by node type, with lists of Node objects
+            that are ready, or an empty dict if none are found.
+        '''
+        ret = {}
+        for node_id in self.getNodes():
+            node = self.getNode(node_id)
+            if (node and node.state == READY and
+                not node.allocated_to and node.type in labels
+            ):
+                if node.type not in ret:
+                    ret[node.type] = []
+                ret[node.type].append(node)
+        return ret
