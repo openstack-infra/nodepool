@@ -32,7 +32,7 @@ import lockfile
 import kazoo.client
 import testtools
 
-from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
+from nodepool import builder, fakeprovider, nodepool, webapp
 from nodepool import zk
 from nodepool.cmd.config_validator import ConfigValidator
 
@@ -420,17 +420,12 @@ class DBTestCase(BaseTestCase):
 
         self.wait_for_threads()
 
-    def waitForNodes(self, pool):
-        self.wait_for_config(pool)
-        allocation_history = allocation.AllocationHistory()
+    def waitForNodes(self, label):
         while True:
             self.wait_for_threads()
-            with pool.getDB().getSession() as session:
-                needed = pool.getNeededNodes(session, allocation_history)
-                if not needed:
-                    nodes = session.getNodes(state=nodedb.BUILDING)
-                    if not nodes:
-                        break
+            ready_nodes = self.zk.getReadyNodesOfTypes([label])
+            if ready_nodes:
+                break
             time.sleep(1)
         self.wait_for_threads()
 

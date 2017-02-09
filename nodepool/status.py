@@ -17,8 +17,6 @@
 import json
 import time
 
-from nodepool import nodedb
-
 from prettytable import PrettyTable
 
 
@@ -31,21 +29,25 @@ def age(timestamp):
     return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
 
-def node_list(db, node_id=None):
-    t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target",
-                     "Manager", "Hostname", "NodeName", "Server ID",
-                     "IP", "State", "Age", "Comment"])
+def node_list(zk, node_id=None):
+    t = PrettyTable(["ID", "Provider", "AZ", "Label",
+                     "Launcher", "Hostname", "Server ID",
+                     "Public IPv4", "Private IPv4", "IPv6",
+                     "State", "Age", "Comment"])
     t.align = 'l'
-    with db.getSession() as session:
-        for node in session.getNodes():
-            if node_id and node.id != node_id:
-                continue
-            t.add_row([node.id, node.provider_name, node.az,
-                       node.label_name, node.target_name,
-                       node.manager_name, node.hostname,
-                       node.nodename, node.external_id, node.ip,
-                       nodedb.STATE_NAMES[node.state],
-                       age(node.state_time), node.comment])
+    if node_id:
+        node = zk.getNode(node_id)
+        t.add_row([node.id, node.provider, node.az, node.type,
+                   node.launcher, node.hostname, node.external_id,
+                   node.public_ipv4, node.private_ipv4, node.public_ipv6,
+                   node.state, age(node.state_time), node.comment])
+    else:
+        for nid in zk.getNodes():
+            node = zk.getNode(nid)
+            t.add_row([node.id, node.provider, node.az, node.type,
+                       node.launcher, node.hostname, node.external_id,
+                       node.public_ipv4, node.private_ipv4, node.public_ipv6,
+                       node.state, age(node.state_time), node.comment])
     return str(t)
 
 

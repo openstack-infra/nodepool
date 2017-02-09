@@ -159,7 +159,7 @@ class NodePoolCmd(NodepoolApp):
             l.setLevel(logging.WARNING)
 
     def list(self, node_id=None):
-        print status.node_list(self.pool.getDB(), node_id)
+        print status.node_list(self.zk, node_id)
 
     def dib_image_list(self):
         print status.dib_image_list(self.zk)
@@ -354,7 +354,8 @@ class NodePoolCmd(NodepoolApp):
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
-                                 'image-delete', 'alien-image-list'):
+                                 'image-delete', 'alien-image-list',
+                                 'list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
         else:

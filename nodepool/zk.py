@@ -386,6 +386,7 @@ class Node(BaseModel):
         self.created_time = None
         self.external_id = None
         self.hostname = None
+        self.comment = None
 
     def __repr__(self):
         d = self.toDict()
@@ -409,7 +410,8 @@ class Node(BaseModel):
                     self.launcher == other.launcher and
                     self.created_time == other.created_time and
                     self.external_id == other.external_id and
-                    self.hostname == other.hostname)
+                    self.hostname == other.hostname,
+                    self.comment == other.comment)
         else:
             return False
 
@@ -430,6 +432,7 @@ class Node(BaseModel):
         d['created_time'] = self.created_time
         d['external_id'] = self.external_id
         d['hostname'] = self.hostname
+        d['comment'] = self.comment
         return d
 
     @staticmethod
@@ -456,6 +459,7 @@ class Node(BaseModel):
         o.created_time = d.get('created_time')
         o.external_id = d.get('external_id')
         o.hostname = d.get('hostname')
+        o.comment = d.get('comment')
         return o
 
 

@@ -21,6 +21,8 @@ import fixtures
 import mock
 import testtools
 
+from unittest import skip
+
 from nodepool.cmd import nodepoolcmd
 from nodepool import tests
 from nodepool import zk
@@ -28,8 +30,7 @@ from nodepool import zk
 
 class TestNodepoolCMD(tests.DBTestCase):
     def setUp(self):
-        super(tests.DBTestCase, self).setUp()
-        self.skipTest("Disabled for early v3 development")
+        super(TestNodepoolCMD, self).setUp()
 
     def patch_argv(self, *args):
         argv = ["nodepool", "-s", self.secure_conf]
@@ -88,6 +89,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForUploadRecordDeletion('fake-provider', 'fake-image',
                                          image.build_id, image.id)
 
+    @skip("Disabled for early v3 development")
     def test_alien_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
@@ -124,7 +126,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        self.waitForNodes('fake-label')
         self.assert_nodes_listed(configfile, 1)
 
     def test_config_validate(self):
@@ -147,6 +149,7 @@ class TestNodepoolCMD(tests.DBTestCase):
             nodepoolcmd.main()
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
 
+    @skip("Disabled for early v3 development")
     def test_dib_image_pause(self):
         configfile = self.setup_config('node_diskimage_pause.yaml')
         self._useBuilder(configfile)
@@ -156,6 +159,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
 
+    @skip("Disabled for early v3 development")
     def test_dib_image_upload_pause(self):
         configfile = self.setup_config('node_image_upload_pause.yaml')
         self._useBuilder(configfile)
@@ -169,6 +173,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['image-list'], 3, 'fake-image', 0)
         self.assert_listed(configfile, ['image-list'], 3, 'fake-image2', 1)
 
+    @skip("Disabled for early v3 development")
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -188,6 +193,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(
             configfile, ['dib-image-list'], 0, 'fake-image-0000000001', 0)
 
+    @skip("Disabled for early v3 development")
     def test_hold(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -205,6 +211,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['list'], 0, 1, 1)
         self.assert_nodes_listed(configfile, 1, 'hold')
 
+    @skip("Disabled for early v3 development")
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -218,6 +225,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         # Delete node 1
         self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
 
+    @skip("Disabled for early v3 development")
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -250,6 +258,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image', [image])
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 2)
 
+    @skip("Disabled for early v3 development")
     def test_job_create(self):
         configfile = self.setup_config('node.yaml')
         self.patch_argv("-c", configfile, "job-create", "fake-job",
@@ -257,6 +266,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         nodepoolcmd.main()
         self.assert_listed(configfile, ['job-list'], 2, 1, 1)
 
+    @skip("Disabled for early v3 development")
     def test_job_delete(self):
         configfile = self.setup_config('node.yaml')
         self.patch_argv("-c", configfile, "job-create", "fake-job",

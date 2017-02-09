@@ -708,6 +708,7 @@ class TestZKModel(tests.BaseTestCase):
         o.launcher = 'launcher-id'
         o.external_id = 'ABCD'
         o.hostname = 'xyz'
+        o.comment = 'comment'
 
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -725,6 +726,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['launcher'], o.launcher)
         self.assertEqual(d['external_id'], o.external_id)
         self.assertEqual(d['hostname'], o.hostname)
+        self.assertEqual(d['comment'], o.comment)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -744,6 +746,7 @@ class TestZKModel(tests.BaseTestCase):
             'launcher': 'launcher-id',
             'external_id': 'ABCD',
             'hostname': 'xyz',
+            'comment': 'comment',
         }
 
         o = zk.Node.fromDict(d, node_id)
@@ -762,3 +765,4 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.launcher, d['launcher'])
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.hostname , d['hostname'])
+        self.assertEqual(o.comment , d['comment'])
