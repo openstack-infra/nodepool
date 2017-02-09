@@ -40,8 +40,6 @@ function waitfornode {
     done
 }
 
-exit 0
-
 if [ $NODEPOOL_PAUSE_CENTOS_7_DIB = 'false' ]; then
     # check that image built
     waitforimage centos-7
@@ -82,7 +80,7 @@ set -o errexit
 $NODEPOOL list
 
 # Try to delete the nodes that were just built
-$NODEPOOL delete --now 1
+$NODEPOOL delete --now 0000000000
 
 # show the deleted nodes (and their replacements may be building)
 $NODEPOOL list
