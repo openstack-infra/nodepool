@@ -204,7 +204,7 @@ def loadConfig(config_path):
         )
         p.image_name_format = provider.get(
             'image-name-format',
-            'template-{image_name}-{timestamp}'
+            '{image_name}-{timestamp}'
         )
         p.image_type = provider.get(
             'image-type', p.cloud_config.config['image_format'])
