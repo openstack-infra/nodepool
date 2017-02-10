@@ -21,7 +21,6 @@ labels:
   - name: trusty-2-node
     image: trusty
     ready-script: multinode_setup.sh
-    subnodes: 1
     min-ready: 0
     providers:
       - name: cloud1

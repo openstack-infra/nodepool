@@ -86,7 +86,6 @@ class ConfigValidator:
             'image': str,
             'min-ready': int,
             'ready-script': str,
-            'subnodes': int,
             'providers': [{
                 'name': str,
             }],

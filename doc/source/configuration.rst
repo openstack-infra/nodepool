@@ -147,7 +147,6 @@ providers or images are used to create them).  Example::
         - name: provider2
     - name: multi-precise
       image: precise
-      subnodes: 2
       min-ready: 2
       ready-script: setup_multinode.sh
       providers:
@@ -171,17 +170,6 @@ providers or images are used to create them).  Example::
     Minimum instances that should be in a ready state. Set to -1 to have the
     label considered disabled. ``min-ready`` is best-effort based on available
     capacity and is not a guaranteed allocation.
-
-  ``subnodes``
-    Used to configure multi-node support.  If a `subnodes` key is supplied to
-    an image, it indicates that the specified number of additional nodes of the
-    same image type should be created and associated with each node for that
-    image.
-
-    Only one node from each such group will be added to the target, the
-    subnodes are expected to communicate directly with each other.  In the
-    example above, for each Precise node added to the target system, two
-    additional nodes will be created and associated with it.
 
   ``ready-script``
     A script to be used to perform any last minute changes to a node after it
