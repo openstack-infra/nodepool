@@ -173,14 +173,14 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['image-list'], 3, 'fake-image', 0)
         self.assert_listed(configfile, ['image-list'], 3, 'fake-image2', 1)
 
-    @skip("Disabled for early v3 development")
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
         # Check the image exists
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
         builds = self.zk.getMostRecentBuilds(1, 'fake-image', zk.READY)
