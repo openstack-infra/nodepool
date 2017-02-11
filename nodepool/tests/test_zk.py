@@ -523,6 +523,54 @@ class TestZooKeeper(tests.DBTestCase):
         node2 = self.zk.getNode(node.id)
         self.assertEqual(node, node2)
 
+    def _create_node_request(self):
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('label1')
+        self.zk.storeNodeRequest(req)
+        self.assertIsNotNone(
+            self.zk.client.exists(self.zk._requestPath(req.id))
+        )
+        return req
+
+    def test_storeNodeRequest(self):
+        req = self._create_node_request()
+        req2 = self.zk.getNodeRequest(req.id)
+        self.assertEqual(req, req2)
+
+    def test_storeNodeRequest_update(self):
+        req = self._create_node_request()
+        req.state = zk.FULFILLED
+        self.zk.storeNodeRequest(req)
+        self.assertIsNotNone(req.id)
+        req2 = self.zk.getNodeRequest(req.id)
+        self.assertEqual(req, req2)
+
+    def test_deleteNodeRequest(self):
+        req = self._create_node_request()
+        self.zk.deleteNodeRequest(req)
+        self.assertIsNone(
+            self.zk.client.exists(self.zk._requestPath(req.id))
+        )
+
+    def test_getReadyNodesOfTypes(self):
+        n1 = self._create_node()
+        n1.type = 'label1'
+        self.zk.storeNode(n1)
+        n2 = self._create_node()
+        n2.state = zk.READY
+        n2.type = 'label1'
+        self.zk.storeNode(n2)
+        n3 = self._create_node()
+        n3.state = zk.READY
+        n3.type = 'label2'
+        self.zk.storeNode(n3)
+
+        r = self.zk.getReadyNodesOfTypes(['label1'])
+        self.assertIn('label1', r)
+        self.assertEqual(1, len(r['label1']))
+        self.assertEqual(n2, r['label1'][0])
+
 
 class TestZKModel(tests.BaseTestCase):
 
@@ -658,6 +706,8 @@ class TestZKModel(tests.BaseTestCase):
         o.public_ipv6 = '<ipv6>'
         o.image_id = 'image-id'
         o.launcher = 'launcher-id'
+        o.external_id = 'ABCD'
+        o.hostname = 'xyz'
 
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -673,6 +723,8 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['public_ipv6'], o.public_ipv6)
         self.assertEqual(d['image_id'], o.image_id)
         self.assertEqual(d['launcher'], o.launcher)
+        self.assertEqual(d['external_id'], o.external_id)
+        self.assertEqual(d['hostname'], o.hostname)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -690,6 +742,8 @@ class TestZKModel(tests.BaseTestCase):
             'public_ipv6': '<ipv6>',
             'image_id': 'image-id',
             'launcher': 'launcher-id',
+            'external_id': 'ABCD',
+            'hostname': 'xyz',
         }
 
         o = zk.Node.fromDict(d, node_id)
@@ -706,3 +760,5 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.public_ipv6, d['public_ipv6'])
         self.assertEqual(o.image_id, d['image_id'])
         self.assertEqual(o.launcher, d['launcher'])
+        self.assertEqual(o.external_id, d['external_id'])
+        self.assertEqual(o.hostname , d['hostname'])

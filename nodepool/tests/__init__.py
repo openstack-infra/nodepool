@@ -188,6 +188,10 @@ class BaseTestCase(testtools.TestCase):
                     continue
                 if t.name.startswith("CleanupWorker"):
                     continue
+                if t.name.startswith("ProviderWorker"):
+                    continue
+                if t.name.startswith("NodeLauncher"):
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
@@ -429,17 +433,6 @@ class DBTestCase(BaseTestCase):
                         break
             time.sleep(1)
         self.wait_for_threads()
-
-    def submitNodeRequest(self, req):
-        '''
-        Very simple submit of a node request to ZooKeeper.
-        '''
-        priority = 100
-        req.state = zk.REQUESTED
-        path = '%s/%s-' % (self.zk.REQUEST_ROOT, priority)
-        path = self.zk.client.create(path, req.serialize(), makepath=True,
-                                     sequence=True, ephemeral=True)
-        req.id = path.split("/")[-1]
 
     def waitForNodeRequest(self, req):
         '''

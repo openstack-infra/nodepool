@@ -44,9 +44,9 @@ class TestNodepool(tests.DBTestCase):
         pool.start()
 
         req = zk.NodeRequest()
-        req.node_types.append('fake-image')
-        self.submitNodeRequest(req)
-        self.assertEqual(req.state, zk.REQUESTED)
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
 
         req = self.waitForNodeRequest(req)
         self.assertEqual(req.state, zk.FULFILLED)
@@ -75,9 +75,9 @@ class TestNodepool(tests.DBTestCase):
         pool.start()
 
         req = zk.NodeRequest()
-        req.node_types.append('fake-image')
-        self.submitNodeRequest(req)
-        self.assertEqual(req.state, zk.REQUESTED)
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
 
         req = self.waitForNodeRequest(req)
         self.assertTrue(mock_launch.called)
@@ -93,9 +93,9 @@ class TestNodepool(tests.DBTestCase):
         pool.start()
 
         req = zk.NodeRequest()
+        req.state = zk.REQUESTED
         req.node_types.append("zorky-zumba")
-        self.submitNodeRequest(req)
-        self.assertEqual(req.state, zk.REQUESTED)
+        self.zk.storeNodeRequest(req)
 
         req = self.waitForNodeRequest(req)
         self.assertEqual(req.state, zk.FAILED)
