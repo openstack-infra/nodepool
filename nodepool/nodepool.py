@@ -1213,7 +1213,7 @@ class ProviderWorker(threading.Thread):
 
         if not self.manager:
             self.log.debug("Creating new ProviderManager")
-            self.manager = provider_manager.ProviderManager(
+            self.manager = provider_manager.get_provider_manager(
                 self.provider, use_taskmanager=True)
             self.manager.start()
 
