@@ -132,7 +132,6 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 0)
 
-    @skip("Disabled for early v3 development")
     def test_node_net_name(self):
         """Test that a node is created with a net name"""
         configfile = self.setup_config('node_net_name.yaml')
@@ -140,14 +139,10 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
+        self.assertEqual(nodes[0].type, 'fake-label')
 
     @skip("Disabled for early v3 development")
     def test_node_vhd_image(self):
