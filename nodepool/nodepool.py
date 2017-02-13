@@ -1368,6 +1368,7 @@ class NodePool(threading.Thread):
             self.log.debug("Waiting for %s" % thd.name)
             thd.join()
 
+        self.join()
         self.log.debug("Finished stopping")
 
     def loadConfig(self):
