@@ -15,6 +15,7 @@
 
 import os
 import fixtures
+from unittest import skip
 
 from nodepool import builder, exceptions, fakeprovider, tests
 from nodepool import zk
@@ -85,9 +86,6 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
         self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')
 
 class TestNodePoolBuilder(tests.DBTestCase):
-    def setUp(self):
-        super(tests.DBTestCase, self).setUp()
-        self.skipTest("Disabled for early v3 development")
 
     def test_start_stop(self):
         config = self.setup_config('node.yaml')
@@ -98,6 +96,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
         nb.start()
         nb.stop()
 
+    @skip("Disabled for early v3 development")
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
 
@@ -279,6 +278,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
         # Make sure our cleanup worker properly removes the first build.
         self.waitForBuildDeletion('fake-image', '0000000001')
 
+    @skip("Disabled for early v3 development")
     def test_diskimage_build_only(self):
         configfile = self.setup_config('node_diskimage_only.yaml')
         self._useBuilder(configfile)
