@@ -166,28 +166,22 @@ class TestNodepool(tests.DBTestCase):
                                      state=nodedb.READY)
         self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
     def test_node_vhd_and_qcow2(self):
         """Test label provided by vhd and qcow2 images builds"""
         configfile = self.setup_config('node_vhd_and_qcow2.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
-        pool.start()
         self.waitForImage('fake-provider1', 'fake-image')
         self.waitForImage('fake-provider2', 'fake-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider1',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-            nodes = session.getNodes(provider_name='fake-provider2',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
+        pool.start()
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+        self.assertEqual(zk.READY, nodes[0].state)
+        self.assertEqual(zk.READY, nodes[1].state)
+        if nodes[0].provider == 'fake-provider1':
+            self.assertEqual(nodes[1].provider, 'fake-provider2')
+        else:
+            self.assertEqual(nodes[1].provider, 'fake-provider1')
 
     @skip("Disabled for early v3 development")
     def test_dib_upload_fail(self):
