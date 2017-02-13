@@ -999,9 +999,8 @@ class NodeRequestHandler(object):
         :returns: An integer for the number launched for this provider.
         '''
         count = 0
-        for node_id in self.zk.getNodes():
-            node = self.zk.getNode(node_id)
-            if node and node.provider == self.provider.name:
+        for node in self.zk.nodeIterator():
+            if node.provider == self.provider.name:
                 count += 1
         return count
 
