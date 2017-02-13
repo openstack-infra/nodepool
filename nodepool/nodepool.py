@@ -1057,7 +1057,7 @@ class NodeRequestHandler(object):
         for ntype in self.request.node_types:
             # First try to grab from the list of already available nodes.
             got_a_node = False
-            if ntype in ready_nodes:
+            if self.request.reuse and ntype in ready_nodes:
                 for node in ready_nodes[ntype]:
                     try:
                         self.zk.lockNode(node, blocking=False)
@@ -1662,26 +1662,37 @@ class NodePool(threading.Thread):
         to our request, since we are deleting the request.
         '''
         for label in self._submittedRequests.keys():
-            req = self._submittedRequests[label]
-            self._submittedRequests[label] = self.zk.getNodeRequest(req.id)
+            label_requests = self._submittedRequests[label]
+            active_requests = []
 
-            if self._submittedRequests[label]:
-                if self._submittedRequests[label].state == zk.FULFILLED:
-                    self.log.debug("min-ready node request for %s fulfilled", label)
+            for req in label_requests:
+                req = self.zk.getNodeRequest(req.id)
+
+                if not req:
+                    continue
+
+                if req.state == zk.FULFILLED:
                     # Reset node allocated_to
-                    for node_id in self._submittedRequests[label].nodes:
+                    for node_id in req.nodes:
                         node = self.zk.getNode(node_id)
                         node.allocated_to = None
-                        # NOTE: locking shouldn't be necessary since a node with
-                        # allocated_to set should not be locked except by the
-                        # creator of the request (us).
+                        # NOTE: locking shouldn't be necessary since a node
+                        # with allocated_to set should not be locked except
+                        # by the creator of the request (us).
                         self.zk.storeNode(node)
-                    self.zk.deleteNodeRequest(self._submittedRequests[label])
-                    del self._submittedRequests[label]
-                elif self._submittedRequests[label].state == zk.FAILED:
-                    self.log.debug("min-ready node request for %s failed", label)
-                    self.zk.deleteNodeRequest(self._submittedRequests[label])
-                    del self._submittedRequests[label]
+                    self.zk.deleteNodeRequest(req)
+                elif req.state == zk.FAILED:
+                    self.log.debug("min-ready node request failed: %s", req)
+                    self.zk.deleteNodeRequest(req)
+                else:
+                    active_requests.append(req)
+
+            if active_requests:
+                self._submittedRequests[label] = active_requests
+            else:
+                self.log.debug(
+                    "No more active min-ready requests for label %s", label)
+                del self._submittedRequests[label]
 
     def createMinReady(self):
         '''
@@ -1692,13 +1703,15 @@ class NodePool(threading.Thread):
         Requests we've already submitted are stored in the _submittedRequests
         dict, keyed by label.
         '''
-        def createRequest(label_name, count):
+        def createRequest(label_name):
             req = zk.NodeRequest()
             req.state = zk.REQUESTED
-            for i in range(0, count):
-                req.node_types.append(label_name)
+            req.node_types.append(label_name)
+            req.reuse = False    # force new node launches
             self.zk.storeNodeRequest(req)
-            self._submittedRequests[label_name] = req
+            if label_name not in self._submittedRequests:
+                self._submittedRequests[label_name] = []
+            self._submittedRequests[label_name].append(req)
 
         # Since we could have already submitted node requests, do not
         # resubmit a request for a type if a request for that type is
@@ -1725,8 +1738,14 @@ class NodePool(threading.Thread):
                 need = min_ready - len(ready_nodes[label.name])
 
             if need:
-                self.log.info("Creating request for %d %s nodes", need, label.name)
-                createRequest(label.name, need)
+                # Create requests for 1 node at a time. This helps to split
+                # up requests across providers, and avoids scenario where a
+                # single provider might fail the entire request because of
+                # quota (e.g., min-ready=2, but max-servers=1).
+                self.log.info("Creating requests for %d %s nodes",
+                              need, label.name)
+                for i in range(0, need):
+                    createRequest(label.name)
 
     def run(self):
         '''

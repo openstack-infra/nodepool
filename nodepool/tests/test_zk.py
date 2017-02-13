@@ -667,6 +667,7 @@ class TestZKModel(tests.BaseTestCase):
         o.declined_by.append("abc")
         o.node_types.append('trusty')
         o.nodes.append('100')
+        o.reuse = False
         d = o.toDict()
         self.assertNotIn('id', d)
         self.assertIn('state', d)
@@ -674,6 +675,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['declined_by'], o.declined_by)
         self.assertEqual(d['node_types'], o.node_types)
         self.assertEqual(d['nodes'], o.nodes)
+        self.assertEqual(d['reuse'], o.reuse)
 
     def test_NodeRequest_fromDict(self):
         now = int(time.time())
@@ -684,6 +686,7 @@ class TestZKModel(tests.BaseTestCase):
             'declined_by': ['abc'],
             'node_types': ['trusty'],
             'nodes': ['100'],
+            'reuse': False,
         }
 
         o = zk.NodeRequest.fromDict(d, req_id)
@@ -693,6 +696,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.declined_by, d['declined_by'])
         self.assertEqual(o.node_types, d['node_types'])
         self.assertEqual(o.nodes, d['nodes'])
+        self.assertEqual(o.reuse, d['reuse'])
 
     def test_Node_toDict(self):
         o = zk.Node('123')

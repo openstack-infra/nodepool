@@ -320,6 +320,7 @@ class NodeRequest(BaseModel):
         self.declined_by = []
         self.node_types = []
         self.nodes = []
+        self.reuse = True
 
     def __repr__(self):
         d = self.toDict()
@@ -332,7 +333,8 @@ class NodeRequest(BaseModel):
             return (self.id == other.id and
                     self.declined_by == other.declined_by and
                     self.node_types == other.node_types and
-                    self.nodes == other.nodes)
+                    self.nodes == other.nodes,
+                    self.reuse == other.reuse)
         else:
             return False
 
@@ -344,6 +346,7 @@ class NodeRequest(BaseModel):
         d['declined_by'] = self.declined_by
         d['node_types'] = self.node_types
         d['nodes'] = self.nodes
+        d['reuse'] = self.reuse
         return d
 
     @staticmethod
@@ -361,6 +364,7 @@ class NodeRequest(BaseModel):
         o.declined_by = d.get('declined_by', [])
         o.node_types = d.get('node_types', [])
         o.nodes = d.get('nodes', [])
+        o.reuse = d.get('reuse', True)
         return o
 
 

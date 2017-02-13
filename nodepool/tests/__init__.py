@@ -420,11 +420,11 @@ class DBTestCase(BaseTestCase):
 
         self.wait_for_threads()
 
-    def waitForNodes(self, label):
+    def waitForNodes(self, label, count=1):
         while True:
             self.wait_for_threads()
             ready_nodes = self.zk.getReadyNodesOfTypes([label])
-            if ready_nodes:
+            if label in ready_nodes and len(ready_nodes[label]) == count:
                 break
             time.sleep(1)
         self.wait_for_threads()
