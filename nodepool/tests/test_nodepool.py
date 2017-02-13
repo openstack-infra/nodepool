@@ -144,7 +144,6 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(nodes[0].provider, 'fake-provider')
         self.assertEqual(nodes[0].type, 'fake-label')
 
-    @skip("Disabled for early v3 development")
     def test_node_vhd_image(self):
         """Test that a image and node are created vhd image"""
         configfile = self.setup_config('node_vhd.yaml')
@@ -152,14 +151,10 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
+        nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
+        self.assertEqual(nodes[0].type, 'fake-label')
 
     def test_node_vhd_and_qcow2(self):
         """Test label provided by vhd and qcow2 images builds"""
