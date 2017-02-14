@@ -39,7 +39,7 @@ class TestWebApp(tests.DBTestCase):
             "http://localhost:%s/image-list" % port)
         f = urllib2.urlopen(req)
         self.assertEqual(f.info().getheader('Content-Type'),
-                         'application/text')
+                         'text/plain; charset=UTF-8')
         data = f.read()
         self.assertTrue('fake-image' in data)
 
