@@ -248,42 +248,28 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].ip, 'fake')
 
-    @skip("Disabled for early v3 development")
     def test_node_delete_success(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        node_id = -1
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-            node_id = nodes[0].id
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(zk.READY, nodes[0].state)
+        self.assertEqual('fake-provider', nodes[0].provider)
+        nodes[0].state = zk.DELETING
+        self.zk.storeNode(nodes[0])
 
-        pool.deleteNode(node_id)
-        self.wait_for_threads()
-        self.waitForNodes(pool)
+        # Wait for this one to be deleted
+        self.waitForNodeDeletion(nodes[0])
 
-        with pool.getDB().getSession() as session:
-            ready_nodes = session.getNodes(provider_name='fake-provider',
-                                           label_name='fake-label',
-                                           target_name='fake-target',
-                                           state=nodedb.READY)
-            deleted_nodes = session.getNodes(provider_name='fake-provider',
-                                             label_name='fake-label',
-                                             target_name='fake-target',
-                                             state=nodedb.DELETE)
-            # Make sure we have one node which is a new node
-            self.assertEqual(len(ready_nodes), 1)
-            self.assertNotEqual(node_id, ready_nodes[0].id)
-
-            # Make sure our old node was deleted
-            self.assertEqual(len(deleted_nodes), 0)
+        # Wait for a new one to take it's place
+        new_nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(zk.READY, new_nodes[0].state)
+        self.assertEqual('fake-provider', new_nodes[0].provider)
+        self.assertNotEqual(nodes[0], new_nodes[0])
 
     @skip("Disabled for early v3 development")
     def test_node_delete_failure(self):

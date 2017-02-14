@@ -18,7 +18,7 @@ import argparse
 import logging.config
 import sys
 
-from nodepool import nodedb
+from nodepool import provider_manager
 from nodepool import nodepool
 from nodepool import status
 from nodepool import zk
@@ -261,17 +261,21 @@ class NodePoolCmd(NodepoolApp):
         self.list(node_id=self.args.id)
 
     def delete(self):
+        node = self.zk.getNode(self.args.id)
+        provider = self.pool.config.providers[node.provider]
+        self.zk.lockNode(node, blocking=True, timeout=5)
+
         if self.args.now:
-            self.pool.reconfigureManagers(self.pool.config)
-        with self.pool.getDB().getSession() as session:
-            node = session.getNode(self.args.id)
-            if not node:
-                print "Node %s not found." % self.args.id
-            elif self.args.now:
-                self.pool._deleteNode(session, node)
-            else:
-                node.state = nodedb.DELETE
-                self.list(node_id=node.id)
+            manager = provider_manager.get_provider_manager(provider, True)
+            manager.start()
+            nodepool.InstanceDeleter.delete(self.zk, manager, node)
+            manager.stop()
+        else:
+            node.state = zk.DELETING
+            self.zk.storeNode(node)
+            self.zk.unlockNode(node)
+
+        self.list(node_id=node.id)
 
     def dib_image_delete(self):
         (image, build_num) = self.args.id.rsplit('-', 1)
@@ -354,7 +358,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
-                                 'list', 'hold'):
+                                 'list', 'hold', 'delete'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
         else:

@@ -212,36 +212,47 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['list'], 0, node_id, 1)
         self.assert_nodes_listed(configfile, 1, 'hold')
 
-    @skip("Disabled for early v3 development")
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
-        self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Delete node 1
-        self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
 
-    @skip("Disabled for early v3 development")
+        # Assert one node exists and it is nodes[0].id in a ready state.
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 1)
+        self.assert_nodes_listed(configfile, 1, zk.READY)
+
+        # Delete node
+        self.patch_argv('-c', configfile, 'delete', nodes[0].id)
+        nodepoolcmd.main()
+        self.waitForNodeDeletion(nodes[0])
+
+        # Assert the node is gone
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 0)
+
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage( 'fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
         # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 1)
         self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Delete node 1
-        self.patch_argv('-c', configfile, 'delete', '--now', '1')
+
+        # Delete node
+        self.patch_argv('-c', configfile, 'delete', '--now', nodes[0].id)
         nodepoolcmd.main()
+        self.waitForNodeDeletion(nodes[0])
+
         # Assert the node is gone
-        self.assert_listed(configfile, ['list'], 0, 1, 0)
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 0)
 
     def test_image_build(self):
         configfile = self.setup_config('node.yaml')

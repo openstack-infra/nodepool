@@ -553,6 +553,13 @@ class TestZooKeeper(tests.DBTestCase):
             self.zk.client.exists(self.zk._requestPath(req.id))
         )
 
+    def test_deleteNode(self):
+        n1 = self._create_node()
+        self.zk.deleteNode(n1)
+        self.assertIsNone(
+            self.zk.client.exists(self.zk._nodePath(n1.id))
+        )
+
     def test_getReadyNodesOfTypes(self):
         n1 = self._create_node()
         n1.type = 'label1'

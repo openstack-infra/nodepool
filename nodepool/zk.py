@@ -414,7 +414,7 @@ class Node(BaseModel):
                     self.launcher == other.launcher and
                     self.created_time == other.created_time and
                     self.external_id == other.external_id and
-                    self.hostname == other.hostname,
+                    self.hostname == other.hostname and
                     self.comment == other.comment)
         else:
             return False
@@ -1452,6 +1452,21 @@ class ZooKeeper(object):
         else:
             path = self._nodePath(node.id)
             self.client.set(path, node.serialize())
+
+    def deleteNode(self, node):
+        '''
+        Delete a node.
+
+        :param Node node: The Node object representing the ZK node to delete.
+        '''
+        if not node.id:
+            return
+
+        path = self._nodePath(node.id)
+        try:
+            self.client.delete(path, recursive=True)
+        except kze.NoNodeError:
+            pass
 
     def getReadyNodesOfTypes(self, labels):
         '''

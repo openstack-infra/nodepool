@@ -37,13 +37,13 @@ def node_list(zk, node_id=None):
     t.align = 'l'
     if node_id:
         node = zk.getNode(node_id)
-        t.add_row([node.id, node.provider, node.az, node.type,
-                   node.launcher, node.hostname, node.external_id,
-                   node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                   node.state, age(node.state_time), node.comment])
+        if node:
+            t.add_row([node.id, node.provider, node.az, node.type,
+                       node.launcher, node.hostname, node.external_id,
+                       node.public_ipv4, node.private_ipv4, node.public_ipv6,
+                       node.state, age(node.state_time), node.comment])
     else:
-        for nid in zk.getNodes():
-            node = zk.getNode(nid)
+        for node in zk.nodeIterator():
             t.add_row([node.id, node.provider, node.az, node.type,
                        node.launcher, node.hostname, node.external_id,
                        node.public_ipv4, node.private_ipv4, node.public_ipv6,

@@ -192,6 +192,8 @@ class BaseTestCase(testtools.TestCase):
                     continue
                 if t.name.startswith("NodeLauncher"):
                     continue
+                if t.name.startswith("NodeCleanupWorker"):
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
@@ -420,6 +422,17 @@ class DBTestCase(BaseTestCase):
 
         self.wait_for_threads()
 
+    def waitForNodeDeletion(self, node):
+        while True:
+            exists = False
+            for n in self.zk.nodeIterator():
+                if node.id == n.id:
+                    exists = True
+                    break
+            if not exists:
+                break
+            time.sleep(1)
+
     def waitForNodes(self, label, count=1):
         while True:
             self.wait_for_threads()
@@ -445,6 +458,7 @@ class DBTestCase(BaseTestCase):
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args
         pool = nodepool.NodePool(*args, **kwargs)
+        pool.cleanup_interval = .5
         self.addCleanup(pool.stop)
         return pool
 

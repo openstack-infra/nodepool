@@ -174,20 +174,41 @@ class NodeCompleteThread(threading.Thread):
 class InstanceDeleter(threading.Thread):
     log = logging.getLogger("nodepool.InstanceDeleter")
 
-    def __init__(self, nodepool, provider_name, external_id):
+    def __init__(self, zk, manager, node):
         threading.Thread.__init__(self, name='InstanceDeleter for %s %s' %
-                                  (provider_name, external_id))
-        self.nodepool = nodepool
-        self.provider_name = provider_name
-        self.external_id = external_id
+                                  (node.provider, node.external_id))
+        self._zk = zk
+        self._manager = manager
+        self._node = node
+
+    @staticmethod
+    def delete(zk, manager, node):
+        '''
+        Delete a node.
+
+        This is a class method so we can support instantaneous deletes.
+        '''
+        try:
+            manager.cleanupServer(node.external_id)
+        except provider_manager.NotFound:
+            InstanceDeleter.log.info("Instance %s not found in provider %s",
+                                     node.external_id, node.provider)
+        except Exception:
+            InstanceDeleter.log.exception(
+                "Exception deleting instance %s from %s:",
+                node.external_id, node.provider)
+            # Don't delete the ZK node in this case, but do unlock it
+            zk.unlockNode(node)
+            return
+
+        InstanceDeleter.log.info(
+            "Deleting ZK node id=%s, state=%s, external_id=%s",
+            node.id, node.state, node.external_id)
+        zk.unlockNode(node)
+        zk.deleteNode(node)
 
     def run(self):
-        try:
-            self.nodepool._deleteInstance(self.provider_name,
-                                          self.external_id)
-        except Exception:
-            self.log.exception("Exception deleting instance %s from %s:" %
-                               (self.external_id, self.provider_name))
+        self.delete(self._zk, self._manager, self._node)
 
 
 class NodeDeleter(threading.Thread):
@@ -1121,26 +1142,95 @@ class ProviderWorker(threading.Thread):
         self.running = False
 
 
+class NodeCleanupWorker(threading.Thread):
+    def __init__(self, nodepool, interval):
+        threading.Thread.__init__(self, name='NodeCleanupWorker')
+        self.log = logging.getLogger("nodepool.NodeCleanupWorker")
+        self._nodepool = nodepool
+        self._interval = interval
+        self._running = False
+
+    def _deleteInstance(self, node):
+        '''
+        Delete an instance from a provider.
+
+        A thread will be spawned to delete the actual instance from the
+        provider.
+
+        :param Node node: A Node object representing the instance to delete.
+        '''
+        self.log.info("Deleting instance %s from %s",
+                      node.external_id, node.provider)
+        try:
+            t = InstanceDeleter(
+                self._nodepool.getZK(),
+                self._nodepool.getProviderManager(node.provider),
+                node)
+            t.start()
+        except Exception:
+            self.log.exception("Could not delete instance %s on provider %s",
+                               node.external_id, node.provider)
+
+    def _cleanupNodes(self):
+        '''
+        Delete instances from providers and nodes entries from ZooKeeper.
+        '''
+        # TODO(Shrews): Cleanup alien instances
+
+        zk_conn = self._nodepool.getZK()
+        for node in zk_conn.nodeIterator():
+            # Can't do anything if we aren't configured for this provider.
+            if node.provider not in self._nodepool.config.providers:
+                continue
+
+            # Any nodes in these states that are unlocked can be deleted.
+            if node.state in (zk.USED, zk.IN_USE, zk.BUILDING, zk.DELETING):
+                try:
+                    zk_conn.lockNode(node, blocking=False)
+                except exceptions.ZKLockException:
+                    continue
+
+                # The InstanceDeleter thread will unlock and remove the
+                # node from ZooKeeper if it succeeds.
+                self._deleteInstance(node)
+
+    def run(self):
+        self.log.info("Starting")
+        self._running = True
+
+        while self._running:
+            try:
+                self._cleanupNodes()
+            except Exception:
+                self.log.exception("Exception in NodeCleanupWorker:")
+
+            time.sleep(self._interval)
+
+        self.log.info("Stopped")
+
+    def stop(self):
+        self._running = False
+        self.join()
+
+
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
+    #TODO(Shrews): remove --no-deletes option
     def __init__(self, securefile, configfile, no_deletes=False,
                  watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
         self.configfile = configfile
-        self.no_deletes = no_deletes
         self.watermark_sleep = watermark_sleep
+        self.cleanup_interval = 5
         self._stopped = False
         self.config = None
         self.apsched = None
         self.zk = None
         self.statsd = stats.get_client()
         self._provider_threads = {}
-        self._delete_threads = {}
-        self._delete_threads_lock = threading.Lock()
-        self._instance_delete_threads = {}
-        self._instance_delete_threads_lock = threading.Lock()
+        self._cleanup_thread = None
         self._wake_condition = threading.Condition()
         self._submittedRequests = {}
 
@@ -1153,6 +1243,10 @@ class NodePool(threading.Thread):
             provider_manager.ProviderManager.stopProviders(self.config)
         if self.apsched and self.apsched.running:
             self.apsched.shutdown()
+
+        if self._cleanup_thread:
+            self._cleanup_thread.stop()
+            self._cleanup_thread.join()
 
         # Don't let stop() return until all provider threads have been
         # terminated.
@@ -1546,6 +1640,11 @@ class NodePool(threading.Thread):
                     time.sleep(SUSPEND_WAIT_TIME)
 
                 self.createMinReady()
+
+                if not self._cleanup_thread:
+                    self._cleanup_thread = NodeCleanupWorker(
+                        self, self.cleanup_interval)
+                    self._cleanup_thread.start()
 
                 # Stop any ProviderWorker threads if the provider was removed
                 # from the config.
