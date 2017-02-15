@@ -364,20 +364,7 @@ class OLDNodeLauncher(threading.Thread):
         # Save the elapsed time for statsd
         dt = int((time.time() - start_time) * 1000)
 
-        if self.label.subnodes:
-            self.log.info("Node id: %s is waiting on subnodes" % self.node.id)
-
-            while ((time.time() - start_time) < (NODE_CLEANUP - 60)):
-                session.commit()
-                ready_subnodes = [n for n in self.node.subnodes
-                                  if n.state == nodedb.READY]
-                if len(ready_subnodes) == self.label.subnodes:
-                    break
-                time.sleep(5)
-
         nodelist = []
-        for subnode in self.node.subnodes:
-            nodelist.append(('sub', subnode))
         nodelist.append(('primary', self.node))
 
         self.writeNodepoolInfo(nodelist)
@@ -460,16 +447,6 @@ class OLDNodeLauncher(threading.Thread):
             f = ftp.open('/etc/nodepool/primary_node_private', 'w')
             f.write(self.node.ip_private + '\n')
             f.close()
-            # The IPs of all sub nodes in this node set
-            f = ftp.open('/etc/nodepool/sub_nodes', 'w')
-            for subnode in self.node.subnodes:
-                f.write(subnode.ip + '\n')
-            f.close()
-            # The private IPs of all sub nodes in this node set
-            f = ftp.open('/etc/nodepool/sub_nodes_private', 'w')
-            for subnode in self.node.subnodes:
-                f.write(subnode.ip_private + '\n')
-            f.close()
             # The SSH key for this node set
             f = ftp.open('/etc/nodepool/id_rsa', 'w')
             key.write_private_key(f)
@@ -509,166 +486,6 @@ class OLDNodeLauncher(threading.Thread):
                      "cd /opt/nodepool-scripts && %s ./%s %s" %
                      (env_vars, self.label.ready_script, n.hostname),
                      output=True)
-
-
-class SubNodeLauncher(threading.Thread):
-    log = logging.getLogger("nodepool.SubNodeLauncher")
-
-    def __init__(self, nodepool, provider, label, subnode_id,
-                 node_id, node_target_name, timeout, launch_timeout, node_az,
-                 manager_name):
-        threading.Thread.__init__(self, name='SubNodeLauncher for %s'
-                                  % subnode_id)
-        self.provider = provider
-        self.label = label
-        self.image = provider.images[label.image]
-        self.node_target_name = node_target_name
-        self.subnode_id = subnode_id
-        self.node_id = node_id
-        self.timeout = timeout
-        self.nodepool = nodepool
-        self.launch_timeout = launch_timeout
-        self.node_az = node_az
-        self.manager_name = manager_name
-
-    def run(self):
-        try:
-            self._run()
-        except Exception:
-            self.log.exception("Exception in run method:")
-
-    def _run(self):
-        with self.nodepool.getDB().getSession() as session:
-            self.log.debug("Launching subnode id: %s for node id: %s" %
-                           (self.subnode_id, self.node_id))
-            try:
-                self.subnode = session.getSubNode(self.subnode_id)
-                self.manager = self.nodepool.getProviderManager(self.provider)
-            except Exception:
-                self.log.exception("Exception preparing to launch subnode "
-                                   "id: %s for node id: %s:"
-                                   % (self.subnode_id, self.node_id))
-                return
-
-            try:
-                start_time = time.time()
-                dt = self.launchSubNode(session)
-                failed = False
-                statsd_key = 'ready'
-            except Exception as e:
-                self.log.exception("%s launching subnode id: %s "
-                                   "for node id: %s in provider: %s error:" %
-                                   (e.__class__.__name__, self.subnode_id,
-                                    self.node_id, self.provider.name))
-                dt = int((time.time() - start_time) * 1000)
-                failed = True
-                if hasattr(e, 'statsd_key'):
-                    statsd_key = e.statsd_key
-                else:
-                    statsd_key = 'error.unknown'
-
-            try:
-                self.nodepool.launchStats(statsd_key, dt, self.image.name,
-                                          self.provider.name,
-                                          self.node_target_name,
-                                          self.node_az,
-                                          self.manager_name)
-            except Exception:
-                self.log.exception("Exception reporting launch stats:")
-
-            if failed:
-                try:
-                    self.nodepool.deleteSubNode(self.subnode, self.manager)
-                except Exception:
-                    self.log.exception("Exception deleting subnode id: %s: "
-                                       "for node id: %s:" %
-                                       (self.subnode_id, self.node_id))
-                    return
-
-    def launchSubNode(self, session):
-        start_time = time.time()
-        timestamp = int(start_time)
-
-        target = self.nodepool.config.targets[self.node_target_name]
-        hostname = target.subnode_hostname.format(
-            label=self.label, provider=self.provider, node_id=self.node_id,
-            subnode_id=self.subnode_id, timestamp=str(timestamp))
-        self.subnode.hostname = hostname
-        self.subnode.nodename = hostname.split('.')[0]
-
-        cloud_image = self.nodepool.zk.getMostRecentImageUpload(
-            self.image.name, self.provider.name)
-        if not cloud_image:
-            raise LaunchNodepoolException("Unable to find current cloud "
-                                          "image %s in %s" %
-                                          (self.image.name,
-                                           self.provider.name))
-
-        self.log.info("Creating server with hostname %s in %s from image %s "
-                      "for subnode id: %s for node id: %s"
-                      % (hostname, self.provider.name,
-                         self.image.name, self.subnode_id, self.node_id))
-        server = self.manager.createServer(
-            hostname, self.image.min_ram, cloud_image.external_id,
-            name_filter=self.image.name_filter, az=self.node_az,
-            config_drive=self.image.config_drive,
-            nodepool_node_id=self.node_id,
-            nodepool_image_name=self.image.name)
-        server_id = server['id']
-        self.subnode.external_id = server_id
-        session.commit()
-
-        self.log.debug("Waiting for server %s for subnode id: %s for "
-                       "node id: %s" %
-                       (server_id, self.subnode_id, self.node_id))
-        server = self.manager.waitForServer(server, self.launch_timeout)
-        if server['status'] != 'ACTIVE':
-            raise LaunchStatusException("Server %s for subnode id: "
-                                        "%s for node id: %s "
-                                        "status: %s" %
-                                        (server_id, self.subnode_id,
-                                         self.node_id, server['status']))
-
-        ip = server.get('public_v4')
-        ip_v6 = server.get('public_v6')
-        if self.provider.ipv6_preferred:
-            if ip_v6:
-                ip = ip_v6
-            else:
-                self.log.warning('Preferred ipv6 not available, '
-                                 'falling back to ipv4.')
-        if not ip:
-            raise LaunchNetworkException("Unable to find public IP of server")
-
-        self.subnode.ip_private = server.get('private_v4')
-        # devstack-gate multi-node depends on private_v4 being populated
-        # with something. On clouds that don't have a private address, use
-        # the public.
-        if not self.subnode.ip_private:
-            self.subnode.ip_private = server.get('public_v4')
-        self.subnode.ip = ip
-        self.log.debug("Subnode id: %s for node id: %s is running, "
-                       "ipv4: %s, ipv6: %s" %
-                       (self.subnode_id, self.node_id, server.get('public_v4'),
-                        server.get('public_v6')))
-
-        self.log.debug("Subnode id: %s for node id: %s testing ssh at ip: %s" %
-                       (self.subnode_id, self.node_id, ip))
-        connect_kwargs = dict(key_filename=self.image.private_key)
-        if not utils.ssh_connect(ip, self.image.username,
-                                 connect_kwargs=connect_kwargs,
-                                 timeout=self.timeout):
-            raise LaunchAuthException("Unable to connect via ssh")
-
-        # Save the elapsed time for statsd
-        dt = int((time.time() - start_time) * 1000)
-
-        self.subnode.state = nodedb.READY
-        self.log.info("Subnode id: %s for node id: %s is ready"
-                      % (self.subnode_id, self.node_id))
-        self.nodepool.updateStats(session, self.provider.name)
-
-        return dt
 
 
 class NodeLauncher(threading.Thread):
@@ -1513,12 +1330,12 @@ class NodePool(threading.Thread):
                             n.label_name == label_name and
                             n.state == state)])
 
-        def count_nodes_and_subnodes(provider_name):
+        def count_provider_nodes(provider_name):
             count = 0
             for n in nodes:
                 if n.provider_name != provider_name:
                     continue
-                count += 1 + len(n.subnodes)
+                count += 1
             return count
 
         # Add a provider for each node provider, along with current
@@ -1526,7 +1343,7 @@ class NodePool(threading.Thread):
         allocation_providers = {}
         for provider in self.config.providers.values():
             provider_max = provider.max_servers
-            n_provider = count_nodes_and_subnodes(provider.name)
+            n_provider = count_provider_nodes(provider.name)
             available = provider_max - n_provider
             if available < 0:
                 self.log.warning("Provider %s over-allocated: "
@@ -1609,7 +1426,7 @@ class NodePool(threading.Thread):
                         # request should be distributed to this target).
                         sr, agt = ar.addProvider(
                             allocation_providers[provider.name],
-                            at, label.subnodes)
+                            at, 0)
                         tlps[agt] = (target, label,
                                      self.config.providers[provider.name])
                     else:
@@ -1641,19 +1458,6 @@ class NodePool(threading.Thread):
         allocation_history.grantsDone()
 
         self.log.debug("Finished node launch calculation")
-        return nodes_to_launch
-
-    def getNeededSubNodes(self, session):
-        nodes_to_launch = []
-        for node in session.getNodes():
-            if node.label_name in self.config.labels:
-                expected_subnodes = \
-                    self.config.labels[node.label_name].subnodes
-                active_subnodes = len([n for n in node.subnodes
-                                       if n.state != nodedb.DELETE])
-                deficit = max(expected_subnodes - active_subnodes, 0)
-                if deficit:
-                    nodes_to_launch.append((node, deficit))
         return nodes_to_launch
 
     def updateConfig(self):
@@ -1794,16 +1598,6 @@ class NodePool(threading.Thread):
             self._wake_condition.release()
 
     def _run(self, session, allocation_history):
-        # Make up the subnode deficit first to make sure that an
-        # already allocated node has priority in filling its subnodes
-        # ahead of new nodes.
-        subnodes_to_launch = self.getNeededSubNodes(session)
-        for (node, num_to_launch) in subnodes_to_launch:
-            self.log.info("Need to launch %s subnodes for node id: %s" %
-                          (num_to_launch, node.id))
-            for i in range(num_to_launch):
-                self.launchSubNode(session, node)
-
         nodes_to_launch = self.getNeededNodes(session, allocation_history)
 
         for (tlp, num_to_launch) in nodes_to_launch:
@@ -1841,39 +1635,6 @@ class NodePool(threading.Thread):
         t = NodeLauncher(self, provider, label, target, node.id, timeout,
                          launch_timeout)
         t.start()
-
-    def launchSubNode(self, session, node):
-        try:
-            self._launchSubNode(session, node)
-        except Exception:
-            self.log.exception(
-                "Could not launch subnode for node id: %s", node.id)
-
-    def _launchSubNode(self, session, node):
-        provider = self.config.providers[node.provider_name]
-        label = self.config.labels[node.label_name]
-        timeout = provider.boot_timeout
-        launch_timeout = provider.launch_timeout
-        subnode = session.createSubNode(node)
-        t = SubNodeLauncher(self, provider, label, subnode.id,
-                            node.id, node.target_name, timeout, launch_timeout,
-                            node_az=node.az, manager_name=node.manager_name)
-        t.start()
-
-    def deleteSubNode(self, subnode, manager):
-        # Don't try too hard here, the actual node deletion will make
-        # sure this is cleaned up.
-        if subnode.external_id:
-            try:
-                self.log.debug('Deleting server %s for subnode id: '
-                               '%s of node id: %s' %
-                               (subnode.external_id, subnode.id,
-                                subnode.node.id))
-                manager.cleanupServer(subnode.external_id)
-                manager.waitForServerDeletion(subnode.external_id)
-            except provider_manager.NotFound:
-                pass
-        subnode.delete()
 
     def deleteNode(self, node_id):
         try:
@@ -1921,16 +1682,6 @@ class NodePool(threading.Thread):
                 self.log.exception("Exception revoking node id: %s" %
                                    node.id)
 
-        for subnode in node.subnodes:
-            if subnode.external_id:
-                try:
-                    self.log.debug('Deleting server %s for subnode id: '
-                                   '%s of node id: %s' %
-                                   (subnode.external_id, subnode.id, node.id))
-                    manager.cleanupServer(subnode.external_id)
-                except provider_manager.NotFound:
-                    pass
-
         if node.external_id:
             try:
                 self.log.debug('Deleting server %s for node id: %s' %
@@ -1940,11 +1691,6 @@ class NodePool(threading.Thread):
             except provider_manager.NotFound:
                 pass
             node.external_id = None
-
-        for subnode in node.subnodes:
-            if subnode.external_id:
-                manager.waitForServerDeletion(subnode.external_id)
-            subnode.delete()
 
         node.delete()
         self.log.info("Deleted node id: %s" % node.id)
@@ -2153,7 +1899,7 @@ class NodePool(threading.Thread):
                 continue
             state = nodedb.STATE_NAMES[node.state]
             key = 'nodepool.nodes.%s' % state
-            total_nodes = self.config.labels[node.label_name].subnodes + 1
+            total_nodes = 1
             states[key] += total_nodes
 
             # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use

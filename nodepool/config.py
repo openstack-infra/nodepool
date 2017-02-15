@@ -269,7 +269,6 @@ def loadConfig(config_path):
         newconfig.labels[l.name] = l
         l.image = label['image']
         l.min_ready = label.get('min-ready', 2)
-        l.subnodes = label.get('subnodes', 0)
         l.ready_script = label.get('ready-script')
         l.providers = {}
         for provider in label['providers']:

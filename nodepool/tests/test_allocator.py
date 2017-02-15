@@ -40,7 +40,7 @@ class OneLabel(tests.AllocatorTestCase, tests.BaseTestCase):
         at1 = allocation.AllocationTarget('target1')
         ar1 = allocation.AllocationRequest('label1', self.label1)
         ar1.addTarget(at1, 0)
-        self.agt.append(ar1.addProvider(ap1, at1, 0)[1])
+        self.agt.append(ar1.addProvider(ap1, at1)[1])
         ap1.makeGrants()
 
 
@@ -67,8 +67,8 @@ class TwoLabels(tests.AllocatorTestCase, tests.BaseTestCase):
         ar2 = allocation.AllocationRequest('label2', self.label2)
         ar1.addTarget(at1, 0)
         ar2.addTarget(at1, 0)
-        self.agt.append(ar1.addProvider(ap1, at1, 0)[1])
-        self.agt.append(ar2.addProvider(ap1, at1, 0)[1])
+        self.agt.append(ar1.addProvider(ap1, at1)[1])
+        self.agt.append(ar2.addProvider(ap1, at1)[1])
         ap1.makeGrants()
 
 
@@ -115,10 +115,10 @@ class TwoProvidersTwoLabels(tests.AllocatorTestCase, tests.BaseTestCase):
         ar2 = allocation.AllocationRequest('label2', self.label2)
         ar1.addTarget(at1, 0)
         ar2.addTarget(at1, 0)
-        self.agt.append(ar1.addProvider(ap1, at1, 0)[1])
-        self.agt.append(ar2.addProvider(ap1, at1, 0)[1])
-        self.agt.append(ar1.addProvider(ap2, at1, 0)[1])
-        self.agt.append(ar2.addProvider(ap2, at1, 0)[1])
+        self.agt.append(ar1.addProvider(ap1, at1)[1])
+        self.agt.append(ar2.addProvider(ap1, at1)[1])
+        self.agt.append(ar1.addProvider(ap2, at1)[1])
+        self.agt.append(ar2.addProvider(ap2, at1)[1])
         ap1.makeGrants()
         ap2.makeGrants()
 
@@ -170,9 +170,9 @@ class TwoProvidersTwoLabelsOneShared(tests.AllocatorTestCase,
         ar2 = allocation.AllocationRequest('label2', self.label2)
         ar1.addTarget(at1, 0)
         ar2.addTarget(at1, 0)
-        self.agt.append(ar1.addProvider(ap1, at1, 0)[1])
-        self.agt.append(ar2.addProvider(ap1, at1, 0)[1])
-        self.agt.append(ar2.addProvider(ap2, at1, 0)[1])
+        self.agt.append(ar1.addProvider(ap1, at1)[1])
+        self.agt.append(ar2.addProvider(ap1, at1)[1])
+        self.agt.append(ar2.addProvider(ap2, at1)[1])
         ap1.makeGrants()
         ap2.makeGrants()
 
@@ -293,8 +293,8 @@ class RoundRobinAllocation(tests.RoundRobinTestCase, tests.BaseTestCase):
             # providers
             for ar in ars:
                 ar.addTarget(at1, 0)
-                ar.addProvider(ap1, at1, 0)
-                ar.addProvider(ap2, at1, 0)
+                ar.addProvider(ap1, at1)
+                ar.addProvider(ap2, at1)
 
             ap1.makeGrants()
             for g in ap1.grants:
@@ -414,15 +414,15 @@ class RoundRobinFixedProvider(tests.RoundRobinTestCase, tests.BaseTestCase):
             # first ar can only go to provider1, the last only to
             # provider2
             ars[0].addTarget(at1, 0)
-            ars[0].addProvider(ap1, at1, 0)
+            ars[0].addProvider(ap1, at1)
             ars[-1].addTarget(at1, 0)
-            ars[-1].addProvider(ap2, at1, 0)
+            ars[-1].addProvider(ap2, at1)
 
             # the rest can go anywhere
             for ar in ars[1:-1]:
                 ar.addTarget(at1, 0)
-                ar.addProvider(ap1, at1, 0)
-                ar.addProvider(ap2, at1, 0)
+                ar.addProvider(ap1, at1)
+                ar.addProvider(ap2, at1)
 
             ap1.makeGrants()
             for g in ap1.grants:
