@@ -571,6 +571,13 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(1, len(r['label1']))
         self.assertEqual(n2, r['label1'][0])
 
+    def test_nodeIterator(self):
+        n1 = self._create_node()
+        i = self.zk.nodeIterator()
+        self.assertEqual(n1, i.next())
+        with testtools.ExpectedException(StopIteration):
+            i.next()
+
 
 class TestZKModel(tests.BaseTestCase):
 
