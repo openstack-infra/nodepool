@@ -31,7 +31,7 @@ function waitfornode {
     name=$1
     state='ready'
 
-    while ! $NODEPOOL list | grep $name | grep $state; do
+    while ! $NODEPOOL list | grep $name | grep $state | grep "unlocked"; do
         $NODEPOOL image-list > /tmp/.nodepool-image-list.txt
         $NODEPOOL list > /tmp/.nodepool-list.txt
         sudo mv /tmp/.nodepool-image-list.txt $WORKSPACE/logs/nodepool-image-list.txt

@@ -33,21 +33,36 @@ def node_list(zk, node_id=None):
     t = PrettyTable(["ID", "Provider", "AZ", "Label",
                      "Launcher", "Hostname", "Server ID",
                      "Public IPv4", "Private IPv4", "IPv6",
-                     "State", "Age", "Comment"])
+                     "State", "Age", "Locked", "Comment"])
     t.align = 'l'
     if node_id:
         node = zk.getNode(node_id)
         if node:
+            locked = "unlocked"
+            try:
+                zk.lockNode(node, blocking=False)
+            except Exception:
+                locked = "locked"
+            else:
+                zk.unlockNode(node)
+
             t.add_row([node.id, node.provider, node.az, node.type,
                        node.launcher, node.hostname, node.external_id,
                        node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.state, age(node.state_time), node.comment])
+                       node.state, age(node.state_time), locked, node.comment])
     else:
         for node in zk.nodeIterator():
+            locked = "unlocked"
+            try:
+                zk.lockNode(node, blocking=False)
+            except Exception:
+                locked = "locked"
+            else:
+                zk.unlockNode(node)
             t.add_row([node.id, node.provider, node.az, node.type,
                        node.launcher, node.hostname, node.external_id,
                        node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.state, age(node.state_time), node.comment])
+                       node.state, age(node.state_time), locked, node.comment])
     return str(t)
 
 
