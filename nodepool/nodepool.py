@@ -190,6 +190,7 @@ class InstanceDeleter(threading.Thread):
         '''
         try:
             manager.cleanupServer(node.external_id)
+            manager.waitForServerDeletion(node.external_id)
         except provider_manager.NotFound:
             InstanceDeleter.log.info("Instance %s not found in provider %s",
                                      node.external_id, node.provider)
