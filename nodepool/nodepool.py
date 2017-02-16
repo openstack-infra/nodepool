@@ -1021,7 +1021,7 @@ class ProviderWorker(threading.Thread):
         self.zk = self.getZK()
         self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
                                          os.getpid(),
-                                         self.ident)
+                                         self.name)
 
     #----------------------------------------------------------------
     # Private methods
