@@ -16,8 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import apscheduler.schedulers.background
-import apscheduler.triggers.cron
 import json
 import logging
 import os
@@ -1309,35 +1307,6 @@ class NodePool(threading.Thread):
                                            t.name)
                         t.online = False
 
-    def reconfigureCrons(self, config):
-        cron_map = {
-            'cleanup': self._doPeriodicCleanup,
-            'check': self._doPeriodicCheck,
-            }
-
-        if not self.apsched:
-            self.apsched = apscheduler.schedulers.background.BackgroundScheduler()
-            self.apsched.start()
-
-        for c in config.crons.values():
-            if ((not self.config) or
-                c.timespec != self.config.crons[c.name].timespec):
-                if self.config and self.config.crons[c.name].job:
-                    self.config.crons[c.name].job.remove()
-                parts = c.timespec.split()
-                if len(parts) > 5:
-                    second = parts[5]
-                else:
-                    second = None
-                minute, hour, dom, month, dow = parts[:5]
-                trigger = apscheduler.triggers.cron.CronTrigger(
-                    month=month, day=dom, day_of_week=dow,
-                    hour=hour, minute=minute, second=second)
-                c.job = self.apsched.add_job(
-                    cron_map[c.name], trigger=trigger)
-            else:
-                c.job = self.config.crons[c.name].job
-
     def reconfigureZooKeeper(self, config):
         if self.config:
             running = self.config.zookeeper_servers.values()
@@ -1714,19 +1683,6 @@ class NodePool(threading.Thread):
                          launch_timeout)
         t.start()
 
-    def deleteNode(self, node_id):
-        try:
-            self._delete_threads_lock.acquire()
-            if node_id in self._delete_threads:
-                return
-            t = NodeDeleter(self, node_id)
-            self._delete_threads[node_id] = t
-            t.start()
-        except Exception:
-            self.log.exception("Could not delete node %s", node_id)
-        finally:
-            self._delete_threads_lock.release()
-
     def _deleteNode(self, session, node):
         self.log.debug("Deleting node id: %s which has been in %s "
                        "state for %s hours" %
@@ -1782,72 +1738,6 @@ class NodePool(threading.Thread):
             self.statsd.incr(key)
         self.updateStats(session, node.provider_name)
 
-    def deleteInstance(self, provider_name, external_id):
-        key = (provider_name, external_id)
-        try:
-            self._instance_delete_threads_lock.acquire()
-            if key in self._instance_delete_threads:
-                return
-            t = InstanceDeleter(self, provider_name, external_id)
-            self._instance_delete_threads[key] = t
-            t.start()
-        except Exception:
-            self.log.exception("Could not delete instance %s on provider %s",
-                               provider_name, external_id)
-        finally:
-            self._instance_delete_threads_lock.release()
-
-    def _deleteInstance(self, provider_name, external_id):
-        provider = self.config.providers[provider_name]
-        manager = self.getProviderManager(provider)
-        manager.cleanupServer(external_id)
-
-    def _doPeriodicCleanup(self):
-        if self.no_deletes:
-            return
-        try:
-            self.periodicCleanup()
-        except Exception:
-            self.log.exception("Exception in periodic cleanup:")
-
-    def periodicCleanup(self):
-        # This function should be run periodically to clean up any hosts
-        # that may have slipped through the cracks, as well as to remove
-        # old images.
-
-        self.log.debug("Starting periodic cleanup")
-
-        for k, t in self._delete_threads.items()[:]:
-            if not t.isAlive():
-                del self._delete_threads[k]
-
-        for k, t in self._instance_delete_threads.items()[:]:
-            if not t.isAlive():
-                del self._instance_delete_threads[k]
-
-        node_ids = []
-        with self.getDB().getSession() as session:
-            for node in session.getNodes():
-                node_ids.append(node.id)
-
-        for node_id in node_ids:
-            try:
-                with self.getDB().getSession() as session:
-                    node = session.getNode(node_id)
-                    if node:
-                        self.cleanupOneNode(session, node)
-            except Exception:
-                self.log.exception("Exception cleaning up node id %s:" %
-                                   node_id)
-
-        try:
-            self.cleanupLeakedInstances()
-            pass
-        except Exception:
-            self.log.exception("Exception cleaning up leaked nodes")
-
-        self.log.debug("Finished periodic cleanup")
-
     def cleanupLeakedInstances(self):
         known_providers = self.config.providers.keys()
         for provider in self.config.providers.values():
@@ -1887,35 +1777,6 @@ class NodePool(threading.Thread):
                         continue
             if provider.clean_floating_ips:
                 manager.cleanupLeakedFloaters()
-
-    def cleanupOneNode(self, session, node):
-        now = time.time()
-        time_in_state = now - node.state_time
-        if (node.state in [nodedb.READY, nodedb.HOLD]):
-            return
-        delete = False
-        if (node.state == nodedb.DELETE):
-            delete = True
-        elif (node.state == nodedb.TEST and
-              time_in_state > TEST_CLEANUP):
-            delete = True
-        elif time_in_state > NODE_CLEANUP:
-            delete = True
-        if delete:
-            try:
-                self.deleteNode(node.id)
-            except Exception:
-                self.log.exception("Exception deleting node id: "
-                                   "%s" % node.id)
-
-    def _doPeriodicCheck(self):
-        if self.no_deletes:
-            return
-        try:
-            with self.getDB().getSession() as session:
-                self.periodicCheck(session)
-        except Exception:
-            self.log.exception("Exception in periodic check:")
 
     def periodicCheck(self, session):
         # This function should be run periodically to make sure we can
