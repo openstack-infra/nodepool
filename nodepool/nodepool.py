@@ -779,10 +779,10 @@ class NodeRequestHandler(object):
         :param NodeRequest request: The request to handle.
         '''
         self.log = logging.getLogger("nodepool.NodeRequestHandler")
-        self.provider = pw.provider
-        self.zk = pw.zk
-        self.labels = pw.labels
-        self.manager = pw.manager
+        self.provider = pw.getProviderConfig()
+        self.zk = pw.getZK()
+        self.labels = pw.getLabelsConfig()
+        self.manager = pw.getProviderManager()
         self.launcher_id = pw.launcher_id
         self.request = request
         self.launch_manager = None
@@ -988,22 +988,17 @@ class ProviderWorker(threading.Thread):
     that will be recognized and this thread will shut itself down.
     '''
 
-    def __init__(self, configfile, zk, provider,
-                 watermark_sleep=WATERMARK_SLEEP):
+    def __init__(self, nodepool, provider_name):
         threading.Thread.__init__(
-            self, name='ProviderWorker.%s' % provider.name
+            self, name='ProviderWorker.%s' % provider_name
         )
         self.log = logging.getLogger("nodepool.%s" % self.name)
+        self.nodepool = nodepool
+        self.provider_name = provider_name
         self.running = False
-        self.configfile = configfile
         self.request_handlers = []
-        self.watermark_sleep = watermark_sleep
-
-        # These attributes will be used by NodeRequestHandler
-        self.zk = zk
-        self.manager = None
-        self.labels = None
-        self.provider = provider
+        self.watermark_sleep = nodepool.watermark_sleep
+        self.zk = self.getZK()
         self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
                                          os.getpid(),
                                          self.ident)
@@ -1011,33 +1006,6 @@ class ProviderWorker(threading.Thread):
     #----------------------------------------------------------------
     # Private methods
     #----------------------------------------------------------------
-
-    def _updateProvider(self):
-        '''
-        Update the provider definition from the config file.
-
-        If this provider has been removed from the config, we need to
-        stop processing the request queue. This will effectively cause
-        this thread to terminate.
-        '''
-        config = nodepool_config.loadConfig(self.configfile)
-        self.labels = config.labels
-
-        if self.provider.name not in config.providers.keys():
-            self.log.info("Provider %s removed from config"
-                          % self.provider.name)
-            self.stop()
-        elif self.provider != config.providers[self.provider.name]:
-            self.provider = config.providers[self.provider.name]
-            if self.manager:
-                self.manager.stop()
-                self.manager = None
-
-        if not self.manager:
-            self.log.debug("Creating new ProviderManager")
-            self.manager = provider_manager.get_provider_manager(
-                self.provider, use_taskmanager=True)
-            self.manager.start()
 
     def _activeThreads(self):
         '''
@@ -1060,13 +1028,14 @@ class ProviderWorker(threading.Thread):
         satisfy the request, then return. We will need to periodically poll
         the handler for completion.
         '''
-        if self.provider.max_concurrency == 0:
+        provider = self.getProviderConfig()
+        if provider.max_concurrency == 0:
             return
 
         for req_id in self.zk.getNodeRequests():
             # Short-circuit for limited request handling
-            if (self.provider.max_concurrency > 0
-                and self._activeThreads() >= self.provider.max_concurrency
+            if (provider.max_concurrency > 0
+                and self._activeThreads() >= provider.max_concurrency
             ):
                 return
 
@@ -1112,6 +1081,18 @@ class ProviderWorker(threading.Thread):
     # Public methods
     #----------------------------------------------------------------
 
+    def getZK(self):
+        return self.nodepool.getZK()
+
+    def getProviderConfig(self):
+        return self.nodepool.config.providers[self.provider_name]
+
+    def getProviderManager(self):
+        return self.nodepool.getProviderManager(self.provider_name)
+
+    def getLabelsConfig(self):
+        return self.nodepool.config.labels
+
     def run(self):
         self.running = True
 
@@ -1123,10 +1104,6 @@ class ProviderWorker(threading.Thread):
 
             # Make sure we're always registered with ZK
             self.zk.registerLauncher(self.launcher_id)
-
-            self._updateProvider()
-            if not self.running:
-                break
 
             self._assignHandlers()
             self._removeCompletedHandlers()
@@ -1142,10 +1119,6 @@ class ProviderWorker(threading.Thread):
         '''
         self.log.info("%s received stop" % self.name)
         self.running = False
-
-        if self.manager:
-            self.manager.stop()
-            self.manager.join()
 
 
 class NodePool(threading.Thread):
@@ -1298,8 +1271,8 @@ class NodePool(threading.Thread):
     def getZK(self):
         return self.zk
 
-    def getProviderManager(self, provider):
-        return self.config.provider_managers[provider.name]
+    def getProviderManager(self, provider_name):
+        return self.config.provider_managers[provider_name]
 
     def getJenkinsManager(self, target):
         if target.name in self.config.jenkins_managers:
@@ -1462,6 +1435,7 @@ class NodePool(threading.Thread):
 
     def updateConfig(self):
         config = self.loadConfig()
+        provider_manager.ProviderManager.reconfigure(self.config, config)
         self.reconfigureZooKeeper(config)
         self.setConfig(config)
 
@@ -1573,20 +1547,24 @@ class NodePool(threading.Thread):
 
                 self.createMinReady()
 
+                # Stop any ProviderWorker threads if the provider was removed
+                # from the config.
+                for provider_name in self._provider_threads.keys():
+                    if provider_name not in self.config.providers.keys():
+                        self._provider_threads[provider_name].stop()
+
                 # Start (or restart) provider threads for each provider in
                 # the config. Removing a provider from the config and then
                 # adding it back would cause a restart.
                 for p in self.config.providers.values():
                     if p.name not in self._provider_threads.keys():
-                        t = ProviderWorker(self.configfile, self.zk, p,
-                                           self.watermark_sleep)
+                        t = ProviderWorker(self, p.name)
                         self.log.info( "Starting %s" % t.name)
                         t.start()
                         self._provider_threads[p.name] = t
                     elif not self._provider_threads[p.name].isAlive():
                         self._provider_threads[p.name].join()
-                        t = ProviderWorker(self.configfile, self.zk, p,
-                                           self.watermark_sleep)
+                        t = ProviderWorker(self, p.name)
                         self.log.info( "Restarting %s" % t.name)
                         t.start()
                         self._provider_threads[p.name] = t

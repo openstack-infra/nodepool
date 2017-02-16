@@ -213,7 +213,7 @@ class NodePoolCmd(NodepoolApp):
             if (self.args.provider and
                     provider.name != self.args.provider):
                 continue
-            manager = self.pool.getProviderManager(provider)
+            manager = self.pool.getProviderManager(provider.name)
 
             # Build list of provider images as known by the provider
             provider_images = []
