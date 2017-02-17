@@ -15,7 +15,6 @@
 
 import os
 import fixtures
-from unittest import skip
 
 from nodepool import builder, exceptions, fakeprovider, tests
 from nodepool import zk
@@ -96,7 +95,6 @@ class TestNodePoolBuilder(tests.DBTestCase):
         nb.start()
         nb.stop()
 
-    @skip("Disabled for early v3 development")
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
 
@@ -115,7 +113,9 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        # NOTE(pabelanger): Disable CleanupWorker thread for nodepool-builder
+        # as we currently race it to validate our failed uploads.
+        self._useBuilder(configfile, cleanup_interval=0)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')

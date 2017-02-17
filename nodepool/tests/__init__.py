@@ -272,15 +272,16 @@ class MySQLSchemaFixture(fixtures.Fixture):
 
 
 class BuilderFixture(fixtures.Fixture):
-    def __init__(self, configfile):
+    def __init__(self, configfile, cleanup_interval):
         super(BuilderFixture, self).__init__()
         self.configfile = configfile
+        self.cleanup_interval = cleanup_interval
         self.builder = None
 
     def setUp(self):
         super(BuilderFixture, self).setUp()
         self.builder = builder.NodePoolBuilder(self.configfile)
-        self.builder.cleanup_interval = .5
+        self.builder.cleanup_interval = self.cleanup_interval
         self.builder.build_interval = .1
         self.builder.upload_interval = .1
         self.builder.dib_cmd = 'nodepool/tests/fake-image-create'
@@ -467,8 +468,8 @@ class DBTestCase(BaseTestCase):
         self.addCleanup(app.stop)
         return app
 
-    def _useBuilder(self, configfile):
-        self.useFixture(BuilderFixture(configfile))
+    def _useBuilder(self, configfile, cleanup_interval=.5):
+        self.useFixture(BuilderFixture(configfile, cleanup_interval))
 
     def setupZK(self):
         f = ZookeeperServerFixture()
