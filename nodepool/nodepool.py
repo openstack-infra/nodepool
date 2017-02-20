@@ -1183,7 +1183,8 @@ class NodeCleanupWorker(threading.Thread):
                 continue
 
             # Any nodes in these states that are unlocked can be deleted.
-            if node.state in (zk.USED, zk.IN_USE, zk.BUILDING, zk.DELETING):
+            if node.state in (zk.USED, zk.IN_USE, zk.BUILDING, zk.FAILED,
+                              zk.DELETING):
                 try:
                     zk_conn.lockNode(node, blocking=False)
                 except exceptions.ZKLockException:
