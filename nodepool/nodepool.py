@@ -681,6 +681,14 @@ class NodeLauncher(threading.Thread):
             except Exception:
                 self.log.exception("Launch attempt %d/%d failed for node %s:",
                     attempts, self._retries, self._node.id)
+                # If we created an instance, delete it.
+                if self._node.external_id:
+                    self._manager.cleanupServer(self._node.external_id)
+                    self._manager.waitForServerDeletion(self._node.external_id)
+                    self._node.external_id = None
+                    self._node.public_ipv4 = None
+                    self._node.public_ipv6 = None
+                    self._zk.storeNode(self._node)
                 if attempts == self._retries:
                     raise
                 attempts += 1
