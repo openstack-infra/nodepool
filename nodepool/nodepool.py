@@ -1270,7 +1270,6 @@ class NodePool(threading.Thread):
         self.log.debug("Finished stopping")
 
     def loadConfig(self):
-        self.log.debug("Loading configuration")
         config = nodepool_config.loadConfig(self.configfile)
         nodepool_config.loadSecureConfig(config, self.securefile)
         return config
@@ -1324,7 +1323,6 @@ class NodePool(threading.Thread):
 
         configured = config.zookeeper_servers.values()
         if running == configured:
-            self.log.debug("Zookeeper client does not need to be updated")
             return
 
         if not self.zk and configured:
