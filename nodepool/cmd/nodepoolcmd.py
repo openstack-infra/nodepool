@@ -262,6 +262,10 @@ class NodePoolCmd(NodepoolApp):
 
     def delete(self):
         node = self.zk.getNode(self.args.id)
+        if not node:
+            print("Node id %s not found" % self.args.id)
+            return
+
         provider = self.pool.config.providers[node.provider]
         self.zk.lockNode(node, blocking=True, timeout=5)
 
