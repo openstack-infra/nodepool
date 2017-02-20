@@ -1184,6 +1184,21 @@ class NodeCleanupWorker(threading.Thread):
         self._interval = interval
         self._running = False
 
+    def _cleanupNodeRequestLocks(self):
+        '''
+        Remove request locks where the request no longer exists.
+
+        Because the node request locks are not direct children of the request
+        znode, we need to remove the locks separately after the request has
+        been processed.
+        '''
+        zk = self._nodepool.getZK()
+        requests = zk.getNodeRequests()
+        locks = zk.getNodeRequestLocks()
+        locks_without_requests = set(locks) - set(requests)
+        for lock_id in locks_without_requests:
+            zk.deleteNodeRequestLock(lock_id)
+
     def _deleteInstance(self, node):
         '''
         Delete an instance from a provider.
@@ -1235,6 +1250,7 @@ class NodeCleanupWorker(threading.Thread):
 
         while self._running:
             try:
+                self._cleanupNodeRequestLocks()
                 self._cleanupNodes()
             except Exception:
                 self.log.exception("Exception in NodeCleanupWorker:")

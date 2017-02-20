@@ -65,6 +65,13 @@ class TestNodepool(tests.DBTestCase):
             self.zk.lockNode(node, blocking=False)
             self.zk.unlockNode(node)
 
+        # Verify the cleanup thread removed the lock
+        self.assertIsNotNone(
+            self.zk.client.exists(self.zk._requestLockPath(req.id))
+        )
+        self.zk.deleteNodeRequest(req)
+        self.waitForNodeRequestLockDeletion(req.id)
+
     def test_fail_request_on_launch_failure(self):
         '''
         Test that provider launch error fails the request.

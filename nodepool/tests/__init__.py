@@ -433,6 +433,17 @@ class DBTestCase(BaseTestCase):
                 break
             time.sleep(1)
 
+    def waitForNodeRequestLockDeletion(self, request_id):
+        while True:
+            exists = False
+            for lock_id in self.zk.getNodeRequestLocks():
+                if request_id == lock_id:
+                    exists = True
+                    break
+            if not exists:
+                break
+            time.sleep(1)
+
     def waitForNodes(self, label, count=1):
         while True:
             self.wait_for_threads()

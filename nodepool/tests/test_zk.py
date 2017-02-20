@@ -585,6 +585,28 @@ class TestZooKeeper(tests.DBTestCase):
         with testtools.ExpectedException(StopIteration):
             i.next()
 
+    def test_getNodeRequestLocks(self):
+        req = self._create_node_request()
+        self.zk.lockNodeRequest(req, blocking=False)
+        locks = self.zk.getNodeRequestLocks()
+        self.assertEqual(1, len(locks))
+        self.assertEqual(req.id, locks[0])
+        self.zk.unlockNodeRequest(req)
+        self.zk.deleteNodeRequest(req)
+
+    def test_deleteNodeRequestLock(self):
+        req = self._create_node_request()
+        self.zk.lockNodeRequest(req, blocking=False)
+        self.zk.unlockNodeRequest(req)
+        self.zk.deleteNodeRequest(req)
+
+        # We expect the lock to linger even after the request is deleted
+        locks = self.zk.getNodeRequestLocks()
+        self.assertEqual(1, len(locks))
+        self.assertEqual(req.id, locks[0])
+        self.zk.deleteNodeRequestLock(locks[0])
+        self.assertEqual([], self.zk.getNodeRequestLocks())
+
 
 class TestZKModel(tests.BaseTestCase):
 

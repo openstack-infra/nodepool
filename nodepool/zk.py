@@ -1240,6 +1240,28 @@ class ZooKeeper(object):
 
         return sorted(requests)
 
+    def getNodeRequestLocks(self):
+        '''
+        Get the current list of all node request locks.
+        '''
+        try:
+            locks = self.client.get_children(self.REQUEST_LOCK_ROOT)
+        except kze.NoNodeError:
+            return []
+        return locks
+
+    def deleteNodeRequestLock(self, lock):
+        '''
+        Delete the znode for a node request lock.
+
+        :param str lock: The lock ID.
+        '''
+        path = self._requestLockPath(lock)
+        try:
+            self.client.delete(path)
+        except kze.NoNodeError:
+            pass
+
     def getNodeRequest(self, request):
         '''
         Get the data for a specific node request.
