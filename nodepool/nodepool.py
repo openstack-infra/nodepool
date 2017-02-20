@@ -977,7 +977,6 @@ class NodeRequestHandler(object):
             return True
 
         if self.launch_manager.failed_nodes:
-            self.nodeset = []
             self.request.declined_by.append(self.launcher_id)
             launchers = set(self.zk.getRegisteredLaunchers())
             if launchers.issubset(set(self.request.declined_by)):
