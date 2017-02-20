@@ -1544,6 +1544,20 @@ class NodePool(threading.Thread):
                     "No more active min-ready requests for label %s", label)
                 del self._submittedRequests[label]
 
+    def labelImageIsAvailable(self, label):
+        '''
+        Check if the image associated with a label is ready in any provider.
+
+        :param Label label: The label config object.
+
+        :returns: True if image associated with the label is uploaded and
+            ready in at least one provider. False otherwise.
+        '''
+        for provider_name in label.providers.keys():
+            if self.zk.getMostRecentImageUpload(label.image, provider_name):
+                return True
+        return False
+
     def createMinReady(self):
         '''
         Create node requests to make the minimum amount of ready nodes.
@@ -1587,7 +1601,7 @@ class NodePool(threading.Thread):
             elif len(ready_nodes[label.name]) < min_ready:
                 need = min_ready - len(ready_nodes[label.name])
 
-            if need:
+            if need and self.labelImageIsAvailable(label):
                 # Create requests for 1 node at a time. This helps to split
                 # up requests across providers, and avoids scenario where a
                 # single provider might fail the entire request because of
