@@ -623,7 +623,7 @@ class NodeLauncher(threading.Thread):
 
         self._writeNodepoolInfo(host, preferred_ip, self._node)
         if self._label.ready_script:
-            self.runReadyScript(host, hostname, self._label.ready_script)
+            self._runReadyScript(host, hostname, self._label.ready_script)
 
     def _writeNodepoolInfo(self, host, preferred_ip, node):
         key = paramiko.RSAKey.generate(2048)
