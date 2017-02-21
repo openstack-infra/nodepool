@@ -1270,6 +1270,7 @@ class ZooKeeper(object):
             path = self.client.create(
                 path,
                 value=request.serialize(),
+                ephemeral=True,
                 sequence=True,
                 makepath=True)
             request.id = path.split("/")[-1]
