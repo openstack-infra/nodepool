@@ -271,6 +271,27 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual('fake-provider', new_nodes[0].provider)
         self.assertNotEqual(nodes[0], new_nodes[0])
 
+    @mock.patch('nodepool.provider_manager.FakeProviderManager.createServer')
+    def test_node_launch_retries(self, mock_create_server):
+        mock_create_server.side_effect = Exception('Boom!')
+
+        configfile = self.setup_config('node_launch_retry.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FAILED)
+
+        # retries in config is set to 2, so 2 attempts to create a server
+        self.assertEqual(2, mock_create_server.call_count)
+
     @skip("Disabled for early v3 development")
     def test_node_delete_failure(self):
         def fail_delete(self, name):

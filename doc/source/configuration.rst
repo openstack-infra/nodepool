@@ -296,6 +296,7 @@ provider, the Nodepool image types are also defined (see
         - az1
       boot-timeout: 120
       launch-timeout: 900
+      launch-retries: 3
       image-name-format: 'template-{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
       ipv6-preferred: False
@@ -412,6 +413,13 @@ provider, the Nodepool image types are also defined (see
     exceeded, the node launch is aborted and the instance deleted.
 
     In seconds. Default 3600.
+
+  ``launch-retries``
+
+    The number of times to retry launching a server before considering the job
+    failed.
+
+    Default 3.
 
   ``keypair``
     Default None
