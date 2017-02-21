@@ -362,8 +362,15 @@ class ProviderManager(object):
 
 class FakeProviderManager(ProviderManager):
     def __init__(self, provider, use_taskmanager):
+        self.createServer_fails = 0
         self.__client = fakeprovider.FakeOpenStackCloud()
         super(FakeProviderManager, self).__init__(provider, use_taskmanager)
 
     def _getClient(self):
         return self.__client
+
+    def createServer(self, *args, **kwargs):
+        while self.createServer_fails:
+            self.createServer_fails -= 1
+            raise Exception("Expected createServer exception")
+        return super(FakeProviderManager, self).createServer(*args, **kwargs)
