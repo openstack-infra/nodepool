@@ -38,6 +38,7 @@ providers:
     boot-timeout: 120
     max-servers: 184
     max-concurrency: 10
+    launch-retries: 3
     rate: 0.001
     images:
       - name: trusty

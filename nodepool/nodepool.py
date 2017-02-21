@@ -900,7 +900,8 @@ class NodeRequestHandler(object):
         self.zk.storeNodeRequest(self.request)
 
         self.launch_manager = NodeLaunchManager(
-            self.zk, self.provider, self.labels, self.manager, retries=3)
+            self.zk, self.provider, self.labels, self.manager,
+            retries=self.provider.launch_retries)
         ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
 
         for ntype in self.request.node_types:

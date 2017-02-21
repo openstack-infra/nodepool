@@ -182,6 +182,7 @@ def loadConfig(config_path):
         p.api_timeout = provider.get('api-timeout')
         p.boot_timeout = provider.get('boot-timeout', 60)
         p.launch_timeout = provider.get('launch-timeout', 3600)
+        p.launch_retries = provider.get('launch-retries', 3)
         p.networks = []
         for network in provider.get('networks', []):
             n = Network()
