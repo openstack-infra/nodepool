@@ -15,7 +15,6 @@
 
 import json
 import logging
-import mock
 import time
 from unittest import skip
 
@@ -66,19 +65,19 @@ class TestNodepool(tests.DBTestCase):
             self.zk.lockNode(node, blocking=False)
             self.zk.unlockNode(node)
 
-    @mock.patch('nodepool.nodepool.NodeLauncher._launchNode')
-    def test_fail_request_on_launch_failure(self, mock_launch):
+    def test_fail_request_on_launch_failure(self):
         '''
         Test that provider launch error fails the request.
         '''
-        mock_launch.side_effect = Exception()
-
-        configfile = self.setup_config('node.yaml')
+        configfile = self.setup_config('node_launch_retry.yaml')
         self._useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
 
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
+        self.wait_for_config(pool)
+        manager = pool.getProviderManager('fake-provider')
+        manager.createServer_fails = 2
 
         req = zk.NodeRequest()
         req.state = zk.REQUESTED
@@ -86,7 +85,7 @@ class TestNodepool(tests.DBTestCase):
         self.zk.storeNodeRequest(req)
 
         req = self.waitForNodeRequest(req)
-        self.assertTrue(mock_launch.called)
+        self.assertEqual(0, manager.createServer_fails)
         self.assertEqual(req.state, zk.FAILED)
         self.assertNotEqual(req.declined_by, [])
 
@@ -271,14 +270,14 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual('fake-provider', new_nodes[0].provider)
         self.assertNotEqual(nodes[0], new_nodes[0])
 
-    @mock.patch('nodepool.provider_manager.FakeProviderManager.createServer')
-    def test_node_launch_retries(self, mock_create_server):
-        mock_create_server.side_effect = Exception('Boom!')
-
+    def test_node_launch_retries(self):
         configfile = self.setup_config('node_launch_retry.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
+        self.wait_for_config(pool)
+        manager = pool.getProviderManager('fake-provider')
+        manager.createServer_fails = 2
         self.waitForImage('fake-provider', 'fake-image')
 
         req = zk.NodeRequest()
@@ -290,7 +289,7 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(req.state, zk.FAILED)
 
         # retries in config is set to 2, so 2 attempts to create a server
-        self.assertEqual(2, mock_create_server.call_count)
+        self.assertEqual(0, manager.createServer_fails)
 
     @skip("Disabled for early v3 development")
     def test_node_delete_failure(self):
