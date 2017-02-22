@@ -476,7 +476,8 @@ provider, the Nodepool image types are also defined (see
     Default ``template-{image.name}-{timestamp}``
 
   ``rate``
-    In seconds. Default 1.0.
+    In seconds, amount to wait between operations on the provider.
+    Defaults to ``1.0``.
 
   ``clean-floating-ips``
     If it is set to True, nodepool will assume it is the only user of the
