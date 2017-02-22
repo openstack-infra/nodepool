@@ -871,6 +871,8 @@ class NodeRequestHandler(object):
                 self.zk.unlockNode(node)
             except Exception:
                 self.log.exception("Error unlocking node:")
+            self.log.debug("Unlocked node %s for request %s",
+                           node.id, self.request.id)
 
     def _run(self):
         '''
@@ -886,9 +888,13 @@ class NodeRequestHandler(object):
             expected failure from the underlying library, which is ok for now.
         '''
         if not self._imagesAvailable() or self._wouldExceedQuota():
+            self.log.debug("Declining node request %s",
+                           self.request.id)
             self.request.declined_by.append(self.launcher_id)
             launchers = set(self.zk.getRegisteredLaunchers())
             if launchers.issubset(set(self.request.declined_by)):
+                self.log.debug("Failing declined node request %s",
+                               self.request.id)
                 # All launchers have declined it
                 self.request.state = zk.FAILED
             self.zk.storeNodeRequest(self.request)
@@ -896,6 +902,7 @@ class NodeRequestHandler(object):
             self.done = True
             return
 
+        self.log.debug("Accepting node request %s", self.request.id)
         self.request.state = zk.PENDING
         self.zk.storeNodeRequest(self.request)
 
@@ -915,6 +922,9 @@ class NodeRequestHandler(object):
                         # It's already locked so skip it.
                         continue
                     else:
+                        self.log.debug(
+                            "Locked existing node %s for request %s",
+                            node.id, self.request.id)
                         got_a_node = True
                         node.allocated_to = self.request.id
                         self.zk.storeNode(node)
@@ -935,6 +945,8 @@ class NodeRequestHandler(object):
                 # locked anywhere.
                 self.zk.storeNode(node)
                 self.zk.lockNode(node, blocking=False)
+                self.log.debug("Locked building node %s for request %s",
+                               node.id, self.request.id)
 
                 # Set state AFTER lock so sthat it isn't accidentally cleaned
                 # up (unlocked BUILDING nodes will be deleted).
@@ -990,6 +1002,8 @@ class NodeRequestHandler(object):
             launchers = set(self.zk.getRegisteredLaunchers())
             if launchers.issubset(set(self.request.declined_by)):
                 # All launchers have declined it
+                self.log.debug("Failing declined node request %s",
+                               self.request.id)
                 self.request.state = zk.FAILED
             else:
                 self.request.state = zk.REQUESTED
@@ -998,6 +1012,8 @@ class NodeRequestHandler(object):
             for node in self.nodeset:
                 # Record node ID in the request
                 self.request.nodes.append(node.id)
+                self.log.debug("Fulfilled node request %s",
+                               self.request.id)
             self.request.state = zk.FULFILLED
 
         self._unlockNodeSet()
@@ -1134,8 +1150,11 @@ class ProviderWorker(threading.Thread):
             # Make sure we're always registered with ZK
             self.zk.registerLauncher(self.launcher_id)
 
-            self._assignHandlers()
-            self._removeCompletedHandlers()
+            try:
+                self._assignHandlers()
+                self._removeCompletedHandlers()
+            except Exception:
+                self.log.exception("Error in ProviderWorker:")
             time.sleep(self.watermark_sleep)
 
     def stop(self):
