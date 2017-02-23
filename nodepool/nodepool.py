@@ -887,9 +887,14 @@ class NodeRequestHandler(object):
             launcher has already started doing so. This would cause an
             expected failure from the underlying library, which is ok for now.
         '''
-        if not self._imagesAvailable() or self._wouldExceedQuota():
-            self.log.debug("Declining node request %s",
-                           self.request.id)
+        declined_reasons = []
+        if not self._imagesAvailable():
+            declined_reasons.append('images are not available')
+        if self._wouldExceedQuota():
+            declined_reasons.append('it would exceed quota')
+        if declined_reasons:
+            self.log.debug("Declining node request %s because %s",
+                           self.request.id, ', '.join(declined_reasons))
             self.request.declined_by.append(self.launcher_id)
             launchers = set(self.zk.getRegisteredLaunchers())
             if launchers.issubset(set(self.request.declined_by)):
@@ -998,7 +1003,7 @@ class NodeRequestHandler(object):
             return True
 
         if self.launch_manager.failed_nodes:
-            self.log.debug("Declining node request %s",
+            self.log.debug("Declining node request %s because nodes failed",
                            self.request.id)
             self.request.declined_by.append(self.launcher_id)
             launchers = set(self.zk.getRegisteredLaunchers())
@@ -1109,7 +1114,7 @@ class ProviderWorker(threading.Thread):
                 continue
 
             # Got a lock, so assign it
-            self.log.info("Assigning node request %s" % req.id)
+            self.log.info("Assigning node request %s" % req)
             rh = NodeRequestHandler(self, req)
             rh.run()
             self.request_handlers.append(rh)
