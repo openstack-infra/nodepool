@@ -998,6 +998,8 @@ class NodeRequestHandler(object):
             return True
 
         if self.launch_manager.failed_nodes:
+            self.log.debug("Declining node request %s",
+                           self.request.id)
             self.request.declined_by.append(self.launcher_id)
             launchers = set(self.zk.getRegisteredLaunchers())
             if launchers.issubset(set(self.request.declined_by)):
@@ -1012,8 +1014,8 @@ class NodeRequestHandler(object):
             for node in self.nodeset:
                 # Record node ID in the request
                 self.request.nodes.append(node.id)
-                self.log.debug("Fulfilled node request %s",
-                               self.request.id)
+            self.log.debug("Fulfilled node request %s",
+                           self.request.id)
             self.request.state = zk.FULFILLED
 
         self._unlockNodeSet()
