@@ -594,6 +594,25 @@ class TestZooKeeper(tests.DBTestCase):
         self.zk.unlockNodeRequest(req)
         self.zk.deleteNodeRequest(req)
 
+    def test_getNodeRequestLock(self):
+        req = self._create_node_request()
+        self.zk.lockNodeRequest(req, blocking=False)
+        lock = self.zk.getNodeRequestLock(req.id)
+        self.assertEqual(lock.id, req.id)
+        self.assertIsNotNone(lock.stat)
+        self.zk.unlockNodeRequest(req)
+        self.zk.deleteNodeRequest(req)
+
+    def test_nodeRequestLockIterator(self):
+        req = self._create_node_request()
+        self.zk.lockNodeRequest(req, blocking=False)
+        i = self.zk.nodeRequestLockIterator()
+        self.assertEqual(zk.NodeRequestLock(req.id), i.next())
+        with testtools.ExpectedException(StopIteration):
+            i.next()
+        self.zk.unlockNodeRequest(req)
+        self.zk.deleteNodeRequest(req)
+
     def test_deleteNodeRequestLock(self):
         req = self._create_node_request()
         self.zk.lockNodeRequest(req, blocking=False)

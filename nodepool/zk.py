@@ -308,6 +308,27 @@ class ImageUpload(BaseModel):
         return o
 
 
+class NodeRequestLock(object):
+    '''
+    Class representing a node request lock.
+
+    This doesn't need to derive from BaseModel since this class exists only
+    to associate the znode stats with the lock.
+    '''
+    def __init__(self, id=None):
+        self.id = id
+        self.stat = None
+
+    def __eq__(self, other):
+        if isinstance(other, NodeRequestLock):
+            return (self.id == other.id)
+        else:
+            return False
+
+    def __repr__(self):
+        return '<NodeRequestLock %s>' % self.id
+
+
 class NodeRequest(BaseModel):
     '''
     Class representing a node request.
@@ -1250,6 +1271,27 @@ class ZooKeeper(object):
             return []
         return locks
 
+    def getNodeRequestLock(self, lock):
+        '''
+        Get the data for a specific node request lock.
+
+        Note that there is no user data set on a node request lock znode. The
+        main purpose for this method is to get the ZK stat data for the lock
+        so we can inspect it and use it for lock deletion.
+
+        :param str lock: The node request lock ID.
+
+        :returns: A NodeRequestLock object.
+        '''
+        path = self._requestLockPath(lock)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+        d = NodeRequestLock(lock)
+        d.stat = stat
+        return d
+
     def deleteNodeRequestLock(self, lock):
         '''
         Delete the znode for a node request lock.
@@ -1518,3 +1560,12 @@ class ZooKeeper(object):
             node = self.getNode(node_id)
             if node:
                 yield node
+
+    def nodeRequestLockIterator(self):
+        '''
+        Utility generator method for iterating through all nodes request locks.
+        '''
+        for lock_id in self.getNodeRequestLocks():
+            lock = self.getNodeRequestLock(lock_id)
+            if lock:
+                yield lock

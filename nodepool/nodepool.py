@@ -45,6 +45,7 @@ WATERMARK_SLEEP = 10         # Interval between checking if new servers needed
 IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
 CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
                              # is ACTIVE
+LOCK_CLEANUP = 8 * HOURS     # When to delete node request lock znodes
 NODE_CLEANUP = 8 * HOURS     # When to start deleting a node that is not
                              # READY or HOLD
 TEST_CLEANUP = 5 * MINS      # When to start deleting a node that is in TEST
@@ -1190,14 +1191,20 @@ class NodeCleanupWorker(threading.Thread):
 
         Because the node request locks are not direct children of the request
         znode, we need to remove the locks separately after the request has
-        been processed.
+        been processed. Only remove them after LOCK_CLEANUP seconds have
+        passed. This helps prevent the scenario where a request could go
+        away _while_ a lock is currently held for processing and the cleanup
+        thread attempts to delete it. The delay should reduce the chance that
+        we delete a currently held lock.
         '''
         zk = self._nodepool.getZK()
         requests = zk.getNodeRequests()
-        locks = zk.getNodeRequestLocks()
-        locks_without_requests = set(locks) - set(requests)
-        for lock_id in locks_without_requests:
-            zk.deleteNodeRequestLock(lock_id)
+        now = time.time()
+        for lock in zk.nodeRequestLockIterator():
+            if lock.id in requests:
+                continue
+            if (now - lock.stat.mtime/1000) > LOCK_CLEANUP:
+                zk.deleteNodeRequestLock(lock.id)
 
     def _deleteInstance(self, node):
         '''

@@ -39,6 +39,7 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         image = self.waitForImage('fake-provider', 'fake-image')
 
+        nodepool.nodepool.LOCK_CLEANUP = 1
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
 
