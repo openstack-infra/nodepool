@@ -446,6 +446,14 @@ provider, the Nodepool image types are also defined (see
 
     In seconds. Default 3600.
 
+  ``nodepool-id`` (deprecated)
+
+    A unique string to identify which nodepool instances is using a provider.
+    This is useful if you want to configure production and development instances
+    of nodepool but share the same provider.
+
+    Default None
+
   ``keypair``
     Default None
 

@@ -220,6 +220,8 @@ class ProviderManager(object):
         # groups[0] is the image name or anything silly like that.
         nodepool_meta = dict(provider_name=self.provider.name)
         groups_meta = [self.provider.name]
+        if self.provider.nodepool_id:
+            nodepool_meta['nodepool_id'] = self.provider.nodepool_id
         if nodepool_node_id:
             nodepool_meta['node_id'] = nodepool_node_id
         if nodepool_snapshot_image_id:

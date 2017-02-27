@@ -334,9 +334,15 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(len(deleted_nodes), 1)
             self.assertEqual(node_id, deleted_nodes[0].id)
 
+    def test_leaked_node_with_nodepool_id(self):
+        self._test_leaked_node('leaked_node_nodepool_id.yaml')
+
     def test_leaked_node(self):
+        self._test_leaked_node('leaked_node.yaml')
+
+    def _test_leaked_node(self, cfgfile):
         """Test that a leaked node is deleted"""
-        configfile = self.setup_config('leaked_node.yaml')
+        configfile = self.setup_config(cfgfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
@@ -384,6 +390,69 @@ class TestNodepool(tests.DBTestCase):
                                      target_name='fake-target',
                                      state=nodedb.READY)
             self.assertEqual(len(nodes), 1)
+
+    def test_leaked_node_not_deleted(self):
+        """Test that a leaked node is not deleted"""
+        configfile = self.setup_config('leaked_node_nodepool_id.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        self.waitForNodes(pool)
+        self.log.debug("...done waiting for initial pool.")
+        pool.stop()
+
+        # Make sure we have a node built and ready
+        provider = pool.config.providers['fake-provider']
+        manager = pool.getProviderManager(provider)
+        servers = manager.listServers()
+        self.assertEqual(len(servers), 1)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+            # Delete the node from the db, but leave the instance
+            # so it is leaked.
+            self.log.debug("Delete node db record so instance is leaked...")
+            for node in nodes:
+                node.delete()
+            self.log.debug("...deleted node db so instance is leaked.")
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 0)
+
+        # Wait for nodepool to replace it, which should be enough
+        # time for it to also delete the leaked node
+        configfile = self.setup_config('leaked_node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.log.debug("Waiting for replacement pool...")
+        self.waitForNodes(pool)
+        self.log.debug("...done waiting for replacement pool.")
+
+        # Make sure we end up with only one server (the replacement)
+        provider = pool.config.providers['fake-provider']
+        manager = pool.getProviderManager(provider)
+        foobar_servers = manager.listServers()
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(len(foobar_servers), 1)
+
+        with pool.getDB().getSession() as session:
+            nodes = session.getNodes(provider_name='fake-provider',
+                                     label_name='fake-label',
+                                     target_name='fake-target',
+                                     state=nodedb.READY)
+            self.assertEqual(len(nodes), 1)
+
+        # Just to be safe, ensure we have 2 nodes again.
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(len(foobar_servers), 1)
 
     @skip("Disabled for early v3 development")
     def test_building_image_cleanup_on_start(self):
