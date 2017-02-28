@@ -1543,7 +1543,8 @@ class NodePool(threading.Thread):
                                            meta['provider_name']))
                         continue
                     nodepool_id = meta.get('nodepool_id', None)
-                    if nodepool_id and nodepool_id != provider.nodepool_id:
+                    if provider.nodepool_id is not None and \
+                            nodepool_id != provider.nodepool_id:
                         self.log.debug("Instance %s (%s) in %s "
                                        "was not launched by us" % (
                                            server['name'], server['id'],
