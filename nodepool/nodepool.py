@@ -850,17 +850,6 @@ class NodeRequestHandler(object):
                 count += 1
         return count
 
-    def _wouldExceedQuota(self):
-        '''
-        Determines if request would exceed provider quota.
-
-        :returns: True if quota would be exceeded, False otherwise.
-        '''
-        provider_max = self.provider.max_servers
-        num_requested = len(self.request.node_types)
-        num_in_use = self._countNodes()
-        return num_requested + num_in_use > provider_max
-
     def _unlockNodeSet(self):
         '''
         Attempt unlocking all Nodes in the object node set.
@@ -875,9 +864,12 @@ class NodeRequestHandler(object):
             self.log.debug("Unlocked node %s for request %s",
                            node.id, self.request.id)
 
-    def _run(self):
+    def _waitForNodeSet(self):
         '''
-        Main body for the NodeRequestHandler.
+        Fill node set for the request.
+
+        Obtain nodes for the request, pausing all new request handling for
+        this provider until the node set can be filled.
 
         note:: This code is a bit racey in its calculation of the number of
             nodes in use for quota purposes. It is possible for multiple
@@ -888,30 +880,6 @@ class NodeRequestHandler(object):
             launcher has already started doing so. This would cause an
             expected failure from the underlying library, which is ok for now.
         '''
-        declined_reasons = []
-        if not self._imagesAvailable():
-            declined_reasons.append('images are not available')
-        if self._wouldExceedQuota():
-            declined_reasons.append('it would exceed quota')
-        if declined_reasons:
-            self.log.debug("Declining node request %s because %s",
-                           self.request.id, ', '.join(declined_reasons))
-            self.request.declined_by.append(self.launcher_id)
-            launchers = set(self.zk.getRegisteredLaunchers())
-            if launchers.issubset(set(self.request.declined_by)):
-                self.log.debug("Failing declined node request %s",
-                               self.request.id)
-                # All launchers have declined it
-                self.request.state = zk.FAILED
-            self.zk.storeNodeRequest(self.request)
-            self.zk.unlockNodeRequest(self.request)
-            self.done = True
-            return
-
-        self.log.debug("Accepting node request %s", self.request.id)
-        self.request.state = zk.PENDING
-        self.zk.storeNodeRequest(self.request)
-
         self.launch_manager = NodeLaunchManager(
             self.zk, self.provider, self.labels, self.manager,
             retries=self.provider.launch_retries)
@@ -939,6 +907,18 @@ class NodeRequestHandler(object):
 
             # Could not grab an existing node, so launch a new one.
             if not got_a_node:
+                logged = False
+
+                # If we calculate that we're at capacity, pause until nodes
+                # are released by Zuul and removed by the NodeCleanupWorker.
+                while self._countNodes() >= self.provider.max_servers:
+                    if not logged:
+                        self.log.debug(
+                            "Pausing request handling to satisfy request %s",
+                             self.request)
+                        logged = True
+                    time.sleep(1)
+
                 node = zk.Node()
                 node.state = zk.INIT
                 node.type = ntype
@@ -962,6 +942,35 @@ class NodeRequestHandler(object):
                 # NOTE: We append the node to nodeset if it successfully
                 # launches.
                 self.launch_manager.launch(node)
+
+    def _run(self):
+        '''
+        Main body for the NodeRequestHandler.
+        '''
+        declined_reasons = []
+        if not self._imagesAvailable():
+            declined_reasons.append('images are not available')
+        if len(self.request.node_types) > self.provider.max_servers:
+            declined_reasons.append('it would exceed quota')
+        if declined_reasons:
+            self.log.debug("Declining node request %s because %s",
+                           self.request.id, ', '.join(declined_reasons))
+            self.request.declined_by.append(self.launcher_id)
+            launchers = set(self.zk.getRegisteredLaunchers())
+            if launchers.issubset(set(self.request.declined_by)):
+                self.log.debug("Failing declined node request %s",
+                               self.request.id)
+                # All launchers have declined it
+                self.request.state = zk.FAILED
+            self.zk.storeNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+            self.done = True
+            return
+
+        self.log.debug("Accepting node request %s", self.request.id)
+        self.request.state = zk.PENDING
+        self.zk.storeNodeRequest(self.request)
+        self._waitForNodeSet()
 
     @property
     def alive_thread_count(self):
