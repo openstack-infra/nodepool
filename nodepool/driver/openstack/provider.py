@@ -365,7 +365,19 @@ class OpenStackProvider(Provider):
             meta['nodepool_node_label'] = nodepool_node_label
         create_args['meta'] = meta
 
-        return self._client.create_server(wait=False, **create_args)
+        try:
+            return self._client.create_server(wait=False, **create_args)
+        except shade.OpenStackCloudBadRequest:
+            # We've gotten a 400 error from nova - which means the request
+            # was malformed. The most likely cause of that, unless something
+            # became functionally and systemically broken, is stale image
+            # or flavor cache. Log a message, invalidate the caches so that
+            # next time we get new caches.
+            self._images = {}
+            self.__flavors = {}
+            self.log.info(
+                "Clearing flavor and image caches due to 400 error from nova")
+            raise
 
     def getServer(self, server_id):
         return self._client.get_server(server_id)
