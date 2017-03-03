@@ -31,6 +31,7 @@ class Dummy(object):
     INSTANCE = 'Instance'
     FLAVOR = 'Flavor'
     KEYPAIR = 'Keypair'
+    LOCATION = 'Server.Location'
 
     def __init__(self, kind, **kw):
         self.__kind = kind
@@ -146,6 +147,7 @@ class FakeOpenStackCloud(object):
                   public_v4=public_v4,
                   public_v6=public_v6,
                   private_v4=private_v4,
+                  location=Dummy(Dummy.LOCATION, zone=kw.get('az')),
                   metadata=kw.get('meta', {}),
                   manager=self,
                   key_name=kw.get('key_name', None),
