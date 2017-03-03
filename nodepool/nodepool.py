@@ -890,6 +890,10 @@ class NodeRequestHandler(object):
             got_a_node = False
             if self.request.reuse and ntype in ready_nodes:
                 for node in ready_nodes[ntype]:
+                    # Only interested in nodes from this provider
+                    if node.provider != self.provider.name:
+                        continue
+
                     try:
                         self.zk.lockNode(node, blocking=False)
                     except exceptions.ZKLockException:
