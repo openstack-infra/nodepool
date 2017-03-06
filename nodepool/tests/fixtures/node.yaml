@@ -20,6 +20,8 @@ labels:
 providers:
   - name: fake-provider
     region-name: fake-region
+    availability-zones:
+      - az1
     keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'

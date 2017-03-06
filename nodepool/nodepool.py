@@ -561,6 +561,10 @@ class NodeLauncher(threading.Thread):
             nodepool_node_id=self._node.id,
             nodepool_image_name=config_image.name)
 
+        # If we didn't specify an AZ, set it to the one chosen by Nova.
+        if not self._node.az:
+            self._node.az = server.location.zone
+
         self._node.external_id = server.id
         self._node.hostname = hostname
         self._node.image_id = "{path}/{upload_id}".format(
@@ -609,11 +613,11 @@ class NodeLauncher(threading.Thread):
         # Checkpoint save the updated node info
         self._zk.storeNode(self._node)
 
-        self.log.debug("Node id: %s is running, ipv4: %s, ipv6: %s" %
-                       (self._node.id, self._node.public_ipv4,
+        self.log.debug("Node %s is running [az: %s, ipv4: %s, ipv6: %s]" %
+                       (self._node.id, self._node.az, self._node.public_ipv4,
                         self._node.public_ipv6))
 
-        self.log.debug("Node id: %s testing ssh at ip: %s" %
+        self.log.debug("Node %s testing ssh at ip: %s" %
                        (self._node.id, preferred_ip))
         host = utils.ssh_connect(
             preferred_ip, config_image.username,
@@ -871,6 +875,14 @@ class NodeRequestHandler(object):
         Obtain nodes for the request, pausing all new request handling for
         this provider until the node set can be filled.
 
+        We attempt to group the node set within the same provider availability
+        zone. For this to work properly, the provider entry in the nodepool
+        config must list the availability zones. Otherwise, new nodes will be
+        put in random AZs at nova's whim. The exception being if there is an
+        existing node in the READY state that we can select for this node set.
+        Its AZ will then be used for new nodes, as well as any other READY
+        nodes.
+
         note:: This code is a bit racey in its calculation of the number of
             nodes in use for quota purposes. It is possible for multiple
             launchers to be doing this calculation at the same time. Since we
@@ -885,13 +897,18 @@ class NodeRequestHandler(object):
             retries=self.provider.launch_retries)
         ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
 
+        chosen_az = None
+
         for ntype in self.request.node_types:
             # First try to grab from the list of already available nodes.
             got_a_node = False
             if self.request.reuse and ntype in ready_nodes:
                 for node in ready_nodes[ntype]:
-                    # Only interested in nodes from this provider
+                    # Only interested in nodes from this provider and within
+                    # the selected AZ.
                     if node.provider != self.provider.name:
+                        continue
+                    if chosen_az and node.az != chosen_az:
                         continue
 
                     try:
@@ -907,10 +924,20 @@ class NodeRequestHandler(object):
                         node.allocated_to = self.request.id
                         self.zk.storeNode(node)
                         self.nodeset.append(node)
+
+                        # AZ from this ready node. This will cause new nodes
+                        # to share this AZ, as well.
+                        if not chosen_az and node.az:
+                            chosen_az = node.az
                         break
 
             # Could not grab an existing node, so launch a new one.
             if not got_a_node:
+                # Select grouping AZ if we didn't set AZ from a selected,
+                # pre-existing node
+                if not chosen_az and self.provider.azs:
+                    chosen_az = random.choice(self.provider.azs)
+
                 logged = False
 
                 # If we calculate that we're at capacity, pause until nodes
@@ -927,6 +954,7 @@ class NodeRequestHandler(object):
                 node.state = zk.INIT
                 node.type = ntype
                 node.provider = self.provider.name
+                node.az = chosen_az
                 node.launcher = self.launcher_id
                 node.allocated_to = self.request.id
 
