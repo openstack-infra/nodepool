@@ -925,6 +925,7 @@ class NodeRequestHandler(object):
                         self.zk.storeNode(node)
                         self.nodeset.append(node)
 
+                        # If we haven't already chosen an AZ, select the
                         # AZ from this ready node. This will cause new nodes
                         # to share this AZ, as well.
                         if not chosen_az and node.az:
