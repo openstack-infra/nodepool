@@ -373,6 +373,14 @@ class CleanupWorker(BaseWorker):
             if (upload.state == zk.UPLOADING and
                 not self._inProgressUpload(upload)
             ):
+                # Since we cache the uploads above, we need to verify the
+                # state hasn't changed on us (e.g., it could have gone from
+                # an in progress upload to a successfully completed upload
+                # between the getUploads() and the _inProgressUpload() check.
+                u = self._zk.getImageUpload(image, build_id, provider,
+                                            upload.id)
+                if upload.state != u.state:
+                    continue
                 self.log.info("Removing failed upload record: %s" % upload)
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
             elif upload.state == zk.DELETING:
