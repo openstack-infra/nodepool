@@ -1298,6 +1298,12 @@ class NodeCleanupWorker(threading.Thread):
         self._running = True
 
         while self._running:
+            # Don't do work if we've lost communication with the ZK cluster
+            zk_conn = self._nodepool.getZK()
+            while zk_conn and (zk_conn.suspended or zk_conn.lost):
+                self.log.info("ZooKeeper suspended. Waiting")
+                time.sleep(SUSPEND_WAIT_TIME)
+
             try:
                 self._cleanupNodeRequestLocks()
                 self._cleanupNodes()
