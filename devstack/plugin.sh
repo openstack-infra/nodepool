@@ -89,7 +89,9 @@ sudo mkdir -p /etc/nodepool
 sudo chmod 777 /etc/nodepool
 EOF
     cat > /tmp/50-apt-allow-unauthenticated <<EOF
-echo "APT::Get::AllowUnauthenticated \"true\";" | sudo tee \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
+if [ -d "\$TARGET_ROOT/etc/apt/apt.conf.d" ]; then
+    echo "APT::Get::AllowUnauthenticated \"true\";" | sudo tee \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
+fi
 EOF
     sudo mv /tmp/01-nodepool-setup \
         $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
