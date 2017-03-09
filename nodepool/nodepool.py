@@ -175,11 +175,19 @@ class InstanceDeleter(threading.Thread, StatsReporter):
         self._node = node
 
     @staticmethod
-    def delete(zk, manager, node):
+    def delete(zk, manager, node, node_exists=True):
         '''
-        Delete a node.
+        Delete a server instance and ZooKeeper node.
 
         This is a class method so we can support instantaneous deletes.
+
+        :param ProviderManager manager: ProviderManager object to use for
+            deleting the server.
+        :param Node node: A locked Node object that describes the server to
+            delete.
+        :param bool node_exists: True if the node actually exists in ZooKeeper.
+            An artifical Node object can be passed that can be used to delete
+            a leaked instance.
         '''
         try:
             manager.cleanupServer(node.external_id)
@@ -192,17 +200,26 @@ class InstanceDeleter(threading.Thread, StatsReporter):
                 "Exception deleting instance %s from %s:",
                 node.external_id, node.provider)
             # Don't delete the ZK node in this case, but do unlock it
-            zk.unlockNode(node)
+            if node_exists:
+                zk.unlockNode(node)
             return
 
-        InstanceDeleter.log.info(
-            "Deleting ZK node id=%s, state=%s, external_id=%s",
-            node.id, node.state, node.external_id)
-        zk.unlockNode(node)
-        zk.deleteNode(node)
+        if node_exists:
+            InstanceDeleter.log.info(
+                "Deleting ZK node id=%s, state=%s, external_id=%s",
+                node.id, node.state, node.external_id)
+            zk.unlockNode(node)
+            zk.deleteNode(node)
 
     def run(self):
-        self.delete(self._zk, self._manager, self._node)
+        # Since leaked instances won't have an actual node in ZooKeeper,
+        # we need to check 'id' to see if this is an artificial Node.
+        if self._node.id is None:
+            node_exists = False
+        else:
+            node_exists = True
+
+        self.delete(self._zk, self._manager, self._node, node_exists)
 
         try:
             self.updateNodeStats(self._zk, self._manager.provider)
@@ -1022,6 +1039,54 @@ class NodeCleanupWorker(threading.Thread):
                 # node from ZooKeeper if it succeeds.
                 self._deleteInstance(node)
 
+    def _cleanupLeakedInstances(self):
+        '''
+        Delete any leaked server instances.
+
+        Remove any servers we find in providers we know about that are not
+        recorded in the ZooKeeper data.
+        '''
+        zk_conn = self._nodepool.getZK()
+
+        for provider in self._nodepool.config.providers.values():
+            manager = self._nodepool.getProviderManager(provider.name)
+
+            # NOTE: Cache the servers BEFORE caching the nodes. Doing this in
+            # the reverse order would create a race where a new server could
+            # be created just after we cache the list of nodes, thus making it
+            # incorrectly appear as leaked since we might not have cached the
+            # node for it.
+            servers = manager.listServers()
+            known = set([n.external_id for n in zk_conn.nodeIterator() if n.provider == provider.name])
+
+            for server in servers:
+                meta = server.get('metadata', {}).get('nodepool')
+                if not meta:
+                    self.log.debug(
+                        "Instance %s (%s) in %s has no nodepool metadata",
+                        server.name, server.id, provider.name)
+                    continue
+
+                meta = json.loads(meta)
+                if meta['provider_name'] != provider.name:
+                    # Another launcher, sharing this provider but configured
+                    # with a different name, owns this.
+                    continue
+
+                if server.id not in known:
+                    self.log.warning(
+                        "Deleting leaked instance %s (%s) in %s",
+                        server.name, server.id, provider.name
+                    )
+                    # Create an artifical node to use for deleting the server.
+                    node = zk.Node()
+                    node.external_id = server.id
+                    node.provider = provider.name
+                    self._deleteInstance(node)
+
+            if provider.clean_floating_ips:
+                manager.cleanupLeakedFloaters()
+
     def run(self):
         self.log.info("Starting")
         self._running = True
@@ -1036,6 +1101,7 @@ class NodeCleanupWorker(threading.Thread):
             try:
                 self._cleanupNodeRequestLocks()
                 self._cleanupNodes()
+                self._cleanupLeakedInstances()
             except Exception:
                 self.log.exception("Exception in NodeCleanupWorker:")
 
@@ -1585,46 +1651,6 @@ class NodePool(threading.Thread):
             self.statsd.timing(key, dt)
             self.statsd.incr(key)
         self.updateStats(session, node.provider_name)
-
-    def cleanupLeakedInstances(self):
-        known_providers = self.config.providers.keys()
-        for provider in self.config.providers.values():
-            manager = self.getProviderManager(provider)
-            servers = manager.listServers()
-            with self.getDB().getSession() as session:
-                for server in servers:
-                    meta = server.get('metadata', {}).get('nodepool')
-                    if not meta:
-                        self.log.debug("Instance %s (%s) in %s has no "
-                                       "nodepool metadata" % (
-                                           server['name'], server['id'],
-                                           provider.name))
-                        continue
-                    meta = json.loads(meta)
-                    if meta['provider_name'] not in known_providers:
-                        self.log.debug("Instance %s (%s) in %s "
-                                       "lists unknown provider %s" % (
-                                           server['name'], server['id'],
-                                           provider.name,
-                                           meta['provider_name']))
-                        continue
-                    node_id = meta.get('node_id')
-                    if node_id:
-                        if session.getNode(node_id):
-                            continue
-                        self.log.warning("Deleting leaked instance %s (%s) "
-                                         "in %s for node id: %s" % (
-                                             server['name'], server['id'],
-                                             provider.name, node_id))
-                        self.deleteInstance(provider.name, server['id'])
-                    else:
-                        self.log.warning("Instance %s (%s) in %s has no "
-                                         "database id" % (
-                                             server['name'], server['id'],
-                                             provider.name))
-                        continue
-            if provider.clean_floating_ips:
-                manager.cleanupLeakedFloaters()
 
     def periodicCheck(self, session):
         # This function should be run periodically to make sure we can

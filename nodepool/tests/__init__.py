@@ -433,6 +433,13 @@ class DBTestCase(BaseTestCase):
                 break
             time.sleep(1)
 
+    def waitForInstanceDeletion(self, manager, instance_id):
+        while True:
+            servers = manager.listServers()
+            if not (instance_id in [s.id for s in servers]):
+                break
+            time.sleep(1)
+
     def waitForNodeRequestLockDeletion(self, request_id):
         while True:
             exists = False
