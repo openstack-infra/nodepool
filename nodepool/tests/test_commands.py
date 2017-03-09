@@ -89,7 +89,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForUploadRecordDeletion('fake-provider', 'fake-image',
                                          image.build_id, image.id)
 
-    @skip("Disabled for early v3 development")
     def test_alien_list_fail(self):
         def fail_list(self):
             raise RuntimeError('Fake list error')
@@ -98,7 +97,7 @@ class TestNodepoolCMD(tests.DBTestCase):
             fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")
-        self.patch_argv("-c", configfile, "alien-list")
+        self.patch_argv("-c", configfile, "alien-list", "fakeprovider")
         nodepoolcmd.main()
 
     def test_alien_image_list_empty(self):

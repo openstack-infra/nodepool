@@ -181,30 +181,32 @@ class NodePoolCmd(NodepoolApp):
         self.zk.submitBuildRequest(diskimage)
 
     def alien_list(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
+        self.pool.updateConfig()
 
         t = PrettyTable(["Provider", "Hostname", "Server ID", "IP"])
         t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for provider in self.pool.config.providers.values():
-                if (self.args.provider and
-                        provider.name != self.args.provider):
-                    continue
-                manager = self.pool.getProviderManager(provider)
 
-                try:
-                    for server in manager.listServers():
-                        if not session.getNodeByExternalID(
-                                provider.name, server['id']):
-                            t.add_row([provider.name, server['name'],
-                                       server['id'], server['public_v4']])
-                except Exception as e:
-                    log.warning("Exception listing aliens for %s: %s"
-                                % (provider.name, str(e.message)))
+        for provider in self.pool.config.providers.values():
+            if (self.args.provider and
+                    provider.name != self.args.provider):
+                continue
+            manager = self.pool.getProviderManager(provider)
+
+            try:
+                servers = manager.listServers()
+                known = set([n.external_id for n in self.zk.nodeIterator()
+                             if n.provider == provider.name])
+                for server in servers:
+                    if server.id not in known:
+                        t.add_row([provider.name, server.name,
+                                   server.id, server.public_v4])
+            except Exception as e:
+                log.warning("Exception listing aliens for %s: %s"
+                            % (provider.name, str(e.message)))
         print t
 
     def alien_image_list(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
+        self.pool.updateConfig()
 
         t = PrettyTable(["Provider", "Name", "Image ID"])
         t.align = 'l'
@@ -362,7 +364,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
-                                 'list', 'hold', 'delete'):
+                                 'alien-list', 'list', 'hold', 'delete'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
         else:
