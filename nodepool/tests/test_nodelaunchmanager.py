@@ -54,7 +54,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
         mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
-                                self.pmanager, 1)
+                                self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
             time.sleep(0)
@@ -71,7 +71,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
         mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
-                                self.pmanager, 1)
+                                self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
             time.sleep(0)
@@ -91,7 +91,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n2.state = zk.BUILDING
         n2.type = 'fake-label'
         mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
-                                self.pmanager, 1)
+                                self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         mgr.launch(n2)
         while not mgr.poll():

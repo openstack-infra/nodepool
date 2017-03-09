@@ -170,12 +170,103 @@ class NodeCompleteThread(threading.Thread):
         self.nodepool.deleteNode(node.id)
 
 
-class InstanceDeleter(threading.Thread):
+class StatsReporter(object):
+    '''
+    Class adding statsd reporting functionality.
+    '''
+    def __init__(self):
+        super(StatsReporter, self).__init__()
+        self._statsd = stats.get_client()
+
+    def recordLaunchStats(self, subkey, dt, image_name,
+                          provider_name, node_az, requestor):
+        '''
+        Record node launch statistics.
+
+        :param str subkey: statsd key
+        :param int dt: Time delta in milliseconds
+        :param str image_name: Name of the image used
+        :param str provider_name: Name of the provider
+        :param str node_az: AZ of the launched node
+        :param str requestor: Identifier for the request originator
+        '''
+        if not self._statsd:
+            return
+
+        keys = [
+            'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
+            'nodepool.launch.image.%s.%s' % (image_name, subkey),
+            'nodepool.launch.%s' % (subkey,),
+            ]
+
+        if node_az:
+            keys.append('nodepool.launch.provider.%s.%s.%s' %
+                        (provider_name, node_az, subkey))
+
+        if requestor:
+           keys.append('nodepool.launch.requestor.%s.%s' %
+                       (requestor, subkey))
+
+        for key in keys:
+            self._statsd.timing(key, dt)
+            self._statsd.incr(key)
+
+
+    def updateNodeStats(self, zk_conn, provider):
+        '''
+        Refresh statistics for all known nodes.
+
+        :param ZooKeeper zk_conn: A ZooKeeper connection object.
+        :param Provider provider: A config Provider object.
+        '''
+        if not self._statsd:
+            return
+
+        states = {}
+
+        # Initialize things we know about to zero
+        for state in zk.Node.VALID_STATES:
+            key = 'nodepool.nodes.%s' % state
+            states[key] = 0
+            key = 'nodepool.provider.%s.nodes.%s' % (provider.name, state)
+            states[key] = 0
+
+        for node in zk_conn.nodeIterator():
+            #nodepool.nodes.STATE
+            key = 'nodepool.nodes.%s' % node.state
+            states[key] += 1
+
+            #nodepool.label.LABEL.nodes.STATE
+            key = 'nodepool.label.%s.nodes.%s' % (node.type, node.state)
+            # It's possible we could see node types that aren't in our config
+            if key in states:
+                states[key] += 1
+            else:
+                states[key] = 1
+
+            #nodepool.provider.PROVIDER.nodes.STATE
+            key = 'nodepool.provider.%s.nodes.%s' % (node.provider, node.state)
+            # It's possible we could see providers that aren't in our config
+            if key in states:
+                states[key] += 1
+            else:
+                states[key] = 1
+
+        for key, count in states.items():
+            self._statsd.gauge(key, count)
+
+        #nodepool.provider.PROVIDER.max_servers
+        key = 'nodepool.provider.%s.max_servers' % provider.name
+        self._statsd.gauge(key, provider.max_servers)
+
+
+class InstanceDeleter(threading.Thread, StatsReporter):
     log = logging.getLogger("nodepool.InstanceDeleter")
 
     def __init__(self, zk, manager, node):
         threading.Thread.__init__(self, name='InstanceDeleter for %s %s' %
                                   (node.provider, node.external_id))
+        StatsReporter.__init__(self)
         self._zk = zk
         self._manager = manager
         self._node = node
@@ -209,6 +300,11 @@ class InstanceDeleter(threading.Thread):
 
     def run(self):
         self.delete(self._zk, self._manager, self._node)
+
+        try:
+            self.updateNodeStats(self._zk, self._manager.provider)
+        except Exception:
+            self.log.exception("Exception while reporting stats:")
 
 
 class NodeDeleter(threading.Thread):
@@ -509,9 +605,10 @@ class OLDNodeLauncher(threading.Thread):
                      output=True)
 
 
-class NodeLauncher(threading.Thread):
+class NodeLauncher(threading.Thread, StatsReporter):
 
-    def __init__(self, zk, provider, label, provider_manager, node, retries):
+    def __init__(self, zk, provider, label, provider_manager, requestor,
+                 node, retries):
         '''
         Initialize the launcher.
 
@@ -520,10 +617,12 @@ class NodeLauncher(threading.Thread):
         :param Label label: The Label object for this node type.
         :param ProviderManager provider_manager: The manager object used to
             interact with the selected provider.
+        :param str requestor: Identifier for the request originator.
         :param Node node: The node object.
         :param int retries: Number of times to retry failed launches.
         '''
         threading.Thread.__init__(self, name="NodeLauncher-%s" % node.id)
+        StatsReporter.__init__(self)
         self.log = logging.getLogger("nodepool.NodeLauncher-%s" % node.id)
         self._zk = zk
         self._provider = provider
@@ -531,9 +630,14 @@ class NodeLauncher(threading.Thread):
         self._manager = provider_manager
         self._node = node
         self._retries = retries
+        self._image_name = None
+        self._requestor = requestor
 
     def _launchNode(self):
         config_image = self._provider.images[self._label.image]
+
+        # Stored for statsd reporting
+        self._image_name = config_image.name
 
         cloud_image = self._zk.getMostRecentImageUpload(
             config_image.name, self._provider.name)
@@ -703,18 +807,36 @@ class NodeLauncher(threading.Thread):
         self.log.info("Node id %s is ready", self._node.id)
 
     def run(self):
+        start_time = time.time()
+        statsd_key = 'ready'
+
         try:
             self._run()
-        except Exception:
+        except Exception as e:
             self._node.state = zk.FAILED
             self._zk.storeNode(self._node)
+
+            if hasattr(e, 'statsd_key'):
+                statsd_key = e.statsd_key
+            else:
+                statsd_key = 'error.unknown'
+
+        dt = int((time.time() - start_time) * 1000)
+        try:
+            self.recordLaunchStats(statsd_key, dt, self._image_name,
+                                   self._node.provider, self._node.az,
+                                   self._requestor)
+            self.updateNodeStats(self._zk, self._provider)
+        except Exception:
+            self.log.exception("Exception while reporting stats:")
 
 
 class NodeLaunchManager(object):
     '''
     Handle launching multiple nodes in parallel.
     '''
-    def __init__(self, zk, provider, labels, provider_manager, retries):
+    def __init__(self, zk, provider, labels, provider_manager,
+                 requestor, retries):
         '''
         Initialize the launch manager.
 
@@ -723,6 +845,7 @@ class NodeLaunchManager(object):
         :param dict labels: A dict of config Label objects.
         :param ProviderManager provider_manager: The manager object used to
             interact with the selected provider.
+        :param str requestor: Identifier for the request originator.
         :param int retries: Number of times to retry failed launches.
         '''
         self._retries = retries
@@ -734,6 +857,7 @@ class NodeLaunchManager(object):
         self._provider = provider
         self._labels = labels
         self._manager = provider_manager
+        self._requestor = requestor
 
     @property
     def alive_thread_count(self):
@@ -764,7 +888,7 @@ class NodeLaunchManager(object):
         self._nodes.append(node)
         label = self._labels[node.type]
         t = NodeLauncher(self._zk, self._provider, label, self._manager,
-                         node, self._retries)
+                         self._requestor, node, self._retries)
         t.start()
         self._threads.append(t)
 
@@ -894,9 +1018,9 @@ class NodeRequestHandler(object):
         '''
         self.launch_manager = NodeLaunchManager(
             self.zk, self.provider, self.labels, self.manager,
-            retries=self.provider.launch_retries)
-        ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
+            self.request.requestor, retries=self.provider.launch_retries)
 
+        ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
         chosen_az = None
 
         for ntype in self.request.node_types:
@@ -1922,112 +2046,3 @@ class NodePool(threading.Thread):
                                    node.label_name)
             self.deleteNode(node.id)
         self.log.debug("Finished periodic check")
-
-    def updateStats(self, session, provider_name):
-        if not self.statsd:
-            return
-        # This may be called outside of the main thread.
-
-        states = {}
-
-        #nodepool.nodes.STATE
-        #nodepool.target.TARGET.nodes.STATE
-        #nodepool.label.LABEL.nodes.STATE
-        #nodepool.provider.PROVIDER.nodes.STATE
-        for state in nodedb.STATE_NAMES.values():
-            key = 'nodepool.nodes.%s' % state
-            states[key] = 0
-            for target in self.config.targets.values():
-                key = 'nodepool.target.%s.nodes.%s' % (
-                    target.name, state)
-                states[key] = 0
-            for label in self.config.labels.values():
-                key = 'nodepool.label.%s.nodes.%s' % (
-                    label.name, state)
-                states[key] = 0
-            for provider in self.config.providers.values():
-                key = 'nodepool.provider.%s.nodes.%s' % (
-                    provider.name, state)
-                states[key] = 0
-
-        managers = set()
-
-        for node in session.getNodes():
-            if node.state not in nodedb.STATE_NAMES:
-                continue
-            state = nodedb.STATE_NAMES[node.state]
-            key = 'nodepool.nodes.%s' % state
-            total_nodes = 1
-            states[key] += total_nodes
-
-            # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use
-            # the manager name.
-            #nodepool.manager.MANAGER.nodes.STATE
-            if node.manager_name:
-                key = 'nodepool.manager.%s.nodes.%s' % (
-                    node.manager_name, state)
-                if key not in states:
-                    states[key] = 0
-                managers.add(node.manager_name)
-            else:
-                key = 'nodepool.target.%s.nodes.%s' % (
-                    node.target_name, state)
-            states[key] += total_nodes
-
-            key = 'nodepool.label.%s.nodes.%s' % (
-                node.label_name, state)
-            states[key] += total_nodes
-
-            key = 'nodepool.provider.%s.nodes.%s' % (
-                node.provider_name, state)
-            states[key] += total_nodes
-
-        # NOTE(pabelanger): Initialize other state values to zero if missed
-        # above.
-        #nodepool.manager.MANAGER.nodes.STATE
-        for state in nodedb.STATE_NAMES.values():
-            for manager_name in managers:
-                key = 'nodepool.manager.%s.nodes.%s' % (
-                    manager_name, state)
-                if key not in states:
-                    states[key] = 0
-
-        for key, count in states.items():
-            self.statsd.gauge(key, count)
-
-        #nodepool.provider.PROVIDER.max_servers
-        for provider in self.config.providers.values():
-            key = 'nodepool.provider.%s.max_servers' % provider.name
-            self.statsd.gauge(key, provider.max_servers)
-
-    def launchStats(self, subkey, dt, image_name,
-                    provider_name, target_name, node_az, manager_name):
-        if not self.statsd:
-            return
-        #nodepool.launch.provider.PROVIDER.subkey
-        #nodepool.launch.image.IMAGE.subkey
-        #nodepool.launch.subkey
-        keys = [
-            'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
-            'nodepool.launch.image.%s.%s' % (image_name, subkey),
-            'nodepool.launch.%s' % (subkey,),
-            ]
-        if node_az:
-            #nodepool.launch.provider.PROVIDER.AZ.subkey
-            keys.append('nodepool.launch.provider.%s.%s.%s' %
-                        (provider_name, node_az, subkey))
-
-        if manager_name:
-            # NOTE(pabelanger): Check if we assign nodes via Gearman if so, use
-            # the manager name.
-            #nodepool.launch.manager.MANAGER.subkey
-            keys.append('nodepool.launch.manager.%s.%s' %
-                        (manager_name, subkey))
-        else:
-            #nodepool.launch.target.TARGET.subkey
-            keys.append('nodepool.launch.target.%s.%s' %
-                        (target_name, subkey))
-
-        for key in keys:
-            self.statsd.timing(key, dt)
-            self.statsd.incr(key)
