@@ -1155,7 +1155,8 @@ class NodePool(threading.Thread):
             self.log.debug("Waiting for %s" % thd.name)
             thd.join()
 
-        self.join()
+        if self.isAlive():
+            self.join()
         self.zk.disconnect()
         self.log.debug("Finished stopping")
 

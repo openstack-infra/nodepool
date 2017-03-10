@@ -20,8 +20,6 @@ import shade
 import testtools
 import yaml
 
-from unittest import skip
-
 from nodepool import config as nodepool_config
 from nodepool import provider_manager
 from nodepool import tests
@@ -75,7 +73,6 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pm.start()
         self.assertEqual(pm._client.auth, auth_data)
 
-    @skip("Disabled for early v3 development")
     def test_nodepool_osc_config_reload(self):
         configfile = self.setup_config('integration_osc.yaml')
         auth_data = {'username': 'os_real',
