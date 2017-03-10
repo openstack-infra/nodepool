@@ -21,8 +21,6 @@ import fixtures
 import mock
 import testtools
 
-from unittest import skip
-
 from nodepool.cmd import nodepoolcmd
 from nodepool import tests
 from nodepool import zk
@@ -268,22 +266,3 @@ class TestNodepoolCMD(tests.DBTestCase):
 
         self.waitForImage('fake-provider', 'fake-image', [image])
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 2)
-
-    @skip("Disabled for early v3 development")
-    def test_job_create(self):
-        configfile = self.setup_config('node.yaml')
-        self.patch_argv("-c", configfile, "job-create", "fake-job",
-                        "--hold-on-failure", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
-
-    @skip("Disabled for early v3 development")
-    def test_job_delete(self):
-        configfile = self.setup_config('node.yaml')
-        self.patch_argv("-c", configfile, "job-create", "fake-job",
-                        "--hold-on-failure", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
-        self.patch_argv("-c", configfile, "job-delete", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 0, 1, 0)
