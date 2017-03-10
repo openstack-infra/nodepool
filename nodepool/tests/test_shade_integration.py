@@ -57,14 +57,14 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         self.assertEqual(pm._client.auth, auth_data)
         self.assertEqual(pm._client.region_name, 'real-region')
 
-    def test_nodepool_osc_config(self):
-        configfile = self.setup_config('integration_osc.yaml')
+    def test_nodepool_occ_config(self):
+        configfile = self.setup_config('integration_occ.yaml')
         auth_data = {'username': 'os_real',
                      'project_name': 'os_real',
                      'password': 'os_real',
                      'auth_url': 'os_real'}
-        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
-        self._use_cloud_config(osc_config)
+        occ_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
+        self._use_cloud_config(occ_config)
 
         config = nodepool_config.loadConfig(configfile)
         self.assertIn('real-provider', config.providers)
@@ -73,14 +73,14 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pm.start()
         self.assertEqual(pm._client.auth, auth_data)
 
-    def test_nodepool_osc_config_reload(self):
-        configfile = self.setup_config('integration_osc.yaml')
+    def test_nodepool_occ_config_reload(self):
+        configfile = self.setup_config('integration_occ.yaml')
         auth_data = {'username': 'os_real',
                      'project_name': 'os_real',
                      'password': 'os_real',
                      'auth_url': 'os_real'}
-        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
-        self._use_cloud_config(osc_config)
+        occ_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
+        self._use_cloud_config(occ_config)
 
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
@@ -91,7 +91,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         auth_data['password'] = 'os_new_real'
         os.remove(self.clouds_path)
         with open(self.clouds_path, 'w') as h:
-            yaml.safe_dump(osc_config, h)
+            yaml.safe_dump(occ_config, h)
 
         pool.updateConfig()
         provider_manager = pool.config.provider_managers['real-provider']
