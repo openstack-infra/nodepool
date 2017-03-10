@@ -113,7 +113,9 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        # NOTE(pabelanger): Disable CleanupWorker thread for nodepool-builder
+        # as we currently race it to validate our failed uploads.
+        self._useBuilder(configfile, cleanup_interval=0)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')

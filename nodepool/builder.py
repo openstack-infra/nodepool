@@ -1114,18 +1114,19 @@ class NodePoolBuilder(object):
                 w.start()
                 self._upload_workers.append(w)
 
-            self._janitor = CleanupWorker(0, self._config_path,
-                                          self.cleanup_interval, self.zk)
-            self._janitor.start()
+            if self.cleanup_interval > 0:
+                self._janitor = CleanupWorker(
+                    0, self._config_path, self.cleanup_interval, self.zk)
+                self._janitor.start()
 
             # Wait until all threads are running. Otherwise, we have a race
             # on the worker _running attribute if shutdown() is called before
             # run() actually begins.
+            workers = self._build_workers + self._upload_workers
+            if self._janitor:
+                workers += [self._janitor]
             while not all([
-                x.running for x in (self._build_workers
-                                    + self._upload_workers
-                                    + [self._janitor])
-            ]):
+                x.running for x in (workers)]):
                 time.sleep(0)
 
     def stop(self):
@@ -1138,10 +1139,10 @@ class NodePoolBuilder(object):
         '''
         with self._start_lock:
             self.log.debug("Stopping. NodePoolBuilder shutting down workers")
-            for worker in (self._build_workers
-                           + self._upload_workers
-                           + [self._janitor]
-            ):
+            workers = self._build_workers + self._upload_workers
+            if self._janitor:
+                workers += [self._janitor]
+            for worker in (workers):
                 worker.shutdown()
 
         self._running = False
@@ -1149,10 +1150,7 @@ class NodePoolBuilder(object):
         self.log.debug('Waiting for jobs to complete')
 
         # Do not exit until all of our owned threads exit.
-        for worker in (self._build_workers
-                       + self._upload_workers
-                       + [self._janitor]
-        ):
+        for worker in (workers):
             worker.join()
 
         self.log.debug('Terminating ZooKeeper connection')
