@@ -15,7 +15,6 @@
 
 import os
 import fixtures
-from unittest import skip
 
 from nodepool import builder, exceptions, fakeprovider, tests
 from nodepool import zk
@@ -96,7 +95,6 @@ class TestNodePoolBuilder(tests.DBTestCase):
         nb.start()
         nb.stop()
 
-    @skip("Disabled for early v3 development")
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
 
