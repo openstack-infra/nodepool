@@ -17,14 +17,12 @@ import json
 import logging
 import urllib2
 
-from unittest import skip
 from nodepool import tests
 
 
 class TestWebApp(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestWebApp")
 
-    @skip("Disabled for early v3 development")
     def test_image_list(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -35,7 +33,7 @@ class TestWebApp(tests.DBTestCase):
         port = webapp.server.socket.getsockname()[1]
 
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        self.waitForNodes('fake-label')
 
         req = urllib2.Request(
             "http://localhost:%s/image-list" % port)
@@ -45,7 +43,6 @@ class TestWebApp(tests.DBTestCase):
         data = f.read()
         self.assertTrue('fake-image' in data)
 
-    @skip("Disabled for early v3 development")
     def test_dib_image_list_json(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -56,7 +53,7 @@ class TestWebApp(tests.DBTestCase):
         port = webapp.server.socket.getsockname()[1]
 
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        self.waitForNodes('fake-label')
 
         req = urllib2.Request(
             "http://localhost:%s/dib-image-list.json" % port)
