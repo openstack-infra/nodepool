@@ -407,8 +407,10 @@ class NodeLauncher(threading.Thread, StatsReporter):
                 self._launchNode()
                 break
             except Exception:
-                self.log.exception("Launch attempt %d/%d failed for node %s:",
-                    attempts, self._retries, self._node.id)
+                if attempts <= self._retries:
+                    self.log.exception(
+                        "Launch attempt %d/%d failed for node %s:",
+                        attempts, self._retries, self._node.id)
                 # If we created an instance, delete it.
                 if self._node.external_id:
                     self._manager.cleanupServer(self._node.external_id)
@@ -432,6 +434,8 @@ class NodeLauncher(threading.Thread, StatsReporter):
         try:
             self._run()
         except Exception as e:
+            self.log.exception("Launch failed for node %s:",
+                               self._node.id)
             self._node.state = zk.FAILED
             self._zk.storeNode(self._node)
 
@@ -440,8 +444,8 @@ class NodeLauncher(threading.Thread, StatsReporter):
             else:
                 statsd_key = 'error.unknown'
 
-        dt = int((time.time() - start_time) * 1000)
         try:
+            dt = int((time.time() - start_time) * 1000)
             self.recordLaunchStats(statsd_key, dt, self._image_name,
                                    self._node.provider, self._node.az,
                                    self._requestor)
