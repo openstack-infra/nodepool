@@ -207,23 +207,15 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(nodes[0].provider, 'fake-provider')
         self.assertEqual(nodes[0].type, 'fake-label')
 
-
-    @skip("Disabled for early v3 development")
     def test_disabled_label(self):
-        """Test that an image and node are not created"""
+        """Test that a node is not created with min-ready=0"""
         configfile = self.setup_config('node_disabled_label.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 0)
+        self.assertEqual([], self.zk.getNodeRequests())
+        self.assertEqual([], self.zk.getNodes())
 
     def test_node_net_name(self):
         """Test that a node is created with a net name"""
