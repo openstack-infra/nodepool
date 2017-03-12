@@ -36,6 +36,3 @@ providers:
       - name: fake-dib-image
         min-ram: 8192
         diskimage: fake-dib-image
-
-targets:
-  - name: fake-jenkins

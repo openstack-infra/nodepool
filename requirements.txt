@@ -1,7 +1,6 @@
 pbr>=1.3
 
 PyYAML
-python-jenkins
 paramiko>1.11.6,<2.0.0
 python-daemon>=2.0.4,<2.1.0
 extras

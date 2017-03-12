@@ -65,9 +65,6 @@ providers:
         user-home: /home/jenkins
         private-key: /home/nodepool/.ssh/id_rsa
 
-targets:
-  - name: zuul
-
 diskimages:
   - name: trusty
     formats:

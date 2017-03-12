@@ -184,11 +184,6 @@ zookeeper-servers:
   - host: localhost
     port: 2181
 
-# Need to have at least one target for node allocations, but
-# this does not need to be a jenkins target.
-targets:
-  - name: dummy
-
 cron:
   cleanup: '*/1 * * * *'
   check: '*/15 * * * *'

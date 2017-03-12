@@ -51,9 +51,6 @@ providers:
     rate: 0.0001
     images: []
 
-targets:
-  - name: fake-target
-
 diskimages:
   - name: fake-image
     elements:
