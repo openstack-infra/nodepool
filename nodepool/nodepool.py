@@ -600,6 +600,23 @@ class NodeRequestHandler(object):
                 return False
         return True
 
+    def _invalidNodeTypes(self):
+        '''
+        Return any node types that are invalid for this provider.
+
+        :returns: A list of node type names that are invalid, or an empty
+            list if all are valid.
+        '''
+        invalid = []
+        for ntype in self.request.node_types:
+            if ntype not in self.labels:
+                invalid.append(ntype)
+            else:
+                label = self.labels[ntype]
+                if self.provider.name not in label.providers.keys():
+                    invalid.append(ntype)
+        return invalid
+
     def _countNodes(self):
         '''
         Query ZooKeeper to determine the number of provider nodes launched.
@@ -733,6 +750,11 @@ class NodeRequestHandler(object):
             declined_reasons.append('images are not available')
         if len(self.request.node_types) > self.provider.max_servers:
             declined_reasons.append('it would exceed quota')
+        invalid_types = self._invalidNodeTypes()
+        if invalid_types:
+            declined_reasons.append('node type(s) [%s] not available' %
+                                    ','.join(invalid_types))
+
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))
