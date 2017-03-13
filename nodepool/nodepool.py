@@ -171,12 +171,13 @@ class InstanceDeleter(threading.Thread, StatsReporter):
         self._node = node
 
     @staticmethod
-    def delete(zk, manager, node, node_exists=True):
+    def delete(zk_conn, manager, node, node_exists=True):
         '''
         Delete a server instance and ZooKeeper node.
 
         This is a class method so we can support instantaneous deletes.
 
+        :param ZooKeeper zk_conn: A ZooKeeper object to use.
         :param ProviderManager manager: ProviderManager object to use for
             deleting the server.
         :param Node node: A locked Node object that describes the server to
@@ -186,6 +187,8 @@ class InstanceDeleter(threading.Thread, StatsReporter):
             a leaked instance.
         '''
         try:
+            node.state = zk.DELETING
+            zk_conn.storeNode(node)
             manager.cleanupServer(node.external_id)
             manager.waitForServerDeletion(node.external_id)
         except provider_manager.NotFound:
@@ -197,15 +200,15 @@ class InstanceDeleter(threading.Thread, StatsReporter):
                 node.external_id, node.provider)
             # Don't delete the ZK node in this case, but do unlock it
             if node_exists:
-                zk.unlockNode(node)
+                zk_conn.unlockNode(node)
             return
 
         if node_exists:
             InstanceDeleter.log.info(
                 "Deleting ZK node id=%s, state=%s, external_id=%s",
                 node.id, node.state, node.external_id)
-            zk.unlockNode(node)
-            zk.deleteNode(node)
+            # This also effectively releases the lock
+            zk_conn.deleteNode(node)
 
     def run(self):
         # Since leaked instances won't have an actual node in ZooKeeper,
