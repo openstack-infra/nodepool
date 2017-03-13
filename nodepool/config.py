@@ -131,12 +131,10 @@ def loadConfig(config_path):
 
     newconfig = Config()
     newconfig.db = None
-    newconfig.dburi = None
     newconfig.providers = {}
     newconfig.labels = {}
     newconfig.elementsdir = config.get('elements-dir')
     newconfig.imagesdir = config.get('images-dir')
-    newconfig.dburi = None
     newconfig.provider_managers = {}
     newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}
@@ -277,7 +275,7 @@ def loadSecureConfig(config, secure_config_path):
     secure = ConfigParser.ConfigParser()
     secure.readfp(open(secure_config_path))
 
-    config.dburi = secure.get('database', 'dburi')
+    #config.dburi = secure.get('database', 'dburi')
 
 
 def _cloudKwargsFromProvider(provider):

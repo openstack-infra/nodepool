@@ -105,7 +105,6 @@ class ConfigValidator:
         top_level = {
             'elements-dir': str,
             'images-dir': str,
-            'dburi': str,
             'zookeeper-servers': [{
                 'host': str,
                 'port': int,

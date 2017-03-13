@@ -101,7 +101,6 @@ EOF
 function nodepool_write_config {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)
     sudo mkdir -p $(dirname $NODEPOOL_SECURE)
-    local dburi=$(database_connection_url nodepool)
 
     cat > /tmp/logging.conf <<EOF
 [formatters]
@@ -149,12 +148,7 @@ EOF
     sudo mv /tmp/logging.conf $NODEPOOL_LOGGING
 
     cat > /tmp/secure.conf << EOF
-[database]
-# The mysql password here may be different depending on your
-# devstack install, you should double check it (the devstack var
-# is MYSQL_PASSWORD and if unset devstack should prompt you for
-# the value).
-dburi: $dburi
+# Empty
 EOF
     sudo mv /tmp/secure.conf $NODEPOOL_SECURE
 
@@ -174,11 +168,6 @@ EOF
 # example element.
 elements-dir: $(dirname $NODEPOOL_CONFIG)/elements
 images-dir: $NODEPOOL_DIB_BASE_PATH/images
-# The mysql password here may be different depending on your
-# devstack install, you should double check it (the devstack var
-# is MYSQL_PASSWORD and if unset devstack should prompt you for
-# the value).
-dburi: '$dburi'
 
 zookeeper-servers:
   - host: localhost
@@ -378,7 +367,6 @@ EOF
     mkdir -p $HOME/.cache/openstack/
 }
 
-# Initialize database
 # Create configs
 # Setup custom flavor
 function configure_nodepool {
@@ -390,10 +378,6 @@ function configure_nodepool {
 
     # write the elements
     nodepool_write_elements
-
-    # builds a fresh db
-    recreate_database nodepool
-
 }
 
 function start_nodepool {
