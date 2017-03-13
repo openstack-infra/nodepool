@@ -772,6 +772,7 @@ class TestZKModel(tests.BaseTestCase):
         o.external_id = 'ABCD'
         o.hostname = 'xyz'
         o.comment = 'comment'
+        o.host_keys = ['key1', 'key2']
 
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -790,6 +791,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['external_id'], o.external_id)
         self.assertEqual(d['hostname'], o.hostname)
         self.assertEqual(d['comment'], o.comment)
+        self.assertEqual(d['host_keys'], o.host_keys)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -810,6 +812,7 @@ class TestZKModel(tests.BaseTestCase):
             'external_id': 'ABCD',
             'hostname': 'xyz',
             'comment': 'comment',
+            'host_keys': ['key1', 'key2'],
         }
 
         o = zk.Node.fromDict(d, node_id)
@@ -829,3 +832,4 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.hostname , d['hostname'])
         self.assertEqual(o.comment , d['comment'])
+        self.assertEqual(o.host_keys , d['host_keys'])

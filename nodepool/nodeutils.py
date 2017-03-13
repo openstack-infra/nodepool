@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import errno
 import time
 import socket
@@ -73,3 +74,34 @@ def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
     if "access okay" in out:
         return client
     return None
+
+
+def keyscan(ip):
+    '''
+    Scan the IP address for public SSH keys.
+
+    Keys are returned formatted as: "<type> <base64_string>"
+    '''
+    if 'fake' in ip:
+        return ['ssh-rsa FAKEKEY']
+
+    keys = []
+
+    key = None
+    try:
+        t = paramiko.transport.Transport('%s:%s' % (ip, "22"))
+        t.start_client()
+        key = t.get_remote_server_key()
+        t.close()
+    except Exception as e:
+        log.exception("ssh-keyscan failure: %s", e)
+
+    # Paramiko, at this time, seems to return only the ssh-rsa key, so
+    # only the single key is placed into the list.
+    if key:
+        keys.append(
+            "%s %s" % (key.get_name(),
+                       base64.encodestring(str(key)).replace('\n', ''))
+        )
+
+    return keys
