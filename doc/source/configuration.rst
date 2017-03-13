@@ -4,23 +4,8 @@ Configuration
 =============
 
 Nodepool reads its secure configuration from ``/etc/nodepool/secure.conf``
-by default. The secure file is a standard ini config file, with
-one section for the database.
-
-  [database]
-  dburi={dburi}
-
-Following settings are available::
-
-**required**
-
-  ``dburi``
-  Indicates the URI for the database connection.  See the `SQLAlchemy
-  documentation
-  <http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls>`_
-  for the syntax.  Example::
-
-    dburi='mysql+pymysql://nodepool@localhost/nodepool'
+by default. The secure file is a standard ini config file. Note that this
+file is currently unused, but may be in the future.
 
 Nodepool reads its configuration from ``/etc/nodepool/nodepool.yaml``
 by default.  The configuration file follows the standard YAML syntax

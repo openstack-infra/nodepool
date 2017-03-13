@@ -18,17 +18,14 @@
 import glob
 import logging
 import os
-import pymysql
 import random
 import string
 import subprocess
 import threading
 import tempfile
 import time
-import uuid
 
 import fixtures
-import lockfile
 import kazoo.client
 import testtools
 
@@ -230,47 +227,6 @@ class RoundRobinTestCase(object):
                                                          self.allocations))
 
 
-class MySQLSchemaFixture(fixtures.Fixture):
-    def setUp(self):
-        super(MySQLSchemaFixture, self).setUp()
-
-        random_bits = ''.join(random.choice(string.ascii_lowercase +
-                                            string.ascii_uppercase)
-                              for x in range(8))
-        self.name = '%s_%s' % (random_bits, os.getpid())
-        self.passwd = uuid.uuid4().hex
-        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
-        with lock:
-            db = pymysql.connect(host="localhost",
-                                 user="openstack_citest",
-                                 passwd="openstack_citest",
-                                 db="openstack_citest")
-            cur = db.cursor()
-            cur.execute("create database %s" % self.name)
-            cur.execute(
-                "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
-                (self.name, self.name, self.passwd))
-            cur.execute("flush privileges")
-
-        self.dburi = 'mysql+pymysql://%s:%s@localhost/%s' % (self.name,
-                                                             self.passwd,
-                                                             self.name)
-        self.addDetail('dburi', testtools.content.text_content(self.dburi))
-        self.addCleanup(self.cleanup)
-
-    def cleanup(self):
-        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
-        with lock:
-            db = pymysql.connect(host="localhost",
-                                 user="openstack_citest",
-                                 passwd="openstack_citest",
-                                 db="openstack_citest")
-            cur = db.cursor()
-            cur.execute("drop database %s" % self.name)
-            cur.execute("drop user '%s'@'localhost'" % self.name)
-            cur.execute("flush privileges")
-
-
 class BuilderFixture(fixtures.Fixture):
     def __init__(self, configfile, cleanup_interval):
         super(BuilderFixture, self).__init__()
@@ -296,9 +252,6 @@ class DBTestCase(BaseTestCase):
     def setUp(self):
         super(DBTestCase, self).setUp()
         self.log = logging.getLogger("tests")
-        f = MySQLSchemaFixture()
-        self.useFixture(f)
-        self.dburi = f.dburi
         self.secure_conf = self._setup_secure()
         self.setupZK()
 
@@ -333,7 +286,8 @@ class DBTestCase(BaseTestCase):
         (fd, path) = tempfile.mkstemp()
         with open(configfile) as conf_fd:
             config = conf_fd.read()
-            os.write(fd, config.format(dburi=self.dburi))
+            os.write(fd, config)
+            #os.write(fd, config.format(dburi=self.dburi))
         os.close(fd)
         return path
 
