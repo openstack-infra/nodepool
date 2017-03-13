@@ -563,15 +563,26 @@ class NodeRequestHandler(object):
         :param NodeRequest request: The request to handle.
         '''
         self.log = logging.getLogger("nodepool.NodeRequestHandler")
-        self.provider = pw.getProviderConfig()
-        self.zk = pw.getZK()
-        self.labels = pw.getLabelsConfig()
-        self.manager = pw.getProviderManager()
-        self.launcher_id = pw.launcher_id
+        self.pw = pw
         self.request = request
         self.launch_manager = None
         self.nodeset = []
         self.done = False
+        self.chosen_az = None
+        self.paused = False
+
+    def _setFromProviderWorker(self):
+        '''
+        Set values that we pull from the parent ProviderWorker.
+
+        We don't do this in __init__ because this class is re-entrant and we
+        want the updated values.
+        '''
+        self.provider = self.pw.getProviderConfig()
+        self.zk = self.pw.getZK()
+        self.labels = self.pw.getLabelsConfig()
+        self.manager = self.pw.getProviderManager()
+        self.launcher_id = self.pw.launcher_id
 
     def _imagesAvailable(self):
         '''
@@ -605,20 +616,6 @@ class NodeRequestHandler(object):
                 count += 1
         return count
 
-    def _unlockNodeSet(self):
-        '''
-        Attempt unlocking all Nodes in the object node set.
-        '''
-        for node in self.nodeset:
-            if not node.lock:
-                continue
-            try:
-                self.zk.unlockNode(node)
-            except Exception:
-                self.log.exception("Error unlocking node:")
-            self.log.debug("Unlocked node %s for request %s",
-                           node.id, self.request.id)
-
     def _waitForNodeSet(self):
         '''
         Fill node set for the request.
@@ -643,12 +640,12 @@ class NodeRequestHandler(object):
             launcher has already started doing so. This would cause an
             expected failure from the underlying library, which is ok for now.
         '''
-        self.launch_manager = NodeLaunchManager(
-            self.zk, self.provider, self.labels, self.manager,
-            self.request.requestor, retries=self.provider.launch_retries)
+        if not self.launch_manager:
+            self.launch_manager = NodeLaunchManager(
+                self.zk, self.provider, self.labels, self.manager,
+                self.request.requestor, retries=self.provider.launch_retries)
 
         ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
-        chosen_az = None
 
         for ntype in self.request.node_types:
             # First try to grab from the list of already available nodes.
@@ -659,7 +656,7 @@ class NodeRequestHandler(object):
                     # the selected AZ.
                     if node.provider != self.provider.name:
                         continue
-                    if chosen_az and node.az != chosen_az:
+                    if self.chosen_az and node.az != self.chosen_az:
                         continue
 
                     try:
@@ -679,34 +676,37 @@ class NodeRequestHandler(object):
                         # If we haven't already chosen an AZ, select the
                         # AZ from this ready node. This will cause new nodes
                         # to share this AZ, as well.
-                        if not chosen_az and node.az:
-                            chosen_az = node.az
+                        if not self.chosen_az and node.az:
+                            self.chosen_az = node.az
                         break
 
             # Could not grab an existing node, so launch a new one.
             if not got_a_node:
                 # Select grouping AZ if we didn't set AZ from a selected,
                 # pre-existing node
-                if not chosen_az and self.provider.azs:
-                    chosen_az = random.choice(self.provider.azs)
-
-                logged = False
+                if not self.chosen_az and self.provider.azs:
+                    self.chosen_az = random.choice(self.provider.azs)
 
                 # If we calculate that we're at capacity, pause until nodes
                 # are released by Zuul and removed by the NodeCleanupWorker.
-                while self._countNodes() >= self.provider.max_servers:
-                    if not logged:
+                if self._countNodes() >= self.provider.max_servers:
+                    self.paused = True
+                    if not self.pw.paused:
                         self.log.debug(
                             "Pausing request handling to satisfy request %s",
                              self.request)
-                        logged = True
-                    time.sleep(1)
+                        self.pw.paused = True
+                    return
+
+                if self.paused:
+                    self.log.debug("Unpaused request %s", self.request)
+                    self.paused = False
 
                 node = zk.Node()
                 node.state = zk.INIT
                 node.type = ntype
                 node.provider = self.provider.name
-                node.az = chosen_az
+                node.az = self.chosen_az
                 node.launcher = self.launcher_id
                 node.allocated_to = self.request.id
 
@@ -731,6 +731,8 @@ class NodeRequestHandler(object):
         '''
         Main body for the NodeRequestHandler.
         '''
+        self._setFromProviderWorker()
+
         declined_reasons = []
         if not self._imagesAvailable():
             declined_reasons.append('images are not available')
@@ -746,25 +748,67 @@ class NodeRequestHandler(object):
                                self.request.id)
                 # All launchers have declined it
                 self.request.state = zk.FAILED
+            self.unlockNodeSet(clear_allocation=True)
             self.zk.storeNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
             self.done = True
             return
 
-        self.log.debug("Accepting node request %s", self.request.id)
-        self.request.state = zk.PENDING
-        self.zk.storeNodeRequest(self.request)
+        if self.paused:
+            self.log.debug("Retrying node request %s", self.request.id)
+        else:
+            self.log.debug("Accepting node request %s", self.request.id)
+            self.request.state = zk.PENDING
+            self.zk.storeNodeRequest(self.request)
+
         self._waitForNodeSet()
 
     @property
     def alive_thread_count(self):
         return self.launch_manager.alive_thread_count
 
+    #----------------------------------------------------------------
+    # Public methods
+    #----------------------------------------------------------------
+
+    def unlockNodeSet(self, clear_allocation=False):
+        '''
+        Attempt unlocking all Nodes in the node set.
+
+        :param bool clear_allocation: If true, clears the node allocated_to
+            attribute.
+        '''
+        for node in self.nodeset:
+            if not node.lock:
+                continue
+
+            if clear_allocation:
+                node.allocated_to = None
+                self.zk.storeNode(node)
+
+            try:
+                self.zk.unlockNode(node)
+            except Exception:
+                self.log.exception("Error unlocking node:")
+            self.log.debug("Unlocked node %s for request %s",
+                           node.id, self.request.id)
+
+        self.nodeset = []
+
     def run(self):
+        '''
+        Execute node request handling.
+
+        This code is designed to be re-entrant. Because we can't always
+        satisfy a request immediately (due to lack of provider resources), we
+        need to be able to call run() repeatedly until the request can be
+        fulfilled. The node set is saved and added to between calls.
+        '''
         try:
             self._run()
         except Exception:
             self.log.exception("Exception in NodeRequestHandler:")
+            self.unlockNodeSet(clear_allocation=True)
             self.request.state = zk.FAILED
             self.zk.storeNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
@@ -793,7 +837,7 @@ class NodeRequestHandler(object):
             for node in self.nodeset:
                 node.allocated_to = None
                 self.zk.storeNode(node)
-            self._unlockNodeSet()
+            self.unlockNodeSet()
             return True
 
         if self.launch_manager.failed_nodes:
@@ -817,7 +861,7 @@ class NodeRequestHandler(object):
                            self.request.id)
             self.request.state = zk.FULFILLED
 
-        self._unlockNodeSet()
+        self.unlockNodeSet()
         self.zk.storeNodeRequest(self.request)
         self.zk.unlockNodeRequest(self.request)
         return True
@@ -841,6 +885,7 @@ class ProviderWorker(threading.Thread):
         self.nodepool = nodepool
         self.provider_name = provider_name
         self.running = False
+        self.paused = False
         self.request_handlers = []
         self.watermark_sleep = nodepool.watermark_sleep
         self.zk = self.getZK()
@@ -878,6 +923,9 @@ class ProviderWorker(threading.Thread):
             return
 
         for req_id in self.zk.getNodeRequests():
+            if self.paused:
+                return
+
             # Short-circuit for limited request handling
             if (provider.max_concurrency > 0
                 and self._activeThreads() >= provider.max_concurrency
@@ -919,7 +967,7 @@ class ProviderWorker(threading.Thread):
         '''
         active_handlers = []
         for r in self.request_handlers:
-            if not r.poll():
+            if r.paused or not r.poll():
                 active_handlers.append(r)
         self.request_handlers = active_handlers
 
@@ -952,11 +1000,32 @@ class ProviderWorker(threading.Thread):
             self.zk.registerLauncher(self.launcher_id)
 
             try:
-                self._assignHandlers()
+                if not self.paused:
+                    self._assignHandlers()
+                else:
+                    # If we are paused, one request handler could not satisify
+                    # its assigned request, so we need to find it and give it
+                    # another shot (there can be only 1). Unpause ourselves if
+                    # it completed.
+                    completed = True
+                    for handler in self.request_handlers:
+                        if handler.paused:
+                            self.log.debug("Re-run handler %s", handler)
+                            handler.run()
+                            completed = False
+                            break
+                    if completed:
+                        self.paused = False
+
                 self._removeCompletedHandlers()
             except Exception:
                 self.log.exception("Error in ProviderWorker:")
             time.sleep(self.watermark_sleep)
+
+        # Cleanup on exit
+        if self.paused:
+            for handler in self.request_handlers:
+                handler.unlockNodeSet(clear_allocation=True)
 
     def stop(self):
         '''

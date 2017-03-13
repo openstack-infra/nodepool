@@ -74,6 +74,85 @@ class TestNodepool(tests.DBTestCase):
         self.zk.deleteNodeRequest(req)
         self.waitForNodeRequestLockDeletion(req.id)
 
+    def test_node_assignment_at_quota(self):
+        '''
+        Successful node launch should have unlocked nodes in READY state
+        and assigned to the request.
+        '''
+        configfile = self.setup_config('node_quota.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        nodepool.nodepool.LOCK_CLEANUP = 1
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.wait_for_config(pool)
+
+        client = pool.getProviderManager('fake-provider')._getClient()
+
+        # One of the things we want to test is that if spawn many node
+        # launches at once, we do not deadlock while the request
+        # handler pauses for quota.  To ensure we test that case,
+        # pause server creation until we have accepted all of the node
+        # requests we submit.  This will ensure that we hold locks on
+        # all of the nodes before pausing so that we can validate they
+        # are released.
+        client.pause_creates = True
+
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.node_types.append('fake-label')
+        req1.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req1)
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        req2.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req2)
+
+        req1 = self.waitForNodeRequest(req1, (zk.PENDING,))
+        req2 = self.waitForNodeRequest(req2, (zk.PENDING,))
+
+        # At this point, we should be about to create or have already
+        # created two servers for the first request, and the request
+        # handler has accepted the second node request but paused
+        # waiting for the server count to go below quota.
+
+        # Wait until both of the servers exist.
+        while len(client._server_list) < 2:
+            time.sleep(0.1)
+
+        # Allow the servers to finish being created.
+        for server in client._server_list:
+            server.event.set()
+
+        self.log.debug("Waiting for 1st request %s", req1.id)
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+        self.assertEqual(len(req1.nodes), 2)
+
+        # Mark the first request's nodes as USED, which will get them deleted
+        # and allow the second to proceed.
+        self.log.debug("Deleting 1st request %s", req1.id)
+        for node_id in req1.nodes:
+            node = self.zk.getNode(node_id)
+            node.state = zk.USED
+            self.zk.storeNode(node)
+        self.zk.deleteNodeRequest(req1)
+        self.waitForNodeRequestLockDeletion(req1.id)
+
+        # Wait until both of the servers exist.
+        while len(client._server_list) < 2:
+            time.sleep(0.1)
+
+        # Allow the servers to finish being created.
+        for server in client._server_list:
+            server.event.set()
+
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FULFILLED)
+        self.assertEqual(len(req2.nodes), 2)
+
     def test_fail_request_on_launch_failure(self):
         '''
         Test that provider launch error fails the request.

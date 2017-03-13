@@ -75,6 +75,7 @@ class FakeOpenStackCloud(object):
     log = logging.getLogger("nodepool.FakeOpenStackCloud")
 
     def __init__(self, images=None, networks=None):
+        self.pause_creates = False
         self._image_list = images
         if self._image_list is None:
             self._image_list = [
@@ -151,7 +152,8 @@ class FakeOpenStackCloud(object):
                   metadata=kw.get('meta', {}),
                   manager=self,
                   key_name=kw.get('key_name', None),
-                  should_fail=should_fail)
+                  should_fail=should_fail,
+                  event=threading.Event())
         instance_list.append(s)
         t = threading.Thread(target=self._finish,
                              name='FakeProvider create',
@@ -170,7 +172,13 @@ class FakeOpenStackCloud(object):
         self.log.debug("Deleted from %s" % (repr(instance_list),))
 
     def _finish(self, obj, delay, status):
-        time.sleep(delay)
+        self.log.debug("Pause creates %s", self.pause_creates)
+        if self.pause_creates:
+            self.log.debug("Pausing")
+            obj.event.wait()
+            self.log.debug("Continuing")
+        else:
+            time.sleep(delay)
         obj.status = status
 
     def create_image(self, **kwargs):
@@ -223,7 +231,8 @@ class FakeOpenStackCloud(object):
         return result
 
     def wait_for_server(self, server, **kwargs):
-        server.status = 'ACTIVE'
+        while server.status == 'BUILD':
+            time.sleep(0.1)
         return server
 
     def list_servers(self):

@@ -462,13 +462,15 @@ class DBTestCase(BaseTestCase):
         self.wait_for_threads()
         return ready_nodes[label]
 
-    def waitForNodeRequest(self, req):
+    def waitForNodeRequest(self, req, states=None):
         '''
         Wait for a node request to transition to a final state.
         '''
+        if states is None:
+            states = (zk.FULFILLED, zk.FAILED)
         while True:
             req = self.zk.getNodeRequest(req.id)
-            if req.state in (zk.FULFILLED, zk.FAILED):
+            if req.state in states:
                 break
             time.sleep(1)
 
