@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import time
 from unittest import skip
@@ -539,130 +538,6 @@ class TestNodepool(tests.DBTestCase):
             self.assertEqual(images[0].state, nodedb.READY)
             # should be second image built.
             self.assertEqual(images[0].id, 2)
-
-    @skip("Disabled for early v3 development")
-    def test_job_start_event(self):
-        """Test that job start marks node used"""
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        msg_obj = {'name': 'fake-job',
-                   'build': {'node_name': 'fake-label-fake-provider-1'}}
-        json_string = json.dumps(msg_obj)
-        handler = nodepool.nodepool.NodeUpdateListener(pool,
-                                                       'tcp://localhost:8881')
-        handler.handleEvent('onStarted', json_string)
-        self.wait_for_threads()
-
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.USED)
-            self.assertEqual(len(nodes), 1)
-
-    @skip("Disabled for early v3 development")
-    def test_job_end_event(self):
-        """Test that job end marks node delete"""
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-        self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        msg_obj = {'name': 'fake-job',
-                   'build': {'node_name': 'fake-label-fake-provider-1',
-                             'status': 'SUCCESS'}}
-        json_string = json.dumps(msg_obj)
-        # Don't delay when deleting.
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool.DELETE_DELAY',
-            0))
-        handler = nodepool.nodepool.NodeUpdateListener(pool,
-                                                       'tcp://localhost:8881')
-        handler.handleEvent('onFinalized', json_string)
-        self.wait_for_threads()
-
-        with pool.getDB().getSession() as session:
-            node = session.getNode(1)
-            self.assertEqual(node, None)
-
-    @skip("Disabled for early v3 development")
-    def _test_job_auto_hold(self, result):
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
-        pool.start()
-
-        self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-
-        with pool.getDB().getSession() as session:
-            session.createJob('fake-job', hold_on_failure=1)
-
-        msg_obj = {'name': 'fake-job',
-                   'build': {'node_name': 'fake-label-fake-provider-1',
-                             'status': result}}
-        json_string = json.dumps(msg_obj)
-        # Don't delay when deleting.
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool.DELETE_DELAY',
-            0))
-        handler = nodepool.nodepool.NodeUpdateListener(pool,
-                                                       'tcp://localhost:8881')
-        handler.handleEvent('onFinalized', json_string)
-        self.wait_for_threads()
-        return pool
-
-    @skip("Disabled for early v3 development")
-    def test_job_auto_hold_success(self):
-        """Test that a successful job does not hold a node"""
-        pool = self._test_job_auto_hold('SUCCESS')
-        with pool.getDB().getSession() as session:
-            node = session.getNode(1)
-            self.assertIsNone(node)
-
-    @skip("Disabled for early v3 development")
-    def test_job_auto_hold_failure(self):
-        """Test that a failed job automatically holds a node"""
-        pool = self._test_job_auto_hold('FAILURE')
-        with pool.getDB().getSession() as session:
-            node = session.getNode(1)
-            self.assertEqual(node.state, nodedb.HOLD)
-
-    @skip("Disabled for early v3 development")
-    def test_job_auto_hold_failure_max(self):
-        """Test that a failed job automatically holds only one node"""
-        pool = self._test_job_auto_hold('FAILURE')
-        with pool.getDB().getSession() as session:
-            node = session.getNode(1)
-            self.assertEqual(node.state, nodedb.HOLD)
-
-        # Wait for a replacement node
-        self.waitForNodes(pool)
-        with pool.getDB().getSession() as session:
-            node = session.getNode(2)
-            self.assertEqual(node.state, nodedb.READY)
-
-        # Fail the job again
-        msg_obj = {'name': 'fake-job',
-                   'build': {'node_name': 'fake-label-fake-provider-2',
-                             'status': 'FAILURE'}}
-        json_string = json.dumps(msg_obj)
-        handler = nodepool.nodepool.NodeUpdateListener(pool,
-                                                       'tcp://localhost:8881')
-        handler.handleEvent('onFinalized', json_string)
-        self.wait_for_threads()
-
-        # Ensure that the second node was deleted
-        with pool.getDB().getSession() as session:
-            node = session.getNode(2)
-            self.assertEqual(node, None)
 
     def test_label_provider(self):
         """Test that only providers listed in the label satisfy the request"""
