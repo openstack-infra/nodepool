@@ -690,12 +690,11 @@ class NodeRequestHandler(object):
                 # If we calculate that we're at capacity, pause until nodes
                 # are released by Zuul and removed by the NodeCleanupWorker.
                 if self._countNodes() >= self.provider.max_servers:
-                    self.paused = True
-                    if not self.pw.paused:
+                    if not self.paused:
                         self.log.debug(
                             "Pausing request handling to satisfy request %s",
-                             self.request)
-                        self.pw.paused = True
+                            self.request)
+                    self.paused = True
                     return
 
                 if self.paused:
@@ -824,6 +823,9 @@ class NodeRequestHandler(object):
 
         :returns: True if we are done with the request, False otherwise.
         '''
+        if self.paused:
+            return False
+
         if self.done:
             return True
 
@@ -885,7 +887,7 @@ class ProviderWorker(threading.Thread):
         self.nodepool = nodepool
         self.provider_name = provider_name
         self.running = False
-        self.paused = False
+        self.paused_handler = None
         self.request_handlers = []
         self.watermark_sleep = nodepool.watermark_sleep
         self.zk = self.getZK()
@@ -923,7 +925,7 @@ class ProviderWorker(threading.Thread):
             return
 
         for req_id in self.zk.getNodeRequests():
-            if self.paused:
+            if self.paused_handler:
                 return
 
             # Short-circuit for limited request handling
@@ -959,6 +961,8 @@ class ProviderWorker(threading.Thread):
             self.log.info("Assigning node request %s" % req)
             rh = NodeRequestHandler(self, req)
             rh.run()
+            if rh.paused:
+                self.paused_handler = rh
             self.request_handlers.append(rh)
 
     def _removeCompletedHandlers(self):
@@ -967,7 +971,7 @@ class ProviderWorker(threading.Thread):
         '''
         active_handlers = []
         for r in self.request_handlers:
-            if r.paused or not r.poll():
+            if not r.poll():
                 active_handlers.append(r)
         self.request_handlers = active_handlers
 
@@ -1000,22 +1004,15 @@ class ProviderWorker(threading.Thread):
             self.zk.registerLauncher(self.launcher_id)
 
             try:
-                if not self.paused:
+                if not self.paused_handler:
                     self._assignHandlers()
                 else:
-                    # If we are paused, one request handler could not satisify
-                    # its assigned request, so we need to find it and give it
-                    # another shot (there can be only 1). Unpause ourselves if
-                    # it completed.
-                    completed = True
-                    for handler in self.request_handlers:
-                        if handler.paused:
-                            self.log.debug("Re-run handler %s", handler)
-                            handler.run()
-                            completed = False
-                            break
-                    if completed:
-                        self.paused = False
+                    # If we are paused, one request handler could not
+                    # satisify its assigned request, so give it
+                    # another shot. Unpause ourselves if it completed.
+                    self.paused_handler.run()
+                    if not self.paused_handler.paused:
+                        self.paused_handler = None
 
                 self._removeCompletedHandlers()
             except Exception:
@@ -1023,9 +1020,8 @@ class ProviderWorker(threading.Thread):
             time.sleep(self.watermark_sleep)
 
         # Cleanup on exit
-        if self.paused:
-            for handler in self.request_handlers:
-                handler.unlockNodeSet(clear_allocation=True)
+        if self.paused_handler:
+            self.paused_handler.unlockNodeSet(clear_allocation=True)
 
     def stop(self):
         '''
