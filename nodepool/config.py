@@ -82,11 +82,6 @@ class ProviderImage(ConfigValue):
         return "<ProviderImage %s>" % self.name
 
 
-class Target(ConfigValue):
-    def __repr__(self):
-        return "<Target %s>" % self.name
-
-
 class Label(ConfigValue):
     def __repr__(self):
         return "<Label %s>" % self.name
@@ -138,13 +133,11 @@ def loadConfig(config_path):
     newconfig.db = None
     newconfig.dburi = None
     newconfig.providers = {}
-    newconfig.targets = {}
     newconfig.labels = {}
     newconfig.elementsdir = config.get('elements-dir')
     newconfig.imagesdir = config.get('images-dir')
     newconfig.dburi = None
     newconfig.provider_managers = {}
-    newconfig.jenkins_managers = {}
     newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}
     newconfig.crons = {}
@@ -277,19 +270,6 @@ def loadConfig(config_path):
             p.name = provider['name']
             l.providers[p.name] = p
 
-    for target in config.get('targets', []):
-        t = Target()
-        t.name = target['name']
-        newconfig.targets[t.name] = t
-        jenkins = target.get('jenkins', {})
-        t.online = True
-        t.rate = target.get('rate', 1.0)
-        t.jenkins_test_job = jenkins.get('test-job')
-        t.jenkins_url = None
-        t.jenkins_user = None
-        t.jenkins_apikey = None
-        t.jenkins_credentials_id = None
-
     return newconfig
 
 
@@ -298,19 +278,6 @@ def loadSecureConfig(config, secure_config_path):
     secure.readfp(open(secure_config_path))
 
     config.dburi = secure.get('database', 'dburi')
-
-    for target in config.targets.values():
-        section_name = 'jenkins "%s"' % target.name
-        if secure.has_section(section_name):
-            target.jenkins_url = secure.get(section_name, 'url')
-            target.jenkins_user = secure.get(section_name, 'user')
-            target.jenkins_apikey = secure.get(section_name, 'apikey')
-
-        try:
-            target.jenkins_credentials_id = secure.get(
-                section_name, 'credentials')
-        except:
-            pass
 
 
 def _cloudKwargsFromProvider(provider):

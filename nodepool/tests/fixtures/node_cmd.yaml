@@ -59,9 +59,6 @@ providers:
           key: value
           key2: value
 
-targets:
-  - name: fake-target
-
 diskimages:
   - name: fake-image1
   - name: fake-image2

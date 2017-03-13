@@ -92,17 +92,6 @@ class ConfigValidator:
             }],
         }
 
-        targets = {
-            'name': str,
-            'jenkins': {
-                'url': str,
-                'user': str,
-                'apikey': str,
-                'credentials-id': str,
-                'test-job': str
-            }
-        }
-
         diskimages = {
             'name': str,
             'pause': bool,
@@ -125,7 +114,6 @@ class ConfigValidator:
             'cron': cron,
             'providers': [providers],
             'labels': [labels],
-            'targets': [targets],
             'diskimages': [diskimages],
         }
 

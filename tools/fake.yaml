@@ -46,6 +46,3 @@ providers:
         min-ram: 8192
         name-filter: 'Fake'
         diskimage: fake-nodepool
-
-targets:
-  - name: zuul

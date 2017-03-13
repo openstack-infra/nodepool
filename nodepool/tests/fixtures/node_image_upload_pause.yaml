@@ -46,9 +46,6 @@ providers:
       - name: fake-image2
         min-ram: 8192
 
-targets:
-  - name: fake-target
-
 diskimages:
   - name: fake-image
     elements:

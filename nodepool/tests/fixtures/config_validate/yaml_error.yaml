@@ -60,9 +60,6 @@ providers:
         username: jenkins
         private-key: /home/nodepool/.ssh/id_rsa
 
-targets:
-  - name: zuul
-
 diskimages:
   - name: trusty
     elements:

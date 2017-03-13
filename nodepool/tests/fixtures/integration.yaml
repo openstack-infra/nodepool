@@ -35,12 +35,5 @@ providers:
           key: value
           key2: value
 
-targets:
-  - name: fake-target
-    jenkins:
-      url: https://jenkins.example.org/
-      user: fake
-      apikey: fake
-
 diskimages:
   - name: fake-image
