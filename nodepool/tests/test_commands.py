@@ -266,3 +266,20 @@ class TestNodepoolCMD(tests.DBTestCase):
 
         self.waitForImage('fake-provider', 'fake-image', [image])
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 2)
+
+    def test_request_list(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage( 'fake-provider', 'fake-image')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        req = zk.NodeRequest()
+        req.state = zk.PENDING   # so it will be ignored
+        req.node_types = ['fake-label']
+        req.requestor = 'test_request_list'
+        self.zk.storeNodeRequest(req)
+
+        self.assert_listed(configfile, ['request-list'], 0, req.id, 1)
