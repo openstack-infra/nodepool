@@ -666,3 +666,15 @@ class TestNodepool(tests.DBTestCase):
         with pool.getDB().getSession() as session:
             node = session.getNode(2)
             self.assertEqual(node, None)
+
+    def test_label_provider(self):
+        """Test that only providers listed in the label satisfy the request"""
+        configfile = self.setup_config('node_label_provider.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider2')
