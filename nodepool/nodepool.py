@@ -1206,8 +1206,7 @@ class NodeCleanupWorker(threading.Thread):
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
-    #TODO(Shrews): remove --no-deletes option
-    def __init__(self, securefile, configfile, no_deletes=False,
+    def __init__(self, securefile, configfile,
                  watermark_sleep=WATERMARK_SLEEP):
         threading.Thread.__init__(self, name='NodePool')
         self.securefile = securefile
