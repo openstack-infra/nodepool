@@ -77,21 +77,18 @@ When Nodepool creates instances, it will assign the following nova
 metadata:
 
   groups
-    A json-encoded list containing the name of the image and the name
+    A comma separated list containing the name of the image and the name
     of the provider.  This may be used by the Ansible OpenStack
     inventory plugin.
 
-  nodepool
-    A json-encoded dictionary with the following entries:
+  nodepool_image_name
+    The name of the image as a string.
 
-    image_name
-      The name of the image as a string.
+  nodepool_provider_name
+    The name of the provider as a string.
 
-    provider_name
-      The name of the provider as a string.
-
-    node_id
-      The nodepool id of the node as an integer.
+  nodepool_node_id
+    The nodepool id of the node as an integer.
 
 Command Line Tools
 ------------------
