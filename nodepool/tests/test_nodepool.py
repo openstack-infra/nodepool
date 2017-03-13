@@ -202,6 +202,7 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
         self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertNotEqual(nodes[0].host_keys, [])
 
     def test_disabled_label(self):
         """Test that a node is not created with min-ready=0"""

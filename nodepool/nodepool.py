@@ -69,6 +69,10 @@ class LaunchAuthException(Exception):
     statsd_key = 'error.auth'
 
 
+class LaunchKeyscanException(Exception):
+    statsd_key = 'error.keyscan'
+
+
 class StatsReporter(object):
     '''
     Class adding statsd reporting functionality.
@@ -355,6 +359,14 @@ class NodeLauncher(threading.Thread, StatsReporter):
             timeout=self._provider.boot_timeout)
         if not host:
             raise LaunchAuthException("Unable to connect via ssh")
+
+        # Get the SSH public keys for the new node and record in ZooKeeper
+        self.log.debug("Gathering host keys for node %s", self._node.id)
+        host_keys = utils.keyscan(preferred_ip)
+        if not host_keys:
+            raise LaunchKeyscanException("Unable to gather host keys")
+        self._node.host_keys = host_keys
+        self._zk.storeNode(self._node)
 
         self._writeNodepoolInfo(host, preferred_ip, self._node)
         if self._label.ready_script:
