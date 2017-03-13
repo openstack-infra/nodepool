@@ -273,6 +273,11 @@ class NodeLauncher(threading.Thread, StatsReporter):
                       "for node id: %s" % (hostname, self._provider.name,
                                            config_image.name, self._node.id))
 
+        # NOTE: We store the node ID in the server metadata to use for leaked
+        # instance detection. We cannot use the external server ID for this
+        # because that isn't available in ZooKeeper until after the server is
+        # active, which could cause a race in leak detection.
+
         server = self._manager.createServer(
             hostname,
             config_image.min_ram,
@@ -1051,15 +1056,7 @@ class NodeCleanupWorker(threading.Thread):
         for provider in self._nodepool.config.providers.values():
             manager = self._nodepool.getProviderManager(provider.name)
 
-            # NOTE: Cache the servers BEFORE caching the nodes. Doing this in
-            # the reverse order would create a race where a new server could
-            # be created just after we cache the list of nodes, thus making it
-            # incorrectly appear as leaked since we might not have cached the
-            # node for it.
-            servers = manager.listServers()
-            known = set([n.external_id for n in zk_conn.nodeIterator() if n.provider == provider.name])
-
-            for server in servers:
+            for server in manager.listServers():
                 meta = server.get('metadata', {})
 
                 if 'nodepool_provider_name' not in meta:
@@ -1073,10 +1070,12 @@ class NodeCleanupWorker(threading.Thread):
                     # with a different name, owns this.
                     continue
 
-                if server.id not in known:
+                if not zk_conn.getNode(meta['nodepool_node_id']):
                     self.log.warning(
-                        "Deleting leaked instance %s (%s) in %s",
-                        server.name, server.id, provider.name
+                        "Deleting leaked instance %s (%s) in %s "
+                        "(unknown node id %s)",
+                        server.name, server.id, provider.name,
+                        meta['nodepool_node_id']
                     )
                     # Create an artifical node to use for deleting the server.
                     node = zk.Node()
