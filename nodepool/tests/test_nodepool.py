@@ -15,12 +15,9 @@
 
 import logging
 import time
-from unittest import skip
-
 import fixtures
 
 from nodepool import tests
-from nodepool import nodedb
 from nodepool import zk
 import nodepool.fakeprovider
 import nodepool.nodepool
@@ -361,12 +358,11 @@ class TestNodepool(tests.DBTestCase):
         # retries in config is set to 2, so 2 attempts to create a server
         self.assertEqual(0, manager.createServer_fails)
 
-    @skip("Disabled for early v3 development")
     def test_node_delete_failure(self):
         def fail_delete(self, name):
             raise RuntimeError('Fake Error')
 
-        fake_delete = 'nodepool.fakeprovider.FakeJenkins.delete_node'
+        fake_delete = 'nodepool.provider_manager.FakeProviderManager.deleteServer'
         self.useFixture(fixtures.MonkeyPatch(fake_delete, fail_delete))
 
         configfile = self.setup_config('node.yaml')
@@ -374,36 +370,22 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        node_id = -1
-        with pool.getDB().getSession() as session:
-            nodes = session.getNodes(provider_name='fake-provider',
-                                     label_name='fake-label',
-                                     target_name='fake-target',
-                                     state=nodedb.READY)
-            self.assertEqual(len(nodes), 1)
-            node_id = nodes[0].id
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
 
-        pool.deleteNode(node_id)
-        self.wait_for_threads()
-        self.waitForNodes(pool)
+        self.zk.lockNode(nodes[0], blocking=False)
+        nodepool.nodepool.InstanceDeleter.delete(
+            self.zk, pool.getProviderManager('fake-provider'), nodes[0])
 
-        with pool.getDB().getSession() as session:
-            ready_nodes = session.getNodes(provider_name='fake-provider',
-                                           label_name='fake-label',
-                                           target_name='fake-target',
-                                           state=nodedb.READY)
-            deleted_nodes = session.getNodes(provider_name='fake-provider',
-                                             label_name='fake-label',
-                                             target_name='fake-target',
-                                             state=nodedb.DELETE)
-            # Make sure we have one node which is a new node
-            self.assertEqual(len(ready_nodes), 1)
-            self.assertNotEqual(node_id, ready_nodes[0].id)
+        # Make sure our old node is in delete state, even though delete failed
+        deleted_node = self.zk.getNode(nodes[0].id)
+        self.assertIsNotNone(deleted_node)
+        self.assertEqual(deleted_node.state, zk.DELETING)
 
-            # Make sure our old node is in delete state
-            self.assertEqual(len(deleted_nodes), 1)
-            self.assertEqual(node_id, deleted_nodes[0].id)
+        # Make sure we have a new, READY node
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
 
     def test_leaked_node(self):
         """Test that a leaked node is deleted"""
