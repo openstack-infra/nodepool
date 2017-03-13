@@ -198,35 +198,6 @@ class BaseTestCase(testtools.TestCase):
             time.sleep(0.1)
 
 
-class AllocatorTestCase(object):
-    def setUp(self):
-        super(AllocatorTestCase, self).setUp()
-        self.agt = []
-
-    def test_allocator(self):
-        for i, amount in enumerate(self.results):
-            print self.agt[i]
-        for i, amount in enumerate(self.results):
-            self.assertEqual(self.agt[i].amount, amount,
-                             'Error at pos %d, '
-                             'expected %s and got %s' % (i, self.results,
-                                                         [x.amount
-                                                          for x in self.agt]))
-
-
-class RoundRobinTestCase(object):
-    def setUp(self):
-        super(RoundRobinTestCase, self).setUp()
-        self.allocations = []
-
-    def test_allocator(self):
-        for i, label in enumerate(self.results):
-            self.assertEqual(self.results[i], self.allocations[i],
-                             'Error at pos %d, '
-                             'expected %s and got %s' % (i, self.results,
-                                                         self.allocations))
-
-
 class BuilderFixture(fixtures.Fixture):
     def __init__(self, configfile, cleanup_interval):
         super(BuilderFixture, self).__init__()
