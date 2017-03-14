@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import logging
 import os
 import os.path
@@ -677,9 +678,18 @@ class NodeRequestHandler(object):
                 self.zk, self.provider, self.labels, self.manager,
                 self.request.requestor, retries=self.provider.launch_retries)
 
-        ready_nodes = self.zk.getReadyNodesOfTypes(self.request.node_types)
+        # Since this code can be called more than once for the same request,
+        # we need to calculate the difference between our current node set
+        # and what was requested. We cannot use set operations here since a
+        # node type can appear more than once in the requested types.
+        saved_types = collections.Counter([n.type for n in self.nodeset])
+        requested_types = collections.Counter(self.request.node_types)
+        diff = requested_types - saved_types
+        needed_types = list(diff.elements())
 
-        for ntype in self.request.node_types:
+        ready_nodes = self.zk.getReadyNodesOfTypes(needed_types)
+
+        for ntype in needed_types:
             # First try to grab from the list of already available nodes.
             got_a_node = False
             if self.request.reuse and ntype in ready_nodes:
