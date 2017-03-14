@@ -74,7 +74,6 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
         parser.add_argument('-p', dest='pidfile',
                             help='path to pid file',
                             default='/var/run/nodepool/nodepool.pid')
-        parser.add_argument('--no-deletes', action='store_true')
         parser.add_argument('--no-webapp', action='store_true')
         parser.add_argument('--version', dest='version', action='store_true',
                             help='show version')
@@ -92,8 +91,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolApp):
     def main(self):
         self.setup_logging()
         self.pool = nodepool.nodepool.NodePool(self.args.secure,
-                                               self.args.config,
-                                               self.args.no_deletes)
+                                               self.args.config)
         if not self.args.no_webapp:
             self.webapp = nodepool.webapp.WebApp(self.pool)
 
