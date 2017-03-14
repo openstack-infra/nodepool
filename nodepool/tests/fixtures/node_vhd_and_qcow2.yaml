@@ -26,7 +26,7 @@ providers:
     password: 'fake'
     auth-url: 'fake'
     project-id: 'fake'
-    max-servers: 1
+    max-servers: 2
     pool: 'fake'
     image-type: vhd
     networks:
@@ -46,7 +46,7 @@ providers:
     password: 'fake'
     auth-url: 'fake'
     project-id: 'fake'
-    max-servers: 1
+    max-servers: 2
     pool: 'fake'
     image-type: qcow2
     networks:
