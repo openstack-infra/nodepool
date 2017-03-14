@@ -12,40 +12,28 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import argparse
-import extras
 import signal
 import sys
-
-import daemon
 
 from nodepool import builder
 import nodepool.cmd
 
 
-# as of python-daemon 1.6 it doesn't bundle pidlockfile anymore
-# instead it depends on lockfile-0.9.1 which uses pidfile.
-pid_file_module = extras.try_imports(['daemon.pidlockfile', 'daemon.pidfile'])
+class NodePoolBuilderApp(nodepool.cmd.NodepoolDaemonApp):
 
-class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
+    app_name = 'nodepool-builder'
+    app_description = 'NodePool Image Builder.'
 
     def sigint_handler(self, signal, frame):
         self.nb.stop()
         sys.exit(0)
 
-    def parse_arguments(self):
-        parser = argparse.ArgumentParser(description='NodePool Image Builder.')
+    def create_parser(self):
+        parser = super(NodePoolBuilderApp, self).create_parser()
+
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
-        parser.add_argument('-l', dest='logconfig',
-                            help='path to log config file')
-        parser.add_argument('-p', dest='pidfile',
-                            help='path to pid file',
-                            default='/var/run/nodepool-builder/'
-                                    'nodepool-builder.pid')
-        parser.add_argument('-d', dest='nodaemon', action='store_true',
-                            help='do not run as a daemon')
         parser.add_argument('--build-workers', dest='build_workers',
                             default=1, help='number of build workers',
                             type=int)
@@ -55,16 +43,16 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
         parser.add_argument('--fake', action='store_true',
                             help='Do not actually run diskimage-builder '
                             '(used for testing)')
-        self.args = parser.parse_args()
+        return parser
 
-    def main(self):
-        self.setup_logging()
-        self.nb = builder.NodePoolBuilder(
-            self.args.config, self.args.build_workers,
-            self.args.upload_workers, self.args.fake)
+    def run(self):
+        self.nb = builder.NodePoolBuilder(self.args.config,
+                                          self.args.build_workers,
+                                          self.args.upload_workers,
+                                          self.args.fake)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
-        signal.signal(signal.SIGUSR2, nodepool.cmd.stack_dump_handler)
+
         self.nb.start()
 
         while True:
@@ -72,15 +60,7 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolApp):
 
 
 def main():
-    app = NodePoolBuilderApp()
-    app.parse_arguments()
-
-    if app.args.nodaemon:
-        app.main()
-    else:
-        pid = pid_file_module.TimeoutPIDLockFile(app.args.pidfile, 10)
-        with daemon.DaemonContext(pidfile=pid):
-            app.main()
+    return NodePoolBuilderApp.main()
 
 
 if __name__ == "__main__":
