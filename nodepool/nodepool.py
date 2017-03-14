@@ -1110,8 +1110,8 @@ class NodeCleanupWorker(threading.Thread):
 
         :param Node node: A Node object representing the instance to delete.
         '''
-        self.log.info("Deleting instance %s from %s",
-                      node.external_id, node.provider)
+        self.log.info("Deleting %s instance %s from %s",
+                      node.state, node.external_id, node.provider)
         try:
             t = InstanceDeleter(
                 self._nodepool.getZK(),
@@ -1126,7 +1126,8 @@ class NodeCleanupWorker(threading.Thread):
         '''
         Delete instances from providers and nodes entries from ZooKeeper.
         '''
-        # TODO(Shrews): Cleanup alien instances
+        cleanup_states = (zk.USED, zk.IN_USE, zk.BUILDING, zk.FAILED,
+                          zk.DELETING)
 
         zk_conn = self._nodepool.getZK()
         for node in zk_conn.nodeIterator():
@@ -1135,11 +1136,16 @@ class NodeCleanupWorker(threading.Thread):
                 continue
 
             # Any nodes in these states that are unlocked can be deleted.
-            if node.state in (zk.USED, zk.IN_USE, zk.BUILDING, zk.FAILED,
-                              zk.DELETING):
+            if node.state in cleanup_states:
                 try:
                     zk_conn.lockNode(node, blocking=False)
                 except exceptions.ZKLockException:
+                    continue
+
+                # Double check the state now that we have a lock since it
+                # may have changed on us.
+                if node.state not in cleanup_states:
+                    zk_conn.unlockNode(node)
                     continue
 
                 # The InstanceDeleter thread will unlock and remove the
