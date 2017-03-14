@@ -98,7 +98,6 @@ label. Example::
     - name: multi-precise
       image: precise
       min-ready: 2
-      ready-script: setup_multinode.sh
       providers:
         - name: provider1
 
@@ -120,11 +119,6 @@ label. Example::
     Minimum instances that should be in a ready state. Set to -1 to have the
     label considered disabled. ``min-ready`` is best-effort based on available
     capacity and is not a guaranteed allocation.
-
-  ``ready-script``
-    A script to be used to perform any last minute changes to a node after it
-    has been launched but before it is put in the READY state to receive jobs.
-    For more information, see :ref:`scripts`.
 
 .. _diskimages:
 
