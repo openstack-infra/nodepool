@@ -111,3 +111,14 @@ def image_list(zk):
                                upload.state,
                                age(upload.state_time)])
     return str(t)
+
+def request_list(zk):
+    t = PrettyTable(["Request ID", "State", "Requestor", "Node Types", "Nodes",
+                     "Declined By"])
+    t.align = 'l'
+    for req in zk.nodeRequestIterator():
+        t.add_row([req.id, req.state, req.requestor,
+                   ','.join(req.node_types),
+                   ','.join(req.nodes),
+                   ','.join(req.declined_by)])
+    return str(t)

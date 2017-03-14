@@ -125,6 +125,11 @@ class NodePoolCmd(NodepoolApp):
             help='Validate configuration file')
         cmd_config_validate.set_defaults(func=self.config_validate)
 
+        cmd_request_list = subparsers.add_parser(
+            'request-list',
+            help='list the current node requests')
+        cmd_request_list.set_defaults(func=self.request_list)
+
         self.args = parser.parse_args()
 
     def setup_logging(self):
@@ -306,6 +311,9 @@ class NodePoolCmd(NodepoolApp):
         log.info("Configuration validation complete")
         #TODO(asselin,yolanda): add validation of secure.conf
 
+    def request_list(self):
+        print status.request_list(self.zk)
+
     def _wait_for_threads(self, threads):
         for t in threads:
             if t:
@@ -325,7 +333,8 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
-                                 'alien-list', 'list', 'hold', 'delete'):
+                                 'alien-list', 'list', 'hold', 'delete',
+                                 'request-list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(config.zookeeper_servers.values())
 

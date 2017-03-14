@@ -1577,3 +1577,12 @@ class ZooKeeper(object):
             lock = self.getNodeRequestLock(lock_id)
             if lock:
                 yield lock
+
+    def nodeRequestIterator(self):
+        '''
+        Utility generator method for iterating through all nodes requests.
+        '''
+        for req_id in self.getNodeRequests():
+            req = self.getNodeRequest(req_id)
+            if req:
+                yield req
