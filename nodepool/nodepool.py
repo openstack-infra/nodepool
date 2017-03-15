@@ -370,8 +370,6 @@ class NodeLauncher(threading.Thread, StatsReporter):
         self._zk.storeNode(self._node)
 
         self._writeNodepoolInfo(host, preferred_ip, self._node)
-        if self._label.ready_script:
-            self._runReadyScript(host, hostname, self._label.ready_script)
 
     def _writeNodepoolInfo(self, host, preferred_ip, node):
         key = paramiko.RSAKey.generate(2048)
@@ -409,16 +407,6 @@ class NodeLauncher(threading.Thread, StatsReporter):
         f.close()
 
         ftp.close()
-
-    def _runReadyScript(self, host, hostname, script):
-        env_vars = ''
-        for k, v in os.environ.items():
-            if k.startswith('NODEPOOL_'):
-                env_vars += ' %s="%s"' % (k, v)
-        host.ssh("run ready script",
-                 "cd /opt/nodepool-scripts && %s ./%s %s" %
-                 (env_vars, script, hostname),
-                 output=True)
 
     def _run(self):
         attempts = 1

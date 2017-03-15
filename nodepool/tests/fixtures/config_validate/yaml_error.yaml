@@ -13,14 +13,12 @@ zookeeper-servers:
 labels:
   - name: trusty
     image: trusty
-    ready-script: configure_mirror.sh
     min-ready: 1
     providers:
       - name: cloud1
       - name: cloud2
   - name: trusty-2-node
     image: trusty
-    ready-script: multinode_setup.sh
     min-ready: 0
     providers:
       - name: cloud1
