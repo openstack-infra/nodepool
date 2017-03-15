@@ -1243,7 +1243,6 @@ class NodePool(threading.Thread):
         self.cleanup_interval = 5
         self._stopped = False
         self.config = None
-        self.apsched = None
         self.zk = None
         self.statsd = stats.get_client()
         self._provider_threads = {}
@@ -1258,8 +1257,6 @@ class NodePool(threading.Thread):
         self._wake_condition.release()
         if self.config:
             provider_manager.ProviderManager.stopProviders(self.config)
-        if self.apsched and self.apsched.running:
-            self.apsched.shutdown()
 
         if self._cleanup_thread:
             self._cleanup_thread.stop()

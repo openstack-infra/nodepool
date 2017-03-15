@@ -155,8 +155,7 @@ class BaseTestCase(testtools.TestCase):
             fakeprovider.fake_get_one_cloud))
 
     def wait_for_threads(self):
-        whitelist = ['APScheduler',
-                     'MainThread',
+        whitelist = ['MainThread',
                      'NodePool',
                      'NodePool Builder',
                      'NodeUpdateListener',
@@ -174,7 +173,6 @@ class BaseTestCase(testtools.TestCase):
             done = True
             for t in threading.enumerate():
                 if t.name.startswith("Thread-"):
-                    # apscheduler thread pool
                     continue
                 if t.name.startswith("worker "):
                     # paste web server
