@@ -1090,6 +1090,58 @@ class NodeCleanupWorker(threading.Thread):
         self._interval = interval
         self._running = False
 
+    def _resetLostRequest(self, zk_conn, req):
+        '''
+        Reset the request state and unallocate nodes.
+
+        :param ZooKeeper zk_conn: A ZooKeeper connection object.
+        :param NodeRequest req: The lost NodeRequest object.
+        '''
+        # Double check the state after the lock
+        req = zk_conn.getNodeRequest(req.id)
+        if req.state != zk.PENDING:
+            return
+
+        for node in zk_conn.nodeIterator():
+            if node.allocated_to == req.id:
+                try:
+                    zk_conn.lockNode(node)
+                except exceptions.ZKLockException:
+                    self.log.warning(
+                        "Unable to unallocate node %s from request %s",
+                        node.id, req.id)
+                    return
+
+                node.allocated_to = None
+                zk_conn.storeNode(node)
+                zk_conn.unlockNode(node)
+                self.log.debug("Unallocated lost request node %s", node.id)
+
+        req.state = zk.REQUESTED
+        req.nodes = []
+        zk_conn.storeNodeRequest(req)
+        self.log.info("Reset lost request %s", req.id)
+
+    def _cleanupLostRequests(self):
+        '''
+        Look for lost requests and reset them.
+
+        A lost request is a node request that was left in the PENDING state
+        when nodepool exited. We need to look for these (they'll be unlocked)
+        and disassociate any nodes we've allocated to the request and reset
+        the request state to REQUESTED so it will be processed again.
+        '''
+        zk_conn = self._nodepool.getZK()
+        for req in zk_conn.nodeRequestIterator():
+            if req.state == zk.PENDING:
+                try:
+                    zk_conn.lockNodeRequest(req, blocking=False)
+                except exceptions.ZKLockException:
+                    continue
+
+                self._resetLostRequest(zk_conn, req)
+                zk_conn.unlockNodeRequest(req)
+
     def _cleanupNodeRequestLocks(self):
         '''
         Remove request locks where the request no longer exists.
@@ -1216,6 +1268,7 @@ class NodeCleanupWorker(threading.Thread):
                 self._cleanupNodeRequestLocks()
                 self._cleanupNodes()
                 self._cleanupLeakedInstances()
+                self._cleanupLostRequests()
             except Exception:
                 self.log.exception("Exception in NodeCleanupWorker:")
 
