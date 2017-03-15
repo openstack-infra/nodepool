@@ -1178,9 +1178,6 @@ class NodeCleanupWorker(threading.Thread):
                 meta = server.get('metadata', {})
 
                 if 'nodepool_provider_name' not in meta:
-                    self.log.debug(
-                        "Instance %s (%s) in %s has no nodepool_provider_name",
-                        server.name, server.id, provider.name)
                     continue
 
                 if meta['nodepool_provider_name'] != provider.name:
