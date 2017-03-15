@@ -551,7 +551,7 @@ Example configuration::
     Default ``/var/lib/jenkins/.ssh/id_rsa``
 
   ``config-drive`` (boolean)
-    Whether config drive should be used for the image.
+    Whether config drive should be used for the image. Default ``True``
 
   ``meta`` (dict)
     Arbitrary key/value metadata to store for this server using the Nova

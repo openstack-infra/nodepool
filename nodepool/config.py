@@ -241,7 +241,7 @@ def loadConfig(config_path):
             i.pause = bool(image.get('pause', False))
             i.private_key = image.get('private-key',
                                       '/var/lib/jenkins/.ssh/id_rsa')
-            i.config_drive = image.get('config-drive', None)
+            i.config_drive = image.get('config-drive', True)
 
             # This dict is expanded and used as custom properties when
             # the image is uploaded.

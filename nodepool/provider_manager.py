@@ -185,7 +185,7 @@ class ProviderManager(object):
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
-                     config_drive=None, nodepool_node_id=None,
+                     config_drive=True, nodepool_node_id=None,
                      nodepool_image_name=None,
                      nodepool_snapshot_image_id=None):
         if image_name:
