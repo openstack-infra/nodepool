@@ -155,24 +155,23 @@ class BaseTestCase(testtools.TestCase):
             fakeprovider.fake_get_one_cloud))
 
     def wait_for_threads(self):
+        # Wait until all transient threads (node launches, deletions,
+        # etc.) are all complete.  Whitelist any long-running threads.
         whitelist = ['MainThread',
                      'NodePool',
                      'NodePool Builder',
-                     'NodeUpdateListener',
                      'fake-provider',
                      'fake-provider1',
                      'fake-provider2',
                      'fake-provider3',
-                     'fake-dib-provider',
-                     'fake-jenkins',
-                     'fake-target',
-                     'DiskImageBuilder queue',
+                     'NodeCleanupWorker',
                      ]
 
         while True:
             done = True
             for t in threading.enumerate():
                 if t.name.startswith("Thread-"):
+                    # Kazoo
                     continue
                 if t.name.startswith("worker "):
                     # paste web server
@@ -184,10 +183,6 @@ class BaseTestCase(testtools.TestCase):
                 if t.name.startswith("CleanupWorker"):
                     continue
                 if t.name.startswith("ProviderWorker"):
-                    continue
-                if t.name.startswith("NodeLauncher"):
-                    continue
-                if t.name.startswith("NodeCleanupWorker"):
                     continue
                 if t.name not in whitelist:
                     done = False
