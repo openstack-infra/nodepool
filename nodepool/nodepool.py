@@ -20,7 +20,6 @@ import collections
 import logging
 import os
 import os.path
-import paramiko
 import pprint
 import random
 import socket
@@ -368,45 +367,6 @@ class NodeLauncher(threading.Thread, StatsReporter):
             raise LaunchKeyscanException("Unable to gather host keys")
         self._node.host_keys = host_keys
         self._zk.storeNode(self._node)
-
-        self._writeNodepoolInfo(host, preferred_ip, self._node)
-
-    def _writeNodepoolInfo(self, host, preferred_ip, node):
-        key = paramiko.RSAKey.generate(2048)
-        public_key = key.get_name() + ' ' + key.get_base64()
-        host.ssh("test for config dir", "ls /etc/nodepool")
-
-        ftp = host.client.open_sftp()
-
-        # The IP of this node
-        f = ftp.open('/etc/nodepool/node', 'w')
-        f.write(preferred_ip + '\n')
-        f.close()
-        # The private IP of this node
-        f = ftp.open('/etc/nodepool/node_private', 'w')
-        f.write(node.private_ipv4 + '\n')
-        f.close()
-        # The SSH key for this node set
-        f = ftp.open('/etc/nodepool/id_rsa', 'w')
-        key.write_private_key(f)
-        f.close()
-        f = ftp.open('/etc/nodepool/id_rsa.pub', 'w')
-        f.write(public_key + '\n')
-        f.close()
-        # Provider information for this node set
-        f = ftp.open('/etc/nodepool/provider', 'w')
-        f.write('NODEPOOL_PROVIDER=%s\n' % self._provider.name)
-        f.write('NODEPOOL_CLOUD=%s\n' % self._provider.cloud_config.name)
-        f.write('NODEPOOL_REGION=%s\n' % (
-            self._provider.region_name or '',))
-        f.write('NODEPOOL_AZ=%s\n' % (node.az or '',))
-        f.close()
-        # The instance UUID for this node
-        f = ftp.open('/etc/nodepool/uuid', 'w')
-        f.write(node.external_id + '\n')
-        f.close()
-
-        ftp.close()
 
     def _run(self):
         attempts = 1

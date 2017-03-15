@@ -13,7 +13,6 @@ Contents:
 
    installation
    configuration
-   scripts
    operation
    devguide
 
