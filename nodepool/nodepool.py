@@ -1034,13 +1034,39 @@ class ProviderWorker(threading.Thread):
         self.running = False
 
 
-class DeletedNodeWorker(threading.Thread):
-    def __init__(self, nodepool, interval):
-        threading.Thread.__init__(self, name='DeletedNodeWorker')
-        self.log = logging.getLogger("nodepool.DeletedNodeWorker")
+class BaseCleanupWorker(threading.Thread):
+    def __init__(self, nodepool, interval, name):
+        threading.Thread.__init__(self, name=name)
         self._nodepool = nodepool
         self._interval = interval
         self._running = False
+
+    def run(self):
+        self.log.info("Starting")
+        self._running = True
+
+        while self._running:
+            # Don't do work if we've lost communication with the ZK cluster
+            zk_conn = self._nodepool.getZK()
+            while zk_conn and (zk_conn.suspended or zk_conn.lost):
+                self.log.info("ZooKeeper suspended. Waiting")
+                time.sleep(SUSPEND_WAIT_TIME)
+
+            self._run()
+            time.sleep(self._interval)
+
+        self.log.info("Stopped")
+
+    def stop(self):
+        self._running = False
+        self.join()
+
+
+class DeletedNodeWorker(BaseCleanupWorker):
+    def __init__(self, nodepool, interval):
+        super(DeletedNodeWorker, self).__init__(
+            nodepool, interval, name='DeletedNodeWorker')
+        self.log = logging.getLogger("nodepool.DeletedNodeWorker")
 
     def _resetLostRequest(self, zk_conn, req):
         '''
@@ -1225,32 +1251,14 @@ class DeletedNodeWorker(threading.Thread):
             if provider.clean_floating_ips:
                 manager.cleanupLeakedFloaters()
 
-    def run(self):
-        self.log.info("Starting")
-        self._running = True
-
-        while self._running:
-            # Don't do work if we've lost communication with the ZK cluster
-            zk_conn = self._nodepool.getZK()
-            while zk_conn and (zk_conn.suspended or zk_conn.lost):
-                self.log.info("ZooKeeper suspended. Waiting")
-                time.sleep(SUSPEND_WAIT_TIME)
-
-            try:
-                self._cleanupNodeRequestLocks()
-                self._cleanupNodes()
-                self._cleanupLeakedInstances()
-                self._cleanupLostRequests()
-            except Exception:
-                self.log.exception("Exception in DeletedNodeWorker:")
-
-            time.sleep(self._interval)
-
-        self.log.info("Stopped")
-
-    def stop(self):
-        self._running = False
-        self.join()
+    def _run(self):
+        try:
+            self._cleanupNodeRequestLocks()
+            self._cleanupNodes()
+            self._cleanupLeakedInstances()
+            self._cleanupLostRequests()
+        except Exception:
+            self.log.exception("Exception in DeletedNodeWorker:")
 
 
 class NodePool(threading.Thread):
