@@ -435,3 +435,37 @@ class TestNodepool(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider2')
+
+    def _create_pending_request(self):
+        req = zk.NodeRequest()
+        req.state = zk.PENDING
+        req.requestor = 'test_nodepool'
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        # Create a node that is allocated to the request, but not yet assigned
+        # within the NodeRequest object
+        node = zk.Node()
+        node.state = zk.READY
+        node.type = 'fake-label'
+        node.public_ipv4 = 'fake'
+        node.provider = 'fake-provider'
+        node.allocated_to = req.id
+        self.zk.storeNode(node)
+
+        return (req, node)
+
+    def test_lost_requests(self):
+        """Test a request left pending is reset and satisfied on restart"""
+        (req, node) = self._create_pending_request()
+
+        configfile = self.setup_config('node_lost_requests.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+
+        req = self.waitForNodeRequest(req, (zk.FULFILLED,))
+        # Since our config file has min-ready=0, we should be able to re-use
+        # the previously assigned node, thus making sure that the cleanup
+        # code reset the 'allocated_to' field.
+        self.assertIn(node.id, req.nodes)
