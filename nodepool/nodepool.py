@@ -1141,6 +1141,26 @@ class NodeCleanupWorker(threading.Thread):
 
         zk_conn = self._nodepool.getZK()
         for node in zk_conn.nodeIterator():
+            # If a ready node has been allocated to a request, but that
+            # request is now missing, deallocate it.
+            if (node.state == zk.READY and node.allocated_to
+                and not zk_conn.getNodeRequest(node.allocated_to)
+            ):
+                try:
+                    zk_conn.lockNode(node, blocking=False)
+                except exceptions.ZKLockException:
+                    pass
+                else:
+                    # Double check node conditions after lock
+                    if node.state == zk.READY and node.allocated_to:
+                        self.log.debug(
+                            "Unallocating node %s with missing request %s",
+                            node.id, node.allocated_to)
+                        node.allocated_to = None
+                        zk_conn.storeNode(node)
+
+                    zk_conn.unlockNode(node)
+
             # Can't do anything if we aren't configured for this provider.
             if node.provider not in self._nodepool.config.providers:
                 continue

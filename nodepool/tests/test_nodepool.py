@@ -469,3 +469,23 @@ class TestNodepool(tests.DBTestCase):
         # the previously assigned node, thus making sure that the cleanup
         # code reset the 'allocated_to' field.
         self.assertIn(node.id, req.nodes)
+
+    def test_node_deallocation(self):
+        """Test an allocated node with a missing request is deallocated"""
+        node = zk.Node()
+        node.state = zk.READY
+        node.type = 'fake-label'
+        node.public_ipv4 = 'fake'
+        node.provider = 'fake-provider'
+        node.allocated_to = "MISSING"
+        self.zk.storeNode(node)
+
+        configfile = self.setup_config('node_lost_requests.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+
+        while True:
+            node = self.zk.getNode(node.id)
+            if not node.allocated_to:
+                break
