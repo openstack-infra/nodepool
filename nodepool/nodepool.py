@@ -655,6 +655,10 @@ class NodeRequestHandler(object):
                         # It's already locked so skip it.
                         continue
                     else:
+                        if self.paused:
+                            self.log.debug("Unpaused request %s", self.request)
+                            self.paused = False
+
                         self.log.debug(
                             "Locked existing node %s for request %s",
                             node.id, self.request.id)
