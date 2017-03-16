@@ -193,8 +193,9 @@ class InstanceDeleter(threading.Thread, StatsReporter):
         try:
             node.state = zk.DELETING
             zk_conn.storeNode(node)
-            manager.cleanupServer(node.external_id)
-            manager.waitForServerDeletion(node.external_id)
+            if node.external_id:
+                manager.cleanupServer(node.external_id)
+                manager.waitForServerDeletion(node.external_id)
         except provider_manager.NotFound:
             InstanceDeleter.log.info("Instance %s not found in provider %s",
                                      node.external_id, node.provider)
