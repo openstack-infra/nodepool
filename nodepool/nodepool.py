@@ -295,10 +295,6 @@ class NodeLauncher(threading.Thread, StatsReporter):
             nodepool_node_id=self._node.id,
             nodepool_image_name=config_image.name)
 
-        # If we didn't specify an AZ, set it to the one chosen by Nova.
-        if not self._node.az:
-            self._node.az = server.location.zone
-
         self._node.external_id = server.id
         self._node.hostname = hostname
         self._node.image_id = "{path}/{upload_id}".format(
@@ -320,6 +316,12 @@ class NodeLauncher(threading.Thread, StatsReporter):
                                         "status: %s" %
                                         (server.id, self._node.id,
                                          server.status))
+
+        # If we didn't specify an AZ, set it to the one chosen by Nova.
+        # Do this after we are done waiting since AZ may not be available
+        # immediately after the create request.
+        if not self._node.az:
+            self._node.az = server.location.zone
 
         self._node.public_ipv4 = server.public_v4
         self._node.public_ipv6 = server.public_v6
