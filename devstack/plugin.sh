@@ -14,7 +14,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-NODEPOOL_KEY=$HOME/.ssh/id_nodepool
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 NODEPOOL_INSTALL=$HOME/nodepool-venv
 NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
@@ -73,12 +72,6 @@ function install_nodepool {
 
 # requires some globals from devstack, which *might* not be stable api
 # points. If things break, investigate changes in those globals first.
-
-function nodepool_create_keypairs {
-    if [[ ! -f $NODEPOOL_KEY ]]; then
-        ssh-keygen -f $NODEPOOL_KEY -P ""
-    fi
-}
 
 function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
@@ -218,32 +211,22 @@ providers:
       - name: centos-7
         min-ram: 1024
         name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: fedora-25
         min-ram: 1024
         name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-precise
         min-ram: 512
         name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-trusty
         min-ram: 512
         name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: ubuntu-xenial
         min-ram: 512
         name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
 
 diskimages:
@@ -370,9 +353,6 @@ EOF
 # Create configs
 # Setup custom flavor
 function configure_nodepool {
-    # build a dedicated keypair for nodepool to use with guests
-    nodepool_create_keypairs
-
     # write the nodepool config
     nodepool_write_config
 

@@ -250,21 +250,13 @@ provider, the Nodepool image types are also defined (see
         - name: trusty
           min-ram: 8192
           name-filter: 'something to match'
-          username: jenkins
-          user-home: '/home/jenkins'
-          private-key: /var/lib/jenkins/.ssh/id_rsa
           meta:
               key: value
               key2: value
         - name: precise
           min-ram: 8192
-          username: jenkins
-          user-home: '/home/jenkins'
-          private-key: /var/lib/jenkins/.ssh/id_rsa
         - name: devstack-trusty
           min-ram: 30720
-          username: jenkins
-          private-key: /home/nodepool/.ssh/id_rsa
     - name: provider2
       username: 'username'
       password: 'password'
@@ -280,9 +272,6 @@ provider, the Nodepool image types are also defined (see
       images:
         - name: precise
           min-ram: 8192
-          username: jenkins
-          user-home: '/home/jenkins'
-          private-key: /var/lib/jenkins/.ssh/id_rsa
           meta:
               key: value
               key2: value
@@ -432,8 +421,6 @@ Example configuration::
       pause: False
       min-ram: 8192
       name-filter: 'something to match'
-      username: jenkins
-      private-key: /var/lib/jenkins/.ssh/id_rsa
       meta:
           key: value
           key2: value
@@ -461,13 +448,6 @@ Example configuration::
   ``pause`` (bool)
     When set to True, nodepool-builder will not upload the image to the
     provider.
-
-  ``username``
-    Nodepool expects that user to exist after running the script indicated by
-    ``setup``. Default ``jenkins``
-
-  ``private-key``
-    Default ``/var/lib/jenkins/.ssh/id_rsa``
 
   ``config-drive`` (boolean)
     Whether config drive should be used for the image.
