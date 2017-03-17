@@ -685,7 +685,7 @@ class NodeRequestHandler(object):
                     self.chosen_az = random.choice(self.provider.azs)
 
                 # If we calculate that we're at capacity, pause until nodes
-                # are released by Zuul and removed by the NodeCleanupWorker.
+                # are released by Zuul and removed by the DeletedNodeWorker.
                 if self._countNodes() >= self.provider.max_servers:
                     if not self.paused:
                         self.log.debug(
@@ -1037,10 +1037,10 @@ class ProviderWorker(threading.Thread):
         self.running = False
 
 
-class NodeCleanupWorker(threading.Thread):
+class DeletedNodeWorker(threading.Thread):
     def __init__(self, nodepool, interval):
-        threading.Thread.__init__(self, name='NodeCleanupWorker')
-        self.log = logging.getLogger("nodepool.NodeCleanupWorker")
+        threading.Thread.__init__(self, name='DeletedNodeWorker')
+        self.log = logging.getLogger("nodepool.DeletedNodeWorker")
         self._nodepool = nodepool
         self._interval = interval
         self._running = False
@@ -1245,7 +1245,7 @@ class NodeCleanupWorker(threading.Thread):
                 self._cleanupLeakedInstances()
                 self._cleanupLostRequests()
             except Exception:
-                self.log.exception("Exception in NodeCleanupWorker:")
+                self.log.exception("Exception in DeletedNodeWorker:")
 
             time.sleep(self._interval)
 
@@ -1265,13 +1265,13 @@ class NodePool(threading.Thread):
         self.securefile = securefile
         self.configfile = configfile
         self.watermark_sleep = watermark_sleep
-        self.cleanup_interval = 5
+        self.delete_interval = 5
         self._stopped = False
         self.config = None
         self.zk = None
         self.statsd = stats.get_client()
         self._provider_threads = {}
-        self._cleanup_thread = None
+        self._delete_thread = None
         self._wake_condition = threading.Condition()
         self._submittedRequests = {}
 
@@ -1283,9 +1283,9 @@ class NodePool(threading.Thread):
         if self.config:
             provider_manager.ProviderManager.stopProviders(self.config)
 
-        if self._cleanup_thread:
-            self._cleanup_thread.stop()
-            self._cleanup_thread.join()
+        if self._delete_thread:
+            self._delete_thread.stop()
+            self._delete_thread.join()
 
         # Don't let stop() return until all provider threads have been
         # terminated.
@@ -1462,10 +1462,10 @@ class NodePool(threading.Thread):
 
                 self.createMinReady()
 
-                if not self._cleanup_thread:
-                    self._cleanup_thread = NodeCleanupWorker(
-                        self, self.cleanup_interval)
-                    self._cleanup_thread.start()
+                if not self._delete_thread:
+                    self._delete_thread = DeletedNodeWorker(
+                        self, self.delete_interval)
+                    self._delete_thread.start()
 
                 # Stop any ProviderWorker threads if the provider was removed
                 # from the config.

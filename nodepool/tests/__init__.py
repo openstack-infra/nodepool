@@ -164,7 +164,7 @@ class BaseTestCase(testtools.TestCase):
                      'fake-provider1',
                      'fake-provider2',
                      'fake-provider3',
-                     'NodeCleanupWorker',
+                     'DeletedNodeWorker',
                      ]
 
         while True:
@@ -397,7 +397,7 @@ class DBTestCase(BaseTestCase):
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args
         pool = nodepool.NodePool(*args, **kwargs)
-        pool.cleanup_interval = .5
+        pool.delete_interval = .5
         self.addCleanup(pool.stop)
         return pool
 
