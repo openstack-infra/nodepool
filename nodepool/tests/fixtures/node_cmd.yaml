@@ -23,7 +23,6 @@ labels:
 
 providers:
   - name: fake-provider1
-    keypair: 'if-present-use-this-keypair'
     max-servers: 96
     pool: 'fake'
     networks:
@@ -37,7 +36,6 @@ providers:
           key: value
           key2: value
   - name: fake-provider2
-    keypair: 'if-present-use-this-keypair'
     max-servers: 96
     pool: 'fake'
     networks:

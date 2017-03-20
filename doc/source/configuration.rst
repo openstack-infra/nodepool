@@ -337,9 +337,6 @@ provider, the Nodepool image types are also defined (see
 
     Default 3.
 
-  ``keypair``
-    Default None
-
   ``networks`` (dict)
     Specify custom Neutron networks that get attached to each
     node. Specify the ``name`` of the network (a string).

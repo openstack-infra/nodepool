@@ -21,7 +21,6 @@ providers:
   - name: fake-provider
     cloud: 'fake'
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 96
     pool: 'fake'
     launch-retries: 2

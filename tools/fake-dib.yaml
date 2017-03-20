@@ -25,7 +25,6 @@ labels:
 
 providers:
   - name: fake-provider
-    keypair: 'if-present-use-this-keypair'
     region-name: 'fake-region'
     max-servers: 96
     images:

@@ -21,7 +21,6 @@ labels:
 providers:
   - name: fake-provider1
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 2
     pool: 'fake'
     image-type: vhd
@@ -37,7 +36,6 @@ providers:
           key2: value
   - name: fake-provider2
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 2
     pool: 'fake'
     image-type: qcow2
