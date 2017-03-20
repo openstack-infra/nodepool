@@ -24,8 +24,8 @@ labels:
 
 providers:
   - name: fake-provider
+    cloud: fake
     max-servers: 96
-    auth-url: 'fake'
     images:
       - name: fake-nodepool
         min-ram: 8192

@@ -18,10 +18,6 @@ providers:
   - name: real-provider
     region-name: real-region
     keypair: 'if-present-use-this-keypair'
-    username: 'real'
-    password: 'real'
-    auth-url: 'real'
-    project-id: 'real'
     max-servers: 96
     pool: 'real'
     networks:

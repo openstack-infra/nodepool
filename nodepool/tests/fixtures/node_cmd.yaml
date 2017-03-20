@@ -24,10 +24,6 @@ labels:
 providers:
   - name: fake-provider1
     keypair: 'if-present-use-this-keypair'
-    username: 'fake'
-    password: 'fake'
-    auth-url: 'fake'
-    project-id: 'fake'
     max-servers: 96
     pool: 'fake'
     networks:
@@ -42,10 +38,6 @@ providers:
           key2: value
   - name: fake-provider2
     keypair: 'if-present-use-this-keypair'
-    username: 'fake'
-    password: 'fake'
-    auth-url: 'fake'
-    project-id: 'fake'
     max-servers: 96
     pool: 'fake'
     networks:

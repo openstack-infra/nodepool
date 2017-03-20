@@ -45,7 +45,7 @@ class NotFound(Exception):
 
 
 def get_provider_manager(provider, use_taskmanager):
-    if (provider.cloud_config.get_auth_args().get('auth_url') == 'fake'):
+    if (provider.cloud_config.name == 'fake'):
         return FakeProviderManager(provider, use_taskmanager)
     else:
         return ProviderManager(provider, use_taskmanager)
