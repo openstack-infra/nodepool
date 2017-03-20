@@ -842,6 +842,7 @@ class NodeRequestHandler(object):
                 node.allocated_to = None
                 self.zk.storeNode(node)
             self.unlockNodeSet()
+            self.zk.unlockNodeRequest(self.request)
             return True
 
         if self.launch_manager.failed_nodes:
@@ -1205,12 +1206,27 @@ class CleanupWorker(BaseCleanupWorker):
                 manager.cleanupLeakedFloaters()
 
     def _run(self):
+        '''
+        Catch exceptions individually so that other cleanup routines may
+        have a chance.
+        '''
         try:
             self._cleanupNodeRequestLocks()
+        except Exception:
+            self.log.exception(
+                "Exception in DeletedNodeWorker (node request lock cleanup):")
+
+        try:
             self._cleanupLeakedInstances()
+        except Exception:
+            self.log.exception(
+                "Exception in DeletedNodeWorker (leaked instance cleanup):")
+
+        try:
             self._cleanupLostRequests()
         except Exception:
-            self.log.exception("Exception in DeletedNodeWorker:")
+            self.log.exception(
+                "Exception in DeletedNodeWorker (lost request cleanup):")
 
 
 class DeletedNodeWorker(BaseCleanupWorker):

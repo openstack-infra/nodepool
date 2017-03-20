@@ -1308,7 +1308,7 @@ class ZooKeeper(object):
         '''
         path = self._requestLockPath(lock)
         try:
-            self.client.delete(path)
+            self.client.delete(path, recursive=True)
         except kze.NoNodeError:
             pass
 
