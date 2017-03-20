@@ -86,8 +86,8 @@ class TestNodepool(tests.DBTestCase):
 
         client = pool.getProviderManager('fake-provider')._getClient()
 
-        # One of the things we want to test is that if spawn many node
-        # launches at once, we do not deadlock while the request
+        # One of the things we want to test is that if we spawn many
+        # node launches at once, we do not deadlock while the request
         # handler pauses for quota.  To ensure we test that case,
         # pause server creation until we have accepted all of the node
         # requests we submit.  This will ensure that we hold locks on
@@ -129,11 +129,30 @@ class TestNodepool(tests.DBTestCase):
 
         # Mark the first request's nodes as USED, which will get them deleted
         # and allow the second to proceed.
+        self.log.debug("Marking first node as used %s", req1.id)
+        node = self.zk.getNode(req1.nodes[0])
+        node.state = zk.USED
+        self.zk.storeNode(node)
+        self.waitForNodeDeletion(node)
+
+        # To force the sequential nature of what we're testing, wait for
+        # the 2nd request to get a node allocated to it now that we've
+        # freed up a node.
+        self.log.debug("Waiting for node allocation for 2nd request")
+        done = False
+        while not done:
+            for n in self.zk.nodeIterator():
+                if n.allocated_to == req2.id:
+                    done = True
+                    break
+
+        self.log.debug("Marking second node as used %s", req1.id)
+        node = self.zk.getNode(req1.nodes[1])
+        node.state = zk.USED
+        self.zk.storeNode(node)
+        self.waitForNodeDeletion(node)
+
         self.log.debug("Deleting 1st request %s", req1.id)
-        for node_id in req1.nodes:
-            node = self.zk.getNode(node_id)
-            node.state = zk.USED
-            self.zk.storeNode(node)
         self.zk.deleteNodeRequest(req1)
         self.waitForNodeRequestLockDeletion(req1.id)
 

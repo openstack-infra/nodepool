@@ -719,8 +719,7 @@ class NodeRequestHandler(object):
                 node.state = zk.BUILDING
                 self.zk.storeNode(node)
 
-                # NOTE: We append the node to nodeset if it successfully
-                # launches.
+                self.nodeset.append(node)
                 self.launch_manager.launch(node)
 
     def _run(self):
@@ -858,7 +857,6 @@ class NodeRequestHandler(object):
             else:
                 self.request.state = zk.REQUESTED
         else:
-            self.nodeset.extend(self.launch_manager.ready_nodes)
             for node in self.nodeset:
                 # Record node ID in the request
                 self.request.nodes.append(node.id)
