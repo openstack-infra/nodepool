@@ -1,7 +1,7 @@
 clouds:
   fake:
     auth:
-      usernmae: 'fake'
+      username: 'fake'
       password: 'fake'
       project_id: 'fake'
       auth_url: 'fake'

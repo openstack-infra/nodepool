@@ -40,7 +40,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
 
         self.provider = b._config.providers['fake-provider']
-        self.labels = b._config.labels
+        self.provider_pool = self.provider.pools['main']
 
         # The builder config does not have a provider manager, so create one.
         self.pmanager = provider_manager.ProviderManager(self.provider, False)
@@ -53,7 +53,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
+        mgr = NodeLaunchManager(self.zk, self.provider_pool,
                                 self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
@@ -70,7 +70,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
+        mgr = NodeLaunchManager(self.zk, self.provider_pool,
                                 self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
@@ -90,7 +90,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n2 = zk.Node()
         n2.state = zk.BUILDING
         n2.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider, self.labels,
+        mgr = NodeLaunchManager(self.zk, self.provider_pool,
                                 self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         mgr.launch(n2)

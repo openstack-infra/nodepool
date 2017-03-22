@@ -221,7 +221,7 @@ class NodePoolCmd(NodepoolApp):
 
             alien_ids = []
             uploads = []
-            for image in provider.images:
+            for image in provider.diskimages:
                 # Build list of provider images as recorded in ZK
                 for bnum in self.zk.getBuildNumbers(image):
                     uploads.extend(

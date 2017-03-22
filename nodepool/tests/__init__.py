@@ -126,6 +126,9 @@ class BaseTestCase(testtools.TestCase):
         l = logging.getLogger('kazoo')
         l.setLevel(logging.INFO)
         l.propagate=False
+        l = logging.getLogger('stevedore')
+        l.setLevel(logging.INFO)
+        l.propagate=False
         self.useFixture(fixtures.NestedTempfile())
 
         self.subprocesses = []
@@ -187,7 +190,7 @@ class BaseTestCase(testtools.TestCase):
                     continue
                 if t.name.startswith("CleanupWorker"):
                     continue
-                if t.name.startswith("ProviderWorker"):
+                if t.name.startswith("PoolWorker"):
                     continue
                 if t.name not in whitelist:
                     done = False

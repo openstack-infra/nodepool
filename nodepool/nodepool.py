@@ -229,14 +229,13 @@ class InstanceDeleter(threading.Thread, StatsReporter):
 
 class NodeLauncher(threading.Thread, StatsReporter):
 
-    def __init__(self, zk, provider, label, provider_manager, requestor,
+    def __init__(self, zk, provider_label, provider_manager, requestor,
                  node, retries):
         '''
         Initialize the launcher.
 
         :param ZooKeeper zk: A ZooKeeper object.
-        :param Provider provider: A config Provider object.
-        :param Label label: The Label object for this node type.
+        :param ProviderLabel provider: A config ProviderLabel object.
         :param ProviderManager provider_manager: The manager object used to
             interact with the selected provider.
         :param str requestor: Identifier for the request originator.
@@ -247,26 +246,24 @@ class NodeLauncher(threading.Thread, StatsReporter):
         StatsReporter.__init__(self)
         self.log = logging.getLogger("nodepool.NodeLauncher-%s" % node.id)
         self._zk = zk
-        self._provider = provider
-        self._label = label
+        self._label = provider_label
         self._manager = provider_manager
         self._node = node
         self._retries = retries
         self._image_name = None
         self._requestor = requestor
 
+        self._pool = self._label.pool
+        self._provider = self._pool.provider
+        self._diskimage = self._provider.diskimages[self._label.diskimage.name]
+
     def _launchNode(self):
-        config_image = self._provider.images[self._label.image]
-
-        # Stored for statsd reporting
-        self._image_name = config_image.name
-
         cloud_image = self._zk.getMostRecentImageUpload(
-            config_image.name, self._provider.name)
+            self._diskimage.name, self._provider.name)
         if not cloud_image:
             raise LaunchNodepoolException(
                 "Unable to find current cloud image %s in %s" %
-                (config_image.name, self._provider.name)
+                (self._diskimage.name, self._provider.name)
             )
 
         hostname = self._provider.hostname_format.format(
@@ -275,7 +272,8 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for node id: %s" % (hostname, self._provider.name,
-                                           config_image.name, self._node.id))
+                                           self._diskimage.name,
+                                           self._node.id))
 
         # NOTE: We store the node ID in the server metadata to use for leaked
         # instance detection. We cannot use the external server ID for this
@@ -284,13 +282,14 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         server = self._manager.createServer(
             hostname,
-            config_image.min_ram,
+            self._label.min_ram,
             cloud_image.external_id,
-            name_filter=config_image.name_filter,
+            name_filter=self._label.name_filter,
             az=self._node.az,
-            config_drive=config_image.config_drive,
+            config_drive=self._diskimage.config_drive,
             nodepool_node_id=self._node.id,
-            nodepool_image_name=config_image.name)
+            nodepool_image_name=self._diskimage.name,
+            networks=self._pool.networks)
 
         self._node.external_id = server.id
         self._node.hostname = hostname
@@ -417,14 +416,13 @@ class NodeLaunchManager(object):
     '''
     Handle launching multiple nodes in parallel.
     '''
-    def __init__(self, zk, provider, labels, provider_manager,
+    def __init__(self, zk, pool, provider_manager,
                  requestor, retries):
         '''
         Initialize the launch manager.
 
         :param ZooKeeper zk: A ZooKeeper object.
-        :param Provider provider: A config Provider object.
-        :param dict labels: A dict of config Label objects.
+        :param ProviderPool pool: A config ProviderPool object.
         :param ProviderManager provider_manager: The manager object used to
             interact with the selected provider.
         :param str requestor: Identifier for the request originator.
@@ -436,8 +434,7 @@ class NodeLaunchManager(object):
         self._ready_nodes = []
         self._threads = []
         self._zk = zk
-        self._provider = provider
-        self._labels = labels
+        self._pool = pool
         self._manager = provider_manager
         self._requestor = requestor
 
@@ -468,8 +465,8 @@ class NodeLaunchManager(object):
         :param Node node: The node object.
         '''
         self._nodes.append(node)
-        label = self._labels[node.type]
-        t = NodeLauncher(self._zk, self._provider, label, self._manager,
+        provider_label = self._pool.labels[node.type]
+        t = NodeLauncher(self._zk, provider_label, self._manager,
                          self._requestor, node, self._retries)
         t.start()
         self._threads.append(t)
@@ -508,13 +505,13 @@ class NodeRequestHandler(object):
     '''
     Class to process a single node request.
 
-    The ProviderWorker thread will instantiate a class of this type for each
+    The PoolWorker thread will instantiate a class of this type for each
     node request that it pulls from ZooKeeper.
     '''
 
     def __init__(self, pw, request):
         '''
-        :param ProviderWorker pw: The parent ProviderWorker object.
+        :param PoolWorker pw: The parent PoolWorker object.
         :param NodeRequest request: The request to handle.
         '''
         self.log = logging.getLogger("nodepool.NodeRequestHandler")
@@ -526,16 +523,16 @@ class NodeRequestHandler(object):
         self.chosen_az = None
         self.paused = False
 
-    def _setFromProviderWorker(self):
+    def _setFromPoolWorker(self):
         '''
-        Set values that we pull from the parent ProviderWorker.
+        Set values that we pull from the parent PoolWorker.
 
         We don't do this in __init__ because this class is re-entrant and we
         want the updated values.
         '''
         self.provider = self.pw.getProviderConfig()
+        self.pool = self.pw.getPoolConfig()
         self.zk = self.pw.getZK()
-        self.labels = self.pw.getLabelsConfig()
         self.manager = self.pw.getProviderManager()
         self.launcher_id = self.pw.launcher_id
 
@@ -549,11 +546,7 @@ class NodeRequestHandler(object):
         :returns: True if it is available, False otherwise.
         '''
         for label in self.request.node_types:
-            try:
-                img = self.labels[label].image
-            except KeyError:
-                 self.log.error("Node type %s not a defined label", label)
-                 return False
+            img = self.pool.labels[label].diskimage.name
 
             if not self.zk.getMostRecentImageUpload(img, self.provider.name):
                 return False
@@ -568,12 +561,8 @@ class NodeRequestHandler(object):
         '''
         invalid = []
         for ntype in self.request.node_types:
-            if ntype not in self.labels:
+            if ntype not in self.pool.labels:
                 invalid.append(ntype)
-            else:
-                label = self.labels[ntype]
-                if self.provider.name not in label.providers.keys():
-                    invalid.append(ntype)
         return invalid
 
     def _countNodes(self):
@@ -584,7 +573,8 @@ class NodeRequestHandler(object):
         '''
         count = 0
         for node in self.zk.nodeIterator():
-            if node.provider == self.provider.name:
+            if (node.provider == self.provider.name and
+                node.pool == self.pool.name):
                 count += 1
         return count
 
@@ -614,7 +604,7 @@ class NodeRequestHandler(object):
         '''
         if not self.launch_manager:
             self.launch_manager = NodeLaunchManager(
-                self.zk, self.provider, self.labels, self.manager,
+                self.zk, self.pool, self.manager,
                 self.request.requestor, retries=self.provider.launch_retries)
 
         # Since this code can be called more than once for the same request,
@@ -633,9 +623,11 @@ class NodeRequestHandler(object):
             got_a_node = False
             if self.request.reuse and ntype in ready_nodes:
                 for node in ready_nodes[ntype]:
-                    # Only interested in nodes from this provider and within
-                    # the selected AZ.
+                    # Only interested in nodes from this provider and
+                    # pool, and within the selected AZ.
                     if node.provider != self.provider.name:
+                        continue
+                    if node.pool != self.pool.name:
                         continue
                     if self.chosen_az and node.az != self.chosen_az:
                         continue
@@ -669,12 +661,12 @@ class NodeRequestHandler(object):
             if not got_a_node:
                 # Select grouping AZ if we didn't set AZ from a selected,
                 # pre-existing node
-                if not self.chosen_az and self.provider.azs:
-                    self.chosen_az = random.choice(self.provider.azs)
+                if not self.chosen_az and self.pool.azs:
+                    self.chosen_az = random.choice(self.pool.azs)
 
                 # If we calculate that we're at capacity, pause until nodes
                 # are released by Zuul and removed by the DeletedNodeWorker.
-                if self._countNodes() >= self.provider.max_servers:
+                if self._countNodes() >= self.pool.max_servers:
                     if not self.paused:
                         self.log.debug(
                             "Pausing request handling to satisfy request %s",
@@ -690,6 +682,7 @@ class NodeRequestHandler(object):
                 node.state = zk.INIT
                 node.type = ntype
                 node.provider = self.provider.name
+                node.pool = self.pool.name
                 node.az = self.chosen_az
                 node.launcher = self.launcher_id
                 node.allocated_to = self.request.id
@@ -714,17 +707,17 @@ class NodeRequestHandler(object):
         '''
         Main body for the NodeRequestHandler.
         '''
-        self._setFromProviderWorker()
+        self._setFromPoolWorker()
 
         declined_reasons = []
-        if not self._imagesAvailable():
-            declined_reasons.append('images are not available')
-        if len(self.request.node_types) > self.provider.max_servers:
-            declined_reasons.append('it would exceed quota')
         invalid_types = self._invalidNodeTypes()
         if invalid_types:
             declined_reasons.append('node type(s) [%s] not available' %
                                     ','.join(invalid_types))
+        elif not self._imagesAvailable():
+            declined_reasons.append('images are not available')
+        if len(self.request.node_types) > self.pool.max_servers:
+            declined_reasons.append('it would exceed quota')
 
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
@@ -753,6 +746,8 @@ class NodeRequestHandler(object):
 
     @property
     def alive_thread_count(self):
+        if not self.launch_manager:
+            return 0
         return self.launch_manager.alive_thread_count
 
     #----------------------------------------------------------------
@@ -858,23 +853,25 @@ class NodeRequestHandler(object):
         return True
 
 
-class ProviderWorker(threading.Thread):
+class PoolWorker(threading.Thread):
     '''
-    Class that manages node requests for a single provider.
+    Class that manages node requests for a single provider pool.
 
     The NodePool thread will instantiate a class of this type for each
-    provider found in the nodepool configuration file. If the provider to
-    which this thread is assigned is removed from the configuration file, then
-    that will be recognized and this thread will shut itself down.
+    provider pool found in the nodepool configuration file. If the
+    pool or provider to which this thread is assigned is removed from
+    the configuration file, then that will be recognized and this
+    thread will shut itself down.
     '''
 
-    def __init__(self, nodepool, provider_name):
+    def __init__(self, nodepool, provider_name, pool_name):
         threading.Thread.__init__(
-            self, name='ProviderWorker.%s' % provider_name
+            self, name='PoolWorker.%s-%s' % (provider_name, pool_name)
         )
         self.log = logging.getLogger("nodepool.%s" % self.name)
         self.nodepool = nodepool
         self.provider_name = provider_name
+        self.pool_name = pool_name
         self.running = False
         self.paused_handler = None
         self.request_handlers = []
@@ -887,19 +884,6 @@ class ProviderWorker(threading.Thread):
     #----------------------------------------------------------------
     # Private methods
     #----------------------------------------------------------------
-
-    def _activeThreads(self):
-        '''
-        Return the number of alive threads in use by this provider.
-
-        This is an approximate, top-end number for alive threads, since some
-        threads obviously may have finished by the time we finish the
-        calculation.
-        '''
-        total = 0
-        for r in self.request_handlers:
-            total += r.alive_thread_count
-        return total
 
     def _assignHandlers(self):
         '''
@@ -917,9 +901,15 @@ class ProviderWorker(threading.Thread):
             if self.paused_handler:
                 return
 
+            # Get active threads for all pools for this provider
+            active_threads = sum([
+                w.activeThreads() for
+                w in self.nodepool.getPoolWorkers(self.provider_name)
+            ])
+
             # Short-circuit for limited request handling
-            if (provider.max_concurrency > 0
-                and self._activeThreads() >= provider.max_concurrency
+            if (provider.max_concurrency > 0 and
+                active_threads >= provider.max_concurrency
             ):
                 return
 
@@ -968,17 +958,30 @@ class ProviderWorker(threading.Thread):
     # Public methods
     #----------------------------------------------------------------
 
+    def activeThreads(self):
+        '''
+        Return the number of alive threads in use by this provider.
+
+        This is an approximate, top-end number for alive threads, since some
+        threads obviously may have finished by the time we finish the
+        calculation.
+        '''
+        total = 0
+        for r in self.request_handlers:
+            total += r.alive_thread_count
+        return total
+
     def getZK(self):
         return self.nodepool.getZK()
 
     def getProviderConfig(self):
         return self.nodepool.config.providers[self.provider_name]
 
+    def getPoolConfig(self):
+        return self.getProviderConfig().pools[self.pool_name]
+
     def getProviderManager(self):
         return self.nodepool.getProviderManager(self.provider_name)
-
-    def getLabelsConfig(self):
-        return self.nodepool.config.labels
 
     def run(self):
         self.running = True
@@ -1005,7 +1008,7 @@ class ProviderWorker(threading.Thread):
 
                 self._removeCompletedHandlers()
             except Exception:
-                self.log.exception("Error in ProviderWorker:")
+                self.log.exception("Error in PoolWorker:")
             time.sleep(self.watermark_sleep)
 
         # Cleanup on exit
@@ -1014,7 +1017,7 @@ class ProviderWorker(threading.Thread):
 
     def stop(self):
         '''
-        Shutdown the ProviderWorker thread.
+        Shutdown the PoolWorker thread.
 
         Do not wait for the request handlers to finish. Any nodes
         that are in the process of launching will be cleaned up on a
@@ -1293,7 +1296,7 @@ class NodePool(threading.Thread):
         self.config = None
         self.zk = None
         self.statsd = stats.get_client()
-        self._provider_threads = {}
+        self._pool_threads = {}
         self._cleanup_thread = None
         self._delete_thread = None
         self._wake_condition = threading.Condition()
@@ -1315,10 +1318,10 @@ class NodePool(threading.Thread):
             self._delete_thread.stop()
             self._delete_thread.join()
 
-        # Don't let stop() return until all provider threads have been
+        # Don't let stop() return until all pool threads have been
         # terminated.
-        self.log.debug("Stopping provider threads")
-        for thd in self._provider_threads.values():
+        self.log.debug("Stopping pool threads")
+        for thd in self._pool_threads.values():
             if thd.isAlive():
                 thd.stop()
             self.log.debug("Waiting for %s" % thd.name)
@@ -1360,6 +1363,10 @@ class NodePool(threading.Thread):
 
     def getProviderManager(self, provider_name):
         return self.config.provider_managers[provider_name]
+
+    def getPoolWorkers(self, provider_name):
+        return [t for t in self._pool_threads.values() if
+                t.provider_name == provider_name]
 
     def updateConfig(self):
         config = self.loadConfig()
@@ -1416,6 +1423,13 @@ class NodePool(threading.Thread):
         :returns: True if image associated with the label is uploaded and
             ready in at least one provider. False otherwise.
         '''
+        for pool in label.pools:
+            for pool_label in pool.labels.values():
+                if self.zk.getMostRecentImageUpload(pool_label.diskimage.name,
+                                                    pool.provider.name):
+                    return True
+        return False
+
         for provider_name in label.providers.keys():
             if self.zk.getMostRecentImageUpload(label.image, provider_name):
                 return True
@@ -1500,27 +1514,34 @@ class NodePool(threading.Thread):
                         self, self.delete_interval)
                     self._delete_thread.start()
 
-                # Stop any ProviderWorker threads if the provider was removed
+                # Stop any PoolWorker threads if the pool was removed
                 # from the config.
-                for provider_name in self._provider_threads.keys():
-                    if provider_name not in self.config.providers.keys():
-                        self._provider_threads[provider_name].stop()
+                pool_keys = set()
+                for provider in self.config.providers.values():
+                    for pool in provider.pools.values():
+                        pool_keys.add(provider.name + '-' + pool.name)
+
+                for key in self._pool_threads.keys():
+                    if key not in pool_keys:
+                        self._pool_threads[key].stop()
 
                 # Start (or restart) provider threads for each provider in
                 # the config. Removing a provider from the config and then
                 # adding it back would cause a restart.
-                for p in self.config.providers.values():
-                    if p.name not in self._provider_threads.keys():
-                        t = ProviderWorker(self, p.name)
-                        self.log.info( "Starting %s" % t.name)
-                        t.start()
-                        self._provider_threads[p.name] = t
-                    elif not self._provider_threads[p.name].isAlive():
-                        self._provider_threads[p.name].join()
-                        t = ProviderWorker(self, p.name)
-                        self.log.info( "Restarting %s" % t.name)
-                        t.start()
-                        self._provider_threads[p.name] = t
+                for provider in self.config.providers.values():
+                    for pool in provider.pools.values():
+                        key = provider.name + '-' + pool.name
+                        if key not in self._pool_threads.keys():
+                            t = PoolWorker(self, provider.name, pool.name)
+                            self.log.info( "Starting %s" % t.name)
+                            t.start()
+                            self._pool_threads[key] = t
+                        elif not self._pool_threads[key].isAlive():
+                            self._pool_threads[key].join()
+                            t = PoolWorker(self, provider.name, pool.name)
+                            self.log.info( "Restarting %s" % t.name)
+                            t.start()
+                            self._pool_threads[key] = t
             except Exception:
                 self.log.exception("Exception in main loop:")
 

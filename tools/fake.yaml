@@ -20,23 +20,21 @@ diskimages:
       BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
 
 labels:
-  - name: single-fake
-    image: fake-nodepool
+  - name: small-fake
     min-ready: 2
-    providers:
-      - name: fake-provider
-  - name: multi-fake
-    image: fake-nodepool
+  - name: big-fake
     min-ready: 2
-    providers:
-      - name: fake-provider
 
 providers:
   - name: fake-provider
     region-name: 'fake-region'
-    max-servers: 96
-    images:
+    diskimages:
       - name: fake-nodepool
-        min-ram: 8192
-        name-filter: 'Fake'
-        diskimage: fake-nodepool
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+          - name: big-fake
+            diskimage: fake-nodepool
+            min-ram: 8192
+            name-filter: 'Fake'

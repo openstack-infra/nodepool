@@ -12,38 +12,47 @@ zookeeper-servers:
 
 labels:
   - name: trusty
-    image: trusty
     min-ready: 1
-    providers:
-      - name: cloud1
-      - name: cloud2
   - name: trusty-2-node
-    image: trusty
     min-ready: 0
-    providers:
-      - name: cloud1
-      - name: cloud2
 
 providers:
   - name: cloud1
     region-name: 'vanilla'
     boot-timeout: 120
-    max-servers: 184
     max-concurrency: 10
     launch-retries: 3
     rate: 0.001
-    images:
+    diskimages:
       - name: trusty
-        min-ram: 8192
+    pools:
+      - name: main
+        max-servers: 184
+        labels:
+          - name: trusty
+            diskimage: trusty
+            min-ram: 8192
+          - name: trusty-2-node
+            diskimage: trusty
+            min-ram: 8192
+
   - name: cloud2
     region-name: 'chocolate'
     boot-timeout: 120
-    max-servers: 184
     rate: 0.001
-    images:
+    diskimages:
       - name: trusty
         pause: False
-        min-ram: 8192
+    pools:
+      - name: main
+        max-servers: 184
+        labels:
+          - name: trusty
+            diskimage: trusty
+            min-ram: 8192
+          - name: trusty-2-node
+            diskimage: trusty
+            min-ram: 8192
 
 diskimages:
   - name: trusty

@@ -404,6 +404,7 @@ class Node(BaseModel):
         super(Node, self).__init__(id)
         self.lock = None
         self.provider = None
+        self.pool = None
         self.type = None
         self.allocated_to = None
         self.az = None
@@ -430,6 +431,7 @@ class Node(BaseModel):
                     self.state == other.state and
                     self.state_time == other.state_time and
                     self.provider == other.provider and
+                    self.pool == other.pool and
                     self.type == other.type and
                     self.allocated_to == other.allocated_to and
                     self.az == other.az and
@@ -452,6 +454,7 @@ class Node(BaseModel):
         '''
         d = super(Node, self).toDict()
         d['provider'] = self.provider
+        d['pool'] = self.pool
         d['type'] = self.type
         d['allocated_to'] = self.allocated_to
         d['az'] = self.az
@@ -480,6 +483,7 @@ class Node(BaseModel):
         o = Node(o_id)
         super(Node, o).fromDict(d)
         o.provider = d.get('provider')
+        o.pool = d.get('pool')
         o.type = d.get('type')
         o.allocated_to = d.get('allocated_to')
         o.az = d.get('az')

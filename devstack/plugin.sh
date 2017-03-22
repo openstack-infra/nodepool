@@ -172,30 +172,15 @@ cron:
 
 labels:
   - name: centos-7
-    image: centos-7
     min-ready: 1
-    providers:
-      - name: devstack
   - name: fedora-25
-    image: fedora-25
     min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-precise
-    image: ubuntu-precise
     min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-trusty
-    image: ubuntu-trusty
     min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-xenial
-    image: ubuntu-xenial
     min-ready: 1
-    providers:
-      - name: devstack
 
 providers:
   - name: devstack
@@ -205,29 +190,42 @@ providers:
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
     launch-timeout: 900
-    max-servers: 5
     rate: 0.25
-    images:
+    diskimages:
       - name: centos-7
-        min-ram: 1024
-        name-filter: 'nodepool'
         config-drive: true
       - name: fedora-25
-        min-ram: 1024
-        name-filter: 'nodepool'
         config-drive: true
       - name: ubuntu-precise
-        min-ram: 512
-        name-filter: 'nodepool'
         config-drive: true
       - name: ubuntu-trusty
-        min-ram: 512
-        name-filter: 'nodepool'
         config-drive: true
       - name: ubuntu-xenial
-        min-ram: 512
-        name-filter: 'nodepool'
         config-drive: true
+    pools:
+      - name: main
+        max-servers: 5
+        labels:
+          - name: centos-7
+            diskimage: centos-7
+            min-ram: 1024
+            name-filter: 'nodepool'
+          - name: fedora-25
+            diskimage: fedora-25
+            min-ram: 1024
+            name-filter: 'nodepool'
+          - name: ubuntu-precise
+            diskimage: ubuntu-precise
+            min-ram: 512
+            name-filter: 'nodepool'
+          - name: ubuntu-trusty
+            diskimage: ubuntu-trusty
+            min-ram: 512
+            name-filter: 'nodepool'
+          - name: ubuntu-xenial
+            diskimage: ubuntu-xenial
+            min-ram: 512
+            name-filter: 'nodepool'
 
 diskimages:
   - name: centos-7

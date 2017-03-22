@@ -29,16 +29,6 @@ class ConfigValidator:
             'cleanup': str,
         }
 
-        images = {
-            'name': str,
-            'pause': bool,
-            'min-ram': int,
-            'name-filter': str,
-            'diskimage': str,
-            'meta': dict,
-            'config-drive': bool,
-        }
-
         old_network = {
             'net-id': str,
             'net-label': str,
@@ -49,38 +39,53 @@ class ConfigValidator:
             'public': bool,  # Ignored, but kept for backwards compat
         }
 
-        providers = {
+        pool_label = {
+            v.Required('name'): str,
+            v.Required('diskimage'): str,
+            'min-ram': int,
+            'name-filter': str,
+        }
+
+        pool = {
+            'name': str,
+            'networks': [v.Any(old_network, network)],
+            'max-servers': int,
+            'labels': [pool_label],
+            'availability-zones': [str],
+            }
+
+        provider_diskimage = {
+            'name': str,
+            'pause': bool,
+            'meta': dict,
+            'config-drive': bool,
+        }
+
+        provider = {
             'name': str,
             'region-name': str,
-            'availability-zones': [str],
             'cloud': str,
-            'max-servers': int,
             'max-concurrency': int,
-            'pool': str,  # Ignored, but kept for backwards compat
             'image-type': str,
-            'networks': [v.Any(old_network, network)],
             'ipv6-preferred': bool,
             'boot-timeout': int,
             'api-timeout': int,
             'launch-timeout': int,
             'launch-retries': int,
             'rate': float,
-            'images': [images],
             'hostname-format': str,
             'image-name-format': str,
             'clean-floating-ips': bool,
+            'pools': [pool],
+            'diskimages': [provider_diskimage],
         }
 
-        labels = {
+        label = {
             'name': str,
-            'image': str,
             'min-ready': int,
-            'providers': [{
-                'name': str,
-            }],
         }
 
-        diskimages = {
+        diskimage = {
             'name': str,
             'pause': bool,
             'elements': [str],
@@ -99,9 +104,9 @@ class ConfigValidator:
                 'chroot': str,
             }],
             'cron': cron,
-            'providers': [providers],
-            'labels': [labels],
-            'diskimages': [diskimages],
+            'providers': [provider],
+            'labels': [label],
+            'diskimages': [diskimage],
         }
 
         log.info("validating %s" % self.config_file)
@@ -110,12 +115,3 @@ class ConfigValidator:
         # validate the overall schema
         schema = v.Schema(top_level)
         schema(config)
-
-        # labels must list valid providers
-        all_providers = [p['name'] for p in config['providers']]
-        for label in config['labels']:
-            for provider in label['providers']:
-                if not provider['name'] in all_providers:
-                    raise AssertionError('label %s requests '
-                                         'non-existent provider %s'
-                                         % (label['name'], provider['name']))

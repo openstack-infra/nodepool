@@ -12,43 +12,38 @@ zookeeper-servers:
 
 labels:
   - name: fake-label
-    image: fake-image
     min-ready: 2
-    providers:
-      - name: fake-provider1
-      - name: fake-provider2
 
 providers:
   - name: fake-provider1
+    cloud: fake
     region-name: fake-region
-    max-servers: 2
-    pool: 'fake'
     image-type: vhd
-    networks:
-      - net-id: 'some-uuid'
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
-        meta:
-          key: value
-          key2: value
+    pools:
+      - name: main
+        max-servers: 2
+        labels:
+          - name: fake-label
+            diskimage: fake-image
+            min-ram: 8192
+
   - name: fake-provider2
+    cloud: fake
     region-name: fake-region
-    max-servers: 2
-    pool: 'fake'
     image-type: qcow2
-    networks:
-      - net-id: 'some-uuid'
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
-        meta:
-          key: value
-          key2: value
+    pools:
+      - name: main
+        max-servers: 2
+        labels:
+          - name: fake-label
+            diskimage: fake-image
+            min-ram: 8192
 
 diskimages:
   - name: fake-image

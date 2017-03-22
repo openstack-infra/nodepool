@@ -271,7 +271,7 @@ class CleanupWorker(BaseWorker):
             self._deleteUpload(upload)
 
     def _cleanupObsoleteProviderUploads(self, provider, image, build_id):
-        image_names_for_provider = provider.images.keys()
+        image_names_for_provider = provider.diskimages.keys()
         if image in image_names_for_provider:
             # This image is in use for this provider
             return
@@ -849,7 +849,7 @@ class UploadWorker(BaseWorker):
                       (build_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
-        provider_image = provider.images.get(image_name)
+        provider_image = provider.diskimages.get(image_name)
         if provider_image is None:
             raise exceptions.BuilderInvalidCommandError(
                 "Could not find matching provider image for %s" % image_name
@@ -899,7 +899,7 @@ class UploadWorker(BaseWorker):
         to providers, do the upload if they are available on the local disk.
         '''
         for provider in self._config.providers.values():
-            for image in provider.images.values():
+            for image in provider.diskimages.values():
                 uploaded = False
 
                 # Check if we've been told to shutdown
@@ -931,7 +931,7 @@ class UploadWorker(BaseWorker):
         :returns: True if an upload was attempted, False otherwise.
         '''
         # Check if image uploads are paused.
-        if provider.images.get(image.name).pause:
+        if provider.diskimages.get(image.name).pause:
             return False
 
         # Search for the most recent 'ready' image build
