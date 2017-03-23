@@ -83,35 +83,19 @@ the supplied root path, is also optional and has no default.
 labels
 ------
 
-Defines the types of nodes that should be created.  Maps node types to
-the images that are used to back them and the providers that are used
-to supply them.  Jobs should be written to run on nodes of a certain
-label. Example::
+Defines the types of nodes that should be created.  Jobs should be
+written to run on nodes of a certain label. Example::
 
   labels:
     - name: my-precise
-      image: precise
       min-ready: 2
-      providers:
-        - name: provider1
-        - name: provider2
     - name: multi-precise
-      image: precise
       min-ready: 2
-      providers:
-        - name: provider1
 
 **required**
 
   ``name``
     Unique name used to tie jobs to those instances.
-
-  ``image``
-    Refers to providers images, see :ref:`images`.
-
-  ``providers`` (list)
-    Required if any nodes should actually be created (e.g., the label is not
-    currently disabled, see ``min-ready`` below).
 
 **optional**
 
@@ -227,48 +211,74 @@ provider
 ---------
 
 Lists the OpenStack cloud providers Nodepool should use.  Within each
-provider, the Nodepool image types are also defined (see
-:ref:`images` for details).  Example::
+provider the available Nodepool image types are defined (see
+:ref:`provider_diskimages`.
+
+A provider's resources are partitioned into groups called "pools" (see
+:ref:`pools` for details), and within a pool, the node types which are
+to be made available are listed (see :ref:`pool_labels` for
+details).
+
+Example::
 
   providers:
     - name: provider1
       cloud: example
       region-name: 'region1'
-      max-servers: 96
       rate: 1.0
-      availability-zones:
-        - az1
       boot-timeout: 120
       launch-timeout: 900
       launch-retries: 3
       image-name-format: 'template-{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
       ipv6-preferred: False
-      networks:
-        - name: 'some-network-name'
-      images:
+      diskimages:
         - name: trusty
-          min-ram: 8192
-          name-filter: 'something to match'
           meta:
               key: value
               key2: value
         - name: precise
-          min-ram: 8192
         - name: devstack-trusty
-          min-ram: 30720
+      pools:
+        - name: main
+          max-servers: 96
+          availability-zones:
+            - az1
+          networks:
+            - name: 'some-network-name'
+          labels:
+            - name: trusty
+              min-ram: 8192
+              diskimage: trusty
+            - name: precise
+              min-ram: 8192
+              diskimage: precise
+            - name: devstack-trusty
+              min-ram: 8192
+              diskimage: devstack-trusty
     - name: provider2
       region-name: 'region1'
-      max-servers: 96
       rate: 1.0
       image-name-format: 'template-{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
-      images:
+      diskimages:
         - name: precise
-          min-ram: 8192
           meta:
               key: value
               key2: value
+      pools:
+        - name: main
+          max-servers: 96
+          labels:
+            - name: trusty
+              min-ram: 8192
+              diskimage: trusty
+            - name: precise
+              min-ram: 8192
+              diskimage: precise
+            - name: devstack-trusty
+              min-ram: 8192
+              diskimage: devstack-trusty
 
 **cloud configuration***
 
@@ -301,19 +311,7 @@ provider, the Nodepool image types are also defined (see
 
   ``name``
 
-  ``max-servers``
-    Maximum number of servers spawnable on this provider.
-
 **optional**
-
-  ``availability-zones`` (list)
-    Without it nodepool will rely on nova to schedule an availability zone.
-
-    If it is provided the value should be a list of availability zone names.
-    Nodepool will select one at random and provide that to nova. This should
-    give a good distribution of availability zones being used. If you need more
-    control of the distribution you can use multiple logical providers each
-    providing a different list of availabiltiy zones.
 
   ``boot-timeout``
     Once an instance is active, how long to try connecting to the
@@ -336,15 +334,6 @@ provider, the Nodepool image types are also defined (see
     failed.
 
     Default 3.
-
-  ``networks`` (dict)
-    Specify custom Neutron networks that get attached to each
-    node. Specify the ``name`` of the network (a string).
-
-  ``ipv6-preferred``
-    If it is set to True, nodepool will try to find ipv6 in public net first
-    as the ip address for the ssh connection. If ipv6 is not found or the key
-    is not specified or set to False, ipv4 address will be used.
 
   ``api-timeout`` (compatability)
     Timeout for the OpenStack API calls client in seconds. Prefer setting
@@ -374,12 +363,64 @@ provider, the Nodepool image types are also defined (see
     each node request is handled by a separate thread, this can be useful for
     limiting the number of threads used by the nodepoold daemon.
 
-.. _images:
+.. _pools:
 
-images
-~~~~~~
+pools
+~~~~~
 
-Each entry in a provider's `images` section must correspond to an
+A pool defines a group of resources from a provider.  Each pool has a
+maximum number of nodes which can be launched from it, along with a
+number of cloud-related attributes used when launching nodes.
+
+Example::
+
+  pools:
+    - name: main
+      max-servers: 96
+      availability-zones:
+        - az1
+      networks:
+        - name: 'some-network-name'
+      labels:
+        - name: trusty
+          min-ram: 8192
+          diskimage: trusty
+        - name: precise
+          min-ram: 8192
+          diskimage: precise
+        - name: devstack-trusty
+          min-ram: 8192
+          diskimage: devstack-trusty
+
+**required**
+
+  ``name``
+
+  ``max-servers``
+    Maximum number of servers spawnable from this pool.
+
+**optional**
+
+  ``availability-zones`` (list)
+    Without it nodepool will rely on nova to schedule an availability zone.
+
+    If it is provided the value should be a list of availability zone names.
+    Nodepool will select one at random and provide that to nova. This should
+    give a good distribution of availability zones being used. If you need more
+    control of the distribution you can use multiple logical providers each
+    providing a different list of availabiltiy zones.
+
+  ``networks`` (dict)
+    Specify custom Neutron networks that get attached to each
+    node. Specify the ``name`` of the network (a string).
+
+
+.. _provider_diskimages:
+
+diskimages
+~~~~~~~~~~
+
+Each entry in a provider's `diskimages` section must correspond to an
 entry in :ref:`diskimages`.  Such an entry indicates that the
 corresponding diskimage should be uploaded for use in this provider.
 Additionally, any nodes that are created using the uploaded image will
@@ -390,11 +431,9 @@ images will be deleted from the provider.
 
 Example configuration::
 
-  images:
+  diskimages:
     - name: precise
       pause: False
-      min-ram: 8192
-      name-filter: 'something to match'
       meta:
           key: value
           key2: value
@@ -404,6 +443,47 @@ Example configuration::
   ``name``
     Identifier to refer this image from :ref:`labels` and :ref:`diskimages`
     sections.
+
+**optional**
+
+  ``pause`` (bool)
+    When set to True, nodepool-builder will not upload the image to the
+    provider.
+
+  ``config-drive`` (boolean)
+    Whether config drive should be used for the image.
+
+  ``meta`` (dict)
+    Arbitrary key/value metadata to store for this server using the Nova
+    metadata service. A maximum of five entries is allowed, and both keys and
+    values must be 255 characters or less.
+
+
+.. _pool_labels:
+
+labels
+~~~~~~
+
+Each entry in a pool`s `labels` section indicates that the
+corresponding label is available for use in this pool.  When creating
+nodes for a label, the flavor-related attributes in that label's
+section will be used.
+
+Example configuration::
+
+  labels:
+    - name: precise
+      min-ram: 8192
+      name-filter: 'something to match'
+
+**required**
+
+  ``name``
+    Identifier to refer this image from :ref:`labels` and :ref:`diskimages`
+    sections.
+
+  ``diskimage``
+    Refers to provider's diskimages, see :ref:`images`.
 
   ``min-ram``
     Determine the flavor to use (e.g. ``m1.medium``, ``m1.large``,
@@ -418,15 +498,3 @@ Example configuration::
     the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
     `name-filter` to ``Performance`` will ensure the chosen flavor also
     contains this string as well as meeting `min-ram` requirements).
-
-  ``pause`` (bool)
-    When set to True, nodepool-builder will not upload the image to the
-    provider.
-
-  ``config-drive`` (boolean)
-    Whether config drive should be used for the image.
-
-  ``meta`` (dict)
-    Arbitrary key/value metadata to store for this server using the Nova
-    metadata service. A maximum of five entries is allowed, and both keys and
-    values must be 255 characters or less.
