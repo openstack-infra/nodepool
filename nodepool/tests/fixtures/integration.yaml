@@ -1,9 +1,5 @@
 images-dir: '{images_dir}'
 
-cron:
-  check: '*/15 * * * *'
-  cleanup: '*/1 * * * *'
-
 zookeeper-servers:
   - host: localhost
 

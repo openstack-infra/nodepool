@@ -1,10 +1,6 @@
 elements-dir: .
 images-dir: /tmp/nodepool_dib
 
-cron:
-  check: '*/15 * * * *'
-  cleanup: '*/1 * * * *'
-
 diskimages:
   - name: fake-dib-image
     elements:

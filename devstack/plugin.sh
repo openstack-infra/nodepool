@@ -166,10 +166,6 @@ zookeeper-servers:
   - host: localhost
     port: 2181
 
-cron:
-  cleanup: '*/1 * * * *'
-  check: '*/15 * * * *'
-
 labels:
   - name: centos-7
     min-ready: 1
