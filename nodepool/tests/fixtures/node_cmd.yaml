@@ -36,6 +36,7 @@ providers:
             name-filter: 'fake'
 
   - name: fake-provider2
+    cloud: fake
     rate: 0.0001
     diskimages:
       - name: fake-image2

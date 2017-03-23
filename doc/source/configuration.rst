@@ -293,20 +293,6 @@ Example::
   More information about the contents of `clouds.yaml` can be found in
   `the os-client-config documentation <http://docs.openstack.org/developer/os-client-config/>`_.
 
-**compatablity**
-
-  For backwards compatibility reasons, you can also include
-  portions of the cloud configuration directly in ``nodepool.yaml``. Not all
-  of the options settable via ``clouds.yaml`` are available.
-
-  ``image-type``
-    Specifies the image type supported by this provider.  The disk images built
-    by diskimage-builder will output an image for each ``image-type`` specified
-    by a provider using that particular diskimage.
-
-    By default, ``image-type`` is set to the value returned from
-    ``os-client-config`` and can be omitted in most cases.
-
 **required**
 
   ``name``
@@ -334,10 +320,6 @@ Example::
     failed.
 
     Default 3.
-
-  ``api-timeout`` (compatability)
-    Timeout for the OpenStack API calls client in seconds. Prefer setting
-    this in `clouds.yaml`
 
   ``region-name``
 
