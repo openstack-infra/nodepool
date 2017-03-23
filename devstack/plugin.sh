@@ -117,7 +117,7 @@ function nodepool_write_config {
 keys=simple
 
 [loggers]
-keys=root,nodepool,shade,kazoo
+keys=root,nodepool,shade,kazoo,keystoneauth,novaclient
 
 [handlers]
 keys=console
@@ -136,6 +136,18 @@ propagate=0
 level=DEBUG
 handlers=console
 qualname=shade
+propagate=0
+
+[logger_keystoneauth]
+level=DEBUG
+handlers=console
+qualname=keystoneauth
+propagate=0
+
+[logger_novaclient]
+level=DEBUG
+handlers=console
+qualname=novaclient
 propagate=0
 
 [logger_kazoo]
