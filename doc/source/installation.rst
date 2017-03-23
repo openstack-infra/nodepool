@@ -52,13 +52,15 @@ Or install directly from a git checkout with::
 Configuration
 -------------
 
-Nodepool has two required configuration files: secure.conf and
-nodepool.yaml, and an optional logging configuration file logging.conf.
-The secure.conf file is used to store nodepool configurations that contain
-sensitive data. The nodepool.yaml files is used to store all other
-configurations.
+Nodepool has one required configuration file, which defaults to
+``/etc/nodepool/nodepool.yaml``. This can be changed with the ``-c`` option.
+The Nodepool configuration file is described in :ref:`configuration`.
 
-The logging configuration file is in the standard python logging
+Although there is support for a secure file that is used to store nodepool
+configurations that contain sensitive data, this is currently not used, but
+may be in the future.
+
+There is an optional logging configuration file, specified with the ``-l``
+option. The logging configuration file is in the standard python logging
 `configuration file format
 <http://docs.python.org/2/library/logging.config.html#configuration-file-format>`_.
-The Nodepool configuration file is described in :ref:`configuration`.
