@@ -367,11 +367,12 @@ Example::
   ``availability-zones`` (list)
     Without it nodepool will rely on nova to schedule an availability zone.
 
-    If it is provided the value should be a list of availability zone names.
-    Nodepool will select one at random and provide that to nova. This should
-    give a good distribution of availability zones being used. If you need more
-    control of the distribution you can use multiple logical providers each
-    providing a different list of availabiltiy zones.
+    If it is provided, the value should be a list of availability zone names.
+    If you have more than one availability zone, you should specify them all
+    here, rather than letting one get selected by nova. By doing so, you allow
+    nodepool to group all nodes allocated for a node request into the same
+    zone, which will be selected at random from the list. If you do not list
+    your zones here, this grouping cannot be guaranteed.
 
   ``networks`` (list)
     Specify custom Neutron networks that get attached to each
