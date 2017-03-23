@@ -87,7 +87,9 @@ class FakeOpenStackCloud(object):
             networks = [dict(id='fake-public-network-uuid',
                              name='fake-public-network-name'),
                         dict(id='fake-private-network-uuid',
-                             name='fake-private-network-name')]
+                             name='fake-private-network-name'),
+                        dict(id='fake-ipv6-network-uuid',
+                             name='fake-ipv6-network-name')]
         self.networks = networks
         self._flavor_list = [
             Dummy(Dummy.FLAVOR, id='f1', ram=8192, name='Fake Flavor'),
@@ -103,8 +105,10 @@ class FakeOpenStackCloud(object):
         return None
 
     def get_network(self, name_or_id, filters=None):
-        return dict(id='fake-network-uuid',
-                    name='fake-network-name')
+        for net in self.networks:
+            if net['id'] == name_or_id or net['name'] == name_or_id:
+                return net
+        return self.networks[0]
 
     def _create(
             self, instance_list, instance_type=Dummy.INSTANCE,
@@ -115,7 +119,7 @@ class FakeOpenStackCloud(object):
         # if keyword 'ipv6-uuid' is found in provider config,
         # ipv6 address will be available in public addr dict.
         for nic in nics:
-            if 'ipv6-uuid' not in nic['net-id']:
+            if nic['net-id'] != 'fake-ipv6-network-uuid':
                 continue
             addresses = dict(
                 public=[dict(version=4, addr='fake'),
@@ -225,9 +229,6 @@ class FakeOpenStackCloud(object):
 
     def delete_server(self, name_or_id, delete_ips=True):
         self._delete(name_or_id, self._server_list)
-
-    def list_networks(self):
-        return dict(networks=self.networks)
 
 
 class FakeUploadFailCloud(FakeOpenStackCloud):

@@ -30,7 +30,7 @@ providers:
         availability-zones:
           - az1
         networks:
-          - net-id: 'some-uuid'
+          - net-name
         labels:
           - name: fake-label
             diskimage: fake-image

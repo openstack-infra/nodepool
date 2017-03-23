@@ -27,8 +27,6 @@ providers:
     pools:
       - name: main
         max-servers: 96
-        networks:
-          - net-id: 'some-uuid'
         labels:
           - name: fake-label1
             diskimage: fake-image1
@@ -46,8 +44,6 @@ providers:
     pools:
       - name: main
         max-servers: 96
-        networks:
-          - net-id: 'some-uuid'
         labels:
           - name: fake-label2
             diskimage: fake-image2
