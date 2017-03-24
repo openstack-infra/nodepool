@@ -279,22 +279,15 @@ Example::
               min-ram: 8192
               diskimage: devstack-trusty
 
-**cloud configuration***
-
-**preferred**
-
-  ``cloud``
-  There are two methods supported for configuring cloud entries. The preferred
-  method is to create an ``~/.config/openstack/clouds.yaml`` file containing
-  your cloud configuration information. Then, use ``cloud`` to refer to a
-  named entry in that file.
-
-  More information about the contents of `clouds.yaml` can be found in
-  `the os-client-config documentation <http://docs.openstack.org/developer/os-client-config/>`_.
-
 **required**
 
   ``name``
+
+  ``cloud``
+  Name of a cloud configured in ``clouds.yaml``.
+
+  More information about the contents of `clouds.yaml` can be found in
+  `the os-client-config documentation <http://docs.openstack.org/developer/os-client-config/>`_.
 
 **optional**
 
