@@ -19,7 +19,9 @@ import glob
 import logging
 import os
 import random
+import select
 import string
+import socket
 import subprocess
 import threading
 import tempfile
@@ -97,6 +99,39 @@ class ChrootedKazooFixture(fixtures.Fixture):
         _tmp_client.close()
 
 
+class StatsdFixture(fixtures.Fixture):
+    def _setUp(self):
+        self.running = True
+        self.thread = threading.Thread(target=self.run)
+        self.thread.daemon = True
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(('', 0))
+        self.port = self.sock.getsockname()[1]
+        self.wake_read, self.wake_write = os.pipe()
+        self.stats = []
+        self.thread.start()
+
+    def run(self):
+        while self.running:
+            poll = select.poll()
+            poll.register(self.sock, select.POLLIN)
+            poll.register(self.wake_read, select.POLLIN)
+            ret = poll.poll()
+            for (fd, event) in ret:
+                if fd == self.sock.fileno():
+                    data = self.sock.recvfrom(1024)
+                    if not data:
+                        return
+                    self.stats.append(data[0])
+                if fd == self.wake_read:
+                    return
+
+    def _cleanup(self):
+        self.running = False
+        os.write(self.wake_write, '1\n')
+        self.thread.join()
+
+
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -137,6 +172,14 @@ class BaseTestCase(testtools.TestCase):
             p = LoggingPopen(*args, **kw)
             self.subprocesses.append(p)
             return p
+
+        self.statsd = StatsdFixture()
+        self.useFixture(self.statsd)
+
+        # note, use 127.0.0.1 rather than localhost to avoid getting ipv6
+        # see: https://github.com/jsocol/pystatsd/issues/61
+        os.environ['STATSD_HOST'] = '127.0.0.1'
+        os.environ['STATSD_PORT'] = str(self.statsd.port)
 
         self.useFixture(fixtures.MonkeyPatch('subprocess.Popen',
                                              LoggingPopenFactory))
@@ -197,6 +240,24 @@ class BaseTestCase(testtools.TestCase):
             if done:
                 return
             time.sleep(0.1)
+
+    def assertReportedStat(self, key, value=None, kind=None):
+        start = time.time()
+        while time.time() < (start + 5):
+            for stat in self.statsd.stats:
+                k, v = stat.split(':')
+                if key == k:
+                    if value is None and kind is None:
+                        return
+                    elif value:
+                        if value == v:
+                            return
+                    elif kind:
+                        if v.endswith('|' + kind):
+                            return
+            time.sleep(0.1)
+
+        raise Exception("Key %s not found in reported stats" % key)
 
 
 class BuilderFixture(fixtures.Fixture):

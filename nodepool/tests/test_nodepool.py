@@ -69,6 +69,8 @@ class TestNodepool(tests.DBTestCase):
         )
         self.zk.deleteNodeRequest(req)
         self.waitForNodeRequestLockDeletion(req.id)
+        self.assertReportedStat('nodepool.nodes.ready', '1|g')
+        self.assertReportedStat('nodepool.nodes.building', '0|g')
 
     def test_node_assignment_at_quota(self):
         '''

@@ -103,8 +103,12 @@ class StatsReporter(object):
                         (provider_name, node_az, subkey))
 
         if requestor:
-           keys.append('nodepool.launch.requestor.%s.%s' %
-                       (requestor, subkey))
+            # Replace '.' which is a graphite hierarchy, and ':' which is
+            # a statsd delimeter.
+            requestor = requestor.replace('.', '_')
+            requestor = requestor.replace(':', '_')
+            keys.append('nodepool.launch.requestor.%s.%s' %
+                        (requestor, subkey))
 
         for key in keys:
             self._statsd.timing(key, dt)
@@ -156,7 +160,8 @@ class StatsReporter(object):
 
         #nodepool.provider.PROVIDER.max_servers
         key = 'nodepool.provider.%s.max_servers' % provider.name
-        self._statsd.gauge(key, provider.max_servers)
+        max_servers = sum([p.max_servers for p in provider.pools.values()])
+        self._statsd.gauge(key, max_servers)
 
 
 class InstanceDeleter(threading.Thread, StatsReporter):
