@@ -28,7 +28,7 @@ class ConfigValidator:
             v.Required('name'): str,
             v.Required('diskimage'): str,
             'min-ram': int,
-            'name-filter': str,
+            'flavor-name': str,
         }
 
         pool = {

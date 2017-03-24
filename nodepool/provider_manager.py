@@ -131,15 +131,32 @@ class ProviderManager(object):
         flavors.sort(lambda a, b: cmp(a['ram'], b['ram']))
         return flavors
 
-    def findFlavor(self, min_ram, name_filter=None):
+    # TODO(mordred): These next three methods duplicate logic that is in
+    #                shade, but we can't defer to shade until we're happy
+    #                with using shade's resource caching facility. We have
+    #                not yet proven that to our satisfaction, but if/when
+    #                we do, these should be able to go away.
+    def _findFlavorByName(self, flavor_name):
+        for f in self._flavors:
+            if flavor_name in (f['name'], f['id']):
+                return f
+        raise Exception("Unable to find flavor: %s" % flavor_name)
+
+    def _findFlavorByRam(self, min_ram, flavor_name):
+        for f in self._flavors:
+            if (f['ram'] >= min_ram
+                    and (not flavor_name or flavor_name in f['name'])):
+                return f
+        raise Exception("Unable to find flavor with min ram: %s" % min_ram)
+
+    def findFlavor(self, flavor_name, min_ram):
         # Note: this will throw an error if the provider is offline
         # but all the callers are in threads (they call in via CreateServer) so
         # the mainloop won't be affected.
-        for f in self._flavors:
-            if (f['ram'] >= min_ram
-                    and (not name_filter or name_filter in f['name'])):
-                return f
-        raise Exception("Unable to find flavor with min ram: %s" % min_ram)
+        if min_ram:
+            return self._findFlavorByRam(min_ram, flavor_name)
+        else:
+            return self._findFlavorByName(flavor_name)
 
     def findImage(self, name):
         if name in self._images:
@@ -166,17 +183,18 @@ class ProviderManager(object):
         with shade_inner_exceptions():
             return self._client.delete_image(name)
 
-    def createServer(self, name, min_ram, image_id=None, image_name=None,
-                     az=None, key_name=None, name_filter=None,
-                     config_drive=True, nodepool_node_id=None,
-                     nodepool_image_name=None, networks=None):
+    def createServer(self, name, image_id=None, image_name=None,
+                     flavor_name=None, min_ram=None,
+                     az=None, key_name=None, config_drive=True,
+                     nodepool_node_id=None, nodepool_image_name=None,
+                     networks=None):
         if not networks:
             networks = []
         if image_name:
             image = self.findImage(image_name)
         else:
             image = {'id': image_id}
-        flavor = self.findFlavor(min_ram, name_filter)
+        flavor = self.findFlavor(flavor_name=flavor_name, min_ram=min_ram)
         create_args = dict(name=name,
                            image=image,
                            flavor=flavor,

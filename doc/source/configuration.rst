@@ -442,7 +442,7 @@ Example configuration::
   labels:
     - name: precise
       min-ram: 8192
-      name-filter: 'something to match'
+      flavor-name: 'something to match'
 
 **required**
 
@@ -453,16 +453,15 @@ Example configuration::
   ``diskimage``
     Refers to provider's diskimages, see :ref:`provider_diskimages`.
 
+**at least one of**
+
+  ``flavor-name``
+    Name or id of the flavor to use. If ``min-ram`` is omitted, it
+    must be an exact match. If ``min-ram`` is given, ``flavor-name`` will
+    be used to find flavor names that meet ``min-ram`` and also contain
+    ``flavor-name``.
+
   ``min-ram``
     Determine the flavor to use (e.g. ``m1.medium``, ``m1.large``,
     etc).  The smallest flavor that meets the ``min-ram`` requirements
-    will be chosen. To further filter by flavor name, see optional
-    ``name-filter`` below.
-
-**optional**
-
-  ``name-filter``
-    Additional filter complementing ``min-ram``, will be required to match on
-    the flavor-name (e.g. Rackspace offer a "Performance" flavour; setting
-    `name-filter` to ``Performance`` will ensure the chosen flavor also
-    contains this string as well as meeting `min-ram` requirements).
+    will be chosen.
