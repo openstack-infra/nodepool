@@ -305,36 +305,30 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(nodes[0].az, 'az1')
 
     def test_node_ipv6(self):
-        """Test that a node is created w/ or w/o ipv6 preferred flag"""
+        """Test that ipv6 existence either way works fine."""
         configfile = self.setup_config('node_ipv6.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider1', 'fake-image')
         self.waitForImage('fake-provider2', 'fake-image')
-        self.waitForImage('fake-provider3', 'fake-image')
         label1_nodes = self.waitForNodes('fake-label1')
         label2_nodes = self.waitForNodes('fake-label2')
-        label3_nodes = self.waitForNodes('fake-label3')
 
         self.assertEqual(len(label1_nodes), 1)
         self.assertEqual(len(label2_nodes), 1)
-        self.assertEqual(len(label3_nodes), 1)
 
-        # ipv6 preferred set to true and ipv6 address available
+        # ipv6 address available
         self.assertEqual(label1_nodes[0].provider, 'fake-provider1')
         self.assertEqual(label1_nodes[0].public_ipv4, 'fake')
         self.assertEqual(label1_nodes[0].public_ipv6, 'fake_v6')
+        self.assertEqual(label1_nodes[0].interface_ip, 'fake_v6')
 
-        # ipv6 preferred unspecified and ipv6 address available
+        # ipv6 address unavailable
         self.assertEqual(label2_nodes[0].provider, 'fake-provider2')
         self.assertEqual(label2_nodes[0].public_ipv4, 'fake')
-        self.assertEqual(label2_nodes[0].public_ipv6, 'fake_v6')
-
-        # ipv6 preferred set to true but ipv6 address unavailable
-        self.assertEqual(label3_nodes[0].provider, 'fake-provider3')
-        self.assertEqual(label3_nodes[0].public_ipv4, 'fake')
-        self.assertEqual(label3_nodes[0].public_ipv6, '')
+        self.assertEqual(label2_nodes[0].public_ipv6, '')
+        self.assertEqual(label2_nodes[0].interface_ip, 'fake')
 
     def test_node_delete_success(self):
         configfile = self.setup_config('node.yaml')

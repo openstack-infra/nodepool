@@ -45,7 +45,6 @@ class Provider(ConfigValue):
             other.rate != self.rate or
             other.boot_timeout != self.boot_timeout or
             other.launch_timeout != self.launch_timeout or
-            other.ipv6_preferred != self.ipv6_preferred or
             other.clean_floating_ips != self.clean_floating_ips or
             other.max_concurrency != self.max_concurrency or
             other.diskimages != self.diskimages):
@@ -216,7 +215,6 @@ def loadConfig(config_path):
         p.boot_timeout = provider.get('boot-timeout', 60)
         p.launch_timeout = provider.get('launch-timeout', 3600)
         p.launch_retries = provider.get('launch-retries', 3)
-        p.ipv6_preferred = provider.get('ipv6-preferred')
         p.clean_floating_ips = provider.get('clean-floating-ips')
         p.hostname_format = provider.get(
             'hostname-format',

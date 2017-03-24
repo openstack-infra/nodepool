@@ -231,7 +231,6 @@ Example::
       launch-retries: 3
       image-name-format: 'template-{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
-      ipv6-preferred: False
       diskimages:
         - name: trusty
           meta:

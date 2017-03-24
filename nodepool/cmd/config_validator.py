@@ -56,7 +56,6 @@ class ConfigValidator:
             'region-name': str,
             'cloud': str,
             'max-concurrency': int,
-            'ipv6-preferred': bool,
             'boot-timeout': int,
             'launch-timeout': int,
             'launch-retries': int,

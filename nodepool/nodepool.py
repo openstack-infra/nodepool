@@ -324,22 +324,16 @@ class NodeLauncher(threading.Thread, StatsReporter):
         if not self._node.az:
             self._node.az = server.location.zone
 
-        self._node.public_ipv4 = server.public_v4
-        self._node.public_ipv6 = server.public_v6
-
-        preferred_ip = server.public_v4
-        if self._provider.ipv6_preferred:
-            if server.public_v6:
-                preferred_ip = server.public_v6
-            else:
-                self.log.warning('Preferred ipv6 not available, '
-                                 'falling back to ipv4.')
-        if not preferred_ip:
+        interface_ip = server.interface_ip
+        if not interface_ip:
             self.log.debug(
                 "Server data for failed IP: %s" % pprint.pformat(
                     server))
             raise LaunchNetworkException("Unable to find public IP of server")
 
+        self._node.interface_ip = interface_ip
+        self._node.public_ipv4 = server.public_v4
+        self._node.public_ipv6 = server.public_v6
         self._node.private_ipv4 = server.private_v4
         # devstack-gate multi-node depends on private_v4 being populated
         # with something. On clouds that don't have a private address, use
@@ -350,14 +344,15 @@ class NodeLauncher(threading.Thread, StatsReporter):
         # Checkpoint save the updated node info
         self._zk.storeNode(self._node)
 
-        self.log.debug("Node %s is running [az: %s, ipv4: %s, ipv6: %s]" %
-                       (self._node.id, self._node.az, self._node.public_ipv4,
-                        self._node.public_ipv6))
+        self.log.debug(
+            "Node %s is running [az: %s, ip: %s ipv4: %s, ipv6: %s]" %
+            (self._node.id, self._node.az, self._node.interface_ip,
+             self._node.public_ipv4, self._node.public_ipv6))
 
         # Get the SSH public keys for the new node and record in ZooKeeper
         self.log.debug("Gathering host keys for node %s", self._node.id)
         host_keys = utils.keyscan(
-            preferred_ip, timeout=self._provider.boot_timeout)
+            interface_ip, timeout=self._provider.boot_timeout)
         if not host_keys:
             raise LaunchKeyscanException("Unable to gather host keys")
         self._node.host_keys = host_keys
@@ -381,6 +376,7 @@ class NodeLauncher(threading.Thread, StatsReporter):
                     self._node.external_id = None
                     self._node.public_ipv4 = None
                     self._node.public_ipv6 = None
+                    self._node.inerface_ip = None
                     self._zk.storeNode(self._node)
                 if attempts == self._retries:
                     raise

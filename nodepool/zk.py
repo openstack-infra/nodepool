@@ -411,6 +411,7 @@ class Node(BaseModel):
         self.public_ipv4 = None
         self.private_ipv4 = None
         self.public_ipv6 = None
+        self.interface_ip = None
         self.image_id = None
         self.launcher = None
         self.created_time = None
@@ -438,6 +439,7 @@ class Node(BaseModel):
                     self.public_ipv4 == other.public_ipv4 and
                     self.private_ipv4 == other.private_ipv4 and
                     self.public_ipv6 == other.public_ipv6 and
+                    self.interface_ip == other.interface_ip and
                     self.image_id == other.image_id and
                     self.launcher == other.launcher and
                     self.created_time == other.created_time and
@@ -461,6 +463,7 @@ class Node(BaseModel):
         d['public_ipv4'] = self.public_ipv4
         d['private_ipv4'] = self.private_ipv4
         d['public_ipv6'] = self.public_ipv6
+        d['interface_ip'] = self.interface_ip
         d['image_id'] = self.image_id
         d['launcher'] = self.launcher
         d['created_time'] = self.created_time
@@ -490,6 +493,7 @@ class Node(BaseModel):
         o.public_ipv4 = d.get('public_ipv4')
         o.private_ipv4 = d.get('private_ipv4')
         o.public_ipv6 = d.get('public_ipv6')
+        o.interface_ip = d.get('interface_ip')
         o.image_id = d.get('image_id')
         o.launcher = d.get('launcher')
         o.created_time = d.get('created_time')
