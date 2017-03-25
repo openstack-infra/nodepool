@@ -184,9 +184,11 @@ EOF
         NODEPOOL_MIRROR_HOST=$(echo $NODEPOOL_MIRROR_HOST|tr '[:upper:]' '[:lower:]')
 
         NODEPOOL_CENTOS_MIRROR=${NODEPOOL_CENTOS_MIRROR:-http://$NODEPOOL_MIRROR_HOST/centos}
+        NODEPOOL_DEBIAN_MIRROR=${NODEPOOL_DEBIAN_MIRROR:-http://$NODEPOOL_MIRROR_HOST/debian}
         NODEPOOL_UBUNTU_MIRROR=${NODEPOOL_UBUNTU_MIRROR:-http://$NODEPOOL_MIRROR_HOST/ubuntu}
 
         DIB_DISTRIBUTION_MIRROR_CENTOS="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_CENTOS_MIRROR"
+        DIB_DISTRIBUTION_MIRROR_DEBIAN="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_DEBIAN_MIRROR"
         DIB_DISTRIBUTION_MIRROR_UBUNTU="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_UBUNTU_MIRROR"
         DIB_DEBOOTSTRAP_EXTRA_ARGS="DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'"
     fi
@@ -227,6 +229,11 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
+  - name: debian-jessie
+    image: debian-jessie
+    min-ready: 1
+    providers:
+      - name: devstack
   - name: fedora-25
     image: fedora-25
     min-ready: 1
@@ -261,6 +268,12 @@ providers:
     images:
       - name: centos-7
         min-ram: 1024
+        name-filter: 'nodepool'
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+      - name: debian-jessie
+        min-ram: 512
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
@@ -307,6 +320,31 @@ diskimages:
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_DISTRIBUTION_MIRROR_CENTOS
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: debian-jessie
+    pause: $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB
+    rebuild-age: 86400
+    elements:
+      - debian-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: jessie
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      DIB_DEBIAN_COMPONENTS: 'main'
+      $DIB_DISTRIBUTION_MIRROR_DEBIAN
+      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
