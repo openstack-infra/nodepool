@@ -153,6 +153,10 @@ class BaseTestCase(testtools.TestCase):
         self.useFixture(fixtures.MonkeyPatch(
             'nodepool.nodepool._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
+        clouds_path = os.path.join(os.path.dirname(__file__),
+                                   'fixtures', 'clouds.yaml')
+        self.useFixture(fixtures.MonkeyPatch(
+            'os_client_config.config.CONFIG_FILES', [clouds_path]))
 
     def wait_for_threads(self):
         # Wait until all transient threads (node launches, deletions,

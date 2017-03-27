@@ -276,25 +276,11 @@ def _cloudKwargsFromProvider(provider):
         if arg in provider:
             cloud_kwargs[arg] = provider[arg]
 
-    # These are named from back when we only talked to Nova. They're
-    # actually compute service related
-    if 'service-type' in provider:
-        cloud_kwargs['compute-service-type'] = provider['service-type']
-    if 'service-name' in provider:
-        cloud_kwargs['compute-service-name'] = provider['service-name']
-
-    auth_kwargs = {}
-    for auth_key in (
-            'username', 'password', 'auth-url', 'project-id', 'project-name'):
-        if auth_key in provider:
-            auth_kwargs[auth_key] = provider[auth_key]
-
-    cloud_kwargs['auth'] = auth_kwargs
     return cloud_kwargs
 
 
 def _get_one_cloud(cloud_config, cloud_kwargs):
     '''This is a function to allow for overriding it in tests.'''
-    if cloud_kwargs.get('auth', {}).get('auth-url', '') == 'fake':
+    if cloud_kwargs.get('cloud') == 'fake':
         return fakeprovider.fake_get_one_cloud(cloud_config, cloud_kwargs)
     return cloud_config.get_one_cloud(**cloud_kwargs)

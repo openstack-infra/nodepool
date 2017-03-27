@@ -27,12 +27,6 @@ labels:
 providers:
   - name: cloud1
     region-name: 'vanilla'
-    service-type: 'compute'
-    service-name: 'cloudServersOpenStack'
-    username: '<%= username %>'
-    password: '<%= password %>'
-    project-id: '<%= project %>'
-    auth-url: 'https://identity.example.com/v2.0/'
     boot-timeout: 120
     max-servers: 184
     max-concurrency: 10
@@ -43,12 +37,6 @@ providers:
         min-ram: 8192
   - name: cloud2
     region-name: 'chocolate'
-    service-type: 'compute'
-    service-name: 'cloudServersOpenStack'
-    username: '<%= username %>'
-    password: '<%= password %>'
-    project-id: '<%= project %>'
-    auth-url: 'https://identity.example.com/v2.0/'
     boot-timeout: 120
     max-servers: 184
     rate: 0.001

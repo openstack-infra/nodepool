@@ -52,16 +52,9 @@ class ConfigValidator:
         providers = {
             'name': str,
             'region-name': str,
-            'service-type': str,
-            'service-name': str,
             'availability-zones': [str],
             'keypair': str,
             'cloud': str,
-            'username': str,
-            'password': str,
-            'auth-url': str,
-            'project-id': str,
-            'project-name': str,
             'max-servers': int,
             'max-concurrency': int,
             'pool': str,  # Ignored, but kept for backwards compat

@@ -254,12 +254,6 @@ provider, the Nodepool image types are also defined (see
         - name: devstack-trusty
           min-ram: 30720
     - name: provider2
-      username: 'username'
-      password: 'password'
-      auth-url: 'http://auth.provider2.example.com/'
-      project-name: 'project'
-      service-type: 'compute'
-      service-name: 'compute'
       region-name: 'region1'
       max-servers: 96
       rate: 1.0
@@ -290,17 +284,6 @@ provider, the Nodepool image types are also defined (see
   For backwards compatibility reasons, you can also include
   portions of the cloud configuration directly in ``nodepool.yaml``. Not all
   of the options settable via ``clouds.yaml`` are available.
-
-  ``username``
-
-  ``password``
-
-  ``project-id`` OR ``project-name``
-    Some clouds may refer to the ``project-id`` as ``tenant-id``.
-    Some clouds may refer to the ``project-name`` as ``tenant-name``.
-
-  ``auth-url``
-    Keystone URL.
 
   ``image-type``
     Specifies the image type supported by this provider.  The disk images built
@@ -365,12 +348,6 @@ provider, the Nodepool image types are also defined (see
   ``api-timeout`` (compatability)
     Timeout for the OpenStack API calls client in seconds. Prefer setting
     this in `clouds.yaml`
-
-  ``service-type`` (compatability)
-    Prefer setting this in `clouds.yaml`.
-
-  ``service-name`` (compatability)
-    Prefer setting this in `clouds.yaml`.
 
   ``region-name``
 

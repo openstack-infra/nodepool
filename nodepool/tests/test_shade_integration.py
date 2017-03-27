@@ -50,11 +50,6 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         pm = provider_manager.ProviderManager(
             config.providers['real-provider'], use_taskmanager=False)
         pm.start()
-        auth_data = {'username': 'real',
-                     'project_id': 'real',
-                     'password': 'real',
-                     'auth_url': 'real'}
-        self.assertEqual(pm._client.auth, auth_data)
         self.assertEqual(pm._client.region_name, 'real-region')
 
     def test_nodepool_occ_config(self):
