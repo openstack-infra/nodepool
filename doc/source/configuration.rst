@@ -3,10 +3,6 @@
 Configuration
 =============
 
-Nodepool reads its secure configuration from ``/etc/nodepool/secure.conf``
-by default. The secure file is a standard ini config file. Note that this
-file is currently unused, but may be in the future.
-
 Nodepool reads its configuration from ``/etc/nodepool/nodepool.yaml``
 by default.  The configuration file follows the standard YAML syntax
 with a number of sections defined with top level keys.  For example, a
