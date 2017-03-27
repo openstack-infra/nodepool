@@ -230,6 +230,9 @@ class FakeOpenStackCloud(object):
     def delete_server(self, name_or_id, delete_ips=True):
         self._delete(name_or_id, self._server_list)
 
+    def list_availability_zone_names(self):
+        return ['fake-az1', 'fake-az2']
+
 
 class FakeUploadFailCloud(FakeOpenStackCloud):
     log = logging.getLogger("nodepool.FakeUploadFailCloud")

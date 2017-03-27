@@ -86,6 +86,7 @@ class ProviderManager(object):
         self._images = {}
         self._networks = {}
         self.__flavors = {}
+        self.__azs = None
         self._use_taskmanager = use_taskmanager
         self._taskmanager = None
 
@@ -330,6 +331,17 @@ class ProviderManager(object):
     def cleanupLeakedFloaters(self):
         with shade_inner_exceptions():
             self._client.delete_unattached_floating_ips()
+
+    def getAZs(self):
+        if self.__azs is None:
+            self.__azs = self._client.list_availability_zone_names()
+            if not self.__azs:
+                # If there are no zones, return a list containing None so that
+                # random.choice can pick None and pass that to Nova. If this
+                # feels dirty, please direct your ire to policy.json and the
+                # ability to turn off random portions of the OpenStack API.
+                self.__azs = [None]
+        return self.__azs
 
 
 class FakeProviderManager(ProviderManager):
