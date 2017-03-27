@@ -1332,7 +1332,8 @@ class NodePool(threading.Thread):
 
     def loadConfig(self):
         config = nodepool_config.loadConfig(self.configfile)
-        nodepool_config.loadSecureConfig(config, self.securefile)
+        if self.securefile:
+            nodepool_config.loadSecureConfig(config, self.securefile)
         return config
 
     def reconfigureZooKeeper(self, config):
