@@ -31,8 +31,6 @@ providers:
         max-servers: 1
         availability-zones:
           - az1
-        networks:
-          - net-id: 'some-uuid'
         labels:
           - name: fake-label1
             diskimage: fake-image
@@ -43,8 +41,6 @@ providers:
         max-servers: 1
         availability-zones:
           - az2
-        networks:
-          - net-id: 'some-uuid'
         labels:
           - name: fake-label2
             diskimage: fake-image

@@ -241,7 +241,7 @@ Example::
           availability-zones:
             - az1
           networks:
-            - name: 'some-network-name'
+            - some-network-name
           labels:
             - name: trusty
               min-ram: 8192
@@ -358,7 +358,7 @@ Example::
       availability-zones:
         - az1
       networks:
-        - name: 'some-network-name'
+        - some-network-name
       labels:
         - name: trusty
           min-ram: 8192
@@ -388,9 +388,9 @@ Example::
     control of the distribution you can use multiple logical providers each
     providing a different list of availabiltiy zones.
 
-  ``networks`` (dict)
+  ``networks`` (list)
     Specify custom Neutron networks that get attached to each
-    node. Specify the ``name`` of the network (a string).
+    node. Specify the name or id of the network as a string.
 
 
 .. _provider_diskimages:

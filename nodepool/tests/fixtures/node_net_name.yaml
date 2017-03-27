@@ -25,9 +25,8 @@ providers:
       - name: main
         max-servers: 96
         networks:
-          - name: 'fake-public-network-name'
-            public: true
-          - name: 'fake-private-network-name'
+          - 'fake-public-network-name'
+          - 'fake-private-network-name'
         labels:
           - name: fake-label
             diskimage: fake-image

@@ -32,7 +32,9 @@ providers:
       - name: main
         max-servers: 96
         networks:
-          - net-id: 'ipv6-uuid'
+          # This activates a flag in fakeprovider to give us an ipv6
+          # network
+          - 'fake-ipv6-network-name'
         labels:
           - name: fake-label1
             diskimage: fake-image
@@ -48,7 +50,9 @@ providers:
       - name: main
         max-servers: 96
         networks:
-          - net-id: 'ipv6-uuid'
+          # This activates a flag in fakeprovider to give us an ipv6
+          # network
+          - 'fake-ipv6-network-name'
         labels:
           - name: fake-label2
             diskimage: fake-image
@@ -65,7 +69,7 @@ providers:
       - name: main
         max-servers: 96
         networks:
-          - net-id: 'some-uuid'
+          - 'some-name'
         labels:
           - name: fake-label3
             diskimage: fake-image

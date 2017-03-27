@@ -186,13 +186,8 @@ class ProviderManager(object):
             create_args['availability_zone'] = az
         nics = []
         for network in networks:
-            if network.id:
-                nics.append({'net-id': network.id})
-            elif network.name:
-                net_id = self.findNetwork(network.name)['id']
-                nics.append({'net-id': net_id})
-            else:
-                raise Exception("Invalid 'networks' configuration.")
+            net_id = self.findNetwork(network)['id']
+            nics.append({'net-id': net_id})
         if nics:
             create_args['nics'] = nics
         # Put provider.name and image_name in as groups so that ansible

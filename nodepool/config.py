@@ -125,11 +125,6 @@ class DiskImage(ConfigValue):
         return "<DiskImage %s>" % self.name
 
 
-class Network(ConfigValue):
-    def __repr__(self):
-        return "<Network name:%s id:%s>" % (self.name, self.id)
-
-
 def loadConfig(config_path):
     retry = 3
 
@@ -265,19 +260,7 @@ def loadConfig(config_path):
             p.pools[pp.name] = pp
             pp.max_servers = pool['max-servers']
             pp.azs = pool.get('availability-zones')
-            pp.networks = []
-            for network in pool.get('networks', []):
-                n = Network()
-                pp.networks.append(n)
-                if 'net-id' in network:
-                    n.id = network['net-id']
-                    n.name = None
-                elif 'net-label' in network:
-                    n.name = network['net-label']
-                    n.id = None
-                else:
-                    n.name = network.get('name')
-                    n.id = None
+            pp.networks = pool.get('networks', [])
             pp.labels = {}
             for label in pool.get('labels', []):
                 pl = ProviderLabel()

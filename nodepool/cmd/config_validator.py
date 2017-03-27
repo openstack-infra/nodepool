@@ -29,16 +29,6 @@ class ConfigValidator:
             'cleanup': str,
         }
 
-        old_network = {
-            'net-id': str,
-            'net-label': str,
-        }
-
-        network = {
-            'name': v.Required(str),
-            'public': bool,  # Ignored, but kept for backwards compat
-        }
-
         pool_label = {
             v.Required('name'): str,
             v.Required('diskimage'): str,
@@ -48,7 +38,7 @@ class ConfigValidator:
 
         pool = {
             'name': str,
-            'networks': [v.Any(old_network, network)],
+            'networks': [str],
             'max-servers': int,
             'labels': [pool_label],
             'availability-zones': [str],

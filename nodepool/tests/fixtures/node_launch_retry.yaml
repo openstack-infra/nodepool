@@ -24,8 +24,6 @@ providers:
       - name: fake-image
     pools:
       - name: main
-        networks:
-          - net-id: 'some-uuid'
         max-servers: 96
         labels:
           - name: fake-label
