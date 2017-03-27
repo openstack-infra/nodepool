@@ -271,25 +271,3 @@ class FakeFile(StringIO.StringIO):
         print "Wrote to %s:" % self.__path
         print self.getvalue()
         StringIO.StringIO.close(self)
-
-
-class FakeSFTPClient(object):
-    def open(self, path, mode):
-        return FakeFile(path)
-
-    def close(self):
-        pass
-
-
-class FakeSSHClient(object):
-    def __init__(self):
-        self.client = self
-
-    def ssh(self, description, cmd, output=False):
-        return True
-
-    def scp(self, src, dest):
-        return True
-
-    def open_sftp(self):
-        return FakeSFTPClient()

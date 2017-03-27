@@ -39,8 +39,6 @@ providers:
     images:
       - name: trusty
         min-ram: 8192
-        username: jenkins
-        private-key: /home/nodepool/.ssh/id_rsa
   - name: cloud2
     region-name: 'chocolate'
     service-type: 'compute'
@@ -55,8 +53,6 @@ providers:
     images:
       - name: trusty
         min-ram: 8192
-        username: jenkins
-        private-key: /home/nodepool/.ssh/id_rsa
 
 diskimages:
   - name: trusty

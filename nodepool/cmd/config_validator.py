@@ -36,9 +36,6 @@ class ConfigValidator:
             'name-filter': str,
             'diskimage': str,
             'meta': dict,
-            'username': str,
-            'user-home': str,
-            'private-key': str,
             'config-drive': bool,
         }
 

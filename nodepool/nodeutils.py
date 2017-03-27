@@ -18,12 +18,11 @@
 
 import base64
 import errno
+import ipaddress
 import time
 import socket
 import logging
-from sshclient import SSHClient
 
-import fakeprovider
 import paramiko
 
 import exceptions
@@ -45,38 +44,7 @@ def iterate_timeout(max_seconds, exc, purpose):
     raise exc("Timeout waiting for %s" % purpose)
 
 
-def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
-    if 'fake' in ip:
-        return fakeprovider.FakeSSHClient()
-    # HPcloud may return ECONNREFUSED or EHOSTUNREACH
-    # for about 30 seconds after adding the IP
-    for count in iterate_timeout(
-            timeout, exceptions.SSHTimeoutException, "ssh access"):
-        try:
-            client = SSHClient(ip, username, **connect_kwargs)
-            break
-        except paramiko.SSHException as e:
-            # NOTE(pabelanger): Currently paramiko only returns a string with
-            # error code. If we want finer granularity we'll need to regex the
-            # string.
-            log.exception('Failed to negotiate SSH: %s' % (e))
-        except paramiko.AuthenticationException as e:
-            # This covers the case where the cloud user is created
-            # after sshd is up (Fedora for example)
-            log.info('Auth exception for %s@%s. Try number %i...' %
-                     (username, ip, count))
-        except socket.error as e:
-            if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
-                log.exception(
-                    'Exception while testing ssh access to %s:' % ip)
-
-    out = client.ssh("test ssh access", "echo access okay", output=True)
-    if "access okay" in out:
-        return client
-    return None
-
-
-def keyscan(ip):
+def keyscan(ip, timeout=60):
     '''
     Scan the IP address for public SSH keys.
 
@@ -85,16 +53,43 @@ def keyscan(ip):
     if 'fake' in ip:
         return ['ssh-rsa FAKEKEY']
 
-    keys = []
+    if ipaddress.ip_address(unicode(ip)).version < 6:
+        family = socket.AF_INET
+        sockaddr = (ip, 22)
+    else:
+        family = socket.AF_INET6
+        sockaddr = (ip, 22, 0, 0)
 
+    keys = []
     key = None
-    try:
-        t = paramiko.transport.Transport('%s:%s' % (ip, "22"))
-        t.start_client()
-        key = t.get_remote_server_key()
-        t.close()
-    except Exception as e:
-        log.exception("ssh-keyscan failure: %s", e)
+    for count in iterate_timeout(
+            timeout, exceptions.SSHTimeoutException, "ssh access"):
+        sock = None
+        t = None
+        try:
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.connect(sockaddr)
+            t = paramiko.transport.Transport(sock)
+            t.start_client()
+            key = t.get_remote_server_key()
+            break
+        except socket.error as e:
+            if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
+                log.exception(
+                    'Exception with ssh access to %s:' % ip)
+        except Exception as e:
+            log.exception("ssh-keyscan failure: %s", e)
+        finally:
+            try:
+                if t:
+                    t.close()
+            except Exception as e:
+                log.exception('Exception closing paramiko: %s', e)
+            try:
+                if sock:
+                    sock.close()
+            except Exception as e:
+                log.exception('Exception closing socket: %s', e)
 
     # Paramiko, at this time, seems to return only the ssh-rsa key, so
     # only the single key is placed into the list.

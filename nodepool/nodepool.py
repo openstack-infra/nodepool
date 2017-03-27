@@ -65,10 +65,6 @@ class LaunchNetworkException(Exception):
     statsd_key = 'error.network'
 
 
-class LaunchAuthException(Exception):
-    statsd_key = 'error.auth'
-
-
 class LaunchKeyscanException(Exception):
     statsd_key = 'error.keyscan'
 
@@ -354,18 +350,10 @@ class NodeLauncher(threading.Thread, StatsReporter):
                        (self._node.id, self._node.az, self._node.public_ipv4,
                         self._node.public_ipv6))
 
-        self.log.debug("Node %s testing ssh at ip: %s" %
-                       (self._node.id, preferred_ip))
-        host = utils.ssh_connect(
-            preferred_ip, config_image.username,
-            connect_kwargs=dict(key_filename=config_image.private_key),
-            timeout=self._provider.boot_timeout)
-        if not host:
-            raise LaunchAuthException("Unable to connect via ssh")
-
         # Get the SSH public keys for the new node and record in ZooKeeper
         self.log.debug("Gathering host keys for node %s", self._node.id)
-        host_keys = utils.keyscan(preferred_ip)
+        host_keys = utils.keyscan(
+            preferred_ip, timeout=self._provider.boot_timeout)
         if not host_keys:
             raise LaunchKeyscanException("Unable to gather host keys")
         self._node.host_keys = host_keys

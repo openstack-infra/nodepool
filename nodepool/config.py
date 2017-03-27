@@ -62,9 +62,6 @@ class Provider(ConfigValue):
         for k in new_images:
             if (new_images[k].min_ram != old_images[k].min_ram or
                 new_images[k].name_filter != old_images[k].name_filter or
-                new_images[k].username != old_images[k].username or
-                new_images[k].user_home != old_images[k].user_home or
-                new_images[k].private_key != old_images[k].private_key or
                 new_images[k].meta != old_images[k].meta or
                 new_images[k].config_drive != old_images[k].config_drive):
                 return False
@@ -207,11 +204,7 @@ def loadConfig(config_path):
             p.images[i.name] = i
             i.min_ram = image['min-ram']
             i.name_filter = image.get('name-filter', None)
-            i.username = image.get('username', 'jenkins')
-            i.user_home = image.get('user-home', '/home/jenkins')
             i.pause = bool(image.get('pause', False))
-            i.private_key = image.get('private-key',
-                                      '/var/lib/jenkins/.ssh/id_rsa')
             i.config_drive = image.get('config-drive', None)
 
             # This dict is expanded and used as custom properties when
