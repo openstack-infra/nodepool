@@ -14,7 +14,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import argparse
 import logging.config
 import sys
 
@@ -23,7 +22,6 @@ from nodepool import nodepool
 from nodepool import status
 from nodepool import zk
 from nodepool.cmd import NodepoolApp
-from nodepool.version import version_info as npc_version_info
 from config_validator import ConfigValidator
 from prettytable import PrettyTable
 
@@ -32,19 +30,15 @@ log = logging.getLogger(__name__)
 
 class NodePoolCmd(NodepoolApp):
 
-    def parse_arguments(self):
-        parser = argparse.ArgumentParser(description='Node pool.')
+    def create_parser(self):
+        parser = super(NodePoolCmd, self).create_parser()
+
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
         parser.add_argument('-s', dest='secure',
                             default='/etc/nodepool/secure.conf',
                             help='path to secure file')
-        parser.add_argument('-l', dest='logconfig',
-                            help='path to log config file')
-        parser.add_argument('--version', action='version',
-                            version=npc_version_info.version_string(),
-                            help='show version')
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='show DEBUG level logging')
 
@@ -89,7 +83,8 @@ class NodePoolCmd(NodepoolApp):
             help='place a node in the HOLD state')
         cmd_hold.set_defaults(func=self.hold)
         cmd_hold.add_argument('id', help='node id')
-        cmd_hold.add_argument('--reason', help='Reason this node is held',
+        cmd_hold.add_argument('--reason',
+                              help='Reason this node is held',
                               required=True)
 
         cmd_delete = subparsers.add_parser(
@@ -130,19 +125,21 @@ class NodePoolCmd(NodepoolApp):
             help='list the current node requests')
         cmd_request_list.set_defaults(func=self.request_list)
 
-        self.args = parser.parse_args()
+        return parser
 
     def setup_logging(self):
+        # NOTE(jamielennox): This should just be the same as other apps
         if self.args.debug:
-            logging.basicConfig(level=logging.DEBUG,
-                                format='%(asctime)s %(levelname)s %(name)s: '
-                                       '%(message)s')
+            m = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+            logging.basicConfig(level=logging.DEBUG, format=m)
+
         elif self.args.logconfig:
-            NodepoolApp.setup_logging(self)
+            super(NodePoolCmd, self).setup_logging()
+
         else:
-            logging.basicConfig(level=logging.INFO,
-                                format='%(asctime)s %(levelname)s %(name)s: '
-                                       '%(message)s')
+            m = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+            logging.basicConfig(level=logging.INFO, format=m)
+
             l = logging.getLogger('kazoo')
             l.setLevel(logging.WARNING)
 
@@ -319,7 +316,7 @@ class NodePoolCmd(NodepoolApp):
             if t:
                 t.join()
 
-    def main(self):
+    def run(self):
         self.zk = None
 
         # commands which do not need to start-up or parse config
@@ -344,11 +341,9 @@ class NodePoolCmd(NodepoolApp):
         if self.zk:
             self.zk.disconnect()
 
+
 def main():
-    npc = NodePoolCmd()
-    npc.parse_arguments()
-    npc.setup_logging()
-    return npc.main()
+    return NodePoolCmd.main()
 
 
 if __name__ == "__main__":
