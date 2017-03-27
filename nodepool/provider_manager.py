@@ -44,7 +44,7 @@ class NotFound(Exception):
 
 
 def get_provider_manager(provider, use_taskmanager):
-    if (provider.cloud_config.name == 'fake'):
+    if provider.name.startswith('fake'):
         return FakeProviderManager(provider, use_taskmanager)
     else:
         return ProviderManager(provider, use_taskmanager)
@@ -168,7 +168,9 @@ class ProviderManager(object):
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
                      config_drive=None, nodepool_node_id=None,
-                     nodepool_image_name=None):
+                     nodepool_image_name=None, networks=None):
+        if not networks:
+            networks = []
         if image_name:
             image = self.findImage(image_name)
         else:
@@ -183,7 +185,7 @@ class ProviderManager(object):
         if az:
             create_args['availability_zone'] = az
         nics = []
-        for network in self.provider.networks:
+        for network in networks:
             if network.id:
                 nics.append({'net-id': network.id})
             elif network.name:

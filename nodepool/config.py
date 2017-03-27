@@ -40,31 +40,18 @@ class Config(ConfigValue):
 class Provider(ConfigValue):
     def __eq__(self, other):
         if (other.cloud_config != self.cloud_config or
-            other.max_servers != self.max_servers or
-            other.pool != self.pool or
+            other.pools != self.pools or
             other.image_type != self.image_type or
             other.rate != self.rate or
             other.api_timeout != self.api_timeout or
             other.boot_timeout != self.boot_timeout or
             other.launch_timeout != self.launch_timeout or
-            other.networks != self.networks or
             other.ipv6_preferred != self.ipv6_preferred or
             other.clean_floating_ips != self.clean_floating_ips or
             other.max_concurrency != self.max_concurrency or
-            other.azs != self.azs):
+            other.diskimages != self.diskimages):
             return False
-        new_images = other.images
-        old_images = self.images
-        # Check if images have been added or removed
-        if set(new_images.keys()) != set(old_images.keys()):
-            return False
-        # check if existing images have been updated
-        for k in new_images:
-            if (new_images[k].min_ram != old_images[k].min_ram or
-                new_images[k].name_filter != old_images[k].name_filter or
-                new_images[k].meta != old_images[k].meta or
-                new_images[k].config_drive != old_images[k].config_drive):
-                return False
+
         return True
 
     def __ne__(self, other):
@@ -74,9 +61,25 @@ class Provider(ConfigValue):
         return "<Provider %s>" % self.name
 
 
-class ProviderImage(ConfigValue):
+class ProviderPool(ConfigValue):
+    def __eq__(self, other):
+        if (other.labels != self.labels or
+            other.max_servers != self.max_servers or
+            other.azs != self.azs or
+            other.networks != self.networks):
+            return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
-        return "<ProviderImage %s>" % self.name
+        return "<ProviderPool %s>" % self.name
+
+
+class ProviderDiskImage(ConfigValue):
+    def __repr__(self):
+        return "<ProviderDiskImage %s>" % self.name
 
 
 class Label(ConfigValue):
@@ -84,9 +87,19 @@ class Label(ConfigValue):
         return "<Label %s>" % self.name
 
 
-class LabelProvider(ConfigValue):
+class ProviderLabel(ConfigValue):
+    def __eq__(self, other):
+        if (other.diskimage != self.diskimage or
+            other.min_ram != self.min_ram or
+            other.name_filter != self.name_filter):
+            return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
-        return "<LabelProvider %s>" % self.name
+        return "<ProviderLabel %s>" % self.name
 
 
 class Cron(ConfigValue):
@@ -95,6 +108,20 @@ class Cron(ConfigValue):
 
 
 class DiskImage(ConfigValue):
+    def __eq__(self, other):
+        if (other.name != self.name or
+            other.elements != self.elements or
+            other.release != self.release or
+            other.rebuild_age != self.rebuild_age or
+            other.env_vars != self.env_vars or
+            other.image_types != self.image_types or
+            other.pause != self.pause):
+            return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
         return "<DiskImage %s>" % self.name
 
@@ -154,6 +181,34 @@ def loadConfig(config_path):
         name = z.host + '_' + str(z.port)
         newconfig.zookeeper_servers[name] = z
 
+    for diskimage in config.get('diskimages', []):
+        d = DiskImage()
+        d.name = diskimage['name']
+        newconfig.diskimages[d.name] = d
+        if 'elements' in diskimage:
+            d.elements = u' '.join(diskimage['elements'])
+        else:
+            d.elements = ''
+        # must be a string, as it's passed as env-var to
+        # d-i-b, but might be untyped in the yaml and
+        # interpreted as a number (e.g. "21" for fedora)
+        d.release = str(diskimage.get('release', ''))
+        d.rebuild_age = int(diskimage.get('rebuild-age', 86400))
+        d.env_vars = diskimage.get('env-vars', {})
+        if not isinstance(d.env_vars, dict):
+            #self.log.error("%s: ignoring env-vars; "
+            #               "should be a dict" % d.name)
+            d.env_vars = {}
+        d.image_types = set(diskimage.get('formats', []))
+        d.pause = bool(diskimage.get('pause', False))
+
+    for label in config.get('labels', []):
+        l = Label()
+        l.name = label['name']
+        newconfig.labels[l.name] = l
+        l.min_ready = label.get('min-ready', 2)
+        l.pools = []
+
     for provider in config.get('providers', []):
         p = Provider()
         p.name = provider['name']
@@ -162,30 +217,14 @@ def loadConfig(config_path):
         cloud_kwargs = _cloudKwargsFromProvider(provider)
         p.cloud_config = _get_one_cloud(cloud_config, cloud_kwargs)
         p.region_name = provider.get('region-name')
-        p.max_servers = provider['max-servers']
         p.max_concurrency = provider.get('max-concurrency', -1)
-        p.pool = provider.get('pool', None)
         p.rate = provider.get('rate', 1.0)
         p.api_timeout = provider.get('api-timeout')
         p.boot_timeout = provider.get('boot-timeout', 60)
         p.launch_timeout = provider.get('launch-timeout', 3600)
         p.launch_retries = provider.get('launch-retries', 3)
-        p.networks = []
-        for network in provider.get('networks', []):
-            n = Network()
-            p.networks.append(n)
-            if 'net-id' in network:
-                n.id = network['net-id']
-                n.name = None
-            elif 'net-label' in network:
-                n.name = network['net-label']
-                n.id = None
-            else:
-                n.name = network.get('name')
-                n.id = None
         p.ipv6_preferred = provider.get('ipv6-preferred')
         p.clean_floating_ips = provider.get('clean-floating-ips')
-        p.azs = provider.get('availability-zones')
         p.hostname_format = provider.get(
             'hostname-format',
             '{label.name}-{provider.name}-{node.id}'
@@ -196,13 +235,15 @@ def loadConfig(config_path):
         )
         p.image_type = provider.get(
             'image-type', p.cloud_config.config['image_format'])
-        p.images = {}
-        for image in provider['images']:
-            i = ProviderImage()
+        p.diskimages = {}
+        for image in provider.get('diskimages', []):
+            i = ProviderDiskImage()
             i.name = image['name']
-            p.images[i.name] = i
-            i.min_ram = image['min-ram']
-            i.name_filter = image.get('name-filter', None)
+            p.diskimages[i.name] = i
+            diskimage = newconfig.diskimages[i.name]
+            diskimage.image_types.add(p.image_type)
+            #i.min_ram = image['min-ram']
+            #i.name_filter = image.get('name-filter', None)
             i.pause = bool(image.get('pause', False))
             i.config_drive = image.get('config-drive', None)
 
@@ -219,45 +260,39 @@ def loadConfig(config_path):
                     #self.log.error("Invalid metadata for %s; ignored"
                     #               % i.name)
                     i.meta = {}
+        p.pools = {}
+        for pool in provider.get('pools', []):
+            pp = ProviderPool()
+            pp.name = pool['name']
+            pp.provider = p
+            p.pools[pp.name] = pp
+            pp.max_servers = pool['max-servers']
+            pp.azs = pool.get('availability-zones')
+            pp.networks = []
+            for network in pool.get('networks', []):
+                n = Network()
+                pp.networks.append(n)
+                if 'net-id' in network:
+                    n.id = network['net-id']
+                    n.name = None
+                elif 'net-label' in network:
+                    n.name = network['net-label']
+                    n.id = None
+                else:
+                    n.name = network.get('name')
+                    n.id = None
+            pp.labels = {}
+            for label in pool.get('labels', []):
+                pl = ProviderLabel()
+                pl.name = label['name']
+                pl.pool = pp
+                pp.labels[pl.name] = pl
+                pl.diskimage = newconfig.diskimages[label['diskimage']]
+                pl.min_ram = label['min-ram']
+                pl.name_filter = label.get('name-filter', None)
 
-    if 'diskimages' in config:
-        for diskimage in config['diskimages']:
-            d = DiskImage()
-            d.name = diskimage['name']
-            newconfig.diskimages[d.name] = d
-            if 'elements' in diskimage:
-                d.elements = u' '.join(diskimage['elements'])
-            else:
-                d.elements = ''
-            # must be a string, as it's passed as env-var to
-            # d-i-b, but might be untyped in the yaml and
-            # interpreted as a number (e.g. "21" for fedora)
-            d.release = str(diskimage.get('release', ''))
-            d.rebuild_age = int(diskimage.get('rebuild-age', 86400))
-            d.env_vars = diskimage.get('env-vars', {})
-            if not isinstance(d.env_vars, dict):
-                #self.log.error("%s: ignoring env-vars; "
-                #               "should be a dict" % d.name)
-                d.env_vars = {}
-            d.image_types = set(diskimage.get('formats', []))
-            d.pause = bool(diskimage.get('pause', False))
-        # Do this after providers to build the image-types
-        for provider in newconfig.providers.values():
-            for image in provider.images.values():
-                diskimage = newconfig.diskimages[image.name]
-                diskimage.image_types.add(provider.image_type)
-
-    for label in config.get('labels', []):
-        l = Label()
-        l.name = label['name']
-        newconfig.labels[l.name] = l
-        l.image = label['image']
-        l.min_ready = label.get('min-ready', 2)
-        l.providers = {}
-        for provider in label['providers']:
-            p = LabelProvider()
-            p.name = provider['name']
-            l.providers[p.name] = p
+                top_label = newconfig.labels[pl.name]
+                top_label.pools.append(pp)
 
     return newconfig
 

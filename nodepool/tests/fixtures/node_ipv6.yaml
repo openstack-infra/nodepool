@@ -12,70 +12,64 @@ zookeeper-servers:
 
 labels:
   - name: fake-label1
-    image: fake-image
     min-ready: 1
-    providers:
-      - name: fake-provider1
 
   - name: fake-label2
-    image: fake-image
     min-ready: 1
-    providers:
-      - name: fake-provider2
 
   - name: fake-label3
-    image: fake-image
     min-ready: 1
-    providers:
-      - name: fake-provider3
 
 providers:
   - name: fake-provider1
+    cloud: fake
     region-name: fake-region
-    max-servers: 96
-    pool: 'fake'
-    networks:
-      - net-id: 'ipv6-uuid'
     ipv6-preferred: True
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
-        meta:
-          key: value
-          key2: value
+    pools:
+      - name: main
+        max-servers: 96
+        networks:
+          - net-id: 'ipv6-uuid'
+        labels:
+          - name: fake-label1
+            diskimage: fake-image
+            min-ram: 8192
 
   - name: fake-provider2
+    cloud: fake
     region-name: fake-region
-    max-servers: 96
-    pool: 'fake'
-    networks:
-      - net-id: 'ipv6-uuid'
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
-        meta:
-          key: value
-          key2: value
+    pools:
+      - name: main
+        max-servers: 96
+        networks:
+          - net-id: 'ipv6-uuid'
+        labels:
+          - name: fake-label2
+            diskimage: fake-image
+            min-ram: 8192
 
   - name: fake-provider3
+    cloud: fake
     region-name: fake-region
-    max-servers: 96
-    pool: 'fake'
-    networks:
-      - net-id: 'some-uuid'
     ipv6-preferred: True
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
-        meta:
-          key: value
-          key2: value
+    pools:
+      - name: main
+        max-servers: 96
+        networks:
+          - net-id: 'some-uuid'
+        labels:
+          - name: fake-label3
+            diskimage: fake-image
+            min-ram: 8192
 
 diskimages:
   - name: fake-image

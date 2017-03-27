@@ -469,6 +469,7 @@ class TestNodepool(tests.DBTestCase):
         node.type = 'fake-label'
         node.public_ipv4 = 'fake'
         node.provider = 'fake-provider'
+        node.pool = 'main'
         node.allocated_to = req.id
         self.zk.storeNode(node)
 

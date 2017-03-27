@@ -12,29 +12,30 @@ zookeeper-servers:
 
 labels:
   - name: fake-label
-    image: fake-image
     min-ready: 1
-    providers:
-      - name: fake-provider
 
 providers:
   - name: fake-provider
     cloud: fake
     region-name: fake-region
-    availability-zones:
-      - az1
-    max-servers: 96
-    pool: 'fake'
-    networks:
-      - net-id: 'some-uuid'
     rate: 0.0001
-    images:
+    diskimages:
       - name: fake-image
-        min-ram: 8192
-        name-filter: 'Fake'
         meta:
           key: value
           key2: value
+    pools:
+      - name: main
+        max-servers: 96
+        availability-zones:
+          - az1
+        networks:
+          - net-id: 'some-uuid'
+        labels:
+          - name: fake-label
+            diskimage: fake-image
+            min-ram: 8192
+            name-filter: 'Fake'
 
 diskimages:
   - name: fake-image
