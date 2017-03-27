@@ -29,7 +29,6 @@ class Dummy(object):
     IMAGE = 'Image'
     INSTANCE = 'Instance'
     FLAVOR = 'Flavor'
-    KEYPAIR = 'Keypair'
     LOCATION = 'Server.Location'
 
     def __init__(self, kind, **kw):
@@ -96,7 +95,6 @@ class FakeOpenStackCloud(object):
             Dummy(Dummy.FLAVOR, id='f2', ram=8192, name='Unreal Flavor'),
         ]
         self._server_list = []
-        self._keypair_list = []
 
     def _get(self, name_or_id, instance_list):
         self.log.debug("Get %s in %s" % (name_or_id, repr(instance_list)))
@@ -204,17 +202,6 @@ class FakeOpenStackCloud(object):
 
     def list_flavors(self, get_extra=False):
         return self._flavor_list
-
-    def create_keypair(self, name, public_key):
-        return self._create(
-            self._image_list, instance_type=Dummy.KEYPAIR,
-            name=name, public_key=public_key)
-
-    def list_keypairs(self):
-        return self._keypair_list
-
-    def delete_keypair(self, name):
-        self._delete(name, self._keypair_list)
 
     def get_openstack_vars(self, server):
         server.public_v4 = 'fake'

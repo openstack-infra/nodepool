@@ -21,7 +21,6 @@ labels:
 providers:
   - name: fake-provider1
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 2
     pool: 'fake'
     networks:
@@ -37,7 +36,6 @@ providers:
           SHOULD_FAIL: 'true'
   - name: fake-provider2
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 2
     pool: 'fake'
     networks:

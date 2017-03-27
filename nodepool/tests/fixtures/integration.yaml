@@ -17,7 +17,6 @@ labels:
 providers:
   - name: real-provider
     region-name: real-region
-    keypair: 'if-present-use-this-keypair'
     max-servers: 96
     pool: 'real'
     networks:

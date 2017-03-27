@@ -53,7 +53,6 @@ class ConfigValidator:
             'name': str,
             'region-name': str,
             'availability-zones': [str],
-            'keypair': str,
             'cloud': str,
             'max-servers': int,
             'max-concurrency': int,

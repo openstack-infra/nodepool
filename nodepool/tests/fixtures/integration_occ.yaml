@@ -17,7 +17,6 @@ labels:
 providers:
   - name: real-provider
     cloud: real-cloud
-    keypair: 'if-present-use-this-keypair'
     max-servers: 96
     pool: 'real'
     networks:

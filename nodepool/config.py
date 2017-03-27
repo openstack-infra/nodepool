@@ -164,7 +164,6 @@ def loadConfig(config_path):
         p.region_name = provider.get('region-name')
         p.max_servers = provider['max-servers']
         p.max_concurrency = provider.get('max-concurrency', -1)
-        p.keypair = provider.get('keypair', None)
         p.pool = provider.get('pool', None)
         p.rate = provider.get('rate', 1.0)
         p.api_timeout = provider.get('api-timeout')
