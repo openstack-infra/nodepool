@@ -129,6 +129,7 @@ class FakeOpenStackCloud(object):
             public_v6 = 'fake_v6'
             public_v4 = 'fake'
             private_v4 = 'fake'
+            interface_ip = 'fake_v6'
             break
         if not addresses:
             addresses = dict(
@@ -138,6 +139,7 @@ class FakeOpenStackCloud(object):
             public_v6 = ''
             public_v4 = 'fake'
             private_v4 = 'fake'
+            interface_ip = 'fake'
 
         s = Dummy(instance_type,
                   id=uuid.uuid4().hex,
@@ -148,6 +150,7 @@ class FakeOpenStackCloud(object):
                   public_v4=public_v4,
                   public_v6=public_v6,
                   private_v4=private_v4,
+                  interface_ip=interface_ip,
                   location=Dummy(Dummy.LOCATION, zone=kw.get('az')),
                   metadata=kw.get('meta', {}),
                   manager=self,
@@ -210,6 +213,7 @@ class FakeOpenStackCloud(object):
         server.public_v4 = 'fake'
         server.public_v6 = 'fake'
         server.private_v4 = 'fake'
+        server.interface_ip = 'fake'
         return server
 
     def create_server(self, **kw):
