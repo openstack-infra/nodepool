@@ -16,9 +16,8 @@ labels:
 
 providers:
   - name: fake-provider
-    cloud: fake
+    cloud: fake-vhd
     region-name: fake-region
-    image-type: vhd
     rate: 0.0001
     diskimages:
       - name: fake-image

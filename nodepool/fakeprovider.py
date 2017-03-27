@@ -65,8 +65,6 @@ class Dummy(object):
 
 def fake_get_one_cloud(cloud_config, cloud_kwargs):
     cloud_kwargs['validate'] = False
-    if 'image_format' not in cloud_kwargs:
-        cloud_kwargs['image_format'] = 'qcow2'
     return cloud_config.get_one_cloud(**cloud_kwargs)
 
 

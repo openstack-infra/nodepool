@@ -43,7 +43,6 @@ class Provider(ConfigValue):
             other.pools != self.pools or
             other.image_type != self.image_type or
             other.rate != self.rate or
-            other.api_timeout != self.api_timeout or
             other.boot_timeout != self.boot_timeout or
             other.launch_timeout != self.launch_timeout or
             other.ipv6_preferred != self.ipv6_preferred or
@@ -219,7 +218,6 @@ def loadConfig(config_path):
         p.region_name = provider.get('region-name')
         p.max_concurrency = provider.get('max-concurrency', -1)
         p.rate = provider.get('rate', 1.0)
-        p.api_timeout = provider.get('api-timeout')
         p.boot_timeout = provider.get('boot-timeout', 60)
         p.launch_timeout = provider.get('launch-timeout', 3600)
         p.launch_retries = provider.get('launch-retries', 3)
@@ -233,8 +231,7 @@ def loadConfig(config_path):
             'image-name-format',
             '{image_name}-{timestamp}'
         )
-        p.image_type = provider.get(
-            'image-type', p.cloud_config.config['image_format'])
+        p.image_type = p.cloud_config.config['image_format']
         p.diskimages = {}
         for image in provider.get('diskimages', []):
             i = ProviderDiskImage()
@@ -306,7 +303,7 @@ def loadSecureConfig(config, secure_config_path):
 
 def _cloudKwargsFromProvider(provider):
     cloud_kwargs = {}
-    for arg in ['region-name', 'api-timeout', 'cloud']:
+    for arg in ['region-name', 'cloud']:
         if arg in provider:
             cloud_kwargs[arg] = provider[arg]
 
@@ -315,6 +312,6 @@ def _cloudKwargsFromProvider(provider):
 
 def _get_one_cloud(cloud_config, cloud_kwargs):
     '''This is a function to allow for overriding it in tests.'''
-    if cloud_kwargs.get('cloud') == 'fake':
+    if cloud_kwargs.get('cloud', '').startswith('fake'):
         return fakeprovider.fake_get_one_cloud(cloud_config, cloud_kwargs)
     return cloud_config.get_one_cloud(**cloud_kwargs)
