@@ -509,3 +509,25 @@ class TestNodepool(tests.DBTestCase):
             node = self.zk.getNode(node.id)
             if not node.allocated_to:
                 break
+
+    def test_multiple_pools(self):
+        """Test that an image and node are created"""
+        configfile = self.setup_config('multiple_pools.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        lab1 = self.waitForNodes('fake-label1')
+        lab2 = self.waitForNodes('fake-label2')
+
+        self.assertEqual(len(lab1), 1)
+        self.assertEqual(lab1[0].provider, 'fake-provider')
+        self.assertEqual(lab1[0].type, 'fake-label1')
+        self.assertEqual(lab1[0].az, 'az1')
+        self.assertEqual(lab1[0].pool, 'pool1')
+
+        self.assertEqual(len(lab2), 1)
+        self.assertEqual(lab2[0].provider, 'fake-provider')
+        self.assertEqual(lab2[0].type, 'fake-label2')
+        self.assertEqual(lab2[0].az, 'az2')
+        self.assertEqual(lab2[0].pool, 'pool2')
