@@ -1326,7 +1326,8 @@ class NodePool(threading.Thread):
 
         if self.isAlive():
             self.join()
-        self.zk.disconnect()
+        if self.zk:
+            self.zk.disconnect()
         self.log.debug("Finished stopping")
 
     def loadConfig(self):
