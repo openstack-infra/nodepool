@@ -26,12 +26,12 @@ import nodepool.webapp
 log = logging.getLogger(__name__)
 
 
-class NodePoolDaemon(nodepool.cmd.NodepoolDaemonApp):
+class NodePoolLauncherApp(nodepool.cmd.NodepoolDaemonApp):
 
     app_name = 'nodepool'
 
     def create_parser(self):
-        parser = super(NodePoolDaemon, self).create_parser()
+        parser = super(NodePoolLauncherApp, self).create_parser()
 
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
@@ -72,7 +72,7 @@ class NodePoolDaemon(nodepool.cmd.NodepoolDaemonApp):
 
 
 def main():
-    return NodePoolDaemon.main()
+    return NodePoolLauncherApp.main()
 
 
 if __name__ == "__main__":

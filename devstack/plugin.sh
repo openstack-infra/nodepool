@@ -382,7 +382,7 @@ function start_nodepool {
     export STATSD_PORT=8125
     run_process statsd "socat -u udp-recv:$STATSD_PORT -"
 
-    run_process nodepool "$NODEPOOL_INSTALL/bin/nodepoold -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
+    run_process nodepool-launcher "$NODEPOOL_INSTALL/bin/nodepool-launcher -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
     run_process nodepool-builder "$NODEPOOL_INSTALL/bin/nodepool-builder -c $NODEPOOL_CONFIG -l $NODEPOOL_LOGGING -d"
     :
 }
@@ -397,7 +397,7 @@ function cleanup_nodepool {
 }
 
 # check for service enabled
-if is_service_enabled nodepool; then
+if is_service_enabled nodepool-launcher; then
 
     if [[ "$1" == "stack" && "$2" == "install" ]]; then
         # Perform installation of service source

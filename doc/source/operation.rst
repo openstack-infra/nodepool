@@ -5,7 +5,7 @@ Operation
 
 Nodepool has two components which run as daemons.  The
 ``nodepool-builder`` daemon is responsible for building diskimages and
-uploading them to providers, and the ``nodepoold`` daemon is
+uploading them to providers, and the ``nodepool-launcher`` daemon is
 responsible for launching and deleting nodes.
 
 Both daemons frequently re-read their configuration file after
@@ -31,14 +31,14 @@ safe, it is recommended to run a single instance of
 only a single build thread (the default).
 
 
-Nodepoold
----------
+Nodepool-launcher
+-----------------
 
-The main nodepool daemon is named ``nodepoold`` and is responsible for
-launching instances from the images created and uploaded by
-``nodepool-builder``.
+The main nodepool daemon is named ``nodepool-launcher`` and is
+responsible for launching instances from the images created and
+uploaded by ``nodepool-builder``.
 
-When a new image is created and uploaded, ``nodepoold`` will
+When a new image is created and uploaded, ``nodepool-launcher`` will
 immediately start using it when launching nodes (Nodepool always uses
 the most recent image for a given provider in the ``ready`` state).
 Nodepool will delete images if they are not the most recent or second
@@ -51,9 +51,9 @@ using the previous image.
 Daemon usage
 ------------
 
-To start the main Nodepool daemon, run **nodepoold**:
+To start the main Nodepool daemon, run **nodepool-launcher**:
 
-.. program-output:: nodepoold --help
+.. program-output:: nodepool-launcher --help
    :nostderr:
 
 To start the nodepool-builder daemon, run **nodepool--builder**:

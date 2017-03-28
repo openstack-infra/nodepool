@@ -60,7 +60,7 @@ to contain your data):
 
     export STATSD_HOST=127.0.0.1
     export STATSD_PORT=8125
-    nodepoold -d -c tools/fake.yaml
+    nodepool-launcher -d -c tools/fake.yaml
 
 All logging ends up in stdout.
 

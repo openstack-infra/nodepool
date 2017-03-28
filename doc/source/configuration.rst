@@ -316,7 +316,7 @@ Example::
     Maximum number of node requests that this provider is allowed to handle
     concurrently. The default, if not specified, is to have no maximum. Since
     each node request is handled by a separate thread, this can be useful for
-    limiting the number of threads used by the nodepoold daemon.
+    limiting the number of threads used by the nodepool-launcher daemon.
 
 .. _pools:
 
