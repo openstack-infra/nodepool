@@ -338,6 +338,9 @@ cache:
     floating-ip: 5
     server: 5
     port: 5
+# TODO(pabelanger): Remove once glean fully supports IPv6.
+client:
+  force_ipv4: True
 EOF
     sudo mv /tmp/clouds.yaml /etc/openstack/clouds.yaml
     mkdir -p $HOME/.cache/openstack/
