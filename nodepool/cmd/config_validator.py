@@ -24,11 +24,6 @@ class ConfigValidator:
         self.config_file = config_file
 
     def validate(self):
-        cron = {
-            'check': str,
-            'cleanup': str,
-        }
-
         pool_label = {
             v.Required('name'): str,
             v.Required('diskimage'): str,
@@ -90,7 +85,6 @@ class ConfigValidator:
                 'port': int,
                 'chroot': str,
             }],
-            'cron': cron,
             'providers': [provider],
             'labels': [label],
             'diskimages': [diskimage],

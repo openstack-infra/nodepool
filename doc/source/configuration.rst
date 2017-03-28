@@ -44,21 +44,6 @@ Example::
 
   images-dir: /path/to/images/dir
 
-cron
-----
-This section is optional.
-
-Nodepool runs several periodic tasks.  The ``cleanup`` task deletes
-old images and servers which may have encountered errors during their
-initial deletion.  The ``check`` task attempts to log into each node
-that is waiting to be used to make sure that it is still operational.
-The following illustrates how to change the schedule for these tasks
-and also indicates their default values::
-
-  cron:
-    cleanup: '27 */6 * * *'
-    check: '*/15 * * * *'
-
 zookeeper-servers
 -----------------
 Lists the ZooKeeper servers uses for coordinating information between

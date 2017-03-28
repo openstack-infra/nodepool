@@ -100,11 +100,6 @@ class ProviderLabel(ConfigValue):
         return "<ProviderLabel %s>" % self.name
 
 
-class Cron(ConfigValue):
-    def __repr__(self):
-        return "<Cron %s>" % self.name
-
-
 class DiskImage(ConfigValue):
     def __eq__(self, other):
         if (other.name != self.name or
@@ -155,17 +150,6 @@ def loadConfig(config_path):
     newconfig.provider_managers = {}
     newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}
-    newconfig.crons = {}
-
-    for name, default in [
-        ('cleanup', '* * * * *'),
-        ('check', '*/15 * * * *'),
-        ]:
-        c = Cron()
-        c.name = name
-        newconfig.crons[c.name] = c
-        c.job = None
-        c.timespec = config.get('cron', {}).get(name, default)
 
     for server in config.get('zookeeper-servers', []):
         z = zk.ZooKeeperConnectionConfig(server['host'],
