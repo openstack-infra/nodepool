@@ -68,6 +68,7 @@ def keyscan(ip, timeout=60):
         t = None
         try:
             sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
             sock.connect(sockaddr)
             t = paramiko.transport.Transport(sock)
             t.start_client()
