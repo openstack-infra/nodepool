@@ -40,7 +40,6 @@ class Config(ConfigValue):
 class Provider(ConfigValue):
     def __eq__(self, other):
         if (other.cloud_config != self.cloud_config or
-            other.nodepool_id != self.nodepool_id or
             other.pools != self.pools or
             other.image_type != self.image_type or
             other.rate != self.rate or
@@ -194,7 +193,6 @@ def loadConfig(config_path):
 
         cloud_kwargs = _cloudKwargsFromProvider(provider)
         p.cloud_config = _get_one_cloud(cloud_config, cloud_kwargs)
-        p.nodepool_id = provider.get('nodepool-id', None)
         p.region_name = provider.get('region-name')
         p.max_concurrency = provider.get('max-concurrency', -1)
         p.rate = provider.get('rate', 1.0)
