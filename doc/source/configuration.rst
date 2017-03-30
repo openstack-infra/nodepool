@@ -287,6 +287,14 @@ Example::
 
     In seconds. Default 3600.
 
+  ``nodepool-id`` (deprecated)
+
+    A unique string to identify which nodepool instances is using a provider.
+    This is useful if you want to configure production and development instances
+    of nodepool but share the same provider.
+
+    Default None
+
   ``launch-retries``
 
     The number of times to retry launching a server before considering the job
@@ -305,7 +313,8 @@ Example::
     Default ``template-{image_name}-{timestamp}``
 
   ``rate``
-    In seconds. Default 1.0.
+    In seconds, amount to wait between operations on the provider.
+    Defaults to ``1.0``.
 
   ``clean-floating-ips``
     If it is set to True, nodepool will assume it is the only user of the
@@ -407,7 +416,7 @@ Example configuration::
     provider.
 
   ``config-drive`` (boolean)
-    Whether config drive should be used for the image.
+    Whether config drive should be used for the image. Default ``True``
 
   ``meta`` (dict)
     Arbitrary key/value metadata to store for this server using the Nova

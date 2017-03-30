@@ -75,16 +75,25 @@ function install_nodepool {
 
 function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
+    sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/root.d
     cat > /tmp/01-nodepool-setup <<EOF
 sudo mkdir -p /etc/nodepool
 # Make it world writeable so nodepool can write here later.
 sudo chmod 777 /etc/nodepool
 EOF
-
+    cat > /tmp/50-apt-allow-unauthenticated <<EOF
+if [ -d "\$TARGET_ROOT/etc/apt/apt.conf.d" ]; then
+    echo "APT::Get::AllowUnauthenticated \"true\";" | sudo tee \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
+fi
+EOF
     sudo mv /tmp/01-nodepool-setup \
         $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
     sudo chmod a+x \
         $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
+    sudo mv /tmp/50-apt-allow-unauthenticated \
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/root.d/50-apt-allow-unauthenticated
+    sudo chmod a+x \
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/root.d/50-apt-allow-unauthenticated
     sudo mkdir -p $NODEPOOL_DIB_BASE_PATH/images
     sudo mkdir -p $NODEPOOL_DIB_BASE_PATH/tmp
     sudo mkdir -p $NODEPOOL_DIB_BASE_PATH/cache
@@ -100,7 +109,7 @@ function nodepool_write_config {
 keys=simple
 
 [loggers]
-keys=root,nodepool,shade,kazoo
+keys=root,nodepool,shade,kazoo,keystoneauth,novaclient
 
 [handlers]
 keys=console
@@ -119,6 +128,18 @@ propagate=0
 level=DEBUG
 handlers=console
 qualname=shade
+propagate=0
+
+[logger_keystoneauth]
+level=DEBUG
+handlers=console
+qualname=keystoneauth
+propagate=0
+
+[logger_novaclient]
+level=DEBUG
+handlers=console
+qualname=novaclient
 propagate=0
 
 [logger_kazoo]
@@ -155,6 +176,22 @@ EOF
     if [ -f $NODEPOOL_CACHE_GET_PIP ] ; then
         DIB_GET_PIP="DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP"
     fi
+    if [ -f /etc/nodepool/provider ] ; then
+        source /etc/nodepool/provider
+
+        NODEPOOL_MIRROR_HOST=${NODEPOOL_MIRROR_HOST:-mirror.$NODEPOOL_REGION.$NODEPOOL_CLOUD.openstack.org}
+        NODEPOOL_MIRROR_HOST=$(echo $NODEPOOL_MIRROR_HOST|tr '[:upper:]' '[:lower:]')
+
+        NODEPOOL_CENTOS_MIRROR=${NODEPOOL_CENTOS_MIRROR:-http://$NODEPOOL_MIRROR_HOST/centos}
+        NODEPOOL_DEBIAN_MIRROR=${NODEPOOL_DEBIAN_MIRROR:-http://$NODEPOOL_MIRROR_HOST/debian}
+        NODEPOOL_UBUNTU_MIRROR=${NODEPOOL_UBUNTU_MIRROR:-http://$NODEPOOL_MIRROR_HOST/ubuntu}
+
+        DIB_DISTRIBUTION_MIRROR_CENTOS="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_CENTOS_MIRROR"
+        DIB_DISTRIBUTION_MIRROR_DEBIAN="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_DEBIAN_MIRROR"
+        DIB_DISTRIBUTION_MIRROR_UBUNTU="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_UBUNTU_MIRROR"
+        DIB_DEBOOTSTRAP_EXTRA_ARGS="DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'"
+    fi
+
     cat > /tmp/nodepool.yaml <<EOF
 # You will need to make and populate this path as necessary,
 # cloning nodepool does not do this. Further in this doc we have an
@@ -168,6 +205,8 @@ zookeeper-servers:
 
 labels:
   - name: centos-7
+    min-ready: 1
+  - name: debian-jessie
     min-ready: 1
   - name: fedora-25
     min-ready: 1
@@ -188,6 +227,12 @@ providers:
     rate: 0.25
     diskimages:
       - name: centos-7
+        config-drive: true
+      - name: debian-jessie
+        min-ram: 512
+        name-filter: 'nodepool'
+        username: devuser
+        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: fedora-25
         config-drive: true
@@ -238,6 +283,32 @@ diskimages:
       DIB_CHECKSUM: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_DISTRIBUTION_MIRROR_CENTOS
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: debian-jessie
+    pause: $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB
+    rebuild-age: 86400
+    elements:
+      - debian-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: jessie
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_APT_LOCAL_CACHE: '0'
+      DIB_DISABLE_APT_CLEANUP: '1'
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      DIB_DEBIAN_COMPONENTS: 'main'
+      $DIB_DISTRIBUTION_MIRROR_DEBIAN
+      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
@@ -280,6 +351,7 @@ diskimages:
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      DIB_DEBIAN_COMPONENTS: 'main,universe'
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
@@ -302,6 +374,9 @@ diskimages:
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      DIB_DEBIAN_COMPONENTS: 'main,universe'
+      $DIB_DISTRIBUTION_MIRROR_UBUNTU
+      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
@@ -324,6 +399,9 @@ diskimages:
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      DIB_DEBIAN_COMPONENTS: 'main,universe'
+      $DIB_DISTRIBUTION_MIRROR_UBUNTU
+      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
@@ -334,6 +412,10 @@ EOF
     cp /etc/openstack/clouds.yaml /tmp
     cat >>/tmp/clouds.yaml <<EOF
 cache:
+  max_age: 3600
+  class: dogpile.cache.dbm
+  arguments:
+    filename: $HOME/.cache/openstack/shade.dbm
   expiration:
     floating-ip: 5
     server: 5
@@ -409,7 +491,7 @@ if is_service_enabled nodepool-launcher; then
         echo_summary "Configuring nodepool"
         configure_nodepool
 
-    elif [[ "$1" == "stack" && "$2" == "extra" ]]; then
+    elif [[ "$1" == "stack" && "$2" == "test-config" ]]; then
         # Initialize and start the nodepool service
         echo_summary "Initializing nodepool"
         start_nodepool

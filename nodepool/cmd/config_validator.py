@@ -54,6 +54,7 @@ class ConfigValidator:
             'boot-timeout': int,
             'launch-timeout': int,
             'launch-retries': int,
+            'nodepool-id': str,
             'rate': float,
             'hostname-format': str,
             'image-name-format': str,
@@ -74,7 +75,7 @@ class ConfigValidator:
             'formats': [str],
             'release': v.Any(str, int),
             'rebuild-age': int,
-            'env-vars': dict,
+            'env-vars': {str: str},
         }
 
         top_level = {

@@ -1174,6 +1174,15 @@ class CleanupWorker(BaseCleanupWorker):
                 if 'nodepool_provider_name' not in meta:
                     continue
 
+                nodepool_id = meta.get('nodepool_nodepool_id', None)
+                if provider.nodepool_id is not None and \
+                        nodepool_id != provider.nodepool_id:
+                    self.log.debug("Instance %s (%s) in %s "
+                                   "was not launched by us" % (
+                                       server['name'], server['id'],
+                                       provider.name))
+                    continue
+
                 if meta['nodepool_provider_name'] != provider.name:
                     # Another launcher, sharing this provider but configured
                     # with a different name, owns this.
