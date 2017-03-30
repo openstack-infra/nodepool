@@ -9,6 +9,7 @@ NODEPOOL="$NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE
 # NOTE(pabelanger): Be sure to also update devstack/settings if you change the
 # defaults.
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-true}
+NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-true}
 NODEPOOL_PAUSE_FEDORA_25_DIB=${NODEPOOL_PAUSE_FEDORA_25_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB=${NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
@@ -45,6 +46,13 @@ if [ $NODEPOOL_PAUSE_CENTOS_7_DIB = 'false' ]; then
     waitforimage centos-7
     # check image was bootable
     waitfornode centos-7
+fi
+
+if [ $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB = 'false' ]; then
+    # check that image built
+    waitforimage debian-jessie
+    # check image was bootable
+    waitfornode debian-jessie
 fi
 
 if [ $NODEPOOL_PAUSE_FEDORA_25_DIB = 'false' ]; then

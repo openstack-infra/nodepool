@@ -373,6 +373,14 @@ class CleanupWorker(BaseWorker):
             if (upload.state == zk.UPLOADING and
                 not self._inProgressUpload(upload)
             ):
+                # Since we cache the uploads above, we need to verify the
+                # state hasn't changed on us (e.g., it could have gone from
+                # an in progress upload to a successfully completed upload
+                # between the getUploads() and the _inProgressUpload() check.
+                u = self._zk.getImageUpload(image, build_id, provider,
+                                            upload.id)
+                if upload.state != u.state:
+                    continue
                 self.log.info("Removing failed upload record: %s" % upload)
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
             elif upload.state == zk.DELETING:
@@ -589,6 +597,7 @@ class BuildWorker(BaseWorker):
                     data = zk.ImageBuild()
                     data.state = zk.BUILDING
                     data.builder = self._hostname
+                    data.formats = list(diskimage.image_types)
 
                     bnum = self._zk.storeBuild(diskimage.name, data)
                     data = self._buildImage(bnum, diskimage)
@@ -638,6 +647,7 @@ class BuildWorker(BaseWorker):
                 data = zk.ImageBuild()
                 data.state = zk.BUILDING
                 data.builder = self._hostname
+                data.formats = list(diskimage.image_types)
 
                 bnum = self._zk.storeBuild(diskimage.name, data)
                 data = self._buildImage(bnum, diskimage)
@@ -738,7 +748,7 @@ class BuildWorker(BaseWorker):
         else:
             self.log.info("DIB image %s is built" % diskimage.name)
             build_data.state = zk.READY
-            build_data.formats = img_types.split(",")
+            build_data.formats = list(diskimage.image_types)
 
             if self._statsd:
                 # record stats on the size of each image we create

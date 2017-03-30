@@ -168,7 +168,7 @@ class ProviderManager(object):
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
-                     config_drive=None, nodepool_node_id=None,
+                     config_drive=True, nodepool_node_id=None,
                      nodepool_image_name=None, networks=None):
         if not networks:
             networks = []
@@ -198,12 +198,15 @@ class ProviderManager(object):
         # consumption programs don't need to play a game of knowing that
         # groups[0] is the image name or anything silly like that.
         groups_list = [self.provider.name]
+
         if nodepool_image_name:
             groups_list.append(nodepool_image_name)
         meta = dict(
             groups=",".join(groups_list),
             nodepool_provider_name=self.provider.name,
         )
+        if self.provider.nodepool_id:
+            meta['nodepool_nodepool_id'] = self.provider.nodepool_id
         if nodepool_node_id:
             meta['nodepool_node_id'] = nodepool_node_id
         if nodepool_image_name:
