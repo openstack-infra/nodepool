@@ -270,6 +270,8 @@ def loadConfig(config_path):
                 pl.min_ram = label.get('min-ram', 0)
                 pl.flavor_name = label.get('flavor-name', None)
                 pl.key_name = label.get('key-name')
+                pl.console_log = label.get('console-log', False)
+
                 top_label = newconfig.labels[pl.name]
                 top_label.pools.append(pp)
 

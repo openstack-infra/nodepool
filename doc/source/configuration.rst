@@ -237,6 +237,7 @@ Example::
             - name: trusty
               min-ram: 8192
               diskimage: trusty
+              console-log: True
             - name: precise
               min-ram: 8192
               diskimage: precise
@@ -356,6 +357,7 @@ Example::
         - name: trusty
           min-ram: 8192
           diskimage: trusty
+          console-log: True
         - name: precise
           min-ram: 8192
           diskimage: precise
@@ -475,6 +477,7 @@ Example configuration::
     - name: precise
       min-ram: 8192
       flavor-name: 'something to match'
+      console-log: True
 
 **required**
 
@@ -509,3 +512,7 @@ Example configuration::
   ``key-name``
     If given, is the name of a keypair that will be used when booting each
     server.
+
+  ``console-log`` (default: False)
+    On the failure of the ssh ready check, download the server console log to
+    aid in debuging the problem.

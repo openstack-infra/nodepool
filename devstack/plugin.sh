@@ -246,26 +246,32 @@ providers:
             diskimage: centos-7
             min-ram: 1024
             flavor-name: 'nodepool'
+            console-log: True
           - name: debian-jessie
             diskimage: debian-jessie
             min-ram: 512
             flavor-name: 'nodepool'
+            console-log: True
           - name: fedora-25
             diskimage: fedora-25
             min-ram: 1024
             flavor-name: 'nodepool'
+            console-log: True
           - name: ubuntu-precise
             diskimage: ubuntu-precise
             min-ram: 512
             flavor-name: 'nodepool'
+            console-log: True
           - name: ubuntu-trusty
             diskimage: ubuntu-trusty
             min-ram: 512
             flavor-name: 'nodepool'
+            console-log: True
           - name: ubuntu-xenial
             diskimage: ubuntu-xenial
             min-ram: 512
             flavor-name: 'nodepool'
+            console-log: True
 
 diskimages:
   - name: centos-7
