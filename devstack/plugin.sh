@@ -229,10 +229,6 @@ providers:
       - name: centos-7
         config-drive: true
       - name: debian-jessie
-        min-ram: 512
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
       - name: fedora-25
         config-drive: true
@@ -249,6 +245,10 @@ providers:
           - name: centos-7
             diskimage: centos-7
             min-ram: 1024
+            name-filter: 'nodepool'
+          - name: debian-jessie
+            diskimage: debian-jessie
+            min-ram: 512
             name-filter: 'nodepool'
           - name: fedora-25
             diskimage: fedora-25
