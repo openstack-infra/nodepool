@@ -38,17 +38,7 @@ MINS = 60
 HOURS = 60 * MINS
 
 WATERMARK_SLEEP = 10         # Interval between checking if new servers needed
-IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
-CONNECT_TIMEOUT = 10 * MINS  # How long to try to connect after a server
-                             # is ACTIVE
 LOCK_CLEANUP = 8 * HOURS     # When to delete node request lock znodes
-NODE_CLEANUP = 8 * HOURS     # When to start deleting a node that is not
-                             # READY or HOLD
-TEST_CLEANUP = 5 * MINS      # When to start deleting a node that is in TEST
-IMAGE_CLEANUP = 8 * HOURS    # When to start deleting an image that is not
-                             # READY or is not the current or previous image
-DELETE_DELAY = 1 * MINS      # Delay before deleting a node that has completed
-                             # its job.
 SUSPEND_WAIT_TIME = 30       # How long to wait between checks for ZooKeeper
                              # connectivity if it disappears.
 
