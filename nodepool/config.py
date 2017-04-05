@@ -118,7 +118,8 @@ class DiskImage(ConfigValue):
             other.rebuild_age != self.rebuild_age or
             other.env_vars != self.env_vars or
             other.image_types != self.image_types or
-            other.pause != self.pause):
+            other.pause != self.pause or
+            other.username != self.username):
             return False
         return True
 
@@ -193,6 +194,7 @@ def loadConfig(config_path):
             d.env_vars = {}
         d.image_types = set(diskimage.get('formats', []))
         d.pause = bool(diskimage.get('pause', False))
+        d.username = diskimage.get('username', 'zuul')
 
     for label in config.get('labels', []):
         l = Label()

@@ -104,6 +104,7 @@ class ConfigValidator:
             'release': v.Any(str, int),
             'rebuild-age': int,
             'env-vars': {str: str},
+            'username': str,
         }
 
         webapp = {
