@@ -111,7 +111,8 @@ class NodePoolCmd(NodepoolApp):
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
-            help='delete image built with diskimage-builder')
+            help='Delete a dib built image from disk along with all cloud '
+                 'uploads of this image')
         cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
         cmd_dib_image_delete.add_argument('id', help='dib image id')
 
