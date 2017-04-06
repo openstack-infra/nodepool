@@ -242,7 +242,8 @@ class NodePoolCmd(NodepoolApp):
         node = self.zk.getNode(self.args.id)
         node.state = zk.HOLD
         node.comment = self.args.reason
-        self.zk.lockNode(node, blocking=False)
+        print("Waiting for lock...")
+        self.zk.lockNode(node, blocking=True)
         self.zk.storeNode(node)
         self.zk.unlockNode(node)
         self.list(node_id=self.args.id)
