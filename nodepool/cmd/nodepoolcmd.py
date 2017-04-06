@@ -240,6 +240,10 @@ class NodePoolCmd(NodepoolApp):
 
     def hold(self):
         node = self.zk.getNode(self.args.id)
+        if not node:
+            print("Node id %s not found" % self.args.id)
+            return
+
         node.state = zk.HOLD
         node.comment = self.args.reason
         self.zk.lockNode(node, blocking=False)
