@@ -91,16 +91,16 @@ diskimages
 ----------
 
 This section lists the images to be built using diskimage-builder. The
-name of the diskimage is mapped to the :ref:`images` section of the
-provider, to determine which providers should received uploads of each
+name of the diskimage is mapped to the :ref:`provider_diskimages` section
+of the provider, to determine which providers should received uploads of each
 image.  The diskimage will be built in every format required by the
 providers with which it is associated.  Because Nodepool needs to know
 which formats to build, if the diskimage will only be built if it
 appears in at least one provider.
 
 To remove a diskimage from the system entirely, remove all associated
-entries in :ref:`images` and remove its entry from `diskimages`.  All
-uploads will be deleted as well as the files on disk.
+entries in :ref:`provider_diskimages` and remove its entry from `diskimages`.
+All uploads will be deleted as well as the files on disk.
 
 Example configuration::
 
@@ -155,7 +155,8 @@ Example configuration::
 **required**
 
   ``name``
-    Identifier to reference the disk image in :ref:`images` and :ref:`labels`.
+    Identifier to reference the disk image in :ref:`provider_diskimages`
+    and :ref:`labels`.
 
 **optional**
 
@@ -450,7 +451,7 @@ Example configuration::
     sections.
 
   ``diskimage``
-    Refers to provider's diskimages, see :ref:`images`.
+    Refers to provider's diskimages, see :ref:`provider_diskimages`.
 
   ``min-ram``
     Determine the flavor to use (e.g. ``m1.medium``, ``m1.large``,
