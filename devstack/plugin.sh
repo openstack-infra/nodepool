@@ -256,11 +256,6 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
-  - name: ubuntu-precise
-    image: ubuntu-precise
-    min-ready: 1
-    providers:
-      - name: devstack
   - name: ubuntu-trusty
     image: ubuntu-trusty
     min-ready: 1
@@ -303,12 +298,6 @@ providers:
         config-drive: true
       - name: opensuse-42.2
         min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
-        config-drive: true
-      - name: ubuntu-precise
-        min-ram: 512
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
@@ -408,29 +397,6 @@ diskimages:
       DIB_CHECKSUM: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
-  - name: ubuntu-precise
-    pause: $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB
-    rebuild-age: 86400
-    elements:
-      - ubuntu-minimal
-      - vm
-      - simple-init
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: precise
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_APT_LOCAL_CACHE: '0'
-      DIB_DISABLE_APT_CLEANUP: '1'
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      DIB_DEBIAN_COMPONENTS: 'main,universe'
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION

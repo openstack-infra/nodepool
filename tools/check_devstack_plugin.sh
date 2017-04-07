@@ -12,7 +12,6 @@ NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-true}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-true}
 NODEPOOL_PAUSE_FEDORA_25_DIB=${NODEPOOL_PAUSE_FEDORA_25_DIB:-true}
 NODEPOOL_PAUSE_OPENSUSE_42_2_DIB=${NODEPOOL_PAUSE_OPENSUSE_42_2_DIB:-true}
-NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB=${NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-true}
 
@@ -68,13 +67,6 @@ if [ $NODEPOOL_PAUSE_OPENSUSE_42_2_DIB = 'false' ]; then
     waitforimage opensuse-42.2
     # check image was bootable
     waitfornode opensuse-42.2
-fi
-
-if [ $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB = 'false' ]; then
-    # check that image built
-    waitforimage ubuntu-precise
-    # check image was bootable
-    waitfornode ubuntu-precise
 fi
 
 if [ $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB = 'false' ]; then
