@@ -34,6 +34,7 @@ class ConfigValidator:
             v.Required('diskimage'): str,
             'min-ram': int,
             'flavor-name': str,
+            'key-name': str,
         }
 
         pool_label = v.All(pool_label_main,
