@@ -479,6 +479,7 @@ class NodeLauncher(threading.Thread):
         server = self.manager.createServer(
             hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node.az,
+            key_name=self.image.key_name,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
             nodepool_image_name=self.image.name)
@@ -803,6 +804,7 @@ class SubNodeLauncher(threading.Thread):
         server = self.manager.createServer(
             hostname, self.image.min_ram, cloud_image.external_id,
             name_filter=self.image.name_filter, az=self.node_az,
+            key_name=self.image.key_name,
             config_drive=self.image.config_drive,
             nodepool_node_id=self.node_id,
             nodepool_image_name=self.image.name)

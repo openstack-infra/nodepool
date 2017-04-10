@@ -547,6 +547,9 @@ Example configuration::
     Nodepool expects that user to exist after running the script indicated by
     ``setup``. Default ``jenkins``
 
+  ``key-name``
+    If provided, named keypair in nova that will be provided to server create.
+
   ``private-key``
     Default ``/var/lib/jenkins/.ssh/id_rsa``
 

@@ -34,6 +34,7 @@ class ConfigValidator:
             'pause': bool,
             'min-ram': int,
             'name-filter': str,
+            'key-name': str,
             'diskimage': str,
             'meta': dict,
             'username': str,
