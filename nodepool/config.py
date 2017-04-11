@@ -202,7 +202,6 @@ def loadConfig(config_path):
         p.nodepool_id = provider.get('nodepool-id', None)
         p.region_name = provider.get('region-name')
         p.max_servers = provider['max-servers']
-        p.keypair = provider.get('keypair', None)
         p.pool = provider.get('pool', None)
         p.rate = provider.get('rate', 1.0)
         p.api_timeout = provider.get('api-timeout')

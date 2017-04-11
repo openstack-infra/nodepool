@@ -39,7 +39,6 @@ labels:
 providers:
   - name: fake-provider1
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
     auth-url: 'fake'
@@ -60,7 +59,6 @@ providers:
 
   - name: fake-provider2
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
     auth-url: 'fake'
@@ -80,7 +78,6 @@ providers:
 
   - name: fake-provider3
     region-name: fake-region
-    keypair: 'if-present-use-this-keypair'
     username: 'fake'
     password: 'fake'
     auth-url: 'fake'

@@ -18,7 +18,6 @@
 
 import json
 import logging
-import paramiko
 from contextlib import contextmanager
 
 import shade
@@ -166,22 +165,6 @@ class ProviderManager(object):
 
         with shade_inner_exceptions():
             return self._client.delete_image(name)
-
-    def addKeypair(self, name):
-        key = paramiko.RSAKey.generate(2048)
-        public_key = key.get_name() + ' ' + key.get_base64()
-        with shade_inner_exceptions():
-            self._client.create_keypair(name=name, public_key=public_key)
-        return key
-
-    def listKeypairs(self):
-        with shade_inner_exceptions():
-            keypairs = self._client.list_keypairs()
-        return keypairs
-
-    def deleteKeypair(self, name):
-        with shade_inner_exceptions():
-            return self._client.delete_keypair(name=name)
 
     def createServer(self, name, min_ram, image_id=None, image_name=None,
                      az=None, key_name=None, name_filter=None,
@@ -348,11 +331,6 @@ class ProviderManager(object):
         server = self.getServer(server_id)
         if not server:
             raise NotFound()
-
-        key_name = server.get('key_name')
-        if key_name and key_name != self.provider.keypair:
-            with shade_inner_exceptions():
-                self._client.delete_keypair(name=server['key_name'])
 
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)

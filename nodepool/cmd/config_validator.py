@@ -59,7 +59,6 @@ class ConfigValidator:
             'service-type': str,
             'service-name': str,
             'availability-zones': [str],
-            'keypair': str,
             'cloud': str,
             'username': str,
             'password': str,
