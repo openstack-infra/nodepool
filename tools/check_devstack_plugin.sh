@@ -15,6 +15,14 @@ NODEPOOL_PAUSE_OPENSUSE_42_2_DIB=${NODEPOOL_PAUSE_OPENSUSE_42_2_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-true}
 
+function sshintonode {
+    name=$1
+    state='ready'
+
+    node=`$NODEPOOL list | grep $name | grep $state | cut -d '|' -f11 | tr -d ' '`
+    /tmp/ssh_wrapper $node ls /
+}
+
 function waitforimage {
     name=$1
     state='ready'
@@ -46,6 +54,8 @@ if [ $NODEPOOL_PAUSE_CENTOS_7_DIB = 'false' ]; then
     waitforimage centos-7
     # check image was bootable
     waitfornode centos-7
+    # check ssh for root user
+    sshintonode centos-7
 fi
 
 if [ $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB = 'false' ]; then
@@ -53,6 +63,8 @@ if [ $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB = 'false' ]; then
     waitforimage debian-jessie
     # check image was bootable
     waitfornode debian-jessie
+    # check ssh for root user
+    sshintonode debian-jessie
 fi
 
 if [ $NODEPOOL_PAUSE_FEDORA_25_DIB = 'false' ]; then
@@ -60,6 +72,8 @@ if [ $NODEPOOL_PAUSE_FEDORA_25_DIB = 'false' ]; then
     waitforimage fedora-25
     # check image was bootable
     waitfornode fedora-25
+    # check ssh for root user
+    sshintonode fedora-25
 fi
 
 if [ $NODEPOOL_PAUSE_OPENSUSE_42_2_DIB = 'false' ]; then
@@ -67,6 +81,8 @@ if [ $NODEPOOL_PAUSE_OPENSUSE_42_2_DIB = 'false' ]; then
     waitforimage opensuse-42.2
     # check image was bootable
     waitfornode opensuse-42.2
+    # check ssh for root user
+    sshintonode opensuse-42.2
 fi
 
 if [ $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB = 'false' ]; then
@@ -74,6 +90,8 @@ if [ $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB = 'false' ]; then
     waitforimage ubuntu-trusty
     # check image was bootable
     waitfornode ubuntu-trusty
+    # check ssh for root user
+    sshintonode ubuntu-trusty
 fi
 
 if [ $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB = 'false' ]; then
@@ -81,6 +99,8 @@ if [ $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB = 'false' ]; then
     waitforimage ubuntu-xenial
     # check image was bootable
     waitfornode ubuntu-xenial
+    # check ssh for root user
+    sshintonode ubuntu-xenial
 fi
 
 set -o errexit

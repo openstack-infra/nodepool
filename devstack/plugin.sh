@@ -15,6 +15,7 @@
 # under the License.
 
 NODEPOOL_KEY=$HOME/.ssh/id_nodepool
+NODEPOOL_KEY_NAME=root
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 NODEPOOL_INSTALL=$HOME/nodepool-venv
 NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
@@ -78,6 +79,13 @@ function nodepool_create_keypairs {
     if [[ ! -f $NODEPOOL_KEY ]]; then
         ssh-keygen -f $NODEPOOL_KEY -P ""
     fi
+
+    cat > /tmp/ssh_wrapper <<EOF
+#!/bin/bash -ex
+sudo -H -u stack ssh -o StrictHostKeyChecking=no -i $NODEPOOL_KEY root@\$@
+
+EOF
+    sudo chmod 0755 /tmp/ssh_wrapper
 }
 
 function nodepool_write_elements {
@@ -284,36 +292,42 @@ providers:
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
       - name: debian-jessie
         min-ram: 512
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
       - name: fedora-25
         min-ram: 1024
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
       - name: opensuse-42.2
         min-ram: 1024
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
       - name: ubuntu-trusty
         min-ram: 512
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
       - name: ubuntu-xenial
         min-ram: 512
         name-filter: 'nodepool'
         username: devuser
         private-key: $NODEPOOL_KEY
         config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
 
 diskimages:
   - name: centos-7
@@ -506,6 +520,10 @@ function start_nodepool {
         nova --os-project-name demo --os-username demo \
              secgroup-add-rule default udp 1 65535 0.0.0.0/0
     fi
+
+    # create root keypair to use with glean for devstack cloud.
+    nova --os-project-name demo --os-username demo \
+        keypair-add --pub-key $NODEPOOL_PUBKEY $NODEPOOL_KEY_NAME
 
     export PATH=$NODEPOOL_INSTALL/bin:$PATH
 
