@@ -49,7 +49,7 @@ class ConfigValidator:
         provider = {
             'name': str,
             'region-name': str,
-            'cloud': str,
+            v.Required('cloud'): str,
             'max-concurrency': int,
             'boot-timeout': int,
             'launch-timeout': int,

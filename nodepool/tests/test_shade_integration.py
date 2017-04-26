@@ -18,6 +18,7 @@ import os
 import fixtures
 import shade
 import testtools
+import voluptuous
 import yaml
 
 from nodepool import config as nodepool_config
@@ -43,14 +44,13 @@ class TestShadeIntegration(tests.IntegrationTestCase):
 
         self.addCleanup(self._cleanup_cloud_config)
 
-    def test_nodepool_provider_config(self):
-        configfile = self.setup_config('integration.yaml')
-        config = nodepool_config.loadConfig(configfile)
-        self.assertIn('real-provider', config.providers)
-        pm = provider_manager.ProviderManager(
-            config.providers['real-provider'], use_taskmanager=False)
-        pm.start()
-        self.assertEqual(pm._client.region_name, 'real-region')
+    def test_nodepool_provider_config_bad(self):
+        # nodepool doesn't support clouds.yaml-less config anymore
+        # Assert that we get a nodepool error and not an os-client-config
+        # error.
+        self.assertRaises(
+            voluptuous.MultipleInvalid,
+            self.setup_config, 'integration_noocc.yaml')
 
     def test_nodepool_occ_config(self):
         configfile = self.setup_config('integration_occ.yaml')
