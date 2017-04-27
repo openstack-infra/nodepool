@@ -7,9 +7,7 @@ zookeeper-servers:
     chroot: {zookeeper_chroot}
 
 labels:
-  - name: fake-label1
-    min-ready: 1
-  - name: fake-label2
+  - name: fake-label
     min-ready: 1
 
 providers:
@@ -19,29 +17,13 @@ providers:
     rate: 0.0001
     diskimages:
       - name: fake-image
-        meta:
-          key: value
-          key2: value
     pools:
-      - name: pool1
-        max-servers: 1
-        availability-zones:
-          - az1
+      - name: main
+        max-servers: 96
         labels:
-          - name: fake-label1
+          - name: fake-label
             diskimage: fake-image
-            min-ram: 8192
-            flavor-name: 'Fake'
-
-      - name: pool2
-        max-servers: 1
-        availability-zones:
-          - az2
-        labels:
-          - name: fake-label2
-            diskimage: fake-image
-            min-ram: 8192
-            flavor-name: 'Fake'
+            flavor-name: Fake Flavor
 
 diskimages:
   - name: fake-image

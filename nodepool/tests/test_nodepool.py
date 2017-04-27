@@ -247,6 +247,18 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(nodes[0].provider, 'fake-provider')
         self.assertEqual(nodes[0].type, 'fake-label')
 
+    def test_node_flavor_name(self):
+        """Test that a node is created with a flavor name"""
+        configfile = self.setup_config('node_flavor_name.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
+        self.assertEqual(nodes[0].type, 'fake-label')
+
     def test_node_vhd_image(self):
         """Test that a image and node are created vhd image"""
         configfile = self.setup_config('node_vhd.yaml')

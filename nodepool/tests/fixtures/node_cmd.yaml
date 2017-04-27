@@ -27,7 +27,7 @@ providers:
           - name: fake-label1
             diskimage: fake-image1
             min-ram: 8192
-            name-filter: 'fake'
+            flavor-name: 'fake'
 
   - name: fake-provider2
     cloud: fake
@@ -44,7 +44,7 @@ providers:
           - name: fake-label2
             diskimage: fake-image2
             min-ram: 8192
-            name-filter: 'fake'
+            flavor-name: 'fake'
 
 diskimages:
   - name: fake-image1

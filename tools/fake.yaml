@@ -33,4 +33,4 @@ providers:
           - name: big-fake
             diskimage: fake-nodepool
             min-ram: 8192
-            name-filter: 'Fake'
+            flavor-name: 'Fake'

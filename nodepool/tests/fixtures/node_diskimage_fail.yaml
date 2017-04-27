@@ -27,7 +27,7 @@ providers:
           - name: fake-label
             diskimage: fake-image
             min-ram: 8192
-            name-filter: 'fake'
+            flavor-name: 'fake'
 
 diskimages:
   - name: fake-image
