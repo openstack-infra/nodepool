@@ -1037,9 +1037,11 @@ class ZooKeeper(object):
             if upload == 'lock':
                 continue
             data = self.getImageUpload(image, build_number, provider, upload)
+            if not data:
+                continue
             if states is None:
                 matches.append(data)
-            elif data and data.state in states:
+            elif data.state in states:
                 matches.append(data)
 
         return matches
