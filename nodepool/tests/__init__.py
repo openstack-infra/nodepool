@@ -216,6 +216,9 @@ class BaseTestCase(testtools.TestCase):
                      'fake-provider3',
                      'CleanupWorker',
                      'DeletedNodeWorker',
+                     'pydevd.CommandThread',
+                     'pydevd.Reader',
+                     'pydevd.Writer',
                      ]
 
         while True:
