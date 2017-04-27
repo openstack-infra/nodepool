@@ -17,16 +17,17 @@ diskimages:
 
 labels:
   - name: fake-label
-    image: fake-nodepool
     min-ready: 2
-    providers:
-      - name: fake-provider
 
 providers:
   - name: fake-provider
     cloud: fake
-    max-servers: 96
-    images:
+    diskimages:
       - name: fake-nodepool
-        min-ram: 8192
-        diskimage: fake-nodepool
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+         - name: fake-label
+           diskimage: fake-nodepool
+           min-ram: 8192
