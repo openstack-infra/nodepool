@@ -216,8 +216,6 @@ def loadConfig(config_path):
             p.diskimages[i.name] = i
             diskimage = newconfig.diskimages[i.name]
             diskimage.image_types.add(p.image_type)
-            #i.min_ram = image['min-ram']
-            #i.flavor_name = image.get('flavor-name', None)
             i.pause = bool(image.get('pause', False))
             i.config_drive = image.get('config-drive', None)
 
