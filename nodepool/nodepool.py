@@ -1195,19 +1195,19 @@ class CleanupWorker(BaseCleanupWorker):
             self._cleanupNodeRequestLocks()
         except Exception:
             self.log.exception(
-                "Exception in DeletedNodeWorker (node request lock cleanup):")
+                "Exception in CleanupWorker (node request lock cleanup):")
 
         try:
             self._cleanupLeakedInstances()
         except Exception:
             self.log.exception(
-                "Exception in DeletedNodeWorker (leaked instance cleanup):")
+                "Exception in CleanupWorker (leaked instance cleanup):")
 
         try:
             self._cleanupLostRequests()
         except Exception:
             self.log.exception(
-                "Exception in DeletedNodeWorker (lost request cleanup):")
+                "Exception in CleanupWorker (lost request cleanup):")
 
 
 class DeletedNodeWorker(BaseCleanupWorker):
