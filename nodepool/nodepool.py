@@ -280,6 +280,7 @@ class NodeLauncher(threading.Thread, StatsReporter):
             image_id=cloud_image.external_id,
             min_ram=self._label.min_ram,
             flavor_name=self._label.flavor_name,
+            key_name=self._label.key_name,
             az=self._node.az,
             config_drive=self._diskimage.config_drive,
             nodepool_node_id=self._node.id,

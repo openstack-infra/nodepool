@@ -465,3 +465,9 @@ Example configuration::
     Determine the flavor to use (e.g. ``m1.medium``, ``m1.large``,
     etc).  The smallest flavor that meets the ``min-ram`` requirements
     will be chosen.
+
+**optional**
+
+  ``key-name``
+    If given, is the name of a keypair that will be used when booting each
+    server.
