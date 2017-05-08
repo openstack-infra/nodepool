@@ -184,6 +184,7 @@ def loadConfig(config_path):
         l = Label()
         l.name = label['name']
         newconfig.labels[l.name] = l
+        l.max_ready_age = label.get('max-ready-age', 0)
         l.min_ready = label.get('min-ready', 2)
         l.pools = []
 
