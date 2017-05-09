@@ -14,7 +14,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import StringIO
 import logging
 import threading
 import time
@@ -254,14 +253,3 @@ class FakeUploadFailCloud(FakeOpenStackCloud):
             raise exceptions.BuilderError("Test fail image upload.")
         else:
             return super(FakeUploadFailCloud, self).create_image(**kwargs)
-
-
-class FakeFile(StringIO.StringIO):
-    def __init__(self, path):
-        StringIO.StringIO.__init__(self)
-        self.__path = path
-
-    def close(self):
-        print("Wrote to %s:" % self.__path)
-        print(self.getvalue())
-        StringIO.StringIO.close(self)
