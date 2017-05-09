@@ -262,6 +262,6 @@ class FakeFile(StringIO.StringIO):
         self.__path = path
 
     def close(self):
-        print "Wrote to %s:" % self.__path
-        print self.getvalue()
+        print("Wrote to %s:" % self.__path)
+        print(self.getvalue())
         StringIO.StringIO.close(self)
