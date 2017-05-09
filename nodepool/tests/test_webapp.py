@@ -15,7 +15,7 @@
 
 import json
 import logging
-import urllib2
+from six.moves.urllib import request
 
 from nodepool import tests
 
@@ -35,9 +35,9 @@ class TestWebApp(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes('fake-label')
 
-        req = urllib2.Request(
+        req = request.Request(
             "http://localhost:%s/image-list" % port)
-        f = urllib2.urlopen(req)
+        f = request.urlopen(req)
         self.assertEqual(f.info().getheader('Content-Type'),
                          'text/plain; charset=UTF-8')
         data = f.read()
@@ -55,9 +55,9 @@ class TestWebApp(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes('fake-label')
 
-        req = urllib2.Request(
+        req = request.Request(
             "http://localhost:%s/dib-image-list.json" % port)
-        f = urllib2.urlopen(req)
+        f = request.urlopen(req)
         self.assertEqual(f.info().getheader('Content-Type'),
                          'application/json')
         data = f.read()
