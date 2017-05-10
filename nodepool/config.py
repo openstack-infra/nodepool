@@ -21,8 +21,8 @@ from six.moves import configparser as ConfigParser
 import time
 import yaml
 
-import fakeprovider
-import zk
+from nodepool import fakeprovider
+from nodepool import zk
 
 
 class ConfigValue(object):

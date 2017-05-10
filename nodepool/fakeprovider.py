@@ -21,7 +21,7 @@ import uuid
 
 import shade
 
-import exceptions
+from nodepool import exceptions
 
 
 class Dummy(object):

@@ -25,7 +25,7 @@ import logging
 
 import paramiko
 
-import exceptions
+from nodepool import exceptions
 
 log = logging.getLogger("nodepool.utils")
 

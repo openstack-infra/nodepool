@@ -23,7 +23,7 @@ import logging
 import time
 import requests.exceptions
 
-import stats
+from nodepool import stats
 
 class ManagerStoppedException(Exception):
     pass

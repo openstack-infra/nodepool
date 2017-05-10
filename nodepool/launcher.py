@@ -26,13 +26,12 @@ import socket
 import threading
 import time
 
-import exceptions
-import nodeutils as utils
-import provider_manager
-import stats
-import config as nodepool_config
-
-import zk
+from nodepool import exceptions
+from nodepool import nodeutils as utils
+from nodepool import provider_manager
+from nodepool import stats
+from nodepool import config as nodepool_config
+from nodepool import zk
 
 MINS = 60
 HOURS = 60 * MINS

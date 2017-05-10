@@ -17,13 +17,14 @@
 import logging.config
 import sys
 
+from prettytable import PrettyTable
+
 from nodepool import launcher
 from nodepool import provider_manager
 from nodepool import status
 from nodepool import zk
 from nodepool.cmd import NodepoolApp
-from config_validator import ConfigValidator
-from prettytable import PrettyTable
+from nodepool.cmd.config_validator import ConfigValidator
 
 log = logging.getLogger(__name__)
 
