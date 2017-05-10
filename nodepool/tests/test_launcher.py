@@ -20,11 +20,11 @@ import fixtures
 from nodepool import tests
 from nodepool import zk
 import nodepool.fakeprovider
-import nodepool.nodepool
+import nodepool.launcher
 
 
-class TestNodepool(tests.DBTestCase):
-    log = logging.getLogger("nodepool.TestNodepool")
+class TestLauncher(tests.DBTestCase):
+    log = logging.getLogger("nodepool.TestLauncher")
 
     def test_node_assignment(self):
         '''
@@ -35,7 +35,7 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         image = self.waitForImage('fake-provider', 'fake-image')
 
-        nodepool.nodepool.LOCK_CLEANUP = 1
+        nodepool.launcher.LOCK_CLEANUP = 1
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
 
@@ -81,7 +81,7 @@ class TestNodepool(tests.DBTestCase):
         self._useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
 
-        nodepool.nodepool.LOCK_CLEANUP = 1
+        nodepool.launcher.LOCK_CLEANUP = 1
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.wait_for_config(pool)
@@ -402,7 +402,7 @@ class TestNodepool(tests.DBTestCase):
         self.assertEqual(len(nodes), 1)
 
         self.zk.lockNode(nodes[0], blocking=False)
-        nodepool.nodepool.InstanceDeleter.delete(
+        nodepool.launcher.InstanceDeleter.delete(
             self.zk, pool.getProviderManager('fake-provider'), nodes[0])
 
         # Make sure our old node is in delete state, even though delete failed

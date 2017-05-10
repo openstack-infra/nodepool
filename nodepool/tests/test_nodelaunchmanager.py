@@ -21,7 +21,7 @@ from nodepool import builder
 from nodepool import provider_manager
 from nodepool import tests
 from nodepool import zk
-from nodepool.nodepool import NodeLaunchManager
+from nodepool.launcher import NodeLaunchManager
 
 
 class TestNodeLaunchManager(tests.DBTestCase):
@@ -61,7 +61,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.assertEqual(len(mgr.ready_nodes), 1)
         self.assertEqual(len(mgr.failed_nodes), 0)
 
-    @mock.patch('nodepool.nodepool.NodeLauncher._launchNode')
+    @mock.patch('nodepool.launcher.NodeLauncher._launchNode')
     def test_failed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
@@ -78,7 +78,7 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.assertEqual(len(mgr.failed_nodes), 1)
         self.assertEqual(len(mgr.ready_nodes), 0)
 
-    @mock.patch('nodepool.nodepool.NodeLauncher._launchNode')
+    @mock.patch('nodepool.launcher.NodeLauncher._launchNode')
     def test_mixed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
