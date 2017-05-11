@@ -228,7 +228,7 @@ def loadConfig(config_path):
             if i.meta:
                 if len(i.meta) > 5 or \
                    any([len(k) > 255 or len(v) > 255
-                        for k, v in i.meta.iteritems()]):
+                        for k, v in i.meta.items()]):
                     # soft-fail
                     #self.log.error("Invalid metadata for %s; ignored"
                     #               % i.name)
