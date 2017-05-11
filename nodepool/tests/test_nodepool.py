@@ -490,8 +490,8 @@ class TestNodepool(tests.DBTestCase):
         configfile = self.setup_config('node_lost_requests.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
         pool.start()
-
         req = self.waitForNodeRequest(req, (zk.FULFILLED,))
         # Since our config file has min-ready=0, we should be able to re-use
         # the previously assigned node, thus making sure that the cleanup
