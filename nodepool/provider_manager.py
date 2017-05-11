@@ -18,6 +18,7 @@
 
 import logging
 from contextlib import contextmanager
+import operator
 
 import shade
 
@@ -129,7 +130,7 @@ class ProviderManager(object):
 
     def _getFlavors(self):
         flavors = self.listFlavors()
-        flavors.sort(lambda a, b: cmp(a['ram'], b['ram']))
+        flavors.sort(key=operator.itemgetter('ram'))
         return flavors
 
     # TODO(mordred): These next three methods duplicate logic that is in
