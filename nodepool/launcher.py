@@ -1333,11 +1333,11 @@ class NodePool(threading.Thread):
 
     def reconfigureZooKeeper(self, config):
         if self.config:
-            running = self.config.zookeeper_servers.values()
+            running = list(self.config.zookeeper_servers.values())
         else:
             running = None
 
-        configured = config.zookeeper_servers.values()
+        configured = list(config.zookeeper_servers.values())
         if running == configured:
             return
 
