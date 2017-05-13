@@ -271,6 +271,9 @@ def loadConfig(config_path):
                 pl.flavor_name = label.get('flavor-name', None)
                 pl.key_name = label.get('key-name')
                 pl.console_log = label.get('console-log', False)
+                pl.boot_from_volume = bool(label.get('boot-from-volume',
+                                                     False))
+                pl.volume_size = label.get('volume-size', 50)
 
                 top_label = newconfig.labels[pl.name]
                 top_label.pools.append(pp)

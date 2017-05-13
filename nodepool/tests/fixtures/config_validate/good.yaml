@@ -36,6 +36,8 @@ providers:
           - name: trusty-2-node
             diskimage: trusty
             min-ram: 8192
+            boot-from-volume: True
+            volume-size: 100
 
   - name: cloud2
     cloud: chocolate-cloud

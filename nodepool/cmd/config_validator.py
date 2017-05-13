@@ -41,6 +41,8 @@ class ConfigValidator:
             'flavor-name': str,
             'key-name': str,
             'console-log': bool,
+            'boot-from-volume': bool,
+            'volume-size': int,
         }
 
         pool_label = v.All(pool_label_main,
