@@ -1499,6 +1499,8 @@ class ZooKeeper(object):
             data, stat = self.client.get(path)
         except kze.NoNodeError:
             return None
+        if not data:
+            return None
 
         d = Node.fromDict(self._strToDict(data), node)
         d.id = node
