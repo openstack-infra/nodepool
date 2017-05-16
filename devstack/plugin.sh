@@ -450,11 +450,10 @@ function start_nodepool {
 
     # build sec group rules to reach the nodes, we need to do this
     # this late because nova hasn't started until this phase.
-    if [[ -z $(nova secgroup-list-rules default | grep 'tcp' | grep '65535') ]]; then
-        nova --os-project-name demo --os-username demo \
-             secgroup-add-rule default tcp 1 65535 0.0.0.0/0
-        nova --os-project-name demo --os-username demo \
-             secgroup-add-rule default udp 1 65535 0.0.0.0/0
+    if [[ -z $(openstack security group rule list --protocol tcp default | grep '65535') ]]; then
+        openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol tcp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
+
+        openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol udp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
     fi
 
     export PATH=$NODEPOOL_INSTALL/bin:$PATH
