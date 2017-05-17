@@ -145,13 +145,13 @@ class NodePoolCmd(NodepoolApp):
             l.setLevel(logging.WARNING)
 
     def list(self, node_id=None):
-        print status.node_list(self.zk, node_id)
+        print(status.node_list(self.zk, node_id))
 
     def dib_image_list(self):
-        print status.dib_image_list(self.zk)
+        print(status.dib_image_list(self.zk))
 
     def image_list(self):
-        print status.image_list(self.zk)
+        print(status.image_list(self.zk))
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -189,7 +189,7 @@ class NodePoolCmd(NodepoolApp):
             except Exception as e:
                 log.warning("Exception listing aliens for %s: %s"
                             % (provider.name, str(e.message)))
-        print t
+        print(t)
 
     def alien_image_list(self):
         self.pool.updateConfig()
@@ -237,7 +237,7 @@ class NodePoolCmd(NodepoolApp):
                 if image['id'] in alien_ids:
                     t.add_row([provider.name, image['name'], image['id']])
 
-        print t
+        print(t)
 
     def hold(self):
         node = self.zk.getNode(self.args.id)
@@ -315,7 +315,7 @@ class NodePoolCmd(NodepoolApp):
         #TODO(asselin,yolanda): add validation of secure.conf
 
     def request_list(self):
-        print status.request_list(self.zk)
+        print(status.request_list(self.zk))
 
     def _wait_for_threads(self, threads):
         for t in threads:
