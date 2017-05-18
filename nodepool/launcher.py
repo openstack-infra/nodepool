@@ -249,16 +249,39 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         self._pool = self._label.pool
         self._provider = self._pool.provider
-        self._diskimage = self._provider.diskimages[self._label.diskimage.name]
+        if self._label.diskimage:
+            self._diskimage = self._provider.diskimages[self._label.diskimage.name]
+        else:
+            self._diskimage = None
+        self._cloud_image = self._provider.cloud_images.get(self._label.cloud_image, None)
 
     def _launchNode(self):
-        cloud_image = self._zk.getMostRecentImageUpload(
-            self._diskimage.name, self._provider.name)
-        if not cloud_image:
-            raise LaunchNodepoolException(
-                "Unable to find current cloud image %s in %s" %
-                (self._diskimage.name, self._provider.name)
-            )
+        if self._label.diskimage:
+            # launch using diskimage
+            cloud_image = self._zk.getMostRecentImageUpload(
+                self._diskimage.name, self._provider.name)
+
+            if not cloud_image:
+                raise LaunchNodepoolException(
+                    "Unable to find current cloud image %s in %s" %
+                    (self._diskimage.name, self._provider.name)
+                )
+
+            config_drive = self._diskimage.config_drive
+            image_external_id = cloud_image.external_id
+            image_id = "{path}/{upload_id}".format(
+                path=self._zk._imageUploadPath(cloud_image.image_name,
+                                               cloud_image.build_id,
+                                               cloud_image.provider_name),
+                upload_id=cloud_image.id)
+            image_name = self._diskimage.name
+
+        else:
+            # launch using unmanaged cloud image
+            config_drive = self._cloud_image.config_drive
+            image_external_id = self._label.cloud_image
+            image_id = self._label.cloud_image
+            image_name = self._cloud_image.name
 
         hostname = self._provider.hostname_format.format(
             label=self._label, provider=self._provider, node=self._node
@@ -266,7 +289,7 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         self.log.info("Creating server with hostname %s in %s from image %s "
                       "for node id: %s" % (hostname, self._provider.name,
-                                           self._diskimage.name,
+                                           image_name,
                                            self._node.id))
 
         # NOTE: We store the node ID in the server metadata to use for leaked
@@ -276,23 +299,19 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         server = self._manager.createServer(
             hostname,
-            image_id=cloud_image.external_id,
+            image_id=image_external_id,
             min_ram=self._label.min_ram,
             flavor_name=self._label.flavor_name,
             key_name=self._label.key_name,
             az=self._node.az,
-            config_drive=self._diskimage.config_drive,
+            config_drive=config_drive,
             nodepool_node_id=self._node.id,
-            nodepool_image_name=self._diskimage.name,
+            nodepool_image_name=image_name,
             networks=self._pool.networks)
 
         self._node.external_id = server.id
         self._node.hostname = hostname
-        self._node.image_id = "{path}/{upload_id}".format(
-            path=self._zk._imageUploadPath(cloud_image.image_name,
-                                           cloud_image.build_id,
-                                           cloud_image.provider_name),
-            upload_id=cloud_image.id)
+        self._node.image_id = image_id
 
         # Checkpoint save the updated node info
         self._zk.storeNode(self._node)
@@ -537,10 +556,16 @@ class NodeRequestHandler(object):
         :returns: True if it is available, False otherwise.
         '''
         for label in self.request.node_types:
-            img = self.pool.labels[label].diskimage.name
 
-            if not self.zk.getMostRecentImageUpload(img, self.provider.name):
-                return False
+            if self.pool.labels[label].cloud_image:
+                img = self.pool.labels[label].cloud_image
+                if not self.manager.getImage(img):
+                    return False
+            else:
+                img = self.pool.labels[label].diskimage.name
+
+                if not self.zk.getMostRecentImageUpload(img, self.provider.name):
+                    return False
         return True
 
     def _invalidNodeTypes(self):
@@ -1471,8 +1496,12 @@ class NodePool(threading.Thread):
         '''
         for pool in label.pools:
             for pool_label in pool.labels.values():
-                if self.zk.getMostRecentImageUpload(pool_label.diskimage.name,
-                                                    pool.provider.name):
+                if pool_label.cloud_image:
+                    manager = self.getProviderManager(pool.provider.name)
+                    if manager.getImage(pool_label.cloud_image):
+                        return True
+                elif self.zk.getMostRecentImageUpload(pool_label.diskimage.name,
+                                                      pool.provider.name):
                     return True
         return False
 

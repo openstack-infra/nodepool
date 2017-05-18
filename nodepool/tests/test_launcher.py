@@ -554,3 +554,16 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(lab2[0].type, 'fake-label2')
         self.assertEqual(lab2[0].az, 'az2')
         self.assertEqual(lab2[0].pool, 'pool2')
+
+    def test_unmanaged_image(self):
+        """Test node launching using an unmanaged image"""
+        configfile = self.setup_config('node_unmanaged_image.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+
+        pool.start()
+        self.wait_for_config(pool)
+        manager = pool.getProviderManager('fake-provider')
+        manager._client.create_image(name="fake-image")
+
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)

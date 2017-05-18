@@ -12,6 +12,8 @@ labels:
     min-ready: 1
   - name: trusty-2-node
     min-ready: 0
+  - name: trusty-external
+    min-ready: 1
 
 providers:
   - name: cloud1
@@ -42,6 +44,9 @@ providers:
     diskimages:
       - name: trusty
         pause: False
+    cloud-images:
+      - name: trusty-unmanaged
+        config-drive: true
     pools:
       - name: main
         max-servers: 184
@@ -51,6 +56,9 @@ providers:
             min-ram: 8192
           - name: trusty-2-node
             diskimage: trusty
+            min-ram: 8192
+          - name: trusty-external
+            cloud-image: trusty-unmanaged
             min-ram: 8192
 
 diskimages:

@@ -433,6 +433,32 @@ Example configuration::
     values must be 255 characters or less.
 
 
+.. _provider_cloud_images:
+
+cloud-images
+~~~~~~~~~~~~
+
+Each cloud-image entry in :ref:`labels` refers to an entry in this section.
+This is a way for modifying launch parameters of the nodes (currently only
+config-drive).
+
+Example configuration::
+
+  cloud-images:
+    - name: trusty-external
+      config-drive: False
+
+**required**
+
+  ``name``
+    Identifier to refer this cloud-image from :ref:`labels` section.
+
+**optional**
+
+  ``config-drive`` (boolean)
+    Whether config drive should be used for the cloud image. Default ``True``
+
+
 .. _pool_labels:
 
 labels
@@ -456,8 +482,14 @@ Example configuration::
     Identifier to refer this image from :ref:`labels` and :ref:`diskimages`
     sections.
 
+**one of**
+
   ``diskimage``
     Refers to provider's diskimages, see :ref:`provider_diskimages`.
+
+  ``cloud-image``
+    Refers to an externally managed image name or id already existing on the
+    provider, see :ref:`provider_cloud_images`.
 
 **at least one of**
 

@@ -29,16 +29,22 @@ class ConfigValidator:
         label_flavor_name = v.Schema({v.Required('flavor-name'): str},
                                      extra=True)
 
+        label_diskimage = v.Schema({v.Required('diskimage'): str}, extra=True)
+
+        label_cloud_image = v.Schema({v.Required('cloud-image'): str}, extra=True)
+
         pool_label_main = {
             v.Required('name'): str,
-            v.Required('diskimage'): str,
+            v.Exclusive('diskimage', 'label-image'): str,
+            v.Exclusive('cloud-image', 'label-image'): str,
             'min-ram': int,
             'flavor-name': str,
             'key-name': str,
         }
 
         pool_label = v.All(pool_label_main,
-                           v.Any(label_min_ram, label_flavor_name))
+                           v.Any(label_min_ram, label_flavor_name),
+                           v.Any(label_diskimage, label_cloud_image))
 
         pool = {
             'name': str,
@@ -52,6 +58,11 @@ class ConfigValidator:
             'name': str,
             'pause': bool,
             'meta': dict,
+            'config-drive': bool,
+        }
+
+        provider_cloud_images = {
+            'name': str,
             'config-drive': bool,
         }
 
@@ -70,6 +81,7 @@ class ConfigValidator:
             'clean-floating-ips': bool,
             'pools': [pool],
             'diskimages': [provider_diskimage],
+            'cloud-images': [provider_cloud_images],
         }
 
         label = {
