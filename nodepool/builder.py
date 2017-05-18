@@ -250,7 +250,8 @@ class CleanupWorker(BaseWorker):
             if not manifest_dir:
                 path, ext = filename.rsplit('.', 1)
                 manifest_dir = path + ".d"
-            map(self._removeDibItem, [filename, f.md5_file, f.sha256_file])
+            items = [filename, f.md5_file, f.sha256_file]
+            list(map(self._removeDibItem, items))
 
         try:
             shutil.rmtree(manifest_dir)
