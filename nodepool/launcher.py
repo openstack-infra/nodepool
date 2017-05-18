@@ -1534,8 +1534,8 @@ class NodePool(threading.Thread):
         # resubmit a request for a type if a request for that type is
         # still in progress.
         self.removeCompletedRequests()
-        label_names = self.config.labels.keys()
-        requested_labels = self._submittedRequests.keys()
+        label_names = list(self.config.labels.keys())
+        requested_labels = list(self._submittedRequests.keys())
         needed_labels = list(set(label_names) - set(requested_labels))
 
         ready_nodes = self.zk.getReadyNodesOfTypes(needed_labels)
@@ -1549,7 +1549,7 @@ class NodePool(threading.Thread):
 
             # Calculate how many nodes of this type we need created
             need = 0
-            if label.name not in ready_nodes.keys():
+            if label.name not in ready_nodes:
                 need = label.min_ready
             elif len(ready_nodes[label.name]) < min_ready:
                 need = min_ready - len(ready_nodes[label.name])
@@ -1606,7 +1606,7 @@ class NodePool(threading.Thread):
                 for provider in self.config.providers.values():
                     for pool in provider.pools.values():
                         key = provider.name + '-' + pool.name
-                        if key not in self._pool_threads.keys():
+                        if key not in self._pool_threads:
                             t = PoolWorker(self, provider.name, pool.name)
                             self.log.info( "Starting %s" % t.name)
                             t.start()

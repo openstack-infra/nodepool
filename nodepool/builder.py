@@ -178,7 +178,7 @@ class CleanupWorker(BaseWorker):
                         )
 
         # Sort uploads by state_time (upload time) and keep the 2 most recent
-        for i in self._rtable.keys():
+        for i in list(self._rtable.keys()):
             for p in self._rtable[i].keys():
                 self._rtable[i][p].sort(key=lambda x: x[2], reverse=True)
                 self._rtable[i][p] = self._rtable[i][p][:2]
@@ -271,8 +271,7 @@ class CleanupWorker(BaseWorker):
             self._deleteUpload(upload)
 
     def _cleanupObsoleteProviderUploads(self, provider, image, build_id):
-        image_names_for_provider = provider.diskimages.keys()
-        if image in image_names_for_provider:
+        if image in provider.diskimages:
             # This image is in use for this provider
             return
 
