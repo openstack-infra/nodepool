@@ -189,7 +189,7 @@ class NodePoolCmd(NodepoolApp):
                                    server.id, server.public_v4])
             except Exception as e:
                 log.warning("Exception listing aliens for %s: %s"
-                            % (provider.name, str(e.message)))
+                            % (provider.name, str(e)))
         print(t)
 
     def alien_image_list(self):
@@ -216,7 +216,7 @@ class NodePoolCmd(NodepoolApp):
                     if 'nodepool_build_id' in image['properties']]
             except Exception as e:
                 log.warning("Exception listing alien images for %s: %s"
-                            % (provider.name, str(e.message)))
+                            % (provider.name, str(e)))
 
             alien_ids = []
             uploads = []
