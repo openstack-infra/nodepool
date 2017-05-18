@@ -31,7 +31,7 @@ class TestLauncher(tests.DBTestCase):
         Successful node launch should have unlocked nodes in READY state
         and assigned to the request.
         '''
-        configfile = self.setup_config('node.yaml')
+        configfile = self.setup_config('node_no_min_ready.yaml')
         self._useBuilder(configfile)
         image = self.waitForImage('fake-provider', 'fake-image')
 
