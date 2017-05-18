@@ -23,11 +23,11 @@ import time
 import shlex
 import sys
 
-import config as nodepool_config
-import exceptions
-import provider_manager
-import stats
-import zk
+from nodepool import config as nodepool_config
+from nodepool import exceptions
+from nodepool import provider_manager
+from nodepool import stats
+from nodepool import zk
 
 
 MINS = 60

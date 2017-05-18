@@ -20,7 +20,7 @@ from paste import httpserver
 import webob
 from webob import dec
 
-import status
+from nodepool import status
 
 """Nodepool main web app.
 
