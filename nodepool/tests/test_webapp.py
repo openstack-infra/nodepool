@@ -38,10 +38,10 @@ class TestWebApp(tests.DBTestCase):
         req = request.Request(
             "http://localhost:%s/image-list" % port)
         f = request.urlopen(req)
-        self.assertEqual(f.info().getheader('Content-Type'),
+        self.assertEqual(f.info().get('Content-Type'),
                          'text/plain; charset=UTF-8')
         data = f.read()
-        self.assertTrue('fake-image' in data)
+        self.assertTrue('fake-image' in data.decode('utf8'))
 
     def test_dib_image_list_json(self):
         configfile = self.setup_config('node.yaml')
@@ -58,10 +58,10 @@ class TestWebApp(tests.DBTestCase):
         req = request.Request(
             "http://localhost:%s/dib-image-list.json" % port)
         f = request.urlopen(req)
-        self.assertEqual(f.info().getheader('Content-Type'),
+        self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
         data = f.read()
-        objs = json.loads(data)
+        objs = json.loads(data.decode('utf8'))
         # make sure this is valid json and has some of the
         # non-changing keys
         self.assertDictContainsSubset({'id': 'fake-image-0000000001',

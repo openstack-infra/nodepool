@@ -132,7 +132,7 @@ class StatsdFixture(fixtures.Fixture):
 
     def _cleanup(self):
         self.running = False
-        os.write(self.wake_write, '1\n')
+        os.write(self.wake_write, b'1\n')
         self.thread.join()
 
 
@@ -252,7 +252,7 @@ class BaseTestCase(testtools.TestCase):
         start = time.time()
         while time.time() < (start + 5):
             for stat in self.statsd.stats:
-                k, v = stat.split(':')
+                k, v = stat.decode('utf8').split(':')
                 if key == k:
                     if value is None and kind is None:
                         return
@@ -302,12 +302,13 @@ class DBTestCase(BaseTestCase):
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
-        with open(configfile) as conf_fd:
-            config = conf_fd.read()
-            os.write(fd, config.format(images_dir=images_dir.path,
+        with open(configfile, 'rb') as conf_fd:
+            config = conf_fd.read().decode('utf8')
+            data = config.format(images_dir=images_dir.path,
                                        zookeeper_host=self.zookeeper_host,
                                        zookeeper_port=self.zookeeper_port,
-                                       zookeeper_chroot=self.zookeeper_chroot))
+                                       zookeeper_chroot=self.zookeeper_chroot)
+            os.write(fd, data.encode('utf8'))
         os.close(fd)
         self._config_images_dir = images_dir
         validator = ConfigValidator(path)
@@ -324,7 +325,7 @@ class DBTestCase(BaseTestCase):
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', 'secure.conf')
         (fd, path) = tempfile.mkstemp()
-        with open(configfile) as conf_fd:
+        with open(configfile, 'rb') as conf_fd:
             config = conf_fd.read()
             os.write(fd, config)
             #os.write(fd, config.format(dburi=self.dburi))

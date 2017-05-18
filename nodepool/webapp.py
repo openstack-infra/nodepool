@@ -96,6 +96,7 @@ class WebApp(threading.Thread):
             content_type = 'text/plain'
 
         response = webob.Response(body=output,
+                                  charset='UTF-8',
                                   content_type=content_type)
         response.headers['Access-Control-Allow-Origin'] = '*'
 
