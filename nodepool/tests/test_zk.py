@@ -186,6 +186,7 @@ class TestZooKeeper(tests.DBTestCase):
         orig_data = zk.ImageUpload()
         orig_data.external_id = "deadbeef"
         orig_data.state = zk.READY
+        orig_data.format = "qcow2"
 
         build_number = self.zk.storeBuild(image, zk.ImageBuild())
         upload_id = self.zk.storeImageUpload(image, build_number, provider,
@@ -196,6 +197,7 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(orig_data.external_id, data.external_id)
         self.assertEqual(orig_data.state, data.state)
         self.assertEqual(orig_data.state_time, data.state_time)
+        self.assertEqual(orig_data.format, data.format)
         self.assertEqual(self.zk.getBuildProviders("ubuntu-trusty",
                                                    build_number),
                          [provider])
@@ -695,6 +697,7 @@ class TestZKModel(tests.BaseTestCase):
         o.state = zk.UPLOADING
         o.external_id = 'DEADBEEF'
         o.external_name = 'trusty'
+        o.format = 'qcow2'
 
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -705,6 +708,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
+        self.assertEqual(o.format, d['format'])
 
     def test_ImageUpload_fromDict(self):
         now = int(time.time())
@@ -713,6 +717,7 @@ class TestZKModel(tests.BaseTestCase):
         d = {
             'external_id': 'DEADBEEF',
             'external_name': 'trusty',
+            'format': 'qcow2',
             'state': zk.READY,
             'state_time': now
         }
@@ -726,6 +731,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.external_name, d['external_name'])
+        self.assertEqual(o.format, d['format'])
 
     def test_NodeRequest_toDict(self):
         o = zk.NodeRequest("500-123")
