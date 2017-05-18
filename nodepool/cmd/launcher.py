@@ -20,7 +20,7 @@ import sys
 import signal
 
 import nodepool.cmd
-import nodepool.nodepool
+import nodepool.launcher
 import nodepool.webapp
 
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class NodePoolLauncherApp(nodepool.cmd.NodepoolDaemonApp):
         os._exit(0)
 
     def run(self):
-        self.pool = nodepool.nodepool.NodePool(self.args.secure,
+        self.pool = nodepool.launcher.NodePool(self.args.secure,
                                                self.args.config)
         if not self.args.no_webapp:
             self.webapp = nodepool.webapp.WebApp(self.pool)

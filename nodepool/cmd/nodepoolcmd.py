@@ -17,8 +17,8 @@
 import logging.config
 import sys
 
+from nodepool import launcher
 from nodepool import provider_manager
-from nodepool import nodepool
 from nodepool import status
 from nodepool import zk
 from nodepool.cmd import NodepoolApp
@@ -265,7 +265,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.now:
             manager = provider_manager.get_provider_manager(provider, True)
             manager.start()
-            nodepool.InstanceDeleter.delete(self.zk, manager, node)
+            launcher.InstanceDeleter.delete(self.zk, manager, node)
             manager.stop()
         else:
             node.state = zk.DELETING
@@ -329,7 +329,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('config-validate'):
             return self.args.func()
 
-        self.pool = nodepool.NodePool(self.args.secure, self.args.config)
+        self.pool = launcher.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
 
         # commands needing ZooKeeper

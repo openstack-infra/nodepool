@@ -108,7 +108,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
             'nodepool.provider_manager.FakeProviderManager._getClient',
             get_fake_client))
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool._get_one_cloud',
+            'nodepool.launcher._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
 
         configfile = self.setup_config('node.yaml')

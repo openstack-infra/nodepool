@@ -31,7 +31,10 @@ import fixtures
 import kazoo.client
 import testtools
 
-from nodepool import builder, fakeprovider, nodepool, webapp
+from nodepool import builder
+from nodepool import fakeprovider
+from nodepool import launcher
+from nodepool import webapp
 from nodepool import zk
 from nodepool.cmd.config_validator import ConfigValidator
 
@@ -197,7 +200,7 @@ class BaseTestCase(testtools.TestCase):
             'nodepool.provider_manager.ProviderManager._getClient',
             get_fake_client))
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool._get_one_cloud',
+            'nodepool.launcher._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
         clouds_path = os.path.join(os.path.dirname(__file__),
                                    'fixtures', 'clouds.yaml')
@@ -468,7 +471,7 @@ class DBTestCase(BaseTestCase):
 
     def useNodepool(self, *args, **kwargs):
         args = (self.secure_conf,) + args
-        pool = nodepool.NodePool(*args, **kwargs)
+        pool = launcher.NodePool(*args, **kwargs)
         pool.cleanup_interval = .5
         pool.delete_interval = .5
         self.addCleanup(pool.stop)
