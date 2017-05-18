@@ -113,6 +113,7 @@ class StatsdFixture(fixtures.Fixture):
         self.wake_read, self.wake_write = os.pipe()
         self.stats = []
         self.thread.start()
+        self.addCleanup(self._cleanup)
 
     def run(self):
         while self.running:
