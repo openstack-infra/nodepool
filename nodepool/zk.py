@@ -355,8 +355,8 @@ class NodeRequest(BaseModel):
             return (self.id == other.id and
                     self.declined_by == other.declined_by and
                     self.node_types == other.node_types and
-                    self.nodes == other.nodes,
-                    self.reuse == other.reuse,
+                    self.nodes == other.nodes and
+                    self.reuse == other.reuse and
                     self.requestor == other.requestor)
         else:
             return False
@@ -445,7 +445,7 @@ class Node(BaseModel):
                     self.created_time == other.created_time and
                     self.external_id == other.external_id and
                     self.hostname == other.hostname and
-                    self.comment == other.comment,
+                    self.comment == other.comment and
                     self.host_keys == other.host_keys)
         else:
             return False
