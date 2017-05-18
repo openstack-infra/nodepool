@@ -1186,6 +1186,52 @@ class CleanupWorker(BaseCleanupWorker):
             if provider.clean_floating_ips:
                 manager.cleanupLeakedFloaters()
 
+    def _cleanupMaxReadyAge(self):
+        '''
+        Delete any server past their max-ready-age.
+
+        Remove any servers which are longer than max-ready-age in ready state.
+        '''
+
+        # first get all labels with max_ready_age > 0
+        label_names = []
+        for label_name in self._nodepool.config.labels:
+            if self._nodepool.config.labels[label_name].max_ready_age > 0:
+                label_names.append(label_name)
+
+        zk_conn = self._nodepool.getZK()
+        ready_nodes = zk_conn.getReadyNodesOfTypes(label_names)
+
+        for label_name in ready_nodes:
+            # get label from node
+            label = self._nodepool.config.labels[label_name]
+
+            for node in ready_nodes[label_name]:
+
+                # Can't do anything if we aren't configured for this provider.
+                if node.provider not in self._nodepool.config.providers:
+                    continue
+
+                # check state time against now
+                now = int(time.time())
+                if (now - node.state_time) < label.max_ready_age:
+                    continue
+
+                try:
+                    zk_conn.lockNode(node, blocking=False)
+                except exceptions.ZKLockException:
+                    continue
+
+                # Double check the state now that we have a lock since it
+                # may have changed on us.
+                if node.state != zk.READY:
+                    zk_conn.unlockNode(node)
+                    continue
+
+                # The InstanceDeleter thread will unlock and remove the
+                # node from ZooKeeper if it succeeds.
+                self._deleteInstance(node)
+
     def _run(self):
         '''
         Catch exceptions individually so that other cleanup routines may
@@ -1208,6 +1254,12 @@ class CleanupWorker(BaseCleanupWorker):
         except Exception:
             self.log.exception(
                 "Exception in CleanupWorker (lost request cleanup):")
+
+        try:
+            self._cleanupMaxReadyAge()
+        except Exception:
+            self.log.exception(
+                "Exception in CleanupWorker (max ready age cleanup):")
 
 
 class DeletedNodeWorker(BaseCleanupWorker):

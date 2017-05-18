@@ -75,6 +75,7 @@ class ConfigValidator:
         label = {
             'name': str,
             'min-ready': int,
+            'max-ready-age': int,
         }
 
         diskimage = {

@@ -69,6 +69,7 @@ written to run on nodes of a certain label. Example::
 
   labels:
     - name: my-precise
+      max-ready-age: 3600
       min-ready: 2
     - name: multi-precise
       min-ready: 2
@@ -79,6 +80,11 @@ written to run on nodes of a certain label. Example::
     Unique name used to tie jobs to those instances.
 
 **optional**
+
+  ``max-ready-age`` (int)
+    Maximum number of seconds the node shall be in ready state. If
+    this is exceeded the node will be deleted. A value of 0 disables this.
+    Defaults to 0.
 
   ``min-ready`` (default: 2)
     Minimum instances that should be in a ready state. Set to -1 to have the

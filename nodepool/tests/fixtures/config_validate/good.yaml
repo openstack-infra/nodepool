@@ -8,6 +8,7 @@ zookeeper-servers:
 
 labels:
   - name: trusty
+    max-ready-age: 3600
     min-ready: 1
   - name: trusty-2-node
     min-ready: 0
