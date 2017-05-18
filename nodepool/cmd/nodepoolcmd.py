@@ -340,7 +340,7 @@ class NodePoolCmd(NodepoolApp):
                                  'alien-list', 'list', 'hold', 'delete',
                                  'request-list'):
             self.zk = zk.ZooKeeper()
-            self.zk.connect(config.zookeeper_servers.values())
+            self.zk.connect(list(config.zookeeper_servers.values()))
 
         self.pool.setConfig(config)
         self.args.func()

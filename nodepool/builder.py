@@ -129,7 +129,7 @@ class BaseWorker(threading.Thread):
         '''
         if self._config.zookeeper_servers != new_config.zookeeper_servers:
             self.log.debug("Detected ZooKeeper server changes")
-            self._zk.resetHosts(new_config.zookeeper_servers.values())
+            self._zk.resetHosts(list(new_config.zookeeper_servers.values()))
 
     @property
     def running(self):
@@ -1107,7 +1107,7 @@ class NodePoolBuilder(object):
 
             # All worker threads share a single ZooKeeper instance/connection.
             self.zk = zk.ZooKeeper()
-            self.zk.connect(self._config.zookeeper_servers.values())
+            self.zk.connect(list(self._config.zookeeper_servers.values()))
 
             self.log.debug('Starting listener for build jobs')
 
