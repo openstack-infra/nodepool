@@ -18,6 +18,7 @@
 
 import sys
 import threading
+import six
 from six.moves import queue as Queue
 import logging
 import time
@@ -49,7 +50,7 @@ class Task(object):
     def wait(self):
         self._wait_event.wait()
         if self._exception:
-            raise self._exception, None, self._traceback
+            six.reraise(self._exception, None, self._traceback)
         return self._result
 
     def run(self, client):
