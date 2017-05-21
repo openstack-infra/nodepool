@@ -899,6 +899,7 @@ class UploadWorker(BaseWorker):
         data.state = zk.READY
         data.external_id = external_id
         data.external_name = ext_image_name
+        data.format = image.extension
         return data
 
     def _checkForProviderUploads(self):

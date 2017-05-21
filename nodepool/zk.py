@@ -258,6 +258,7 @@ class ImageUpload(BaseModel):
         self.build_id = build_id
         self.provider_name = provider_name
         self.image_name = image_name
+        self.format = None
         self.external_id = None      # Provider ID of the image
         self.external_name = None    # Provider name of the image
 
@@ -267,6 +268,7 @@ class ImageUpload(BaseModel):
         d['build_id'] = self.build_id
         d['provider_name'] = self.provider_name
         d['image_name'] = self.image_name
+        d['format'] = self.format
         d['stat'] = self.stat
         return '<ImageUpload %s>' % d
 
@@ -275,7 +277,8 @@ class ImageUpload(BaseModel):
             return (self.id == other.id and
                     self.provider_name == other.provider_name and
                     self.build_id == other.build_id and
-                    self.image_name == other.image_name)
+                    self.image_name == other.image_name and
+                    self.format == other.format)
         else:
             return False
 
@@ -286,6 +289,7 @@ class ImageUpload(BaseModel):
         d = super(ImageUpload, self).toDict()
         d['external_id'] = self.external_id
         d['external_name'] = self.external_name
+        d['format'] = self.format
         return d
 
     @staticmethod
@@ -305,6 +309,7 @@ class ImageUpload(BaseModel):
         super(ImageUpload, o).fromDict(d)
         o.external_id = d.get('external_id')
         o.external_name = d.get('external_name')
+        o.format = d.get('format')
         return o
 
 
