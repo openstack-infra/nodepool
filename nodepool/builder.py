@@ -21,7 +21,6 @@ import subprocess
 import threading
 import time
 import shlex
-import sys
 
 from nodepool import config as nodepool_config
 from nodepool import exceptions
@@ -513,32 +512,6 @@ class BuildWorker(BaseWorker):
         self.name = 'BuildWorker.%s' % name
         self.dib_cmd = dib_cmd
 
-    def _running_under_virtualenv(self):
-        # NOTE: borrowed from pip:locations.py
-        if hasattr(sys, 'real_prefix'):
-            return True
-        elif sys.prefix != getattr(sys, "base_prefix", sys.prefix):
-            return True
-        return False
-
-    def _activate_virtualenv(self):
-        """Run as a pre-exec function to activate current virtualenv
-
-        If we are invoked directly as /path/ENV/nodepool-builer (as
-        done by an init script, for example) then /path/ENV/bin will
-        not be in our $PATH, meaning we can't find disk-image-create.
-        Apart from that, dib also needs to run in an activated
-        virtualenv so it can find utils like dib-run-parts.  Run this
-        before exec of dib to ensure the current virtualenv (if any)
-        is activated.
-        """
-        if self._running_under_virtualenv():
-            activate_this = os.path.join(sys.prefix, "bin", "activate_this.py")
-            if not os.path.exists(activate_this):
-                raise exceptions.BuilderError("Running in a virtualenv, but "
-                                              "cannot find: %s" % activate_this)
-            execfile(activate_this, dict(__file__=activate_this))
-
     def _checkForScheduledImageUpdates(self):
         '''
         Check every DIB image to see if it has aged out and needs rebuilt.
@@ -712,7 +685,6 @@ class BuildWorker(BaseWorker):
                 shlex.split(cmd),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                preexec_fn=self._activate_virtualenv,
                 env=env)
         except OSError as e:
             raise exceptions.BuilderError(

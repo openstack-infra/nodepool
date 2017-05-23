@@ -11,7 +11,7 @@ PrettyTable>=0.6,<0.8
 six>=1.7.0
 os-client-config>=1.2.0
 shade>=1.18.1
-diskimage-builder>=1.21.0
+diskimage-builder>=2.0.0
 voluptuous
 kazoo
 Paste
