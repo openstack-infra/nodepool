@@ -61,7 +61,12 @@ function install_glean {
 
 # Install nodepool code
 function install_nodepool {
-    virtualenv $NODEPOOL_INSTALL
+    if python3_enabled; then
+        VENV="virtualenv -p python${PYTHON3_VERSION}"
+    else
+        VENV="virtualenv -p python${PYTHON2_VERSION}"
+    fi
+    $VENV $NODEPOOL_INSTALL
     install_shade
     install_diskimage_builder
     install_glean
