@@ -368,7 +368,9 @@ class CleanupWorker(BaseWorker):
         marked for deleting.
         '''
         cruft = self._zk.getUploads(image, build_id, provider,
-                                    states=[zk.UPLOADING, zk.DELETING])
+                                    states=[zk.UPLOADING,
+                                            zk.DELETING,
+                                            zk.FAILED])
         for upload in cruft:
             if (upload.state == zk.UPLOADING and
                 not self._inProgressUpload(upload)
@@ -385,6 +387,9 @@ class CleanupWorker(BaseWorker):
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
             elif upload.state == zk.DELETING:
                 self.log.info("Removing deleted upload and record: %s" % upload)
+                self._deleteUpload(upload)
+            elif upload.state == zk.FAILED:
+                self.log.info("Removing failed upload and record: %s" % upload)
                 self._deleteUpload(upload)
 
     def _cleanupImage(self, known_providers, image):
