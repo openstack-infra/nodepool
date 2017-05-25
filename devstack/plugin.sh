@@ -32,7 +32,7 @@ function install_shade {
         # BUT - install shade into a virtualenv so that we don't have issues
         # with OpenStack constraints affecting the shade dependency install.
         # This particularly shows up with os-client-config
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/shade
+        $NODEPOOL_INSTALL/bin/pip install $DEST/shade
     fi
 }
 
@@ -43,7 +43,7 @@ function install_diskimage_builder {
         GITBRANCH["diskimage-builder"]=$DISKIMAGE_BUILDER_REPO_REF
         git_clone_by_name "diskimage-builder"
         setup_dev_lib "diskimage-builder"
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/diskimage-builder
+        $NODEPOOL_INSTALL/bin/pip install $DEST/diskimage-builder
     fi
 }
 
@@ -54,7 +54,7 @@ function install_glean {
         GITBRANCH["glean"]=$GLEAN_REPO_REF
         git_clone_by_name "glean"
         setup_dev_lib "glean"
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/glean
+        $NODEPOOL_INSTALL/bin/pip install $DEST/glean
     fi
 }
 
@@ -72,7 +72,7 @@ function install_nodepool {
     install_glean
 
     setup_develop $DEST/nodepool
-    $NODEPOOL_INSTALL/bin/pip install -e $DEST/nodepool
+    $NODEPOOL_INSTALL/bin/pip install $DEST/nodepool
 }
 
 # requires some globals from devstack, which *might* not be stable api
