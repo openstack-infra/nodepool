@@ -1455,7 +1455,7 @@ class NodePool(threading.Thread):
 
         # Use a copy of the labels because we modify _submittedRequests
         # within the loop below.
-        requested_labels = list(self._submittedRequests.keys())
+        requested_labels = self._submittedRequests.keys()
 
         for label in requested_labels:
             label_requests = self._submittedRequests[label]
