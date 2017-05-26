@@ -255,6 +255,15 @@ class NodeLauncher(threading.Thread, StatsReporter):
             self._diskimage = None
         self._cloud_image = self._provider.cloud_images.get(self._label.cloud_image, None)
 
+    def logConsole(self, server_id, hostname):
+        if not self._label.console_log:
+            return
+        console = self._manager.getServerConsole(server_id)
+        if console:
+            self.log.debug('Console log from hostname %s:' % hostname)
+            for line in console.splitlines():
+                self.log.debug(line.rstrip())
+
     def _launchNode(self):
         if self._label.diskimage:
             # launch using diskimage
@@ -359,11 +368,16 @@ class NodeLauncher(threading.Thread, StatsReporter):
              self._node.public_ipv4, self._node.public_ipv6))
 
         # Get the SSH public keys for the new node and record in ZooKeeper
-        self.log.debug("Gathering host keys for node %s", self._node.id)
-        host_keys = utils.keyscan(
-            interface_ip, timeout=self._provider.boot_timeout)
-        if not host_keys:
-            raise LaunchKeyscanException("Unable to gather host keys")
+        try:
+            self.log.debug("Gathering host keys for node %s", self._node.id)
+            host_keys = utils.keyscan(
+                interface_ip, timeout=self._provider.boot_timeout)
+            if not host_keys:
+                raise LaunchKeyscanException("Unable to gather host keys")
+        except exceptions.SSHTimeoutException:
+            self.logConsole(self._node.external_id, self._node.hostname)
+            raise
+
         self._node.host_keys = host_keys
         self._zk.storeNode(self._node)
 
