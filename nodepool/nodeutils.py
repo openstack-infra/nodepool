@@ -20,6 +20,7 @@ import base64
 import errno
 import ipaddress
 import time
+import six
 import socket
 import logging
 
@@ -53,7 +54,7 @@ def keyscan(ip, timeout=60):
     if 'fake' in ip:
         return ['ssh-rsa FAKEKEY']
 
-    if ipaddress.ip_address(unicode(ip)).version < 6:
+    if ipaddress.ip_address(six.text_type(ip)).version < 6:
         family = socket.AF_INET
         sockaddr = (ip, 22)
     else:
