@@ -1452,7 +1452,12 @@ class NodePool(threading.Thread):
         We also must reset the allocated_to attribute for each Node assigned
         to our request, since we are deleting the request.
         '''
-        for label in self._submittedRequests.keys():
+
+        # Use a copy of the labels because we modify _submittedRequests
+        # within the loop below.
+        requested_labels = list(self._submittedRequests.keys())
+
+        for label in requested_labels:
             label_requests = self._submittedRequests[label]
             active_requests = []
 
