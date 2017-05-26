@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 import errno
 import ipaddress
 import time
@@ -95,9 +94,6 @@ def keyscan(ip, timeout=60):
     # Paramiko, at this time, seems to return only the ssh-rsa key, so
     # only the single key is placed into the list.
     if key:
-        keys.append(
-            "%s %s" % (key.get_name(),
-                       base64.encodestring(str(key)).replace('\n', ''))
-        )
+        keys.append("%s %s" % (key.get_name(), key.get_base64()))
 
     return keys
