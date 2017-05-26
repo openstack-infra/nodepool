@@ -74,7 +74,7 @@ def keyscan(ip, timeout=60):
             key = t.get_remote_server_key()
             break
         except socket.error as e:
-            if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
+            if e.errno not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
                 log.exception(
                     'Exception with ssh access to %s:' % ip)
         except Exception as e:
