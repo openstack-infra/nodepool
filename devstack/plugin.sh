@@ -197,6 +197,33 @@ EOF
         DIB_DEBOOTSTRAP_EXTRA_ARGS="DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'"
     fi
 
+
+    NODEPOOL_CENTOS_7_MIN_READY=1
+    NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
+    NODEPOOL_FEDORA_25_MIN_READY=1
+    NODEPOOL_UBUNTU_PRECISE_MIN_READY=1
+    NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
+    NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
+
+    if $NODEPOOL_PAUSE_CENTOS_7_DIB ; then
+       NODEPOOL_CENTOS_7_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB ; then
+       NODEPOOL_DEBIAN_JESSIE_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_FEDORA_25_DIB ; then
+       NODEPOOL_FEDORA_25_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB ; then
+       NODEPOOL_UBUNTU_PRECISE_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB ; then
+       NODEPOOL_UBUNTU_TRUSTY_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB ; then
+       NODEPOOL_UBUNTU_XENIAL_MIN_READY=0
+    fi
+
     cat > /tmp/nodepool.yaml <<EOF
 # You will need to make and populate this path as necessary,
 # cloning nodepool does not do this. Further in this doc we have an
@@ -210,17 +237,17 @@ zookeeper-servers:
 
 labels:
   - name: centos-7
-    min-ready: 1
+    min-ready: $NODEPOOL_CENTOS_7_MIN_READY
   - name: debian-jessie
-    min-ready: 1
+    min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
   - name: fedora-25
-    min-ready: 1
+    min-ready: $NODEPOOL_FEDORA_25_MIN_READY
   - name: ubuntu-precise
-    min-ready: 1
+    min-ready: $NODEPOOL_UBUNTU_PRECISE_MIN_READY
   - name: ubuntu-trusty
-    min-ready: 1
+    min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
-    min-ready: 1
+    min-ready: $NODEPOOL_UBUNTU_XENIAL_MIN_READY
 
 providers:
   - name: devstack
