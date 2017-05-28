@@ -21,7 +21,7 @@ from nodepool import builder
 from nodepool import provider_manager
 from nodepool import tests
 from nodepool import zk
-from nodepool.launcher import NodeLaunchManager
+from nodepool.launcher import OpenStackNodeLaunchManager
 
 
 class TestNodeLaunchManager(tests.DBTestCase):
@@ -53,8 +53,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider_pool,
-                                self.pmanager, 'zuul', 1)
+        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
+                                         self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
             time.sleep(0)
@@ -70,8 +70,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider_pool,
-                                self.pmanager, 'zuul', 1)
+        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
+                                         self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         while not mgr.poll():
             time.sleep(0)
@@ -90,8 +90,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n2 = zk.Node()
         n2.state = zk.BUILDING
         n2.type = 'fake-label'
-        mgr = NodeLaunchManager(self.zk, self.provider_pool,
-                                self.pmanager, 'zuul', 1)
+        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
+                                         self.pmanager, 'zuul', 1)
         mgr.launch(n1)
         mgr.launch(n2)
         while not mgr.poll():
