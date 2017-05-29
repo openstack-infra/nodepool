@@ -832,6 +832,7 @@ class TestZKModel(tests.BaseTestCase):
             'hostname': 'xyz',
             'comment': 'comment',
             'host_keys': ['key1', 'key2'],
+            'ssh_port': 22022,
         }
 
         o = zk.Node.fromDict(d, node_id)
@@ -853,3 +854,15 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.hostname , d['hostname'])
         self.assertEqual(o.comment , d['comment'])
         self.assertEqual(o.host_keys , d['host_keys'])
+        self.assertEqual(o.ssh_port , d['ssh_port'])
+
+    def test_custom_ssh_port(self):
+        n = zk.Node('0001')
+        n.state = zk.BUILDING
+        d = n.toDict()
+        self.assertEqual(d["ssh_port"], 22, "Default port not 22")
+        n = zk.Node.fromDict(d, '0001')
+        self.assertEqual(n.ssh_port, 22, "Default port not 22")
+        n.ssh_port = 22022
+        d = n.toDict()
+        self.assertEqual(d["ssh_port"], 22022, "Custom ssh port not set")

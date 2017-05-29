@@ -44,7 +44,7 @@ def iterate_timeout(max_seconds, exc, purpose):
     raise exc("Timeout waiting for %s" % purpose)
 
 
-def keyscan(ip, timeout=60):
+def keyscan(ip, port=22, timeout=60):
     '''
     Scan the IP address for public SSH keys.
 
@@ -55,10 +55,10 @@ def keyscan(ip, timeout=60):
 
     if ipaddress.ip_address(six.text_type(ip)).version < 6:
         family = socket.AF_INET
-        sockaddr = (ip, 22)
+        sockaddr = (ip, port)
     else:
         family = socket.AF_INET6
-        sockaddr = (ip, 22, 0, 0)
+        sockaddr = (ip, port, 0, 0)
 
     keys = []
     key = None

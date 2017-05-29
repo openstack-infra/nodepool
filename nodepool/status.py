@@ -32,7 +32,7 @@ def age(timestamp):
 def node_list(zk, node_id=None):
     t = PrettyTable(["ID", "Provider", "AZ", "Label",
                      "Launcher", "Hostname", "Server ID",
-                     "Public IPv4", "Private IPv4", "IPv6",
+                     "Public IPv4", "Private IPv4", "IPv6", "SSH Port",
                      "State", "Age", "Locked", "Comment"])
     t.align = 'l'
     if node_id:
@@ -49,7 +49,8 @@ def node_list(zk, node_id=None):
             t.add_row([node.id, node.provider, node.az, node.type,
                        node.launcher, node.hostname, node.external_id,
                        node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.state, age(node.state_time), locked, node.comment])
+                       node.ssh_port, node.state, age(node.state_time), locked,
+                       node.comment])
     else:
         for node in zk.nodeIterator():
             locked = "unlocked"
@@ -62,7 +63,8 @@ def node_list(zk, node_id=None):
             t.add_row([node.id, node.provider, node.az, node.type,
                        node.launcher, node.hostname, node.external_id,
                        node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.state, age(node.state_time), locked, node.comment])
+                       node.ssh_port, node.state, age(node.state_time), locked,
+                       node.comment])
     return str(t)
 
 
