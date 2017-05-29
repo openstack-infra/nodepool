@@ -501,6 +501,9 @@ function start_nodepool {
     export STATSD_PORT=8125
     run_process statsd "/usr/bin/socat -u udp-recv:$STATSD_PORT -"
 
+    # Ensure our configuration is valid.
+    $NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG config-validate
+
     run_process nodepool-launcher "$NODEPOOL_INSTALL/bin/nodepool-launcher -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
     run_process nodepool-builder "$NODEPOOL_INSTALL/bin/nodepool-builder -c $NODEPOOL_CONFIG -l $NODEPOOL_LOGGING -d"
     :

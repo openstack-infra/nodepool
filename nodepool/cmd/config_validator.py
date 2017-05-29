@@ -40,6 +40,7 @@ class ConfigValidator:
             'min-ram': int,
             'flavor-name': str,
             'key-name': str,
+            'console-log': bool,
         }
 
         pool_label = v.All(pool_label_main,

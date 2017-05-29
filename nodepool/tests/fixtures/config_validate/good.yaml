@@ -32,6 +32,7 @@ providers:
           - name: trusty
             diskimage: trusty
             min-ram: 8192
+            console-log: True
           - name: trusty-2-node
             diskimage: trusty
             min-ram: 8192
