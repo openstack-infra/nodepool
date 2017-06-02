@@ -353,7 +353,9 @@ class CleanupWorker(BaseWorker):
         for build in builds:
             base = "-".join([image, build.id])
             files = DibImageFile.from_image_id(self._config.imagesdir, base)
-            if files:
+            # If we have local dib files OR if our hostname matches the
+            # recorded owner hostname, consider this our build.
+            if files or (self._hostname == build.builder):
                 ret.append(build)
         return ret
 
