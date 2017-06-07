@@ -189,7 +189,7 @@ class ProviderManager(object):
                      flavor_name=None, min_ram=None,
                      az=None, key_name=None, config_drive=True,
                      nodepool_node_id=None, nodepool_image_name=None,
-                     networks=None):
+                     networks=None, boot_from_volume=False, volume_size=50):
         if not networks:
             networks = []
         if image_name:
@@ -201,6 +201,11 @@ class ProviderManager(object):
                            image=image,
                            flavor=flavor,
                            config_drive=config_drive)
+        if boot_from_volume:
+            create_args['boot_from_volume'] = boot_from_volume
+            create_args['volume_size'] = volume_size
+            # NOTE(pabelanger): Always cleanup volumes when we delete a server.
+            create_args['terminate_volume'] = True
         if key_name:
             create_args['key_name'] = key_name
         if az:
