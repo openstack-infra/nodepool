@@ -19,6 +19,19 @@ and ``providers`` sections::
 The following sections are available.  All are required unless
 otherwise indicated.
 
+.. _webapp-conf:
+
+webapp
+------
+
+Define the webapp endpoint port and listen address.
+
+Example::
+
+  webapp:
+    port: 8005
+    listen_address: '0.0.0.0'
+
 .. _elements-dir:
 
 elements-dir

@@ -103,7 +103,13 @@ class ConfigValidator:
             'env-vars': {str: str},
         }
 
+        webapp = {
+            'port': int,
+            'listen_address': str,
+        }
+
         top_level = {
+            'webapp': webapp,
             'elements-dir': str,
             'images-dir': str,
             'zookeeper-servers': [{

@@ -54,14 +54,17 @@ class Cache(object):
 class WebApp(threading.Thread):
     log = logging.getLogger("nodepool.WebApp")
 
-    def __init__(self, nodepool, port=8005, cache_expiry=1):
+    def __init__(self, nodepool, port=8005, listen_address='0.0.0.0',
+                 cache_expiry=1):
         threading.Thread.__init__(self)
         self.nodepool = nodepool
         self.port = port
+        self.listen_address = listen_address
         self.cache = Cache(cache_expiry)
         self.cache_expiry = cache_expiry
         self.daemon = True
-        self.server = httpserver.serve(dec.wsgify(self.app), host='0.0.0.0',
+        self.server = httpserver.serve(dec.wsgify(self.app),
+                                       host=self.listen_address,
                                        port=self.port, start_loop=False)
 
     def run(self):

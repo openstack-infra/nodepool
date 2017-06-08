@@ -1,6 +1,10 @@
 elements-dir: /etc/nodepool/elements
 images-dir: /opt/nodepool_dib
 
+webapp:
+  port: 8005
+  listen_address: '0.0.0.0'
+
 zookeeper-servers:
   - host: zk1.openstack.org
     port: 2181

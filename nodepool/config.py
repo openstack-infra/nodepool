@@ -150,6 +150,11 @@ def loadConfig(config_path):
 
     newconfig = Config()
     newconfig.db = None
+    newconfig.webapp = {
+        'port': config.get('webapp', {}).get('port', 8005),
+        'listen_address': config.get('webapp', {}).get('listen_address',
+                                                       '0.0.0.0')
+    }
     newconfig.providers = {}
     newconfig.labels = {}
     newconfig.elementsdir = config.get('elements-dir')

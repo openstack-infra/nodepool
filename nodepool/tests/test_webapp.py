@@ -15,6 +15,7 @@
 
 import json
 import logging
+import yaml
 from six.moves.urllib import request
 
 from nodepool import tests
@@ -67,3 +68,9 @@ class TestWebApp(tests.DBTestCase):
         self.assertDictContainsSubset({'id': 'fake-image-0000000001',
                                        'formats': ['qcow2'],
                                        'state': 'ready'}, objs[0])
+
+    def test_webapp_config(self):
+        configfile = self.setup_config('webapp.yaml')
+        config = yaml.safe_load(open(configfile))
+        self.assertEqual(config['webapp']['port'], 8080)
+        self.assertEqual(config['webapp']['listen_address'], '127.0.0.1')
