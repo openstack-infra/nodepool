@@ -185,17 +185,17 @@ class ProviderManager(object):
         with shade_inner_exceptions():
             return self._client.delete_image(name)
 
-    def createServer(self, name, image_id=None, image_name=None,
+    def createServer(self, name, image,
                      flavor_name=None, min_ram=None,
                      az=None, key_name=None, config_drive=True,
                      nodepool_node_id=None, nodepool_image_name=None,
                      networks=None, boot_from_volume=False, volume_size=50):
         if not networks:
             networks = []
-        if image_name:
-            image = self.findImage(image_name)
-        else:
-            image = {'id': image_id}
+        if not isinstance(image, dict):
+            # if it's a dict, we already have the cloud id. If it's not,
+            # we don't know if it's name or ID so need to look it up
+            image = self.findImage(image)
         flavor = self.findFlavor(flavor_name=flavor_name, min_ram=min_ram)
         create_args = dict(name=name,
                            image=image,

@@ -277,7 +277,7 @@ class NodeLauncher(threading.Thread, StatsReporter):
                 )
 
             config_drive = self._diskimage.config_drive
-            image_external_id = cloud_image.external_id
+            image_external = dict(id=cloud_image.external_id)
             image_id = "{path}/{upload_id}".format(
                 path=self._zk._imageUploadPath(cloud_image.image_name,
                                                cloud_image.build_id,
@@ -288,8 +288,14 @@ class NodeLauncher(threading.Thread, StatsReporter):
         else:
             # launch using unmanaged cloud image
             config_drive = self._cloud_image.config_drive
-            image_external_id = self._label.cloud_image
-            image_id = self._label.cloud_image
+
+            # These are different values for zk, but it's all the same
+            # for cloud-images.
+            # image_external is what we use for OpenStack.
+            # image_id is what we record in the node for zk.
+            # image_name is what we log, so matches the config.
+            image_external = self._cloud_image.name
+            image_id = self._cloud_image.name
             image_name = self._cloud_image.name
 
         hostname = self._provider.hostname_format.format(
@@ -308,7 +314,7 @@ class NodeLauncher(threading.Thread, StatsReporter):
 
         server = self._manager.createServer(
             hostname,
-            image_id=image_external_id,
+            image=image_external,
             min_ram=self._label.min_ram,
             flavor_name=self._label.flavor_name,
             key_name=self._label.key_name,
