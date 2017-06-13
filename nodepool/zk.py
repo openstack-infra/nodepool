@@ -413,6 +413,7 @@ class Node(BaseModel):
         self.type = None
         self.allocated_to = None
         self.az = None
+        self.region = None
         self.public_ipv4 = None
         self.private_ipv4 = None
         self.public_ipv6 = None
@@ -441,6 +442,7 @@ class Node(BaseModel):
                     self.type == other.type and
                     self.allocated_to == other.allocated_to and
                     self.az == other.az and
+                    self.region == other.region and
                     self.public_ipv4 == other.public_ipv4 and
                     self.private_ipv4 == other.private_ipv4 and
                     self.public_ipv6 == other.public_ipv6 and
@@ -465,6 +467,7 @@ class Node(BaseModel):
         d['type'] = self.type
         d['allocated_to'] = self.allocated_to
         d['az'] = self.az
+        d['region'] = self.region
         d['public_ipv4'] = self.public_ipv4
         d['private_ipv4'] = self.private_ipv4
         d['public_ipv6'] = self.public_ipv6
@@ -495,6 +498,7 @@ class Node(BaseModel):
         o.type = d.get('type')
         o.allocated_to = d.get('allocated_to')
         o.az = d.get('az')
+        o.region = d.get('region')
         o.public_ipv4 = d.get('public_ipv4')
         o.private_ipv4 = d.get('private_ipv4')
         o.public_ipv6 = d.get('public_ipv6')

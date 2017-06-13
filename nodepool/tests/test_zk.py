@@ -780,6 +780,7 @@ class TestZKModel(tests.BaseTestCase):
         o.type = 'trusty'
         o.allocated_to = '456-789'
         o.az = 'RegionOne'
+        o.region = 'fake-region'
         o.public_ipv4 = '<ipv4>'
         o.private_ipv4 = '<pvt-ipv4>'
         o.public_ipv6 = '<ipv6>'
@@ -799,6 +800,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['type'], o.type)
         self.assertEqual(d['allocated_to'], o.allocated_to)
         self.assertEqual(d['az'], o.az)
+        self.assertEqual(d['region'], o.region)
         self.assertEqual(d['public_ipv4'], o.public_ipv4)
         self.assertEqual(d['private_ipv4'], o.private_ipv4)
         self.assertEqual(d['public_ipv6'], o.public_ipv6)
@@ -820,6 +822,7 @@ class TestZKModel(tests.BaseTestCase):
             'type': 'trusty',
             'allocated_to': '456-789',
             'az': 'RegionOne',
+            'region': 'fake-region',
             'public_ipv4': '<ipv4>',
             'private_ipv4': '<pvt-ipv4>',
             'public_ipv6': '<ipv6>',
@@ -840,6 +843,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.type, d['type'])
         self.assertEqual(o.allocated_to, d['allocated_to'])
         self.assertEqual(o.az, d['az'])
+        self.assertEqual(o.region, d['region'])
         self.assertEqual(o.public_ipv4, d['public_ipv4'])
         self.assertEqual(o.private_ipv4, d['private_ipv4'])
         self.assertEqual(o.public_ipv6, d['public_ipv6'])

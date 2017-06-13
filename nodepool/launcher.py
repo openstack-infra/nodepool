@@ -371,9 +371,11 @@ class NodeLauncher(threading.Thread, StatsReporter):
         self._zk.storeNode(self._node)
 
         self.log.debug(
-            "Node %s is running [az: %s, ip: %s ipv4: %s, ipv6: %s]" %
-            (self._node.id, self._node.az, self._node.interface_ip,
-             self._node.public_ipv4, self._node.public_ipv6))
+            "Node %s is running [region: %s, az: %s, ip: %s ipv4: %s, "
+            "ipv6: %s]" %
+            (self._node.id, self._node.region, self._node.az,
+             self._node.interface_ip, self._node.public_ipv4,
+             self._node.public_ipv6))
 
         # Get the SSH public keys for the new node and record in ZooKeeper
         try:
@@ -723,6 +725,7 @@ class NodeRequestHandler(object):
                 node.provider = self.provider.name
                 node.pool = self.pool.name
                 node.az = self.chosen_az
+                node.region = self.provider.region_name
                 node.launcher = self.launcher_id
                 node.allocated_to = self.request.id
 

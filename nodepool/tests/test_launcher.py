@@ -53,6 +53,7 @@ class TestLauncher(tests.DBTestCase):
             self.assertEqual(node.allocated_to, req.id)
             self.assertEqual(node.state, zk.READY)
             self.assertIsNotNone(node.launcher)
+            self.assertEqual(node.region, 'fake-region')
             self.assertEqual(node.az, "az1")
             p = "{path}/{id}".format(
                 path=self.zk._imageUploadPath(image.image_name,
