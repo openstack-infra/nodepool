@@ -188,7 +188,8 @@ class ProviderManager(object):
     def createServer(self, name, image_id=None, image_name=None,
                      flavor_name=None, min_ram=None,
                      az=None, key_name=None, config_drive=True,
-                     nodepool_node_id=None, nodepool_image_name=None,
+                     nodepool_node_id=None, nodepool_node_label=None,
+                     nodepool_image_name=None,
                      networks=None, boot_from_volume=False, volume_size=50):
         if not networks:
             networks = []
@@ -226,6 +227,8 @@ class ProviderManager(object):
 
         if nodepool_image_name:
             groups_list.append(nodepool_image_name)
+        if nodepool_node_label:
+            groups_list.append(nodepool_node_label)
         meta = dict(
             groups=",".join(groups_list),
             nodepool_provider_name=self.provider.name,
@@ -234,6 +237,8 @@ class ProviderManager(object):
             meta['nodepool_node_id'] = nodepool_node_id
         if nodepool_image_name:
             meta['nodepool_image_name'] = nodepool_image_name
+        if nodepool_node_label:
+            meta['nodepool_node_label'] = nodepool_node_label
         create_args['meta'] = meta
 
         with shade_inner_exceptions():
