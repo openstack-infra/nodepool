@@ -41,6 +41,22 @@ def iterate_timeout(max_seconds, exc, purpose):
     raise exc("Timeout waiting for %s" % purpose)
 
 
+def set_node_ip(node):
+    '''
+    Set the node public_ip
+    '''
+    if 'fake' in node.hostname:
+        return
+    addrinfo = socket.getaddrinfo(node.hostname, node.connection_port)[0]
+    if addrinfo[0] == socket.AF_INET:
+        node.public_ipv4 = addrinfo[4][0]
+    elif addrinfo[0] == socket.AF_INET6:
+        node.public_ipv6 = addrinfo[4][0]
+    else:
+        raise exceptions.LaunchNetworkException(
+            "Unable to find public IP of server")
+
+
 def keyscan(ip, port=22, timeout=60):
     '''
     Scan the IP address for public SSH keys.

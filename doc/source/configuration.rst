@@ -631,3 +631,61 @@ Example configuration::
     When booting an image from volume, how big should the created volume be.
 
     In gigabytes. Default 50.
+
+
+Static driver
+^^^^^^^^^^^^^
+
+The static provider driver is used to define static nodes. Nodes are also
+partitioned into groups called "pools" (see :ref:`static_nodes` for details).
+
+Example::
+
+  providers:
+    - name: static-rack
+      driver: static
+      pools:
+        - name: main
+          nodes:
+            - name: trusty.example.com
+              labels: trusty-static
+              host-key: fake-key
+              timeout: 13
+              ssh-port: 22022
+              username: zuul
+              max-parallel-jobs: 1
+
+.. _static_nodes:
+
+static nodes
+~~~~~~~~~~~~
+
+Each entry in a pool`s nodes section indicates a static node and it's
+corresponding label.
+
+**required**
+
+  ``name``
+  The hostname or ip address of the static node.
+
+  ``labels`` (list)
+  The list of labels associated with the node.
+
+**optional**
+
+  ``username``
+  The username nodepool will use to validate it can connect to the node.
+  Default to *zuul*
+
+  ``timeout``
+  The timeout in second before the ssh ping is considered failed.
+  Default to *5* seconds
+
+  ``host-key``
+  The ssh host key of the node.
+
+  ``ssh-port``
+  The ssh port, default to *22*
+
+  ``max-parallel-jobs``
+  The number of jobs that can run in parallel on this node, default to *1*.
