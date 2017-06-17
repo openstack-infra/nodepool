@@ -24,7 +24,7 @@ import yaml
 from nodepool import config as nodepool_config
 from nodepool import provider_manager
 from nodepool import tests
-from nodepool.provider_manager import shade_inner_exceptions
+from nodepool.driver.openstack.provider import shade_inner_exceptions
 
 
 class TestShadeIntegration(tests.IntegrationTestCase):

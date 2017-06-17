@@ -400,7 +400,7 @@ class TestLauncher(tests.DBTestCase):
         def fail_delete(self, name):
             raise RuntimeError('Fake Error')
 
-        fake_delete = 'nodepool.provider_manager.FakeProvider.deleteServer'
+        fake_delete = 'nodepool.driver.fake.provider.FakeProvider.deleteServer'
         self.useFixture(fixtures.MonkeyPatch(fake_delete, fail_delete))
 
         configfile = self.setup_config('node.yaml')
@@ -412,7 +412,7 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(len(nodes), 1)
 
         self.zk.lockNode(nodes[0], blocking=False)
-        nodepool.launcher.InstanceDeleter.delete(
+        nodepool.launcher.NodeDeleter.delete(
             self.zk, pool.getProviderManager('fake-provider'), nodes[0])
 
         # Make sure our old node is in delete state, even though delete failed
