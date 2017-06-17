@@ -190,17 +190,6 @@ class BaseTestCase(testtools.TestCase):
         self.setUpFakes()
 
     def setUpFakes(self):
-        log = logging.getLogger("nodepool.test")
-        log.debug("set up fakes")
-        fake_client = fakeprovider.FakeOpenStackCloud()
-
-        def get_fake_client(*args, **kwargs):
-            return fake_client
-
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.driver.openstack.provider.OpenStackProvider.'
-            '_getClient',
-            get_fake_client))
         self.useFixture(fixtures.MonkeyPatch(
             'nodepool.launcher._get_one_cloud',
             fakeprovider.fake_get_one_cloud))
