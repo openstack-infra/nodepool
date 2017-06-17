@@ -105,7 +105,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
             return fake_client
 
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.provider_manager.FakeProviderManager._getClient',
+            'nodepool.provider_manager.FakeProvider._getClient',
             get_fake_client))
         self.useFixture(fixtures.MonkeyPatch(
             'nodepool.launcher._get_one_cloud',

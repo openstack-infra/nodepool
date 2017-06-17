@@ -186,8 +186,8 @@ class InstanceDeleter(threading.Thread, StatsReporter):
             node.state = zk.DELETING
             zk_conn.storeNode(node)
             if node.external_id:
-                manager.cleanupServer(node.external_id)
-                manager.waitForServerDeletion(node.external_id)
+                manager.cleanupNode(node.external_id)
+                manager.waitForNodeCleanup(node.external_id)
         except provider_manager.NotFound:
             InstanceDeleter.log.info("Instance %s not found in provider %s",
                                      node.external_id, node.provider)
@@ -412,8 +412,8 @@ class NodeLauncher(threading.Thread, StatsReporter):
                         attempts, self._retries, self._node.id)
                 # If we created an instance, delete it.
                 if self._node.external_id:
-                    self._manager.cleanupServer(self._node.external_id)
-                    self._manager.waitForServerDeletion(self._node.external_id)
+                    self._manager.cleanupNode(self._node.external_id)
+                    self._manager.waitForNodeCleanup(self._node.external_id)
                     self._node.external_id = None
                     self._node.public_ipv4 = None
                     self._node.public_ipv6 = None
@@ -493,7 +493,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
 
             if self.pool.labels[label].cloud_image:
                 img = self.pool.labels[label].cloud_image
-                if not self.manager.getImage(img):
+                if not self.manager.labelReady(img):
                     return False
             else:
                 img = self.pool.labels[label].diskimage.name
@@ -1014,7 +1014,7 @@ class CleanupWorker(BaseCleanupWorker):
         for provider in self._nodepool.config.providers.values():
             manager = self._nodepool.getProviderManager(provider.name)
 
-            for server in manager.listServers():
+            for server in manager.listNodes():
                 meta = server.get('metadata', {})
 
                 if 'nodepool_provider_name' not in meta:
@@ -1334,7 +1334,7 @@ class NodePool(threading.Thread):
             for pool_label in pool.labels.values():
                 if pool_label.cloud_image:
                     manager = self.getProviderManager(pool.provider.name)
-                    if manager.getImage(pool_label.cloud_image):
+                    if manager.labelReady(pool_label.cloud_image):
                         return True
                 elif self.zk.getMostRecentImageUpload(pool_label.diskimage.name,
                                                       pool.provider.name):

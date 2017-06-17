@@ -23,6 +23,42 @@ from nodepool import zk
 
 
 @six.add_metaclass(abc.ABCMeta)
+class Provider(object):
+    """The Provider interface
+
+    The class or instance attribute **name** must be provided as a string.
+
+    """
+    @abc.abstractmethod
+    def start(self):
+        pass
+
+    @abc.abstractmethod
+    def stop(self):
+        pass
+
+    @abc.abstractmethod
+    def join(self):
+        pass
+
+    @abc.abstractmethod
+    def labelReady(self, name):
+        pass
+
+    @abc.abstractmethod
+    def cleanupNode(self, node_id):
+        pass
+
+    @abc.abstractmethod
+    def waitForNodeCleanup(self, node_id):
+        pass
+
+    @abc.abstractmethod
+    def listNodes(self):
+        pass
+
+
+@six.add_metaclass(abc.ABCMeta)
 class NodeRequestHandler(object):
     '''
     Class to process a single node request.

@@ -180,7 +180,7 @@ class NodePoolCmd(NodepoolApp):
             manager = self.pool.getProviderManager(provider)
 
             try:
-                servers = manager.listServers()
+                servers = manager.listNodes()
                 known = set([n.external_id for n in self.zk.nodeIterator()
                              if n.provider == provider.name])
                 for server in servers:
@@ -264,7 +264,7 @@ class NodePoolCmd(NodepoolApp):
         self.zk.lockNode(node, blocking=True, timeout=5)
 
         if self.args.now:
-            manager = provider_manager.get_provider_manager(provider, True)
+            manager = provider_manager.get_provider(provider, True)
             manager.start()
             launcher.InstanceDeleter.delete(self.zk, manager, node)
             manager.stop()

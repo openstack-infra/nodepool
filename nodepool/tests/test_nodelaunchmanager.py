@@ -43,7 +43,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.provider_pool = self.provider.pools['main']
 
         # The builder config does not have a provider manager, so create one.
-        self.pmanager = provider_manager.ProviderManager(self.provider, False)
+        self.pmanager = provider_manager.get_provider(
+            self.provider, False)
         self.pmanager.resetClient()
 
     def test_successful_launch(self):

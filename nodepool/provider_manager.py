@@ -24,6 +24,7 @@ import shade
 
 from nodepool import exceptions
 from nodepool import fakeprovider
+from nodepool.driver import Provider
 from nodepool.nodeutils import iterate_timeout
 from nodepool.task_manager import ManagerStoppedException
 from nodepool.task_manager import TaskManager
@@ -45,11 +46,11 @@ class NotFound(Exception):
     pass
 
 
-def get_provider_manager(provider, use_taskmanager):
+def get_provider(provider, use_taskmanager):
     if provider.name.startswith('fake'):
-        return FakeProviderManager(provider, use_taskmanager)
+        return FakeProvider(provider, use_taskmanager)
     else:
-        return ProviderManager(provider, use_taskmanager)
+        return OpenStackProvider(provider, use_taskmanager)
 
 
 class ProviderManager(object):
@@ -71,7 +72,7 @@ class ProviderManager(object):
                 ProviderManager.log.debug("Creating new ProviderManager object"
                                           " for %s" % p.name)
                 new_config.provider_managers[p.name] = \
-                    get_provider_manager(p, use_taskmanager)
+                    get_provider(p, use_taskmanager)
                 new_config.provider_managers[p.name].start()
 
         for stop_manager in stop_managers:
@@ -82,6 +83,10 @@ class ProviderManager(object):
         for m in config.provider_managers.values():
             m.stop()
             m.join()
+
+
+class OpenStackProvider(Provider):
+    log = logging.getLogger("nodepool.OpenStackProvider")
 
     def __init__(self, provider, use_taskmanager):
         self.provider = provider
@@ -261,7 +266,7 @@ class ProviderManager(object):
                 server=server, auto_ip=True, reuse=False,
                 timeout=timeout)
 
-    def waitForServerDeletion(self, server_id, timeout=600):
+    def waitForNodeCleanup(self, server_id, timeout=600):
         for count in iterate_timeout(
                 timeout, exceptions.ServerDeleteException,
                 "server %s deletion" % server_id):
@@ -314,6 +319,9 @@ class ProviderManager(object):
         with shade_inner_exceptions():
             return self._client.get_image(image_id)
 
+    def labelReady(self, image_id):
+        return self.getImage(image_id)
+
     def uploadImage(self, image_name, filename, image_type=None, meta=None,
             md5=None, sha256=None):
         # configure glance and upload image.  Note the meta flags
@@ -349,7 +357,7 @@ class ProviderManager(object):
         with shade_inner_exceptions():
             return self._client.list_flavors(get_extra=False)
 
-    def listServers(self):
+    def listNodes(self):
         # shade list_servers carries the nodepool server list caching logic
         with shade_inner_exceptions():
             return self._client.list_servers()
@@ -358,7 +366,7 @@ class ProviderManager(object):
         with shade_inner_exceptions():
             return self._client.delete_server(server_id, delete_ips=True)
 
-    def cleanupServer(self, server_id):
+    def cleanupNode(self, server_id):
         server = self.getServer(server_id)
         if not server:
             raise NotFound()
@@ -382,11 +390,11 @@ class ProviderManager(object):
         return self.__azs
 
 
-class FakeProviderManager(ProviderManager):
+class FakeProvider(OpenStackProvider):
     def __init__(self, provider, use_taskmanager):
         self.createServer_fails = 0
         self.__client = fakeprovider.FakeOpenStackCloud()
-        super(FakeProviderManager, self).__init__(provider, use_taskmanager)
+        super(FakeProvider, self).__init__(provider, use_taskmanager)
 
     def _getClient(self):
         return self.__client
@@ -395,4 +403,4 @@ class FakeProviderManager(ProviderManager):
         while self.createServer_fails:
             self.createServer_fails -= 1
             raise Exception("Expected createServer exception")
-        return super(FakeProviderManager, self).createServer(*args, **kwargs)
+        return super(FakeProvider, self).createServer(*args, **kwargs)

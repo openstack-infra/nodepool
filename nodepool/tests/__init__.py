@@ -198,7 +198,7 @@ class BaseTestCase(testtools.TestCase):
             return fake_client
 
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.provider_manager.ProviderManager._getClient',
+            'nodepool.provider_manager.OpenStackProvider._getClient',
             get_fake_client))
         self.useFixture(fixtures.MonkeyPatch(
             'nodepool.launcher._get_one_cloud',
@@ -431,7 +431,7 @@ class DBTestCase(BaseTestCase):
 
     def waitForInstanceDeletion(self, manager, instance_id):
         while True:
-            servers = manager.listServers()
+            servers = manager.listNodes()
             if not (instance_id in [s.id for s in servers]):
                 break
             time.sleep(1)

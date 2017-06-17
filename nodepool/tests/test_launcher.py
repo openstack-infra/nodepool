@@ -400,7 +400,7 @@ class TestLauncher(tests.DBTestCase):
         def fail_delete(self, name):
             raise RuntimeError('Fake Error')
 
-        fake_delete = 'nodepool.provider_manager.FakeProviderManager.deleteServer'
+        fake_delete = 'nodepool.provider_manager.FakeProvider.deleteServer'
         self.useFixture(fixtures.MonkeyPatch(fake_delete, fail_delete))
 
         configfile = self.setup_config('node.yaml')
@@ -439,7 +439,7 @@ class TestLauncher(tests.DBTestCase):
         # Make sure we have a node built and ready
         self.assertEqual(len(nodes), 1)
         manager = pool.getProviderManager('fake-provider')
-        servers = manager.listServers()
+        servers = manager.listNodes()
         self.assertEqual(len(servers), 1)
 
         # Delete the node from ZooKeeper, but leave the instance
@@ -458,7 +458,7 @@ class TestLauncher(tests.DBTestCase):
         self.waitForInstanceDeletion(manager, nodes[0].external_id)
 
         # Make sure we end up with only one server (the replacement)
-        servers = manager.listServers()
+        servers = manager.listNodes()
         self.assertEqual(len(servers), 1)
 
     def test_max_ready_age(self):
