@@ -21,6 +21,7 @@ labels:
 
 providers:
   - name: cloud1
+    driver: openstack
     cloud: vanilla-cloud
     region-name: 'vanilla'
     boot-timeout: 120
@@ -44,6 +45,7 @@ providers:
             volume-size: 100
 
   - name: cloud2
+    driver: openstack
     cloud: chocolate-cloud
     region-name: 'chocolate'
     boot-timeout: 120

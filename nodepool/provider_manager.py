@@ -25,8 +25,10 @@ from nodepool.driver.openstack.provider import OpenStackProvider
 def get_provider(provider, use_taskmanager):
     if provider.name.startswith('fake'):
         return FakeProvider(provider, use_taskmanager)
-    else:
+    elif provider.driver.name == 'openstack':
         return OpenStackProvider(provider, use_taskmanager)
+    else:
+        raise RuntimeError("Unknown provider driver %s" % provider.driver)
 
 
 class ProviderManager(object):

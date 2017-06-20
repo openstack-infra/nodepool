@@ -73,6 +73,7 @@ class ConfigValidator:
 
         provider = {
             'name': str,
+            'driver': str,
             'region-name': str,
             v.Required('cloud'): str,
             'max-concurrency': int,
