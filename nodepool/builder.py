@@ -1127,7 +1127,14 @@ class NodePoolBuilder(object):
         '''
         with self._start_lock:
             self.log.debug("Stopping. NodePoolBuilder shutting down workers")
-            workers = self._build_workers + self._upload_workers
+            # Note we do not add the upload workers to this list intentionally.
+            # The reason for this is that uploads can take many hours and there
+            # is no good way to stop the blocking writes performed by the
+            # uploads in order to join() below on a reasonable amount of time.
+            # Killing the process will stop the upload then both the record
+            # in zk and in the cloud will be deleted by any other running
+            # builders or when this builder starts again.
+            workers = self._build_workers
             if self._janitor:
                 workers += [self._janitor]
             for worker in (workers):
