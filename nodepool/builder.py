@@ -524,7 +524,7 @@ class BuildWorker(BaseWorker):
         for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
-            if not self.running or self._zk.suspended or self._zk.lost:
+            if not self._running or self._zk.suspended or self._zk.lost:
                 return
             try:
                 self._checkImageForScheduledImageUpdates(diskimage)
@@ -591,7 +591,7 @@ class BuildWorker(BaseWorker):
         for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
-            if not self.running or self._zk.suspended or self._zk.lost:
+            if not self._running or self._zk.suspended or self._zk.lost:
                 return
             try:
                 self._checkImageForManualBuildRequest(diskimage)
@@ -892,7 +892,7 @@ class UploadWorker(BaseWorker):
 
                 # Check if we've been told to shutdown
                 # or if ZK connection is suspended
-                if not self.running or self._zk.suspended or self._zk.lost:
+                if not self._running or self._zk.suspended or self._zk.lost:
                     return
                 try:
                     uploaded = self._checkProviderImageUpload(provider, image)
