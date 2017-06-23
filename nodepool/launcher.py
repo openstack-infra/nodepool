@@ -1480,8 +1480,9 @@ class NodePool(threading.Thread):
         '''
 
         # Use a copy of the labels because we modify _submittedRequests
-        # within the loop below.
-        requested_labels = self._submittedRequests.keys()
+        # within the loop below. Note that keys() returns an iterator in
+        # py3, so we need to explicitly make a new list.
+        requested_labels = list(self._submittedRequests.keys())
 
         for label in requested_labels:
             label_requests = self._submittedRequests[label]
