@@ -38,7 +38,6 @@ class NodePoolCmd(NodepoolApp):
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
         parser.add_argument('-s', dest='secure',
-                            default='/etc/nodepool/secure.conf',
                             help='path to secure file')
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='show DEBUG level logging')
