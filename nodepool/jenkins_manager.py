@@ -19,7 +19,7 @@
 import logging
 import re
 
-import myjenkins
+import jenkins
 import fakeprovider
 from task_manager import Task, TaskManager
 
@@ -47,7 +47,7 @@ class CreateNodeTask(Task):
             args['labels'] = self.args['labels']
         try:
             jenkins.create_node(**args)
-        except myjenkins.JenkinsException as e:
+        except jenkins.JenkinsException as e:
             if 'already exists' in str(e):
                 pass
             else:
@@ -96,9 +96,9 @@ class JenkinsManager(TaskManager):
     def _getClient(self):
         if self.target.jenkins_apikey == 'fake':
             return fakeprovider.FakeJenkins(self.target.jenkins_user)
-        return myjenkins.Jenkins(self.target.jenkins_url,
-                                 self.target.jenkins_user,
-                                 self.target.jenkins_apikey)
+        return jenkins.Jenkins(self.target.jenkins_url,
+                               self.target.jenkins_user,
+                               self.target.jenkins_apikey)
 
     def createNode(self, name, host, description, executors, root, labels=[],
                    credentials_id=None, username=None, private_key=None):
