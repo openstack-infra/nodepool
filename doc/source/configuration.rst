@@ -467,11 +467,26 @@ Example configuration::
 
   ``name``
     Identifier to refer this cloud-image from :ref:`labels` section.
+    Since this name appears elsewhere in the nodepool configuration
+    file, you may want to use your own descriptive name here and use
+    one of ``image-id`` or ``image-name`` to specify the cloud image
+    so that if the image name or id changes on the cloud, the impact
+    to your Nodepool configuration will be minimal.  However, if
+    neither of those attributes are provided, this is also assumed to
+    be the image name or ID in the cloud.
 
 **optional**
 
   ``config-drive`` (boolean)
     Whether config drive should be used for the cloud image. Default ``True``
+
+  ``image-id`` (str)
+    If this is provided, it is used to select the image from the cloud
+    provider by ID, rather than name.  Mutually exclusive with ``image-name``.
+
+  ``image-name`` (str)
+    If this is provided, it is used to select the image from the cloud
+    provider by this name or ID.  Mutually exclusive with ``image-id``.
 
 
 .. _pool_labels:

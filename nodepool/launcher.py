@@ -294,7 +294,12 @@ class NodeLauncher(threading.Thread, StatsReporter):
             # image_external is what we use for OpenStack.
             # image_id is what we record in the node for zk.
             # image_name is what we log, so matches the config.
-            image_external = self._cloud_image.name
+            if self._cloud_image.image_id:
+                image_external = dict(id=self._cloud_image.image_id)
+            elif self._cloud_image.image_name:
+                image_external = self._cloud_image.image_name
+            else:
+                image_external = self._cloud_image.name
             image_id = self._cloud_image.name
             image_name = self._cloud_image.name
 
