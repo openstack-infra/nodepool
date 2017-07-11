@@ -197,10 +197,11 @@ EOF
         DIB_DEBOOTSTRAP_EXTRA_ARGS="DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'"
     fi
 
-
     NODEPOOL_CENTOS_7_MIN_READY=1
     NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
+    # TODO(pabelanger): Remove fedora-25 after fedora-26 is online
     NODEPOOL_FEDORA_25_MIN_READY=1
+    NODEPOOL_FEDORA_26_MIN_READY=1
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
 
@@ -212,6 +213,9 @@ EOF
     fi
     if $NODEPOOL_PAUSE_FEDORA_25_DIB ; then
        NODEPOOL_FEDORA_25_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_FEDORA_26_DIB ; then
+       NODEPOOL_FEDORA_26_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB ; then
        NODEPOOL_UBUNTU_TRUSTY_MIN_READY=0
@@ -238,6 +242,8 @@ labels:
     min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
   - name: fedora-25
     min-ready: $NODEPOOL_FEDORA_25_MIN_READY
+  - name: fedora-26
+    min-ready: $NODEPOOL_FEDORA_26_MIN_READY
   - name: ubuntu-trusty
     min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
@@ -257,6 +263,8 @@ providers:
       - name: debian-jessie
         config-drive: true
       - name: fedora-25
+        config-drive: true
+      - name: fedora-26
         config-drive: true
       - name: ubuntu-trusty
         config-drive: true
@@ -278,6 +286,11 @@ providers:
             console-log: True
           - name: fedora-25
             diskimage: fedora-25
+            min-ram: 1024
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: fedora-26
+            diskimage: fedora-26
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
@@ -349,6 +362,26 @@ diskimages:
       - openssh-server
       - nodepool-setup
     release: 25
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: fedora-26
+    pause: $NODEPOOL_PAUSE_FEDORA_26_DIB
+    rebuild-age: 86400
+    elements:
+      - fedora-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: 26
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'

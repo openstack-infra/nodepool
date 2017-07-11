@@ -11,6 +11,7 @@ NODEPOOL="$NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-true}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-true}
 NODEPOOL_PAUSE_FEDORA_25_DIB=${NODEPOOL_PAUSE_FEDORA_25_DIB:-true}
+NODEPOOL_PAUSE_FEDORA_26_DIB=${NODEPOOL_PAUSE_FEDORA_26_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-true}
 
@@ -59,6 +60,13 @@ if [ $NODEPOOL_PAUSE_FEDORA_25_DIB = 'false' ]; then
     waitforimage fedora-25
     # check image was bootable
     waitfornode fedora-25
+fi
+
+if [ $NODEPOOL_PAUSE_FEDORA_26_DIB = 'false' ]; then
+    # check that image built
+    waitforimage fedora-26
+    # check image was bootable
+    waitfornode fedora-26
 fi
 
 if [ $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB = 'false' ]; then
