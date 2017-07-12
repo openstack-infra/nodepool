@@ -59,7 +59,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(configfile, ['image-list'], 6, status, image_cnt)
 
     def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
-        self.assert_listed(configfile, ['list'], 10, status, node_cnt)
+        self.assert_listed(configfile, ['list'], 11, status, node_cnt)
 
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
