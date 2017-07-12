@@ -201,7 +201,6 @@ EOF
     NODEPOOL_CENTOS_7_MIN_READY=1
     NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
     NODEPOOL_FEDORA_25_MIN_READY=1
-    NODEPOOL_UBUNTU_PRECISE_MIN_READY=1
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
 
@@ -213,9 +212,6 @@ EOF
     fi
     if $NODEPOOL_PAUSE_FEDORA_25_DIB ; then
        NODEPOOL_FEDORA_25_MIN_READY=0
-    fi
-    if $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB ; then
-       NODEPOOL_UBUNTU_PRECISE_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB ; then
        NODEPOOL_UBUNTU_TRUSTY_MIN_READY=0
@@ -242,8 +238,6 @@ labels:
     min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
   - name: fedora-25
     min-ready: $NODEPOOL_FEDORA_25_MIN_READY
-  - name: ubuntu-precise
-    min-ready: $NODEPOOL_UBUNTU_PRECISE_MIN_READY
   - name: ubuntu-trusty
     min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
@@ -263,8 +257,6 @@ providers:
       - name: debian-jessie
         config-drive: true
       - name: fedora-25
-        config-drive: true
-      - name: ubuntu-precise
         config-drive: true
       - name: ubuntu-trusty
         config-drive: true
@@ -287,11 +279,6 @@ providers:
           - name: fedora-25
             diskimage: fedora-25
             min-ram: 1024
-            flavor-name: 'nodepool'
-            console-log: True
-          - name: ubuntu-precise
-            diskimage: ubuntu-precise
-            min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
           - name: ubuntu-trusty
@@ -367,29 +354,6 @@ diskimages:
       DIB_CHECKSUM: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
-  - name: ubuntu-precise
-    pause: $NODEPOOL_PAUSE_UBUNTU_PRECISE_DIB
-    rebuild-age: 86400
-    elements:
-      - ubuntu-minimal
-      - vm
-      - simple-init
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: precise
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_APT_LOCAL_CACHE: '0'
-      DIB_DISABLE_APT_CLEANUP: '1'
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      DIB_DEBIAN_COMPONENTS: 'main,universe'
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
