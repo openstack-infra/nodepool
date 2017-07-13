@@ -29,11 +29,19 @@ class CreateNodeTask(Task):
         if 'credentials_id' in self.args:
             launcher_params = {'port': 22,
                                'credentialsId': self.args['credentials_id'],
+                               'sshHostKeyVerificationStrategy':
+                               {'stapler-class':
+                                ('hudson.plugins.sshslaves.verifiers.'
+                                 'NonVerifyingKeyVerificationStrategy')},
                                'host': self.args['host']}
         else:
             launcher_params = {'port': 22,
                                'username': self.args['username'],
                                'privatekey': self.args['private_key'],
+                               'sshHostKeyVerificationStrategy':
+                               {'stapler-class':
+                                ('hudson.plugins.sshslaves.verifiers.'
+                                 'NonVerifyingKeyVerificationStrategy')},
                                'host': self.args['host']}
         args = dict(
             name=self.args['name'],
