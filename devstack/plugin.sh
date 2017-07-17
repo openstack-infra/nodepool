@@ -258,6 +258,11 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
+  - name: opensuse-423
+    image: opensuse-423
+    min-ready: 1
+    providers:
+      - name: devstack
   - name: ubuntu-trusty
     image: ubuntu-trusty
     min-ready: 1
@@ -302,6 +307,13 @@ providers:
         config-drive: true
         key-name: $NODEPOOL_KEY_NAME
       - name: opensuse-42.2
+        min-ram: 1024
+        name-filter: 'nodepool'
+        username: devuser
+        private-key: $NODEPOOL_KEY
+        config-drive: true
+        key-name: $NODEPOOL_KEY_NAME
+      - name: opensuse-423
         min-ram: 1024
         name-filter: 'nodepool'
         username: devuser
@@ -401,6 +413,26 @@ diskimages:
       - openssh-server
       - nodepool-setup
     release: 42.2
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: opensuse-423
+    pause: $NODEPOOL_PAUSE_OPENSUSE_423_DIB
+    rebuild-age: 86400
+    elements:
+      - opensuse-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: 42.3
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
