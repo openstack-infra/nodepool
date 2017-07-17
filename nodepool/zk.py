@@ -189,13 +189,21 @@ class BaseModel(object):
 class ImageBuild(BaseModel):
     '''
     Class representing a DIB image build within the ZooKeeper cluster.
+
+    Note that the 'builder' attribute used to be used to uniquely identify
+    the owner of an image build in ZooKeeper. Because hostname was used, if
+    it ever changed, then we would get orphaned znodes. The 'builder_id'
+    attribute was added as a replacement, keeping 'builder' to mean the
+    same thing (which is why this attribute is not called 'hostname' or
+    similar).
     '''
     VALID_STATES = set([BUILDING, READY, DELETING, FAILED])
 
     def __init__(self, build_id=None):
         super(ImageBuild, self).__init__(build_id)
         self._formats = []
-        self.builder = None          # Builder hostname
+        self.builder = None       # Hostname
+        self.builder_id = None    # Unique ID
 
     def __repr__(self):
         d = self.toDict()
@@ -223,6 +231,8 @@ class ImageBuild(BaseModel):
         d = super(ImageBuild, self).toDict()
         if self.builder is not None:
             d['builder'] = self.builder
+        if self.builder_id is not None:
+            d['builder_id'] = self.builder_id
         if len(self.formats):
             d['formats'] = ','.join(self.formats)
         return d
@@ -240,6 +250,7 @@ class ImageBuild(BaseModel):
         o = ImageBuild(o_id)
         super(ImageBuild, o).fromDict(d)
         o.builder = d.get('builder')
+        o.builder_id = d.get('builder_id')
         # Only attempt the split on non-empty string
         if d.get('formats', ''):
             o.formats = d.get('formats', '').split(',')
