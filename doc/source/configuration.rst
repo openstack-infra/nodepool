@@ -16,6 +16,12 @@ and ``providers`` sections::
   providers:
     ...
 
+.. note:: The builder daemon creates a UUID to uniquely identify itself and
+          to mark image builds in ZooKeeper that it owns. This file will be
+          named ``builder_id.txt`` and will live in the directory named by the
+          :ref:`images-dir` option. If this file does not exist, it will be
+          created on builder startup and a UUID will be created automatically.
+
 The following sections are available.  All are required unless
 otherwise indicated.
 
@@ -45,6 +51,8 @@ that holds one or more elements.
 Example::
 
   elements-dir: /path/to/elements/dir
+
+.. _images-dir:
 
 images-dir
 ----------

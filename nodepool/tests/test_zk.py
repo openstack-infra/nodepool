@@ -127,12 +127,14 @@ class TestZooKeeper(tests.DBTestCase):
         image = "ubuntu-trusty"
         orig_data = zk.ImageBuild()
         orig_data.builder = 'host'
+        orig_data.builder_id = 'ABC-123'
         orig_data.state = zk.READY
         with self.zk.imageBuildLock(image, blocking=True, timeout=1):
             build_num = self.zk.storeBuild(image, orig_data)
 
         data = self.zk.getBuild(image, build_num)
         self.assertEqual(orig_data.builder, data.builder)
+        self.assertEqual(orig_data.builder_id, data.builder_id)
         self.assertEqual(orig_data.state, data.state)
         self.assertEqual(orig_data.state_time, data.state_time)
         self.assertEqual(build_num, data.id)
@@ -666,6 +668,7 @@ class TestZKModel(tests.BaseTestCase):
         o = zk.ImageBuild('0001')
         o.state = zk.BUILDING
         o.builder = 'localhost'
+        o.builder_id = 'ABC-123'
         o.formats = ['qemu', 'raw']
 
         d = o.toDict()
@@ -674,12 +677,14 @@ class TestZKModel(tests.BaseTestCase):
         self.assertIsNotNone(d['state_time'])
         self.assertEqual(','.join(o.formats), d['formats'])
         self.assertEqual(o.builder, d['builder'])
+        self.assertEqual(o.builder_id, d['builder_id'])
 
     def test_ImageBuild_fromDict(self):
         now = int(time.time())
         d_id = '0001'
         d = {
             'builder': 'localhost',
+            'builder_id': 'ABC-123',
             'formats': 'qemu,raw',
             'state': zk.BUILDING,
             'state_time': now
@@ -690,6 +695,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.state, d['state'])
         self.assertEqual(o.state_time, d['state_time'])
         self.assertEqual(o.builder, d['builder'])
+        self.assertEqual(o.builder_id, d['builder_id'])
         self.assertEqual(o.formats, d['formats'].split(','))
 
     def test_ImageUpload_toDict(self):

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import uuid
 import fixtures
 
 from nodepool import builder, exceptions, fakeprovider, tests
@@ -94,6 +95,18 @@ class TestNodePoolBuilder(tests.DBTestCase):
         nb.upload_interval = .1
         nb.start()
         nb.stop()
+
+    def test_builder_id_file(self):
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        path = os.path.join(self._config_images_dir.path, 'builder_id.txt')
+
+        # Validate the unique ID file exists and contents are what we expect
+        self.assertTrue(os.path.exists(path))
+        with open(path, "r") as f:
+            the_id = f.read()
+            obj = uuid.UUID(the_id, version=4)
+            self.assertEqual(the_id, str(obj))
 
     def test_image_upload_fail(self):
         """Test that image upload fails are handled properly."""
