@@ -22,6 +22,7 @@ labels:
 providers:
   - name: fake-provider
     cloud: fake
+    driver: fake
     diskimages:
       - name: fake-nodepool
     pools:

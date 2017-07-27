@@ -32,7 +32,6 @@ import kazoo.client
 import testtools
 
 from nodepool import builder
-from nodepool import fakeprovider
 from nodepool import launcher
 from nodepool import webapp
 from nodepool import zk
@@ -190,9 +189,6 @@ class BaseTestCase(testtools.TestCase):
         self.setUpFakes()
 
     def setUpFakes(self):
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.launcher._get_one_cloud',
-            fakeprovider.fake_get_one_cloud))
         clouds_path = os.path.join(os.path.dirname(__file__),
                                    'fixtures', 'clouds.yaml')
         self.useFixture(fixtures.MonkeyPatch(

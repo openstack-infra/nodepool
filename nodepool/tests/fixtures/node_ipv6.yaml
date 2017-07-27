@@ -16,6 +16,7 @@ labels:
 providers:
   - name: fake-provider1
     cloud: fake
+    driver: fake
     region-name: fake-region
     rate: 0.0001
     diskimages:
@@ -34,6 +35,7 @@ providers:
 
   - name: fake-provider2
     cloud: fake
+    driver: fake
     region-name: fake-region
     rate: 0.0001
     diskimages:

@@ -21,7 +21,6 @@ from six.moves import configparser as ConfigParser
 import time
 import yaml
 
-from nodepool import fakeprovider
 from nodepool import zk
 
 
@@ -204,19 +203,23 @@ def loadConfig(config_path):
         l.pools = []
 
     for provider in config.get('providers', []):
+        provider.setdefault('driver', 'openstack')
+        # Ensure legacy configuration still works when using fake name
+        if provider.get('name', '').startswith('fake'):
+            provider['driver'] = 'fake'
         p = Provider()
         p.name = provider['name']
         p.driver = Driver()
-        p.driver.name = provider.get('driver', 'openstack')
+        p.driver.name = provider['driver']
         p.driver.manage_images = False
         newconfig.providers[p.name] = p
 
         cloud_kwargs = _cloudKwargsFromProvider(provider)
         p.cloud_config = None
         p.image_type = None
-        if p.driver.name == 'openstack':
+        if p.driver.name in ('openstack', 'fake'):
             p.driver.manage_images = True
-            p.cloud_config = _get_one_cloud(cloud_config, cloud_kwargs)
+            p.cloud_config = cloud_config.get_one_cloud(**cloud_kwargs)
             p.image_type = p.cloud_config.config['image_format']
         p.region_name = provider.get('region-name')
         p.max_concurrency = provider.get('max-concurrency', -1)
@@ -311,12 +314,6 @@ def _cloudKwargsFromProvider(provider):
     for arg in ['region-name', 'cloud']:
         if arg in provider:
             cloud_kwargs[arg] = provider[arg]
-
+    if provider['driver'] == 'fake':
+        cloud_kwargs['validate'] = False
     return cloud_kwargs
-
-
-def _get_one_cloud(cloud_config, cloud_kwargs):
-    '''This is a function to allow for overriding it in tests.'''
-    if cloud_kwargs.get('cloud', '').startswith('fake'):
-        return fakeprovider.fake_get_one_cloud(cloud_config, cloud_kwargs)
-    return cloud_config.get_one_cloud(**cloud_kwargs)

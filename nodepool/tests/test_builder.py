@@ -17,7 +17,8 @@ import os
 import uuid
 import fixtures
 
-from nodepool import builder, exceptions, fakeprovider, tests
+from nodepool import builder, exceptions, tests
+from nodepool.driver.fake import provider as fakeprovider
 from nodepool import zk
 
 
@@ -120,9 +121,6 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.useFixture(fixtures.MonkeyPatch(
             'nodepool.driver.fake.provider.FakeProvider._getClient',
             get_fake_client))
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.launcher._get_one_cloud',
-            fakeprovider.fake_get_one_cloud))
 
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

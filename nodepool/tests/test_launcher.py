@@ -19,7 +19,6 @@ import fixtures
 
 from nodepool import tests
 from nodepool import zk
-import nodepool.fakeprovider
 import nodepool.launcher
 
 

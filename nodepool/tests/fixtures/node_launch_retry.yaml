@@ -13,6 +13,7 @@ labels:
 providers:
   - name: fake-provider
     cloud: fake
+    driver: fake
     region-name: fake-region
     launch-retries: 2
     rate: 0.0001

@@ -23,6 +23,7 @@ labels:
 
 providers:
   - name: fake-provider
+    driver: fake
     region-name: 'fake-region'
     diskimages:
       - name: fake-nodepool

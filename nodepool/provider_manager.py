@@ -23,7 +23,7 @@ from nodepool.driver.openstack.provider import OpenStackProvider
 
 
 def get_provider(provider, use_taskmanager):
-    if provider.name.startswith('fake'):
+    if provider.driver.name == 'fake':
         return FakeProvider(provider, use_taskmanager)
     elif provider.driver.name == 'openstack':
         return OpenStackProvider(provider, use_taskmanager)

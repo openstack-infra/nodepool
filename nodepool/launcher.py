@@ -28,6 +28,7 @@ from nodepool import provider_manager
 from nodepool import stats
 from nodepool import config as nodepool_config
 from nodepool import zk
+from nodepool.driver.fake.handler import FakeNodeRequestHandler
 from nodepool.driver.openstack.handler import OpenStackNodeRequestHandler
 
 
@@ -141,7 +142,9 @@ class PoolWorker(threading.Thread):
     #----------------------------------------------------------------
 
     def _get_node_request_handler(self, provider, request):
-        if provider.driver.name == 'openstack':
+        if provider.driver.name == 'fake':
+            return FakeNodeRequestHandler(self, request)
+        elif provider.driver.name == 'openstack':
             return OpenStackNodeRequestHandler(self, request)
         else:
             raise RuntimeError("Unknown provider driver %s" % provider.driver)

@@ -21,6 +21,7 @@ labels:
 
 providers:
   - name: fake-provider
+    driver: fake
     region-name: 'fake-region'
     max-servers: 96
     images:

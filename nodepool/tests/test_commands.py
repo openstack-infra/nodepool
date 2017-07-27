@@ -91,7 +91,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         def fail_list(self):
             raise RuntimeError('Fake list error')
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
+            'nodepool.driver.fake.provider.FakeOpenStackCloud.list_servers',
             fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")
@@ -110,7 +110,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         def fail_list(self):
             raise RuntimeError('Fake list error')
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
+            'nodepool.driver.fake.provider.FakeOpenStackCloud.list_servers',
             fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")

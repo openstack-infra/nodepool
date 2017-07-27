@@ -14,6 +14,7 @@ labels:
 providers:
   - name: fake-provider1
     cloud: fake
+    driver: fake
     rate: 0.0001
     diskimages:
       - name: fake-image1
@@ -31,6 +32,7 @@ providers:
 
   - name: fake-provider2
     cloud: fake
+    driver: fake
     rate: 0.0001
     diskimages:
       - name: fake-image2
