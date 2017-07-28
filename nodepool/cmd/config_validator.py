@@ -14,6 +14,8 @@ import logging
 import voluptuous as v
 import yaml
 
+from nodepool.config import get_provider_config
+
 log = logging.getLogger(__name__)
 
 
@@ -24,71 +26,10 @@ class ConfigValidator:
         self.config_file = config_file
 
     def validate(self):
-        label_min_ram = v.Schema({v.Required('min-ram'): int}, extra=True)
-
-        label_flavor_name = v.Schema({v.Required('flavor-name'): str},
-                                     extra=True)
-
-        label_diskimage = v.Schema({v.Required('diskimage'): str}, extra=True)
-
-        label_cloud_image = v.Schema({v.Required('cloud-image'): str}, extra=True)
-
-        pool_label_main = {
-            v.Required('name'): str,
-            v.Exclusive('diskimage', 'label-image'): str,
-            v.Exclusive('cloud-image', 'label-image'): str,
-            'min-ram': int,
-            'flavor-name': str,
-            'key-name': str,
-            'console-log': bool,
-            'boot-from-volume': bool,
-            'volume-size': int,
-        }
-
-        pool_label = v.All(pool_label_main,
-                           v.Any(label_min_ram, label_flavor_name),
-                           v.Any(label_diskimage, label_cloud_image))
-
-        pool = {
-            'name': str,
-            'networks': [str],
-            'auto-floating-ip': bool,
-            'max-servers': int,
-            'labels': [pool_label],
-            'availability-zones': [str],
-            }
-
-        provider_diskimage = {
-            'name': str,
-            'pause': bool,
-            'meta': dict,
-            'config-drive': bool,
-        }
-
-        provider_cloud_images = {
-            'name': str,
-            'config-drive': bool,
-            v.Exclusive('image-id', 'cloud-image-name-or-id'): str,
-            v.Exclusive('image-name', 'cloud-image-name-or-id'): str,
-        }
-
         provider = {
-            'name': str,
+            'name': v.Required(str),
             'driver': str,
-            'region-name': str,
-            v.Required('cloud'): str,
             'max-concurrency': int,
-            'boot-timeout': int,
-            'launch-timeout': int,
-            'launch-retries': int,
-            'nodepool-id': str,
-            'rate': float,
-            'hostname-format': str,
-            'image-name-format': str,
-            'clean-floating-ips': bool,
-            'pools': [pool],
-            'diskimages': [provider_diskimage],
-            'cloud-images': [provider_cloud_images],
         }
 
         label = {
@@ -122,7 +63,7 @@ class ConfigValidator:
                 'port': int,
                 'chroot': str,
             }],
-            'providers': [provider],
+            'providers': list,
             'labels': [label],
             'diskimages': [diskimage],
         }
@@ -133,3 +74,6 @@ class ConfigValidator:
         # validate the overall schema
         schema = v.Schema(top_level)
         schema(config)
+        for provider_dict in config.get('providers', []):
+            provider_schema = get_provider_config(provider_dict).get_schema()
+            provider_schema.extend(provider)(provider_dict)
