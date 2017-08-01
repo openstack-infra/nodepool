@@ -795,6 +795,7 @@ class TestZKModel(tests.BaseTestCase):
         o.external_id = 'ABCD'
         o.hostname = 'xyz'
         o.comment = 'comment'
+        o.hold_job = 'hold job'
         o.host_keys = ['key1', 'key2']
 
         d = o.toDict()
@@ -815,6 +816,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['external_id'], o.external_id)
         self.assertEqual(d['hostname'], o.hostname)
         self.assertEqual(d['comment'], o.comment)
+        self.assertEqual(d['hold_job'], o.hold_job)
         self.assertEqual(d['host_keys'], o.host_keys)
 
     def test_Node_fromDict(self):
@@ -837,6 +839,7 @@ class TestZKModel(tests.BaseTestCase):
             'external_id': 'ABCD',
             'hostname': 'xyz',
             'comment': 'comment',
+            'hold_job': 'hold job',
             'host_keys': ['key1', 'key2'],
             'ssh_port': 22022,
         }
@@ -859,6 +862,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.external_id, d['external_id'])
         self.assertEqual(o.hostname , d['hostname'])
         self.assertEqual(o.comment , d['comment'])
+        self.assertEqual(o.hold_job, d['hold_job'])
         self.assertEqual(o.host_keys , d['host_keys'])
         self.assertEqual(o.ssh_port , d['ssh_port'])
 
