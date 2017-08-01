@@ -35,7 +35,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         argv.extend(args)
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
-    def assert_listed(self, configfile, cmd, col, val, count):
+    def assert_listed(self, configfile, cmd, col, val, count, col_count=0):
         log = logging.getLogger("tests.PrettyTableMock")
         self.patch_argv("-c", configfile, *cmd)
         with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
@@ -44,6 +44,8 @@ class TestNodepoolCMD(tests.DBTestCase):
             # Find add_rows with the status were looking for
             for args, kwargs in m_add_row.call_args_list:
                 row = args[0]
+                if col_count:
+                    self.assertEquals(len(row), col_count)
                 log.debug(row)
                 if row[col] == val:
                     rows_with_val += 1
@@ -58,8 +60,16 @@ class TestNodepoolCMD(tests.DBTestCase):
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
         self.assert_listed(configfile, ['image-list'], 6, status, image_cnt)
 
-    def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
-        self.assert_listed(configfile, ['list'], 11, status, node_cnt)
+    def assert_nodes_listed(self, configfile, node_cnt, status="ready",
+                            detail=False, validate_col_count=False):
+        cmd = ['list']
+        col_count = 8
+        if detail:
+            cmd += ['--detail']
+            col_count = 15
+        if not validate_col_count:
+            col_count = 0
+        self.assert_listed(configfile, cmd, 5, status, node_cnt, col_count)
 
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
@@ -124,7 +134,18 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes('fake-label')
-        self.assert_nodes_listed(configfile, 1)
+        self.assert_nodes_listed(configfile, 1, detail=False,
+                                 validate_col_count=True)
+
+    def test_list_nodes_detail(self):
+        configfile = self.setup_config('node.yaml')
+        self._useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForNodes('fake-label')
+        self.assert_nodes_listed(configfile, 1, detail=True,
+                                 validate_col_count=True)
 
     def test_config_validate(self):
         config = os.path.join(os.path.dirname(tests.__file__),

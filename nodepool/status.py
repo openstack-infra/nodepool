@@ -29,12 +29,17 @@ def age(timestamp):
     return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
 
-def node_list(zk, node_id=None):
-    t = PrettyTable(["ID", "Provider", "AZ", "Label",
-                     "Launcher", "Hostname", "Server ID",
-                     "Public IPv4", "Private IPv4", "IPv6", "SSH Port",
-                     "State", "Age", "Locked", "Comment"])
+def node_list(zk, node_id=None, detail=False):
+    headers = ["ID", "Provider", "AZ", "Label", "Server ID", "State",
+               "Age", "Locked"]
+    detail_headers = ["Hostname", "Public IPv4", "Private IPv4", "IPv6",
+                      "SSH Port", "Launcher", "Comment"]
+    if detail:
+        headers += detail_headers
+
+    t = PrettyTable(headers)
     t.align = 'l'
+
     if node_id:
         node = zk.getNode(node_id)
         if node:
@@ -46,11 +51,14 @@ def node_list(zk, node_id=None):
             else:
                 zk.unlockNode(node)
 
-            t.add_row([node.id, node.provider, node.az, node.type,
-                       node.launcher, node.hostname, node.external_id,
-                       node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.ssh_port, node.state, age(node.state_time), locked,
-                       node.comment])
+            values = [node.id, node.provider, node.az, node.type,
+                      node.external_id, node.state, age(node.state_time),
+                      locked]
+            if detail:
+                values += [node.hostname, node.public_ipv4, node.private_ipv4,
+                           node.public_ipv6, node.ssh_port, node.launcher,
+                           node.comment]
+            t.add_row(values)
     else:
         for node in zk.nodeIterator():
             locked = "unlocked"
@@ -60,11 +68,15 @@ def node_list(zk, node_id=None):
                 locked = "locked"
             else:
                 zk.unlockNode(node)
-            t.add_row([node.id, node.provider, node.az, node.type,
-                       node.launcher, node.hostname, node.external_id,
-                       node.public_ipv4, node.private_ipv4, node.public_ipv6,
-                       node.ssh_port, node.state, age(node.state_time), locked,
-                       node.comment])
+
+            values = [node.id, node.provider, node.az, node.type,
+                      node.external_id, node.state, age(node.state_time),
+                      locked]
+            if detail:
+                values += [node.hostname, node.public_ipv4, node.private_ipv4,
+                           node.public_ipv6, node.ssh_port, node.launcher,
+                           node.comment]
+            t.add_row(values)
     return str(t)
 
 

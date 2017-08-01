@@ -50,6 +50,9 @@ class NodePoolCmd(NodepoolApp):
 
         cmd_list = subparsers.add_parser('list', help='list nodes')
         cmd_list.set_defaults(func=self.list)
+        cmd_list.add_argument('--detail', action='store_true',
+                              help='Output detailed node info')
+
         cmd_image_list = subparsers.add_parser(
             'image-list', help='list images from providers')
         cmd_image_list.set_defaults(func=self.image_list)
@@ -145,8 +148,10 @@ class NodePoolCmd(NodepoolApp):
             l = logging.getLogger('kazoo')
             l.setLevel(logging.WARNING)
 
-    def list(self, node_id=None):
-        print(status.node_list(self.zk, node_id))
+    def list(self, node_id=None, detail=False):
+        if hasattr(self.args, 'detail'):
+            detail = self.args.detail
+        print(status.node_list(self.zk, node_id, detail))
 
     def dib_image_list(self):
         print(status.dib_image_list(self.zk))
