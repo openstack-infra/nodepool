@@ -231,7 +231,7 @@ uploads will be deleted as well as the files on disk.
 Example configuration::
 
   diskimages:
-    - name: ubuntu-precise
+    - name: precise
       pause: False
       rebuild-age: 86400
       elements:
@@ -252,7 +252,7 @@ Example configuration::
         DIB_APT_LOCAL_CACHE: '0'
         DIB_DISABLE_APT_CLEANUP: '1'
         FS_TYPE: ext3
-    - name: ubuntu-xenial
+    - name: xenial
       pause: True
       rebuild-age: 86400
       formats:
