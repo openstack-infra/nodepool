@@ -33,7 +33,7 @@ def node_list(zk, node_id=None, detail=False):
     headers = ["ID", "Provider", "AZ", "Label", "Server ID", "State",
                "Age", "Locked"]
     detail_headers = ["Hostname", "Public IPv4", "Private IPv4", "IPv6",
-                      "SSH Port", "Hold Job", "Launcher", "Comment"]
+                      "SSH Port", "Launcher", "Hold Job", "Comment"]
     if detail:
         headers += detail_headers
 
