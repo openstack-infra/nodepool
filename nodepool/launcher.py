@@ -128,7 +128,6 @@ class PoolWorker(threading.Thread):
         self.nodepool = nodepool
         self.provider_name = provider_name
         self.pool_name = pool_name
-        self.running = False
         self.paused_handler = None
         self.request_handlers = []
         self.watermark_sleep = nodepool.watermark_sleep
@@ -136,6 +135,11 @@ class PoolWorker(threading.Thread):
         self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
                                          os.getpid(),
                                          self.name)
+        self._death = threading.Event()
+
+    @property
+    def _running(self):
+        return not self._death.is_set()
 
     #----------------------------------------------------------------
     # Private methods
@@ -248,13 +252,15 @@ class PoolWorker(threading.Thread):
         return self.nodepool.getProviderManager(self.provider_name)
 
     def run(self):
-        self.running = True
-
-        while self.running:
+        while self._running:
             # Don't do work if we've lost communication with the ZK cluster
-            while self.zk and (self.zk.suspended or self.zk.lost):
+            while (self._running and self.zk and
+                   (self.zk.suspended or self.zk.lost)):
                 self.log.info("ZooKeeper suspended. Waiting")
-                time.sleep(SUSPEND_WAIT_TIME)
+                self._death.wait(SUSPEND_WAIT_TIME)
+
+            if not self._running:
+                break
 
             # Make sure we're always registered with ZK
             self.zk.registerLauncher(self.launcher_id)
@@ -273,7 +279,7 @@ class PoolWorker(threading.Thread):
                 self._removeCompletedHandlers()
             except Exception:
                 self.log.exception("Error in PoolWorker:")
-            time.sleep(self.watermark_sleep)
+            self._death.wait(self.watermark_sleep)
 
         # Cleanup on exit
         if self.paused_handler:
@@ -288,7 +294,7 @@ class PoolWorker(threading.Thread):
         restart. They will be unlocked and BUILDING in ZooKeeper.
         '''
         self.log.info("%s received stop" % self.name)
-        self.running = False
+        self._death.set()
 
 
 class BaseCleanupWorker(threading.Thread):
@@ -296,7 +302,11 @@ class BaseCleanupWorker(threading.Thread):
         threading.Thread.__init__(self, name=name)
         self._nodepool = nodepool
         self._interval = interval
-        self._running = False
+        self._death = threading.Event()
+
+    @property
+    def _running(self):
+        return not self._death.is_set()
 
     def _deleteInstance(self, node):
         '''
@@ -321,22 +331,25 @@ class BaseCleanupWorker(threading.Thread):
 
     def run(self):
         self.log.info("Starting")
-        self._running = True
 
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
             zk_conn = self._nodepool.getZK()
-            while zk_conn and (zk_conn.suspended or zk_conn.lost):
+            while (self._running and zk_conn and
+                   (zk_conn.suspended or zk_conn.lost)):
                 self.log.info("ZooKeeper suspended. Waiting")
-                time.sleep(SUSPEND_WAIT_TIME)
+                self._death.wait(SUSPEND_WAIT_TIME)
+
+            if not self._running:
+                break
 
             self._run()
-            time.sleep(self._interval)
+            self._death.wait(self._interval)
 
         self.log.info("Stopped")
 
     def stop(self):
-        self._running = False
+        self._death.set()
         self.join()
 
 
@@ -608,7 +621,6 @@ class NodePool(threading.Thread):
         self.watermark_sleep = watermark_sleep
         self.cleanup_interval = 60
         self.delete_interval = 5
-        self._stopped = False
         self.config = None
         self.zk = None
         self.statsd = stats.get_client()
@@ -617,12 +629,15 @@ class NodePool(threading.Thread):
         self._delete_thread = None
         self._wake_condition = threading.Condition()
         self._submittedRequests = {}
+        self._death = threading.Event()
+
+    @property
+    def _running(self):
+        return not self._death.is_set()
 
     def stop(self):
-        self._stopped = True
-        self._wake_condition.acquire()
-        self._wake_condition.notify()
-        self._wake_condition.release()
+        self._death.set()
+
         if self.config:
             provider_manager.ProviderManager.stopProviders(self.config)
 
@@ -824,14 +839,18 @@ class NodePool(threading.Thread):
         '''
         Start point for the NodePool thread.
         '''
-        while not self._stopped:
+        while self._running:
             try:
                 self.updateConfig()
 
                 # Don't do work if we've lost communication with the ZK cluster
-                while self.zk and (self.zk.suspended or self.zk.lost):
+                while (self._running and self.zk and
+                       (self.zk.suspended or self.zk.lost)):
                     self.log.info("ZooKeeper suspended. Waiting")
-                    time.sleep(SUSPEND_WAIT_TIME)
+                    self._death.wait(SUSPEND_WAIT_TIME)
+
+                if not self._running:
+                    break
 
                 self.createMinReady()
 
@@ -876,6 +895,4 @@ class NodePool(threading.Thread):
             except Exception:
                 self.log.exception("Exception in main loop:")
 
-            self._wake_condition.acquire()
-            self._wake_condition.wait(self.watermark_sleep)
-            self._wake_condition.release()
+            self._death.wait(self.watermark_sleep)
