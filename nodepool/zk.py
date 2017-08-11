@@ -419,6 +419,7 @@ class Node(BaseModel):
     def __init__(self, id=None):
         super(Node, self).__init__(id)
         self.lock = None
+        self.cloud = None
         self.provider = None
         self.pool = None
         self.type = None
@@ -448,6 +449,7 @@ class Node(BaseModel):
     def __eq__(self, other):
         if isinstance(other, Node):
             return (self.id == other.id and
+                    self.cloud == other.cloud and
                     self.state == other.state and
                     self.state_time == other.state_time and
                     self.provider == other.provider and
@@ -476,6 +478,7 @@ class Node(BaseModel):
         Convert a Node object's attributes to a dictionary.
         '''
         d = super(Node, self).toDict()
+        d['cloud'] = self.cloud
         d['provider'] = self.provider
         d['pool'] = self.pool
         d['type'] = self.type
@@ -509,6 +512,7 @@ class Node(BaseModel):
         '''
         o = Node(o_id)
         super(Node, o).fromDict(d)
+        o.cloud = d.get('cloud')
         o.provider = d.get('provider')
         o.pool = d.get('pool')
         o.type = d.get('type')

@@ -445,6 +445,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
                 node.provider = self.provider.name
                 node.pool = self.pool.name
                 node.az = self.chosen_az
+                node.cloud = self.provider.cloud_config.name
                 node.region = self.provider.region_name
                 node.launcher = self.launcher_id
                 node.allocated_to = self.request.id
