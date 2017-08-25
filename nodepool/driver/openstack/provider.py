@@ -273,8 +273,20 @@ class OpenStackProvider(Provider):
         with shade_inner_exceptions():
             return self._client.get_image(image_id)
 
-    def labelReady(self, image_id):
-        return self.getImage(image_id)
+    def labelReady(self, label):
+        if not label.cloud_image:
+            return False
+        image = self.getImage(label.cloud_image.external)
+        if not image:
+            self.log.warning(
+                "Provider %s is configured to use %s as the"
+                " cloud-image for label %s and that"
+                " cloud-image could not be found in the"
+                " cloud." % (self.provider.name,
+                             label.cloud_image.external_name,
+                             label.name))
+            return False
+        return True
 
     def uploadImage(self, image_name, filename, image_type=None, meta=None,
             md5=None, sha256=None):

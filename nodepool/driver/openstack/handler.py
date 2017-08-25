@@ -62,7 +62,6 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             self._diskimage = self._provider.diskimages[self._label.diskimage.name]
         else:
             self._diskimage = None
-        self._cloud_image = self._provider.cloud_images.get(self._label.cloud_image, None)
 
     def logConsole(self, server_id, hostname):
         if not self._label.console_log:
@@ -97,22 +96,11 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
 
         else:
             # launch using unmanaged cloud image
-            config_drive = self._cloud_image.config_drive
+            config_drive = self._label.cloud_image.config_drive
 
-            # These are different values for zk, but it's all the same
-            # for cloud-images.
-            # image_external is what we use for OpenStack.
-            # image_id is what we record in the node for zk.
-            # image_name is what we log, so matches the config.
-            image_external = self._cloud_image.name
-            if self._cloud_image.image_id:
-                image_external = dict(id=self._cloud_image.image_id)
-            elif self._cloud_image.image_name:
-                image_external = self._cloud_image.image_name
-            else:
-                image_external = self._cloud_image.name
-            image_id = self._cloud_image.name
-            image_name = self._cloud_image.name
+            image_external = self._label.cloud_image.external
+            image_id = self._label.cloud_image.name
+            image_name = self._label.cloud_image.name
 
             # TODO(tobiash): support username also for unmanaged cloud images
             username = None
@@ -308,13 +296,12 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         for label in self.request.node_types:
 
             if self.pool.labels[label].cloud_image:
-                img = self.pool.labels[label].cloud_image
-                if not self.manager.labelReady(img):
+                if not self.manager.labelReady(self.pool.labels[label]):
                     return False
             else:
-                img = self.pool.labels[label].diskimage.name
-
-                if not self.zk.getMostRecentImageUpload(img, self.provider.name):
+                if not self.zk.getMostRecentImageUpload(
+                        self.pool.labels[label].diskimage.name,
+                        self.provider.name):
                     return False
         return True
 
