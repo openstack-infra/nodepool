@@ -83,6 +83,10 @@ class WebApp(threading.Thread):
             output = status.dib_image_list(self.nodepool.getZK())
         elif path == '/dib-image-list.json':
             output = status.dib_image_list_json(self.nodepool.getZK())
+        elif path == '/node-list':
+            output = status.node_list(self.nodepool.getZK())
+        elif path == '/node-list.json':
+            output = status.node_list_json(self.nodepool.getZK())
         else:
             return None
         return self.cache.put(path, output)

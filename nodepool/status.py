@@ -102,6 +102,10 @@ def node_list(zk, node_id=None, detail=False):
     return str(t)
 
 
+def node_list_json(zk):
+    return json.dumps([node.toDict() for node in zk.nodeIterator()])
+
+
 def dib_image_list(zk):
     t = PrettyTable(["ID", "Image", "Builder", "Formats",
                      "State", "Age"])
