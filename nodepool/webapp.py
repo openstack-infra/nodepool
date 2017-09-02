@@ -87,6 +87,10 @@ class WebApp(threading.Thread):
             output = status.node_list(self.nodepool.getZK())
         elif path == '/node-list.json':
             output = status.node_list_json(self.nodepool.getZK())
+        elif path == '/label-list':
+            output = status.label_list(self.nodepool.getZK())
+        elif path == '/label-list.json':
+            output = status.label_list_json(self.nodepool.getZK())
         else:
             return None
         return self.cache.put(path, output)
