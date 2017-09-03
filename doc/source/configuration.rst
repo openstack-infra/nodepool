@@ -448,7 +448,8 @@ Example configuration::
     provider.
 
   ``config-drive`` (boolean)
-    Whether config drive should be used for the image. Default ``True``
+    Whether config drive should be used for the image. Defaults to unset which
+    will use the cloud's default behavior.
 
   ``meta`` (dict)
     Arbitrary key/value metadata to store for this server using the Nova
@@ -486,7 +487,8 @@ Example configuration::
 **optional**
 
   ``config-drive`` (boolean)
-    Whether config drive should be used for the cloud image. Default ``True``
+    Whether config drive should be used for the cloud image. Defaults to
+    unset which will use the cloud's default behavior.
 
   ``image-id`` (str)
     If this is provided, it is used to select the image from the cloud
