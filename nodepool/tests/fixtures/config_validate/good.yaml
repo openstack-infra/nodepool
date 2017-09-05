@@ -57,6 +57,8 @@ providers:
     cloud-images:
       - name: trusty-unmanaged
         config-drive: true
+      - name: windows-unmanaged
+        username: winzuul
     pools:
       - name: main
         max-servers: 184

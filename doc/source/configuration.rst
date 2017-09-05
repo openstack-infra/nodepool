@@ -533,6 +533,8 @@ Example configuration::
     If this is provided, it is used to select the image from the cloud
     provider by this name or ID.  Mutually exclusive with ``image-id``.
 
+  ``username`` (str)
+    The username that a consumer should use when connecting onto the node.
 
 .. _pool_labels:
 

@@ -148,6 +148,7 @@ class OpenStackProviderConfig(ProviderConfig):
             i.config_drive = image.get('config-drive', None)
             i.image_id = image.get('image-id', None)
             i.image_name = image.get('image-name', None)
+            i.username = image.get('username', None)
             self.cloud_images[i.name] = i
 
         self.pools = {}
@@ -207,6 +208,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'config-drive': bool,
             v.Exclusive('image-id', 'cloud-image-name-or-id'): str,
             v.Exclusive('image-name', 'cloud-image-name-or-id'): str,
+            'username': str,
         }
 
         pool_label_main = {
