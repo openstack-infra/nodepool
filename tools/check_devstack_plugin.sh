@@ -10,9 +10,7 @@ NODEPOOL="$NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE
 # defaults.
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-true}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-true}
-NODEPOOL_PAUSE_FEDORA_25_DIB=${NODEPOOL_PAUSE_FEDORA_25_DIB:-true}
 NODEPOOL_PAUSE_FEDORA_26_DIB=${NODEPOOL_PAUSE_FEDORA_26_DIB:-true}
-NODEPOOL_PAUSE_OPENSUSE_42_2_DIB=${NODEPOOL_PAUSE_OPENSUSE_42_2_DIB:-true}
 NODEPOOL_PAUSE_OPENSUSE_423_DIB=${NODEPOOL_PAUSE_OPENSUSE_423_DIB:-true}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-false}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-true}
@@ -69,15 +67,6 @@ if [ $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB = 'false' ]; then
     sshintonode debian-jessie
 fi
 
-if [ $NODEPOOL_PAUSE_FEDORA_25_DIB = 'false' ]; then
-    # check that image built
-    waitforimage fedora-25
-    # check image was bootable
-    waitfornode fedora-25
-    # check ssh for root user
-    sshintonode fedora-25
-fi
-
 if [ $NODEPOOL_PAUSE_FEDORA_26_DIB = 'false' ]; then
     # check that image built
     waitforimage fedora-26
@@ -85,15 +74,6 @@ if [ $NODEPOOL_PAUSE_FEDORA_26_DIB = 'false' ]; then
     waitfornode fedora-26
     # check ssh for root user
     sshintonode fedora-26
-fi
-
-if [ $NODEPOOL_PAUSE_OPENSUSE_42_2_DIB = 'false' ]; then
-    # check that image built
-    waitforimage opensuse-42.2
-    # check image was bootable
-    waitfornode opensuse-42.2
-    # check ssh for root user
-    sshintonode opensuse-42.2
 fi
 
 if [ $NODEPOOL_PAUSE_OPENSUSE_423_DIB = 'false' ]; then

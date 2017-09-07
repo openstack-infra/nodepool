@@ -248,18 +248,8 @@ labels:
     min-ready: 1
     providers:
       - name: devstack
-  - name: fedora-25
-    image: fedora-25
-    min-ready: 1
-    providers:
-      - name: devstack
   - name: fedora-26
     image: fedora-26
-    min-ready: 1
-    providers:
-      - name: devstack
-  - name: opensuse-42.2
-    image: opensuse-42.2
     min-ready: 1
     providers:
       - name: devstack
@@ -304,21 +294,7 @@ providers:
         private-key: $NODEPOOL_KEY
         config-drive: true
         key-name: $NODEPOOL_KEY_NAME
-      - name: fedora-25
-        min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
-        config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
       - name: fedora-26
-        min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
-        config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
-      - name: opensuse-42.2
         min-ram: 1024
         name-filter: 'nodepool'
         username: devuser
@@ -393,27 +369,6 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
-  - name: fedora-25
-    pause: $NODEPOOL_PAUSE_FEDORA_25_DIB
-    rebuild-age: 86400
-    elements:
-      - fedora-minimal
-      - vm
-      - simple-init
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: 25
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      $DIB_DISTRIBUTION_MIRROR_FEDORA
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
   - name: fedora-26
     pause: $NODEPOOL_PAUSE_FEDORA_26_DIB
     rebuild-age: 86400
@@ -431,26 +386,6 @@ diskimages:
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_DISTRIBUTION_MIRROR_FEDORA
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
-  - name: opensuse-42.2
-    pause: $NODEPOOL_PAUSE_OPENSUSE_42_2_DIB
-    rebuild-age: 86400
-    elements:
-      - opensuse-minimal
-      - vm
-      - simple-init
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: 42.2
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
