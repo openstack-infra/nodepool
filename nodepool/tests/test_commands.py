@@ -66,7 +66,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         col_count = 8
         if detail:
             cmd += ['--detail']
-            col_count = 16
+            col_count = 17
         if not validate_col_count:
             col_count = 0
         self.assert_listed(configfile, cmd, 5, status, node_cnt, col_count)

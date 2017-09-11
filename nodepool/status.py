@@ -76,7 +76,7 @@ def node_list(zk, node_id=None, detail=False):
             if detail:
                 values += [node.hostname, node.public_ipv4, node.private_ipv4,
                            node.public_ipv6, node.ssh_port, node.launcher,
-                           node.hold_job, node.comment]
+                           node.allocated_to, node.hold_job, node.comment]
             t.add_row(values)
     return str(t)
 
