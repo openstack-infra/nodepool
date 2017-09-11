@@ -33,7 +33,8 @@ def node_list(zk, node_id=None, detail=False):
     headers = ["ID", "Provider", "AZ", "Label", "Server ID", "State",
                "Age", "Locked"]
     detail_headers = ["Hostname", "Public IPv4", "Private IPv4", "IPv6",
-                      "SSH Port", "Launcher", "Hold Job", "Comment"]
+                      "SSH Port", "Launcher", "Allocated To", "Hold Job",
+                      "Comment"]
     if detail:
         headers += detail_headers
 
@@ -57,7 +58,7 @@ def node_list(zk, node_id=None, detail=False):
             if detail:
                 values += [node.hostname, node.public_ipv4, node.private_ipv4,
                            node.public_ipv6, node.ssh_port, node.launcher,
-                           node.hold_job, node.comment]
+                           node.allocated_to, node.hold_job, node.comment]
             t.add_row(values)
     else:
         for node in zk.nodeIterator():
