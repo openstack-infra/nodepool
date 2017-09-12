@@ -445,6 +445,7 @@ class Node(BaseModel):
         self.comment = None
         self.hold_job = None
         self.username = None
+        self.connection_type = None
         self.host_keys = []
 
     def __repr__(self):
@@ -477,6 +478,7 @@ class Node(BaseModel):
                     self.comment == other.comment and
                     self.hold_job == other.hold_job and
                     self.username == other.username and
+                    self.connection_type == other.connection_type and
                     self.host_keys == other.host_keys)
         else:
             return False
@@ -510,6 +512,7 @@ class Node(BaseModel):
         d['hold_job'] = self.hold_job
         d['host_keys'] = self.host_keys
         d['username'] = self.username
+        d['connection_type'] = self.connection_type
         return d
 
     @staticmethod
@@ -544,6 +547,7 @@ class Node(BaseModel):
         o.comment = d.get('comment')
         o.hold_job = d.get('hold_job')
         o.username = d.get('username', 'zuul')
+        o.connection_type = d.get('connection_type')
         o.host_keys = d.get('host_keys', [])
         return o
 

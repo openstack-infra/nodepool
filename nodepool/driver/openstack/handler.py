@@ -93,6 +93,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
                 upload_id=cloud_image.id)
             image_name = self._diskimage.name
             username = cloud_image.username
+            connection_type = self._diskimage.connection_type
 
         else:
             # launch using unmanaged cloud image
@@ -102,6 +103,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             image_id = self._label.cloud_image.name
             image_name = self._label.cloud_image.name
             username = self._label.cloud_image.username
+            connection_type = self._label.cloud_image.connection_type
 
         hostname = self._provider.hostname_format.format(
             label=self._label, provider=self._provider, node=self._node
@@ -137,6 +139,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         self._node.image_id = image_id
         if username:
             self._node.username = username
+        self._node.connection_type = connection_type
 
         # Checkpoint save the updated node info
         self._zk.storeNode(self._node)

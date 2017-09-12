@@ -54,11 +54,13 @@ providers:
     diskimages:
       - name: trusty
         pause: False
+        connection-type: ssh
     cloud-images:
       - name: trusty-unmanaged
         config-drive: true
       - name: windows-unmanaged
         username: winzuul
+        connection-type: winrm
     pools:
       - name: main
         max-servers: 184

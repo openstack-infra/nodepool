@@ -469,6 +469,8 @@ Example configuration::
       meta:
           key: value
           key2: value
+    - name: windows
+      connection-type: winrm
 
 **required**
 
@@ -491,6 +493,11 @@ Example configuration::
     metadata service. A maximum of five entries is allowed, and both keys and
     values must be 255 characters or less.
 
+  ``connection-type`` (string)
+    The connection type that a consumer should use when connecting onto the
+    node. For most diskimages this is not necessary. However when creating
+    Windows images this could be 'winrm' to enable access via ansible.
+
 
 .. _provider_cloud_images:
 
@@ -506,6 +513,8 @@ Example configuration::
   cloud-images:
     - name: trusty-external
       config-drive: False
+    - name: windows-external
+      connection-type: winrm
 
 **required**
 
@@ -535,6 +544,11 @@ Example configuration::
 
   ``username`` (str)
     The username that a consumer should use when connecting onto the node.
+
+  ``connection-type`` (str)
+    The connection type that a consumer should use when connecting onto the
+    node. For most diskimages this is not necessary. However when creating
+    Windows images this could be 'winrm' to enable access via ansible.
 
 .. _pool_labels:
 

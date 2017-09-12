@@ -126,6 +126,7 @@ class OpenStackProviderConfig(ProviderConfig):
             diskimage.image_types.add(self.image_type)
             i.pause = bool(image.get('pause', False))
             i.config_drive = image.get('config-drive', None)
+            i.connection_type = image.get('connection-type', 'ssh')
 
             # This dict is expanded and used as custom properties when
             # the image is uploaded.
@@ -149,6 +150,7 @@ class OpenStackProviderConfig(ProviderConfig):
             i.image_id = image.get('image-id', None)
             i.image_name = image.get('image-name', None)
             i.username = image.get('username', None)
+            i.connection_type = image.get('connection-type', 'ssh')
             self.cloud_images[i.name] = i
 
         self.pools = {}
@@ -201,11 +203,13 @@ class OpenStackProviderConfig(ProviderConfig):
             'pause': bool,
             'meta': dict,
             'config-drive': bool,
+            'connection-type': str,
         }
 
         provider_cloud_images = {
             'name': str,
             'config-drive': bool,
+            'connection-type': str,
             v.Exclusive('image-id', 'cloud-image-name-or-id'): str,
             v.Exclusive('image-name', 'cloud-image-name-or-id'): str,
             'username': str,

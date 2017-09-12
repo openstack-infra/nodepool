@@ -57,6 +57,7 @@ class TestLauncher(tests.DBTestCase):
             self.assertEqual(node.region, 'fake-region')
             self.assertEqual(node.az, "az1")
             self.assertEqual(node.username, "zuul")
+            self.assertEqual(node.connection_type, 'ssh')
             p = "{path}/{id}".format(
                 path=self.zk._imageUploadPath(image.image_name,
                                               image.build_id,
@@ -659,6 +660,7 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label-windows')
         self.assertEqual(len(nodes), 1)
         self.assertEqual('zuul', nodes[0].username)
+        self.assertEqual('winrm', nodes[0].connection_type)
 
     def test_unmanaged_image_provider_name(self):
         """
