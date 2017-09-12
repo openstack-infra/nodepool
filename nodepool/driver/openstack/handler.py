@@ -226,7 +226,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
                     self._node.external_id = None
                     self._node.public_ipv4 = None
                     self._node.public_ipv6 = None
-                    self._node.inerface_ip = None
+                    self._node.interface_ip = None
                     self._zk.storeNode(self._node)
                 if attempts == self._retries:
                     raise
