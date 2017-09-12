@@ -212,7 +212,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             try:
                 self._launchNode()
                 break
-            except Exception:
+            except Exception as e:
                 if attempts <= self._retries:
                     self.log.exception(
                         "Launch attempt %d/%d failed for node %s:",
@@ -228,7 +228,18 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
                     self._zk.storeNode(self._node)
                 if attempts == self._retries:
                     raise
-                attempts += 1
+                # Don't count launch attempts caused by quota exceeded. These
+                # are transient and should occur only if the quota available
+                # to nodepool gets reduced. In this case directly invalidate
+                # the quota cache such that the available quota is recalculated
+                # for the next node request. Also sleep for a while before
+                # retrying to relaunch this node.
+                if 'quota exceeded' in str(e).lower():
+                    self.log.info("Quota exceeded, invalidating quota cache")
+                    self._provider.invalidateQuotaCache()
+                    time.sleep(5)
+                else:
+                    attempts += 1
 
         self._node.state = zk.READY
         self._zk.storeNode(self._node)
