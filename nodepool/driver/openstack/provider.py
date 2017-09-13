@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import logging
 from contextlib import contextmanager
 import operator
+import time
 
 import shade
 
@@ -28,6 +30,7 @@ from nodepool.task_manager import TaskManager
 
 
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
+MAX_QUOTA_AGE = 5 * 60  # How long to keep the quota information cached
 
 
 @contextmanager
@@ -37,6 +40,68 @@ def shade_inner_exceptions():
     except shade.OpenStackCloudException as e:
         e.log_error()
         raise
+
+
+class QuotaInformation:
+
+    def __init__(self, cores=None, instances=None, ram=None, default=0):
+        '''
+        Initializes the quota information with some values. None values will
+        be initialized with default which will be typically 0 or math.inf
+        indicating an infinite limit.
+
+        :param cores:
+        :param instances:
+        :param ram:
+        :param default:
+        '''
+        self.quota = {
+            'compute': {
+                'cores': self._get_default(cores, default),
+                'instances': self._get_default(instances, default),
+                'ram': self._get_default(ram, default),
+            }
+        }
+
+    @staticmethod
+    def construct_from_flavor(flavor):
+        return QuotaInformation(instances=1,
+                                cores=flavor.vcpus,
+                                ram=flavor.ram)
+
+    @staticmethod
+    def construct_from_limits(limits):
+        return QuotaInformation(instances=limits.max_total_instances,
+                                cores=limits.max_total_cores,
+                                ram=limits.max_total_ram_size)
+
+    def _get_default(self, value, default):
+        return value if value is not None else default
+
+    def _add_subtract(self, other, add=True):
+        for category in self.quota.keys():
+            for resource in self.quota[category].keys():
+                second_value = other.quota.get(category, {}).get(resource, 0)
+                if add:
+                    self.quota[category][resource] += second_value
+                else:
+                    self.quota[category][resource] -= second_value
+
+    def subtract(self, other):
+        self._add_subtract(other, add=False)
+
+    def add(self, other):
+        self._add_subtract(other, True)
+
+    def non_negative(self):
+        for key_i, category in self.quota.items():
+            for resource, value in category.items():
+                if value < 0:
+                    return False
+        return True
+
+    def __str__(self):
+        return str(self.quota)
 
 
 class OpenStackProvider(Provider):
@@ -50,6 +115,7 @@ class OpenStackProvider(Provider):
         self.__azs = None
         self._use_taskmanager = use_taskmanager
         self._taskmanager = None
+        self._current_nodepool_quota = None
 
     def start(self):
         if self._use_taskmanager:
@@ -81,6 +147,98 @@ class OpenStackProvider(Provider):
             cloud_config=self.provider.cloud_config,
             manager=manager,
             **self.provider.cloud_config.config)
+
+    def quotaNeededByNodeType(self, ntype, pool):
+        provider_label = pool.labels[ntype]
+
+        flavor = self.findFlavor(provider_label.flavor_name,
+                                 provider_label.min_ram)
+
+        return QuotaInformation.construct_from_flavor(flavor)
+
+    def estimatedNodepoolQuota(self):
+        '''
+        Determine how much quota is available for nodepool managed resources.
+        This needs to take into account the quota of the tenant, resources
+        used outside of nodepool and the currently used resources by nodepool,
+        max settings in nodepool config. This is cached for MAX_QUOTA_AGE
+        seconds.
+
+        :return: Total amount of resources available which is currently
+                 available to nodepool including currently existing nodes.
+        '''
+
+        if self._current_nodepool_quota:
+            now = time.monotonic()
+            if now < self._current_nodepool_quota['timestamp'] + MAX_QUOTA_AGE:
+                return copy.deepcopy(self._current_nodepool_quota['quota'])
+
+        self.log.debug("Updating quota information")
+
+        with shade_inner_exceptions():
+            limits = self._client.get_compute_limits()
+
+        # This is initialized with the full tenant quota and later becomes
+        # the quota available for nodepool.
+        nodepool_quota = QuotaInformation.construct_from_limits(limits)
+
+        # Subtract the unmanaged quota usage from nodepool_max
+        # to get the quota available for us.
+        nodepool_quota.subtract(self.unmanagedQuotaUsed())
+
+        self._current_nodepool_quota = {
+            'quota': nodepool_quota,
+            'timestamp': time.monotonic()
+        }
+
+        quota = self._current_nodepool_quota['quota']
+        self.log.debug("Available nodepool quota: %s", quota)
+
+        return copy.deepcopy(self._current_nodepool_quota['quota'])
+
+    def estimatedNodepoolQuotaUsed(self, zk, pool=None):
+        '''
+        Sums up the quota used (or planned) currently by nodepool. If pool is
+        given it is filtered by the pool.
+
+        :param zk: the object to access zookeeper
+        :param pool: If given, filtered by the pool.
+        :return: Calculated quota in use by nodepool
+        '''
+        used_quota = QuotaInformation()
+
+        for node in zk.nodeIterator():
+            if node.provider == self.provider.name:
+                if pool and not node.pool == pool.name:
+                    continue
+                node_resources = self.quotaNeededByNodeType(
+                    node.type, self.provider.pools.get(node.pool))
+                used_quota.add(node_resources)
+        return used_quota
+
+    def unmanagedQuotaUsed(self):
+        '''
+        Sums up the quota used by servers unmanaged by nodepool.
+
+        :return: Calculated quota in use by unmanaged servers
+        '''
+        flavors = self.listFlavorsById()
+        used_quota = QuotaInformation()
+
+        for server in self.listNodes():
+            meta = server.get('metadata', {})
+
+            nodepool_provider_name = meta.get('nodepool_provider_name')
+            if nodepool_provider_name and \
+                    nodepool_provider_name == self.provider.name:
+                # This provider (regardless of the launcher) owns this server
+                # so it must not be accounted for unmanaged quota.
+                continue
+
+            flavor = flavors.get(server.flavor.id)
+            used_quota.add(QuotaInformation.construct_from_flavor(flavor))
+
+        return used_quota
 
     def resetClient(self):
         self._client = self._getClient()
@@ -322,6 +480,13 @@ class OpenStackProvider(Provider):
     def listFlavors(self):
         with shade_inner_exceptions():
             return self._client.list_flavors(get_extra=False)
+
+    def listFlavorsById(self):
+        with shade_inner_exceptions():
+            flavors = {}
+            for flavor in self._client.list_flavors(get_extra=False):
+                flavors[flavor.id] = flavor
+        return flavors
 
     def listNodes(self):
         # shade list_servers carries the nodepool server list caching logic

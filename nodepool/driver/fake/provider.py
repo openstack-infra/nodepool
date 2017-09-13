@@ -63,6 +63,10 @@ class Dummy(object):
         setattr(self, key, value)
 
 
+def get_fake_quota():
+    return 100, 20, 1000000
+
+
 class FakeOpenStackCloud(object):
     log = logging.getLogger("nodepool.FakeOpenStackCloud")
 
@@ -87,10 +91,13 @@ class FakeOpenStackCloud(object):
                              name='fake-ipv6-network-name')]
         self.networks = networks
         self._flavor_list = [
-            Dummy(Dummy.FLAVOR, id='f1', ram=8192, name='Fake Flavor'),
-            Dummy(Dummy.FLAVOR, id='f2', ram=8192, name='Unreal Flavor'),
+            Dummy(Dummy.FLAVOR, id='f1', ram=8192, name='Fake Flavor',
+                  vcpus=4),
+            Dummy(Dummy.FLAVOR, id='f2', ram=8192, name='Unreal Flavor',
+                  vcpus=4),
         ]
         self._server_list = []
+        self.max_cores, self.max_instances, self.max_ram = get_fake_quota()
 
     def _get(self, name_or_id, instance_list):
         self.log.debug("Get %s in %s" % (name_or_id, repr(instance_list)))
@@ -240,6 +247,17 @@ class FakeOpenStackCloud(object):
 
     def list_availability_zone_names(self):
         return ['fake-az1', 'fake-az2']
+
+    def get_compute_limits(self):
+        return Dummy(
+            'limits',
+            max_total_cores=self.max_cores,
+            max_total_instances=self.max_instances,
+            max_total_ram_size=self.max_ram,
+            total_cores_used=4 * len(self._server_list),
+            total_instances_used=len(self._server_list),
+            total_ram_used=8192 * len(self._server_list)
+        )
 
 
 class FakeUploadFailCloud(FakeOpenStackCloud):
