@@ -419,10 +419,13 @@ Example::
 
   ``name``
 
-  ``max-servers``
-    Maximum number of servers spawnable from this pool.
 
 **optional**
+
+  ``max-servers``
+    Maximum number of servers spawnable from this pool. This can be used to
+    limit the number of servers. If not defined nodepool can create as many
+    servers the tenant allows.
 
   ``availability-zones`` (list)
     A list of availability zones to use.

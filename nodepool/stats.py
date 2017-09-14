@@ -133,5 +133,6 @@ class StatsReporter(object):
 
         #nodepool.provider.PROVIDER.max_servers
         key = 'nodepool.provider.%s.max_servers' % provider.name
-        max_servers = sum([p.max_servers for p in provider.pools.values()])
+        max_servers = sum([p.max_servers for p in provider.pools.values()
+                           if p.max_servers])
         self._statsd.gauge(key, max_servers)
