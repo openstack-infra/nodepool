@@ -356,6 +356,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         # to math.inf representing infinity that can be calculated with.
         pool_quota = QuotaInformation(cores=self.pool.max_cores,
                                       instances=self.pool.max_servers,
+                                      ram=self.pool.max_ram,
                                       default=math.inf)
         pool_quota.subtract(
             self.manager.estimatedNodepoolQuotaUsed(self.zk, self.pool))
@@ -388,6 +389,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         # to math.inf representing infinity that can be calculated with.
         pool_quota = QuotaInformation(cores=self.pool.max_cores,
                                       instances=self.pool.max_servers,
+                                      ram=self.pool.max_ram,
                                       default=math.inf)
         pool_quota.subtract(needed_quota)
         return pool_quota.non_negative()
