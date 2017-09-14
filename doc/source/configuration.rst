@@ -422,6 +422,11 @@ Example::
 
 **optional**
 
+  ``max-cores``
+    Maximum number of cores usable from this pool. This can be used to limit
+    usage of the tenant. If not defined nodepool can use all cores up to the
+    quota of the tenant.
+
   ``max-servers``
     Maximum number of servers spawnable from this pool. This can be used to
     limit the number of servers. If not defined nodepool can create as many

@@ -61,6 +61,7 @@ class ProviderLabel(ConfigValue):
 class ProviderPool(ConfigValue):
     def __eq__(self, other):
         if (other.labels != self.labels or
+            other.max_cores != self.max_cores or
             other.max_servers != self.max_servers or
             other.azs != self.azs or
             other.networks != self.networks):
@@ -156,6 +157,7 @@ class OpenStackProviderConfig(ProviderConfig):
             pp.name = pool['name']
             pp.provider = self
             self.pools[pp.name] = pp
+            pp.max_cores = pool.get('max-cores', None)
             pp.max_servers = pool.get('max-servers', None)
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
@@ -238,6 +240,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'name': str,
             'networks': [str],
             'auto-floating-ip': bool,
+            'max-cores': int,
             'max-servers': int,
             'labels': [pool_label],
             'availability-zones': [str],
