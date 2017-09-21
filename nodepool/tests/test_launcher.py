@@ -156,6 +156,13 @@ class TestLauncher(tests.DBTestCase):
         while len(client._server_list) < 2:
             time.sleep(0.1)
 
+        # Wait until there is a paused request handler and check if there
+        # are exactly two servers
+        pool_worker = pool.getPoolWorkers('fake-provider')
+        while not pool_worker[0].paused_handler:
+            time.sleep(0.1)
+        self.assertEqual(len(client._server_list), 2)
+
         # Allow the servers to finish being created.
         for server in client._server_list:
             server.event.set()
