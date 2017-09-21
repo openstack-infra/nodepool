@@ -761,11 +761,6 @@ class NodePool(threading.Thread):
                     return True
         return False
 
-        for provider_name in label.providers.keys():
-            if self.zk.getMostRecentImageUpload(label.image, provider_name):
-                return True
-        return False
-
     def createMinReady(self):
         '''
         Create node requests to make the minimum amount of ready nodes.
