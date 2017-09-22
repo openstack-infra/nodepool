@@ -265,10 +265,14 @@ class NodePoolCmd(NodepoolApp):
             print("Node id %s not found" % self.args.id)
             return
 
-        provider = self.pool.config.providers[node.provider]
         self.zk.lockNode(node, blocking=True, timeout=5)
 
         if self.args.now:
+            if node.provider not in self.pool.config.providers:
+                print("Provider %s for node %s not defined on this launcher" %
+                      (node.provider, node.id))
+                return
+            provider = self.pool.config.providers[node.provider]
             manager = provider_manager.get_provider(provider, True)
             manager.start()
             launcher.NodeDeleter.delete(self.zk, manager, node)
