@@ -73,6 +73,39 @@ class TestLauncher(tests.DBTestCase):
         self.assertReportedStat('nodepool.nodes.ready', '1|g')
         self.assertReportedStat('nodepool.nodes.building', '0|g')
 
+    def test_node_assignment_order(self):
+        """Test that nodes are assigned in the order requested"""
+        configfile = self.setup_config('node_many_labels.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.waitForNodes('fake-label1')
+        self.waitForNodes('fake-label2')
+        self.waitForNodes('fake-label3')
+        self.waitForNodes('fake-label4')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label3')
+        req.node_types.append('fake-label1')
+        req.node_types.append('fake-label4')
+        req.node_types.append('fake-label2')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(4, len(req.nodes))
+        nodes = []
+        for node_id in req.nodes:
+            nodes.append(self.zk.getNode(node_id))
+        self.assertEqual(nodes[0].type, 'fake-label3')
+        self.assertEqual(nodes[1].type, 'fake-label1')
+        self.assertEqual(nodes[2].type, 'fake-label4')
+        self.assertEqual(nodes[3].type, 'fake-label2')
+
     def test_node_assignment_at_quota(self):
         '''
         Successful node launch should have unlocked nodes in READY state

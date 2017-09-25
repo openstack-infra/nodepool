@@ -191,9 +191,18 @@ class NodeRequestHandler(object):
             else:
                 self.request.state = zk.REQUESTED
         else:
-            for node in self.nodeset:
-                # Record node ID in the request
-                self.request.nodes.append(node.id)
+            # The assigned nodes must be added to the request in the order
+            # in which they were requested.
+            assigned = []
+            for requested_type in self.request.node_types:
+                for node in self.nodeset:
+                    if node.id in assigned:
+                        continue
+                    if node.type == requested_type:
+                        # Record node ID in the request
+                        self.request.nodes.append(node.id)
+                        assigned.append(node.id)
+
             self.log.debug("Fulfilled node request %s",
                            self.request.id)
             self.request.state = zk.FULFILLED
