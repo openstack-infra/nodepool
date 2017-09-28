@@ -586,6 +586,11 @@ class DeletedNodeWorker(BaseCleanupWorker):
                     zk_conn.unlockNode(node)
                     continue
 
+                self.log.debug(
+                    "Marking for deletion unlocked node %s "
+                    "(state: %s, allocated_to: %s)",
+                    node.id, node.state, node.allocated_to)
+
                 # The NodeDeleter thread will unlock and remove the
                 # node from ZooKeeper if it succeeds.
                 self._deleteInstance(node)
