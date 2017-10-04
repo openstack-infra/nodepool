@@ -61,6 +61,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
             time.sleep(0)
         self.assertEqual(len(mgr.ready_nodes), 1)
         self.assertEqual(len(mgr.failed_nodes), 0)
+        self.assertEqual(mgr._manager.listNodes()[0]['metadata']['groups'],
+                         'fake-provider,fake-image,fake-label')
 
     @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
     def test_failed_launch(self, mock_launch):

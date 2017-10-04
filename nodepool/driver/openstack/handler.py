@@ -136,6 +136,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             az=self._node.az,
             config_drive=config_drive,
             nodepool_node_id=self._node.id,
+            nodepool_node_label=self._node.type,
             nodepool_image_name=image_name,
             networks=self._pool.networks,
             boot_from_volume=self._label.boot_from_volume,
