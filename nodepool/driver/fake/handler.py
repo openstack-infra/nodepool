@@ -16,4 +16,4 @@ from nodepool.driver.openstack.handler import OpenStackNodeRequestHandler
 
 
 class FakeNodeRequestHandler(OpenStackNodeRequestHandler):
-    pass
+    launcher_id = "Fake"

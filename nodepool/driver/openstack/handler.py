@@ -283,12 +283,13 @@ class OpenStackNodeLaunchManager(NodeLaunchManager):
 
 
 class OpenStackNodeRequestHandler(NodeRequestHandler):
-    log = logging.getLogger("nodepool.driver.openstack."
-                            "OpenStackNodeRequestHandler")
 
     def __init__(self, pw, request):
         super(OpenStackNodeRequestHandler, self).__init__(pw, request)
         self.chosen_az = None
+        self.log = logging.getLogger(
+            "nodepool.driver.openstack.OpenStackNodeRequestHandler[%s]" %
+            self.launcher_id)
 
     def _imagesAvailable(self):
         '''
