@@ -228,6 +228,35 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(req.state, zk.FAILED)
         self.assertNotEqual(req.declined_by, [])
 
+    def test_fail_minready_request_at_capacity(self):
+        '''
+        A min-ready request to a provider that is already at capacity should
+        be declined.
+        '''
+        configfile = self.setup_config('node_min_ready_capacity.yaml')
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        # Get an initial node ready
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append("fake-label")
+        self.zk.storeNodeRequest(req)
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
+        # Now simulate a min-ready request
+        min_ready_req = zk.NodeRequest()
+        min_ready_req.state = zk.REQUESTED
+        min_ready_req.node_types.append("fake-label")
+        min_ready_req.requestor = "NodePool:min-ready"
+        self.zk.storeNodeRequest(min_ready_req)
+        min_ready_req = self.waitForNodeRequest(min_ready_req)
+        self.assertEqual(min_ready_req.state, zk.FAILED)
+        self.assertNotEqual(min_ready_req.declined_by, [])
+
     def test_invalid_image_fails(self):
         '''
         Test that an invalid image declines and fails the request.

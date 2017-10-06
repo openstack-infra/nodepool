@@ -486,6 +486,15 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         if len(self.request.node_types) > self.pool.max_servers:
             declined_reasons.append('it would exceed quota')
 
+        # For min-ready requests, which do not re-use READY nodes, let's
+        # decline if this provider is already at capacity. Otherwise, we
+        # could end up wedged until another request frees up a node.
+        if self.request.requestor == "NodePool:min-ready":
+            current_count = self.zk.countPoolNodes(self.provider.name,
+                                                   self.pool.name)
+            if current_count == self.pool.max_servers:
+                declined_reasons.append("provider cannot satisify min-ready")
+
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))

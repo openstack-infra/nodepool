@@ -786,7 +786,7 @@ class NodePool(threading.Thread):
             req.requestor = "NodePool:min-ready"
             req.node_types.append(label_name)
             req.reuse = False    # force new node launches
-            self.zk.storeNodeRequest(req)
+            self.zk.storeNodeRequest(req, priority="100")
             if label_name not in self._submittedRequests:
                 self._submittedRequests[label_name] = []
             self._submittedRequests[label_name].append(req)
