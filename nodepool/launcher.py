@@ -395,7 +395,12 @@ class CleanupWorker(BaseCleanupWorker):
                 except exceptions.ZKLockException:
                     continue
 
-                self._resetLostRequest(zk_conn, req)
+                try:
+                    self._resetLostRequest(zk_conn, req)
+                except Exception:
+                    self.log.exception("Error resetting lost request %s:",
+                                       req.id)
+
                 zk_conn.unlockNodeRequest(req)
 
     def _cleanupNodeRequestLocks(self):

@@ -625,6 +625,9 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image build not found for locking: %s", image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -642,6 +645,10 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image build number not found for locking: %s, %s",
+                           build_number, image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -659,6 +666,10 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image upload not found for locking: %s, %s, %s",
+                           build_number, provider, image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -1436,6 +1447,9 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Request not found for locking: %s", request)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -1483,6 +1497,9 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Node not found for locking: %s", node)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
