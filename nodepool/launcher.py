@@ -348,7 +348,7 @@ class CleanupWorker(BaseCleanupWorker):
 
     def _resetLostRequest(self, zk_conn, req):
         '''
-        Reset the request state and unallocate nodes.
+        Reset the request state and deallocate nodes.
 
         :param ZooKeeper zk_conn: A ZooKeeper connection object.
         :param NodeRequest req: The lost NodeRequest object.
@@ -364,14 +364,21 @@ class CleanupWorker(BaseCleanupWorker):
                     zk_conn.lockNode(node)
                 except exceptions.ZKLockException:
                     self.log.warning(
-                        "Unable to unallocate node %s from request %s",
-                        node.id, req.id)
+                        "Unable to grab lock to deallocate node %s from "
+                        "request %s", node.id, req.id)
                     return
 
                 node.allocated_to = None
-                zk_conn.storeNode(node)
+                try:
+                    zk_conn.storeNode(node)
+                    self.log.debug("Deallocated node %s for lost request %s",
+                                   node.id, req.id)
+                except Exception:
+                    self.log.exception(
+                        "Unable to deallocate node %s from request %s:",
+                        node.id, req.id)
+
                 zk_conn.unlockNode(node)
-                self.log.debug("Unallocated lost request node %s", node.id)
 
         req.state = zk.REQUESTED
         req.nodes = []
@@ -505,9 +512,18 @@ class CleanupWorker(BaseCleanupWorker):
                     zk_conn.unlockNode(node)
                     continue
 
+                self.log.debug("Node %s exceeds max ready age: %s >= %s",
+                               node.id, now - node.state_time,
+                               label.max_ready_age)
+
                 # The NodeDeleter thread will unlock and remove the
                 # node from ZooKeeper if it succeeds.
-                self._deleteInstance(node)
+                try:
+                    self._deleteInstance(node)
+                except Exception:
+                    self.log.exception("Failure deleting aged node %s:",
+                                       node.id)
+                    zk_conn.unlockNode(node)
 
     def _run(self):
         '''
@@ -566,11 +582,16 @@ class DeletedNodeWorker(BaseCleanupWorker):
                 else:
                     # Double check node conditions after lock
                     if node.state == zk.READY and node.allocated_to:
-                        self.log.debug(
-                            "Unallocating node %s with missing request %s",
-                            node.id, node.allocated_to)
                         node.allocated_to = None
-                        zk_conn.storeNode(node)
+                        try:
+                            zk_conn.storeNode(node)
+                            self.log.debug(
+                                "Deallocated node %s with missing request %s",
+                                node.id, node.allocated_to)
+                        except Exception:
+                            self.log.exception(
+                                "Failed to deallocate node %s for missing "
+                                "request %s:", node.id, node.allocated_to)
 
                     zk_conn.unlockNode(node)
 
@@ -598,7 +619,13 @@ class DeletedNodeWorker(BaseCleanupWorker):
 
                 # The NodeDeleter thread will unlock and remove the
                 # node from ZooKeeper if it succeeds.
-                self._deleteInstance(node)
+                try:
+                    self._deleteInstance(node)
+                except Exception:
+                    self.log.exception(
+                        "Failure deleting node %s in cleanup state %s:",
+                        node.id, node.state)
+                    zk_conn.unlockNode(node)
 
     def _run(self):
         try:
