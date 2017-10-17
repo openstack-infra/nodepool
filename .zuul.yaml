@@ -1,0 +1,67 @@
+- job:
+    name: nodepool-functional
+    parent: legacy-dsvm-base
+    run: playbooks/nodepool-functional/run
+    post-run: playbooks/nodepool-functional/post
+    timeout: 5400
+    required-projects:
+      - openstack-infra/devstack-gate
+      - openstack-infra/nodepool
+
+- job:
+    name: nodepool-functional-src
+    parent: legacy-dsvm-base
+    run: playbooks/nodepool-functional-src/run
+    post-run: playbooks/nodepool-functional-src/post
+    timeout: 5400
+    required-projects:
+      - openstack-infra/devstack-gate
+      - openstack-infra/glean
+      - openstack-infra/nodepool
+      - openstack-infra/shade
+      - openstack/diskimage-builder
+
+- job:
+    name: nodepool-functional-py35
+    parent: legacy-dsvm-base
+    run: playbooks/nodepool-functional-py35/run
+    post-run: playbooks/nodepool-functional-py35/post
+    timeout: 5400
+    required-projects:
+      - openstack-infra/devstack-gate
+      - openstack-infra/nodepool
+
+- job:
+    name: nodepool-functional-py35-src
+    parent: legacy-dsvm-base
+    run: playbooks/nodepool-functional-py35-src/run
+    post-run: playbooks/nodepool-functional-py35-src/post
+    timeout: 5400
+    required-projects:
+      - openstack-infra/devstack-gate
+      - openstack-infra/glean
+      - openstack-infra/nodepool
+      - openstack-infra/shade
+      - openstack/diskimage-builder
+
+- project:
+    name: openstack-infra/nodepool
+    check:
+      jobs:
+        - tox-pep8
+        - tox-py27
+        - nodepool-functional:
+            voting: false
+        - nodepool-functional-src:
+            voting: false
+        - nodepool-functional-py35:
+            voting: false
+        - nodepool-functional-py35-src:
+            voting: false
+    gate:
+      jobs:
+        - tox-pep8
+        - tox-py27
+    post:
+      jobs:
+        - publish-openstack-python-branch-tarball
