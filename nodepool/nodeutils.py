@@ -71,7 +71,7 @@ def keyscan(ip, port=22, timeout=60):
             sock.settimeout(timeout)
             sock.connect(sockaddr)
             t = paramiko.transport.Transport(sock)
-            t.start_client()
+            t.start_client(timeout=timeout)
             key = t.get_remote_server_key()
             break
         except socket.error as e:
