@@ -1,8 +1,8 @@
 - job:
     name: nodepool-functional-py35
     parent: legacy-dsvm-base
-    run: playbooks/nodepool-functional-py35/run
-    post-run: playbooks/nodepool-functional-py35/post
+    run: playbooks/nodepool-functional-py35/run.yaml
+    post-run: playbooks/nodepool-functional-py35/post.yaml
     timeout: 5400
     required-projects:
       - openstack-infra/devstack-gate
@@ -11,8 +11,8 @@
 - job:
     name: nodepool-functional-py35-src
     parent: legacy-dsvm-base
-    run: playbooks/nodepool-functional-py35-src/run
-    post-run: playbooks/nodepool-functional-py35-src/post
+    run: playbooks/nodepool-functional-py35-src/run.yaml
+    post-run: playbooks/nodepool-functional-py35-src/post.yaml
     timeout: 5400
     required-projects:
       - openstack-infra/devstack-gate
@@ -24,8 +24,8 @@
 - job:
     name: nodepool-zuul-functional
     parent: legacy-base
-    run: playbooks/nodepool-zuul-functional/run
-    post-run: playbooks/nodepool-zuul-functional/post
+    run: playbooks/nodepool-zuul-functional/run.yaml
+    post-run: playbooks/nodepool-zuul-functional/post.yaml
     timeout: 1800
     required-projects:
       - openstack-infra/nodepool
