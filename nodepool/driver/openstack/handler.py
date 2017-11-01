@@ -498,6 +498,11 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
                 declined_reasons.append("provider cannot satisify min-ready")
 
         if declined_reasons:
+            # If conditions have changed for a paused request to now cause us
+            # to decline it, we need to unpause so we don't keep trying it
+            if self.paused:
+                self.paused = False
+
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))
             self.request.declined_by.append(self.launcher_id)
