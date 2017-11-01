@@ -175,6 +175,9 @@ class PoolWorker(threading.Thread):
             if (provider.max_concurrency > 0 and
                 active_threads >= provider.max_concurrency
             ):
+                self.log.debug("Request handling limited: %s active threads ",
+                               "with max concurrency of %s",
+                               active_threads, provider.max_concurrency)
                 return
 
             req = self.zk.getNodeRequest(req_id)
@@ -216,7 +219,11 @@ class PoolWorker(threading.Thread):
         for r in self.request_handlers:
             if not r.poll():
                 active_handlers.append(r)
+            else:
+                self.log.debug("Removing handler for request %s", r.request.id)
         self.request_handlers = active_handlers
+        active_reqs = [r.request.id for r in self.request_handlers]
+        self.log.debug("Active requests: %s", active_reqs)
 
     #----------------------------------------------------------------
     # Public methods
