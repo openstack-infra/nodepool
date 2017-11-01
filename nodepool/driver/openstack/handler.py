@@ -492,7 +492,9 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         if self.request.requestor == "NodePool:min-ready":
             current_count = self.zk.countPoolNodes(self.provider.name,
                                                    self.pool.name)
-            if current_count == self.pool.max_servers:
+            # Use >= because dynamic config changes to max-servers can leave
+            # us with more than max-servers.
+            if current_count >= self.pool.max_servers:
                 declined_reasons.append("provider cannot satisify min-ready")
 
         if declined_reasons:
