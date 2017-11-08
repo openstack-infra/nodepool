@@ -296,6 +296,11 @@ Example::
   ``cloud``
   Name of a cloud configured in ``clouds.yaml``.
 
+  The instances spawned by nodepool will inherit the default security group
+  of the project specified in the cloud definition in `clouds.yaml`. This means
+  that when working with Zuul, for example, SSH traffic (TCP/22) must be allowed
+  in the project's default security group for Zuul to be able to reach instances.
+
   More information about the contents of `clouds.yaml` can be found in
   `the os-client-config documentation <http://docs.openstack.org/developer/os-client-config/>`_.
 
