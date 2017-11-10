@@ -683,3 +683,38 @@ class TestLauncher(tests.DBTestCase):
         # max-servers, req2 should get declined now, and transition to FAILED
         req2 = self.waitForNodeRequest(req2, (zk.FAILED,))
         self.assertNotEqual(req2.declined_by, [])
+
+    def test_node_auto_floating_ip(self):
+        """Test that auto-floating-ip option works fine."""
+        configfile = self.setup_config('node_auto_floating_ip.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self._useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider1', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        self.waitForImage('fake-provider3', 'fake-image')
+        label1_nodes = self.waitForNodes('fake-label1')
+        label2_nodes = self.waitForNodes('fake-label2')
+        label3_nodes = self.waitForNodes('fake-label3')
+
+        self.assertEqual(1, len(label1_nodes))
+        self.assertEqual(1, len(label2_nodes))
+        self.assertEqual(1, len(label3_nodes))
+
+        # auto-floating-ip: False
+        self.assertEqual('fake-provider1', label1_nodes[0].provider)
+        self.assertEqual('', label1_nodes[0].public_ipv4)
+        self.assertEqual('', label1_nodes[0].public_ipv6)
+        self.assertEqual('fake', label1_nodes[0].interface_ip)
+
+        # auto-floating-ip: True
+        self.assertEqual('fake-provider2', label2_nodes[0].provider)
+        self.assertEqual('fake', label2_nodes[0].public_ipv4)
+        self.assertEqual('', label2_nodes[0].public_ipv6)
+        self.assertEqual('fake', label2_nodes[0].interface_ip)
+
+        # auto-floating-ip: default value
+        self.assertEqual('fake-provider3', label3_nodes[0].provider)
+        self.assertEqual('fake', label3_nodes[0].public_ipv4)
+        self.assertEqual('', label3_nodes[0].public_ipv6)
+        self.assertEqual('fake', label3_nodes[0].interface_ip)

@@ -52,6 +52,7 @@ class ConfigValidator:
         pool = {
             'name': str,
             'networks': [str],
+            'auto-floating-ip': bool,
             'max-servers': int,
             'labels': [pool_label],
             'availability-zones': [str],

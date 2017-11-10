@@ -214,11 +214,11 @@ class OpenStackProvider(Provider):
         except shade.OpenStackCloudException:
             return None
 
-    def waitForServer(self, server, timeout=3600):
+    def waitForServer(self, server, timeout=3600, auto_ip=True):
         with shade_inner_exceptions():
             return self._client.wait_for_server(
-                server=server, auto_ip=True, reuse=False,
-                timeout=timeout)
+                server=server, auto_ip=auto_ip,
+                reuse=False, timeout=timeout)
 
     def waitForNodeCleanup(self, server_id, timeout=600):
         for count in iterate_timeout(

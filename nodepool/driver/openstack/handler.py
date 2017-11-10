@@ -158,7 +158,8 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         self.log.debug("Waiting for server %s for node id: %s" %
                        (server.id, self._node.id))
         server = self._manager.waitForServer(
-            server, self._provider.launch_timeout)
+            server, self._provider.launch_timeout,
+            auto_ip=self._pool.auto_floating_ip)
 
         if server.status != 'ACTIVE':
             raise exceptions.LaunchStatusException("Server %s for node id: %s "

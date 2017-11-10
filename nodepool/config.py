@@ -278,6 +278,7 @@ def loadConfig(config_path):
             pp.max_servers = pool['max-servers']
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
+            pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
             pp.labels = {}
             for label in pool.get('labels', []):
                 pl = ProviderLabel()

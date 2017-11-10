@@ -33,6 +33,7 @@ providers:
     pools:
       - name: main
         max-servers: 184
+        auto-floating-ip: True
         labels:
           - name: trusty
             diskimage: trusty
@@ -59,6 +60,7 @@ providers:
     pools:
       - name: main
         max-servers: 184
+        auto-floating-ip: False
         labels:
           - name: trusty
             diskimage: trusty

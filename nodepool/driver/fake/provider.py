@@ -218,9 +218,18 @@ class FakeOpenStackCloud(object):
         result = self._get(name_or_id, self._server_list)
         return result
 
+    def _clean_floating_ip(self, server):
+        server.public_v4 = ''
+        server.public_v6 = ''
+        server.interface_ip = server.private_v4
+        return server
+
     def wait_for_server(self, server, **kwargs):
         while server.status == 'BUILD':
             time.sleep(0.1)
+        auto_ip = kwargs.get('auto_ip')
+        if not auto_ip:
+            server = self._clean_floating_ip(server)
         return server
 
     def list_servers(self):
