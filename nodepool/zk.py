@@ -236,8 +236,7 @@ class ImageBuild(BaseModel):
             d['builder_id'] = self.builder_id
         if len(self.formats):
             d['formats'] = ','.join(self.formats)
-        if self.username:
-            d['username'] = self.username
+        d['username'] = self.username
         return d
 
     @staticmethod
@@ -306,8 +305,7 @@ class ImageUpload(BaseModel):
         d['external_id'] = self.external_id
         d['external_name'] = self.external_name
         d['format'] = self.format
-        if self.username:
-            d['username'] = self.username
+        d['username'] = self.username
         return d
 
     @staticmethod
@@ -446,7 +444,7 @@ class Node(BaseModel):
         self.hostname = None
         self.comment = None
         self.hold_job = None
-        self.username = 'zuul'
+        self.username = None
         self.host_keys = []
 
     def __repr__(self):
@@ -508,8 +506,7 @@ class Node(BaseModel):
         d['comment'] = self.comment
         d['hold_job'] = self.hold_job
         d['host_keys'] = self.host_keys
-        if self.username:
-            d['username'] = self.username
+        d['username'] = self.username
         return d
 
     @staticmethod
