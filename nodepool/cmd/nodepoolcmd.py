@@ -335,6 +335,10 @@ class NodePoolCmd(NodepoolApp):
     def run(self):
         self.zk = None
 
+        # no arguments, print help messaging, then exit with error(1)
+        if not self.args.command:
+            self.parser.print_help()
+            return 1
         # commands which do not need to start-up or parse config
         if self.args.command in ('config-validate'):
             return self.args.func()

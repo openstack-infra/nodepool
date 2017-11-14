@@ -304,3 +304,9 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.zk.storeNodeRequest(req)
 
         self.assert_listed(configfile, ['request-list'], 0, req.id, 1)
+
+    def test_without_argument(self):
+        configfile = self.setup_config("node_cmd.yaml")
+        self.patch_argv("-c", configfile)
+        result = nodepoolcmd.main()
+        self.assertEqual(1, result)

@@ -84,6 +84,7 @@ class NodepoolApp(object):
     app_description = 'Node pool.'
 
     def __init__(self):
+        self.parser = None
         self.args = None
 
     def create_parser(self):
@@ -122,7 +123,8 @@ class NodepoolApp(object):
         if argv is None:
             argv = sys.argv[1:]
 
-        self.args = self.create_parser().parse_args()
+        self.parser = self.create_parser()
+        self.args = self.parser.parse_args()
         return self._do_run()
 
     def _do_run(self):
