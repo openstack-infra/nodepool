@@ -69,6 +69,7 @@ function install_nodepool {
 
     setup_develop $DEST/nodepool
     $NODEPOOL_INSTALL/bin/pip install $DEST/nodepool
+    $NODEPOOL_INSTALL/bin/pbr freeze
 }
 
 # requires some globals from devstack, which *might* not be stable api
