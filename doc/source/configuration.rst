@@ -244,7 +244,7 @@ Example::
       boot-timeout: 120
       launch-timeout: 900
       launch-retries: 3
-      image-name-format: 'template-{image_name}-{timestamp}'
+      image-name-format: '{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
       diskimages:
         - name: trusty
@@ -274,7 +274,7 @@ Example::
     - name: provider2
       region-name: 'region1'
       rate: 1.0
-      image-name-format: 'template-{image_name}-{timestamp}'
+      image-name-format: '{image_name}-{timestamp}'
       hostname-format: '{label.name}-{provider.name}-{node.id}'
       diskimages:
         - name: precise
@@ -345,7 +345,7 @@ Example::
 
   ``image-name-format``
     Format for image names that are uploaded to providers.
-    Default ``template-{image_name}-{timestamp}``
+    Default ``{image_name}-{timestamp}``
 
   ``rate``
     In seconds, amount to wait between operations on the provider.
