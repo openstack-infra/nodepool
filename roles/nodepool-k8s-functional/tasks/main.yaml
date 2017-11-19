@@ -1,0 +1,59 @@
+- name: debug context names
+  command: kubectl config get-contexts
+
+- name: Update nodepool.yaml
+  copy:
+    content: |
+      zookeeper-servers:
+        - host: localhost
+      images-dir: "{{ ansible_user_dir }}/work/images/"
+      build-log-dir: "{{ ansible_user_dir }}/work/logs/nodepool/"
+      labels:
+        - name: kubernetes-namespace
+          min-ready: 1
+        - name: pod-fedora
+          min-ready: 1
+      providers:
+        - name: minikube
+          driver: kubernetes
+          context: minikube
+          pools:
+            - name: main
+              labels:
+                - name: kubernetes-namespace
+                  type: namespace
+                - name: pod-fedora
+                  type: pod
+                  image: docker.io/fedora:28
+    dest: "{{ ansible_user_dir }}/work/etc/nodepool.yaml"
+
+- name: Set nodepool_command facts
+  set_fact:
+    nodepool_command: nodepool -c "{{ ansible_user_dir }}/work/etc/nodepool.yaml"
+
+- name: Wait for nodes
+  command: "{{ nodepool_command }} list"
+  register: nodepool_list
+  until: nodepool_list.stdout
+  retries: 120
+  delay: 2
+
+- name: Show nodes
+  command: "{{ nodepool_command }} list --detail"
+
+- name: Wait for fedora pod to be running
+  shell: "{{ nodepool_command }} list | grep 'pod-fedora.*running'"
+  register: nodepool_list
+  until: nodepool_list.stdout
+  retries: 120
+  delay: 2
+  ignore_errors: yes
+
+- name: Show nodes
+  command: "{{ nodepool_command }} list --detail"
+
+- name: Show namespace
+  command: kubectl get namespaces
+
+- name: Show pods
+  command: kubectl get --all-namespaces=true pods

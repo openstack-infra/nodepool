@@ -1,0 +1,5 @@
+- hosts: all
+  roles:
+    - install-nodepool
+    - install-kubernetes
+    - nodepool-k8s-functional

@@ -1,0 +1,14 @@
+- hosts: all
+  roles:
+    - role: bindep
+      bindep_profile: dev
+
+  tasks:
+    - name: Ensure nodepool services directories
+      file:
+        path: '{{ ansible_user_dir }}/work/{{ item }}'
+        state: directory
+      with_items:
+        - logs/nodepool
+        - etc
+        - images
