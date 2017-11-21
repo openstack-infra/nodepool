@@ -57,12 +57,14 @@ providers:
       - name: trusty
         pause: False
         connection-type: ssh
+        connection-port: 22
     cloud-images:
       - name: trusty-unmanaged
         config-drive: true
       - name: windows-unmanaged
         username: winzuul
         connection-type: winrm
+        connection-port: 5986
     pools:
       - name: main
         max-servers: 184
