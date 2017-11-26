@@ -145,14 +145,15 @@ def dib_image_list_json(zk):
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
             build = zk.getBuild(image_name, build_no)
-            objs.append({'id' : '-'.join([image_name, build_no]),
+            objs.append({'id': '-'.join([image_name, build_no]),
                          'image': image_name,
                          'builder': build.builder,
                          'formats': build.formats,
                          'state': build.state,
                          'age': int(build.state_time)
-            })
+                         })
     return json.dumps(objs)
+
 
 def image_list(zk):
     t = PrettyTable(["Build ID", "Upload ID", "Provider", "Image",
@@ -172,6 +173,7 @@ def image_list(zk):
                                upload.state,
                                age(upload.state_time)])
     return str(t)
+
 
 def request_list(zk):
     t = PrettyTable(["Request ID", "State", "Requestor", "Node Types", "Nodes",

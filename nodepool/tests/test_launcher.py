@@ -256,8 +256,7 @@ class TestLauncher(tests.DBTestCase):
         self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
                                             max_cores=math.inf,
                                             max_instances=math.inf,
-                                            max_ram=2*8192)
-
+                                            max_ram=2 * 8192)
 
     @mock.patch('nodepool.driver.fake.provider.get_fake_quota')
     def test_over_quota(self, mock_quota,
@@ -268,9 +267,9 @@ class TestLauncher(tests.DBTestCase):
 
         '''
         # Start with an instance quota of 2
-        max_cores=math.inf
-        max_instances=2
-        max_ram=math.inf
+        max_cores = math.inf
+        max_instances = 2
+        max_ram = math.inf
 
         # patch the cloud with requested quota
         mock_quota.return_value = (max_cores, max_instances, max_ram)

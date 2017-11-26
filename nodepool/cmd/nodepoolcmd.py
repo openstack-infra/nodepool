@@ -289,7 +289,7 @@ class NodePoolCmd(NodepoolApp):
         validator = ConfigValidator(self.args.config)
         validator.validate()
         log.info("Configuration validation complete")
-        #TODO(asselin,yolanda): add validation of secure.conf
+        # TODO(asselin,yolanda): add validation of secure.conf
 
     def request_list(self):
         print(status.request_list(self.zk))

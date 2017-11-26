@@ -61,8 +61,8 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         self._pool = self._label.pool
         self._provider_config = self._pool.provider
         if self._label.diskimage:
-            self._diskimage = \
-                self._provider_config.diskimages[self._label.diskimage.name]
+            self._diskimage = self._provider_config.diskimages[
+                self._label.diskimage.name]
         else:
             self._diskimage = None
 
@@ -542,8 +542,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         elif not self._imagesAvailable():
             declined_reasons.append('images are not available')
         elif (self.pool.max_servers == 0 or
-              not self._hasProviderQuota(self.request.node_types)
-        ):
+              not self._hasProviderQuota(self.request.node_types)):
             declined_reasons.append('it would exceed quota')
         # TODO(tobiash): Maybe also calculate the quota prediction here and
         # backoff for some seconds if the used quota would be exceeded?

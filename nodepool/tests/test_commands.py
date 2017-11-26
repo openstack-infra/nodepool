@@ -52,7 +52,8 @@ class TestNodepoolCMD(tests.DBTestCase):
             self.assertEquals(rows_with_val, count)
 
     def assert_alien_images_listed(self, configfile, image_cnt, image_id):
-        self.assert_listed(configfile, ['alien-image-list'], 2, image_id, image_cnt)
+        self.assert_listed(configfile, ['alien-image-list'], 2, image_id,
+                           image_cnt)
 
     def assert_alien_images_empty(self, configfile):
         self.assert_alien_images_listed(configfile, 0, 0)
@@ -245,7 +246,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage( 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
 
@@ -282,7 +283,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self._useBuilder(configfile)
         pool.start()
-        self.waitForImage( 'fake-provider', 'fake-image')
+        self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
 

@@ -86,6 +86,7 @@ class TestNodepoolBuilderDibImage(tests.BaseTestCase):
         image = builder.DibImageFile('myid1234')
         self.assertRaises(exceptions.BuilderError, image.to_path, '/imagedir/')
 
+
 class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_start_stop(self):
@@ -155,7 +156,8 @@ class TestNodePoolBuilder(tests.DBTestCase):
         image = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
         self.replace_config(configfile, 'node_two_provider_remove.yaml')
         self.waitForImageDeletion('fake-provider2', 'fake-image')
-        image2 = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
+        image2 = self.zk.getMostRecentImageUpload('fake-provider',
+                                                  'fake-image')
         self.assertEqual(image, image2)
 
     def test_image_addition(self):

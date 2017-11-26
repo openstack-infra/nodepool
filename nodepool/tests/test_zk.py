@@ -104,7 +104,8 @@ class TestZooKeeper(tests.DBTestCase):
             with testtools.ExpectedException(
                 npe.ZKLockException, "Did not get lock on .*"
             ):
-                with self.zk.imageUploadLock(image, bnum, prov, blocking=False):
+                with self.zk.imageUploadLock(image, bnum, prov,
+                                             blocking=False):
                     pass
 
     def test_imageUploadLock_exception_blocking(self):
@@ -254,7 +255,8 @@ class TestZooKeeper(tests.DBTestCase):
         self.zk.storeImageUpload(image, bnum, provider, up3)
 
         # up2 should be the most recent 'ready' upload
-        data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, zk.READY)
+        data = self.zk.getMostRecentBuildImageUploads(
+            1, image, bnum, provider, zk.READY)
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
         self.assertEqual(data[0].id, up2_id)
@@ -278,7 +280,8 @@ class TestZooKeeper(tests.DBTestCase):
         up3_id = self.zk.storeImageUpload(image, bnum, provider, up3)
 
         # up3 should be the most recent upload, regardless of state
-        data = self.zk.getMostRecentBuildImageUploads(1, image, bnum, provider, None)
+        data = self.zk.getMostRecentBuildImageUploads(
+            1, image, bnum, provider, None)
         self.assertNotEqual([], data)
         self.assertEqual(1, len(data))
         self.assertEqual(data[0].id, up3_id)
@@ -860,11 +863,11 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.image_id, d['image_id'])
         self.assertEqual(o.launcher, d['launcher'])
         self.assertEqual(o.external_id, d['external_id'])
-        self.assertEqual(o.hostname , d['hostname'])
-        self.assertEqual(o.comment , d['comment'])
+        self.assertEqual(o.hostname, d['hostname'])
+        self.assertEqual(o.comment, d['comment'])
         self.assertEqual(o.hold_job, d['hold_job'])
-        self.assertEqual(o.host_keys , d['host_keys'])
-        self.assertEqual(o.connection_port , d['connection_port'])
+        self.assertEqual(o.host_keys, d['host_keys'])
+        self.assertEqual(o.connection_port, d['connection_port'])
 
     def test_custom_connection_port(self):
         n = zk.Node('0001')
@@ -875,4 +878,5 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(n.connection_port, 22, "Default port not 22")
         n.connection_port = 22022
         d = n.toDict()
-        self.assertEqual(d["connection_port"], 22022, "Custom ssh port not set")
+        self.assertEqual(d["connection_port"], 22022,
+                         "Custom ssh port not set")
