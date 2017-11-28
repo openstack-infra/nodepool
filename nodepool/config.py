@@ -87,6 +87,19 @@ class ProviderCloudImage(ConfigValue):
     def __repr__(self):
         return "<ProviderCloudImage %s>" % self.name
 
+    @property
+    def external(self):
+        '''External identifier to pass to the cloud.'''
+        if self.image_id:
+            return dict(id=self.image_id)
+        else:
+            return self.image_name or self.name
+
+    @property
+    def external_name(self):
+        '''Human readable version of external.'''
+        return self.image_id or self.image_name or self.name
+
 
 class Label(ConfigValue):
     def __repr__(self):
@@ -290,7 +303,17 @@ def loadConfig(config_path):
                     pl.diskimage = newconfig.diskimages[diskimage]
                 else:
                     pl.diskimage = None
-                pl.cloud_image = label.get('cloud-image', None)
+                cloud_image_name = label.get('cloud-image', None)
+                if cloud_image_name:
+                    cloud_image = p.cloud_images.get(cloud_image_name, None)
+                    if not cloud_image:
+                        raise ValueError(
+                            "cloud-image %s does not exist in provider %s"
+                            " but is referenced in label %s" %
+                            (cloud_image_name, p.name, pl.name))
+                else:
+                    cloud_image = None
+                pl.cloud_image = cloud_image
                 pl.min_ram = label.get('min-ram', 0)
                 pl.flavor_name = label.get('flavor-name', None)
                 pl.key_name = label.get('key-name')

@@ -542,8 +542,10 @@ Example configuration::
     Refers to provider's diskimages, see :ref:`provider_diskimages`.
 
   ``cloud-image``
-    Refers to an externally managed image name or id already existing on the
-    provider, see :ref:`provider_cloud_images`.
+    Refers to the name of an externally managed image in the cloud that already
+    exists on the provider. The value of ``cloud-image`` should match the
+    ``name`` of a previously configured entry from the ``cloud-images`` section
+    of the provider. See :ref:`provider_cloud_images`.
 
 **at least one of**
 
