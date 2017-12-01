@@ -17,10 +17,10 @@ import logging
 import math
 import time
 import fixtures
-import unittest.mock as mock
 
 from nodepool import tests
 from nodepool import zk
+from nodepool.driver import Drivers
 import nodepool.launcher
 
 
@@ -111,8 +111,7 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[2].type, 'fake-label4')
         self.assertEqual(nodes[3].type, 'fake-label2')
 
-    @mock.patch('nodepool.driver.fake.provider.get_fake_quota')
-    def _test_node_assignment_at_quota(self, mock_quota,
+    def _test_node_assignment_at_quota(self,
                                        config='node_quota.yaml',
                                        max_cores=100,
                                        max_instances=20,
@@ -124,7 +123,12 @@ class TestLauncher(tests.DBTestCase):
         '''
 
         # patch the cloud with requested quota
-        mock_quota.return_value = (max_cores, max_instances, max_ram)
+        def fake_get_quota():
+            return (max_cores, max_instances, max_ram)
+        self.useFixture(fixtures.MockPatchObject(
+            Drivers.get('fake')['provider'].fake_cloud, '_get_quota',
+            fake_get_quota
+        ))
 
         configfile = self.setup_config(config)
         self.useBuilder(configfile)
@@ -258,9 +262,7 @@ class TestLauncher(tests.DBTestCase):
                                             max_instances=math.inf,
                                             max_ram=2 * 8192)
 
-    @mock.patch('nodepool.driver.fake.provider.get_fake_quota')
-    def test_over_quota(self, mock_quota,
-                        config='node_quota_cloud.yaml'):
+    def test_over_quota(self, config='node_quota_cloud.yaml'):
         '''
         This tests what happens when a cloud unexpectedly returns an
         over-quota error.
@@ -272,7 +274,12 @@ class TestLauncher(tests.DBTestCase):
         max_ram = math.inf
 
         # patch the cloud with requested quota
-        mock_quota.return_value = (max_cores, max_instances, max_ram)
+        def fake_get_quota():
+            return (max_cores, max_instances, max_ram)
+        self.useFixture(fixtures.MockPatchObject(
+            Drivers.get('fake')['provider'].fake_cloud, '_get_quota',
+            fake_get_quota
+        ))
 
         configfile = self.setup_config(config)
         self.useBuilder(configfile)
@@ -589,8 +596,8 @@ class TestLauncher(tests.DBTestCase):
         def fail_delete(self, name):
             raise RuntimeError('Fake Error')
 
-        fake_delete = 'nodepool.driver.fake.provider.FakeProvider.deleteServer'
-        self.useFixture(fixtures.MonkeyPatch(fake_delete, fail_delete))
+        self.useFixture(fixtures.MockPatchObject(
+            Drivers.get('fake')['provider'], 'deleteServer', fail_delete))
 
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

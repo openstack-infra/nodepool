@@ -21,8 +21,7 @@ import yaml
 
 from nodepool import zk
 from nodepool.driver import ConfigValue
-from nodepool.driver.fake.config import FakeProviderConfig
-from nodepool.driver.openstack.config import OpenStackProviderConfig
+from nodepool.driver import Drivers
 
 
 class Config(ConfigValue):
@@ -59,10 +58,8 @@ def get_provider_config(provider):
     # Ensure legacy configuration still works when using fake cloud
     if provider.get('name', '').startswith('fake'):
         provider['driver'] = 'fake'
-    if provider['driver'] == 'fake':
-        return FakeProviderConfig(provider)
-    elif provider['driver'] == 'openstack':
-        return OpenStackProviderConfig(provider)
+    driver = Drivers.get(provider['driver'])
+    return driver['config'](provider)
 
 
 def openConfig(path):
@@ -90,8 +87,9 @@ def openConfig(path):
 def loadConfig(config_path):
     config = openConfig(config_path)
 
-    # Reset the shared os_client_config instance
-    OpenStackProviderConfig.os_client_config = None
+    # Call driver config reset now to clean global hooks like os_client_config
+    for driver in Drivers.drivers.values():
+        driver["config"].reset()
 
     newconfig = Config()
     newconfig.db = None

@@ -16,11 +16,88 @@
 # limitations under the License.
 
 import abc
+import inspect
+import importlib
+import logging
+import os
 
 import six
 
 from nodepool import zk
 from nodepool import exceptions
+
+
+class Drivers:
+    """The Drivers plugin interface"""
+
+    log = logging.getLogger("nodepool.driver.Drivers")
+    drivers = {}
+    drivers_paths = None
+
+    @staticmethod
+    def _load_class(driver_name, path, parent_class):
+        """Return a driver class that implements the parent_class"""
+        spec = importlib.util.spec_from_file_location(driver_name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        obj = inspect.getmembers(
+            module,
+            lambda x: inspect.isclass(x) and issubclass(x, parent_class) and
+            x.__module__ == driver_name)
+        error = None
+        if len(obj) > 1:
+            error = "multiple %s implementation" % parent_class
+        if not obj:
+            error = "no %s implementation found" % parent_class
+        if error:
+            Drivers.log.error("%s: %s" % (path, error))
+            return False
+        return obj[0][1]
+
+    @staticmethod
+    def load(drivers_paths=[]):
+        """Load drivers"""
+        if drivers_paths == Drivers.drivers_paths:
+            # Already loaded
+            return
+        Drivers.drivers.clear()
+        for drivers_path in drivers_paths + [os.path.dirname(__file__)]:
+            drivers = os.listdir(drivers_path)
+            for driver in drivers:
+                driver_path = os.path.join(drivers_path, driver)
+                if driver in Drivers.drivers:
+                    Drivers.log.warning("%s: duplicate driver" % driver_path)
+                    continue
+                if not os.path.isdir(driver_path) or \
+                   "__init__.py" not in os.listdir(driver_path):
+                    continue
+                Drivers.log.debug("%s: loading driver" % driver_path)
+                driver_obj = {}
+                for name, parent_class in (
+                        ("config", ProviderConfig),
+                        ("handler", NodeRequestHandler),
+                        ("provider", Provider),
+                ):
+                    driver_obj[name] = Drivers._load_class(
+                        driver, os.path.join(driver_path, "%s.py" % name),
+                        parent_class)
+                    if not driver_obj[name]:
+                        break
+                if not driver_obj[name]:
+                    Drivers.log.error("%s: skipping incorrect driver" %
+                                      driver_path)
+                    continue
+                Drivers.drivers[driver] = driver_obj
+        Drivers.drivers_paths = drivers_paths
+
+    @staticmethod
+    def get(name):
+        if not Drivers.drivers:
+            Drivers.load()
+        try:
+            return Drivers.drivers[name]
+        except KeyError:
+            raise RuntimeError("%s: unknown driver" % name)
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -351,6 +428,10 @@ class ProviderConfig(ConfigValue):
 
     @abc.abstractmethod
     def __eq__(self, other):
+        pass
+
+    @abc.abstractmethod
+    def reset():
         pass
 
     @abc.abstractmethod

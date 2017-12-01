@@ -18,6 +18,7 @@ import uuid
 import fixtures
 
 from nodepool import builder, exceptions, tests
+from nodepool.driver import Drivers
 from nodepool.driver.fake import provider as fakeprovider
 from nodepool import zk
 
@@ -119,8 +120,8 @@ class TestNodePoolBuilder(tests.DBTestCase):
         def get_fake_client(*args, **kwargs):
             return fake_client
 
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.driver.fake.provider.FakeProvider._getClient',
+        self.useFixture(fixtures.MockPatchObject(
+            Drivers.get('fake')['provider'], '_getClient',
             get_fake_client))
 
         configfile = self.setup_config('node.yaml')

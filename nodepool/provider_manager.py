@@ -18,17 +18,12 @@
 
 import logging
 
-from nodepool.driver.fake.provider import FakeProvider
-from nodepool.driver.openstack.provider import OpenStackProvider
+from nodepool.driver import Drivers
 
 
 def get_provider(provider, use_taskmanager):
-    if provider.driver.name == 'fake':
-        return FakeProvider(provider, use_taskmanager)
-    elif provider.driver.name == 'openstack':
-        return OpenStackProvider(provider, use_taskmanager)
-    else:
-        raise RuntimeError("Unknown provider driver %s" % provider.driver)
+    driver = Drivers.get(provider.driver.name)
+    return driver['provider'](provider, use_taskmanager)
 
 
 class ProviderManager(object):
