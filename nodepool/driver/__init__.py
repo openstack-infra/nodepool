@@ -182,7 +182,7 @@ class NodeRequestHandler(object):
         if self.done:
             return True
 
-        if not self.launch_manager.poll():
+        if self.launch_manager and not self.launch_manager.poll():
             return False
 
         # If the request has been pulled, unallocate the node set so other
@@ -204,7 +204,9 @@ class NodeRequestHandler(object):
                                self.request.id)
             return True
 
-        if self.launch_manager.failed_nodes:
+        if self.launch_manager and self.launch_manager.failed_nodes or \
+           len(self.nodeset) != len(self.request.node_types) or \
+           [node for node in self.nodeset if node.state != zk.READY]:
             self.log.debug("Declining node request %s because nodes failed",
                            self.request.id)
             self.decline_request()
