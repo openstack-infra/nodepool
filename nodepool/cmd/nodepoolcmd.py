@@ -68,13 +68,6 @@ class NodePoolCmd(NodepoolApp):
         cmd_image_build.add_argument('image', help='image name')
         cmd_image_build.set_defaults(func=self.image_build)
 
-        cmd_alien_list = subparsers.add_parser(
-            'alien-list',
-            help='list nodes not accounted for by nodepool')
-        cmd_alien_list.set_defaults(func=self.alien_list)
-        cmd_alien_list.add_argument('provider', help='provider name',
-                                    nargs='?')
-
         cmd_alien_image_list = subparsers.add_parser(
             'alien-image-list',
             help='list images not accounted for by nodepool')
@@ -171,31 +164,6 @@ class NodePoolCmd(NodepoolApp):
                 "Skipping build request for image %s; paused" % diskimage)
 
         self.zk.submitBuildRequest(diskimage)
-
-    def alien_list(self):
-        self.pool.updateConfig()
-
-        t = PrettyTable(["Provider", "Hostname", "Server ID", "IP"])
-        t.align = 'l'
-
-        for provider in self.pool.config.providers.values():
-            if (self.args.provider and
-                    provider.name != self.args.provider):
-                continue
-            manager = self.pool.getProviderManager(provider)
-
-            try:
-                servers = manager.listNodes()
-                known = set([n.external_id for n in self.zk.nodeIterator()
-                             if n.provider == provider.name])
-                for server in servers:
-                    if server.id not in known:
-                        t.add_row([provider.name, server.name,
-                                   server.id, server.public_v4])
-            except Exception as e:
-                log.warning("Exception listing aliens for %s: %s"
-                            % (provider.name, str(e)))
-        print(t)
 
     def alien_image_list(self):
         self.pool.updateConfig()
@@ -350,7 +318,7 @@ class NodePoolCmd(NodepoolApp):
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
-                                 'alien-list', 'list', 'hold', 'delete',
+                                 'list', 'hold', 'delete',
                                  'request-list'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(list(config.zookeeper_servers.values()))

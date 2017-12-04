@@ -97,17 +97,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForUploadRecordDeletion('fake-provider', 'fake-image',
                                          image.build_id, image.id)
 
-    def test_alien_list_fail(self):
-        def fail_list(self):
-            raise RuntimeError('Fake list error')
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.driver.fake.provider.FakeOpenStackCloud.list_servers',
-            fail_list))
-
-        configfile = self.setup_config("node_cmd.yaml")
-        self.patch_argv("-c", configfile, "alien-list", "fakeprovider")
-        nodepoolcmd.main()
-
     def test_alien_image_list_empty(self):
         configfile = self.setup_config("node.yaml")
         self._useBuilder(configfile)
