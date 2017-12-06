@@ -63,13 +63,13 @@ class TestNodepoolCMD(tests.DBTestCase):
     def assert_nodes_listed(self, configfile, node_cnt, status="ready",
                             detail=False, validate_col_count=False):
         cmd = ['list']
-        col_count = 8
+        col_count = 9
         if detail:
             cmd += ['--detail']
             col_count = 17
         if not validate_col_count:
             col_count = 0
-        self.assert_listed(configfile, cmd, 5, status, node_cnt, col_count)
+        self.assert_listed(configfile, cmd, 6, status, node_cnt, col_count)
 
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)

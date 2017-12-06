@@ -30,11 +30,27 @@ def age(timestamp):
 
 
 def node_list(zk, node_id=None, detail=False):
-    headers = ["ID", "Provider", "AZ", "Label", "Server ID", "State",
-               "Age", "Locked"]
-    detail_headers = ["Hostname", "Public IPv4", "Private IPv4", "IPv6",
-                      "SSH Port", "Launcher", "Allocated To", "Hold Job",
-                      "Comment"]
+    headers = [
+        "ID",
+        "Provider",
+        "Label",
+        "Server ID",
+        "Public IPv4",
+        "IPv6",
+        "State",
+        "Age",
+        "Locked"
+    ]
+    detail_headers = [
+        "Hostname",
+        "Private IPv4",
+        "AZ",
+        "SSH Port",
+        "Launcher",
+        "Allocated To",
+        "Hold Job",
+        "Comment"
+    ]
     if detail:
         headers += detail_headers
 
@@ -52,13 +68,28 @@ def node_list(zk, node_id=None, detail=False):
             else:
                 zk.unlockNode(node)
 
-            values = [node.id, node.provider, node.az, node.type,
-                      node.external_id, node.state, age(node.state_time),
-                      locked]
+            values = [
+                node.id,
+                node.provider,
+                node.type,
+                node.external_id,
+                node.public_ipv4,
+                node.public_ipv6,
+                node.state,
+                age(node.state_time),
+                locked
+            ]
             if detail:
-                values += [node.hostname, node.public_ipv4, node.private_ipv4,
-                           node.public_ipv6, node.ssh_port, node.launcher,
-                           node.allocated_to, node.hold_job, node.comment]
+                values += [
+                    node.hostname,
+                    node.private_ipv4,
+                    node.az,
+                    node.ssh_port,
+                    node.launcher,
+                    node.allocated_to,
+                    node.hold_job,
+                    node.comment
+                ]
             t.add_row(values)
     else:
         for node in zk.nodeIterator():
@@ -70,13 +101,28 @@ def node_list(zk, node_id=None, detail=False):
             else:
                 zk.unlockNode(node)
 
-            values = [node.id, node.provider, node.az, node.type,
-                      node.external_id, node.state, age(node.state_time),
-                      locked]
+            values = [
+                node.id,
+                node.provider,
+                node.type,
+                node.external_id,
+                node.public_ipv4,
+                node.public_ipv6,
+                node.state,
+                age(node.state_time),
+                locked
+            ]
             if detail:
-                values += [node.hostname, node.public_ipv4, node.private_ipv4,
-                           node.public_ipv6, node.ssh_port, node.launcher,
-                           node.allocated_to, node.hold_job, node.comment]
+                values += [
+                    node.hostname,
+                    node.private_ipv4,
+                    node.az,
+                    node.ssh_port,
+                    node.launcher,
+                    node.allocated_to,
+                    node.hold_job,
+                    node.comment
+                ]
             t.add_row(values)
     return str(t)
 
