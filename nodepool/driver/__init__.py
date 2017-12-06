@@ -54,6 +54,10 @@ class Provider(object):
         pass
 
     @abc.abstractmethod
+    def cleanupLeakedResources(self):
+        pass
+
+    @abc.abstractmethod
     def listNodes(self):
         pass
 
@@ -293,4 +297,50 @@ class NodeLaunchManager(object):
 
     @abc.abstractmethod
     def launch(self, node):
+        pass
+
+
+class ConfigValue(object):
+    def __eq__(self, other):
+        if isinstance(other, ConfigValue):
+            if other.__dict__ == self.__dict__:
+                return True
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class Driver(ConfigValue):
+    pass
+
+
+@six.add_metaclass(abc.ABCMeta)
+class ProviderConfig(ConfigValue):
+    """The Provider config interface
+
+    The class or instance attribute **name** must be provided as a string.
+
+    """
+    def __init__(self, provider):
+        self.name = provider['name']
+        self.provider = provider
+        self.driver = Driver()
+        self.driver.name = provider.get('driver', 'openstack')
+        self.max_concurrency = provider.get('max-concurrency', -1)
+        self.driver.manage_images = False
+
+    def __repr__(self):
+        return "<Provider %s>" % self.name
+
+    @abc.abstractmethod
+    def __eq__(self, other):
+        pass
+
+    @abc.abstractmethod
+    def load(self, newconfig):
+        pass
+
+    @abc.abstractmethod
+    def get_schema(self):
         pass

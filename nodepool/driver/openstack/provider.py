@@ -340,9 +340,10 @@ class OpenStackProvider(Provider):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
-    def cleanupLeakedFloaters(self):
-        with shade_inner_exceptions():
-            self._client.delete_unattached_floating_ips()
+    def cleanupLeakedResources(self):
+        if self.provider.clean_floating_ips:
+            with shade_inner_exceptions():
+                self._client.delete_unattached_floating_ips()
 
     def getAZs(self):
         if self.__azs is None:

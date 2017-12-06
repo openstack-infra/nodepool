@@ -222,15 +222,37 @@ Example configuration::
 
 .. _provider:
 
-provider
+providers
 ---------
 
-Lists the OpenStack cloud providers Nodepool should use.  Within each
-provider the available Nodepool image types are defined (see
-:ref:`provider_diskimages`.
+Lists the providers Nodepool should use. Each provider is associated to
+a driver listed below.
 
-A provider's resources are partitioned into groups called "pools" (see
-:ref:`pools` for details), and within a pool, the node types which are
+**required**
+
+  ``name``
+
+
+**optional**
+
+  ``driver``
+    Default to *openstack*
+
+  ``max-concurrency``
+    Maximum number of node requests that this provider is allowed to handle
+    concurrently. The default, if not specified, is to have no maximum. Since
+    each node request is handled by a separate thread, this can be useful for
+    limiting the number of threads used by the nodepool-launcher daemon.
+
+
+OpenStack driver
+^^^^^^^^^^^^^^^^
+
+Within each OpenStack provider the available Nodepool image types are defined
+(see :ref:`provider_diskimages`).
+
+An OpenStack provider's resources are partitioned into groups called "pools"
+(see :ref:`pools` for details), and within a pool, the node types which are
 to be made available are listed (see :ref:`pool_labels` for
 details).
 
@@ -238,6 +260,7 @@ Example::
 
   providers:
     - name: provider1
+      driver: openstack
       cloud: example
       region-name: 'region1'
       rate: 1.0
@@ -272,6 +295,8 @@ Example::
               min-ram: 8192
               diskimage: devstack-trusty
     - name: provider2
+      driver: openstack
+      cloud: example2
       region-name: 'region1'
       rate: 1.0
       image-name-format: '{image_name}-{timestamp}'
@@ -296,8 +321,6 @@ Example::
               diskimage: devstack-trusty
 
 **required**
-
-  ``name``
 
   ``cloud``
   Name of a cloud configured in ``clouds.yaml``.
@@ -356,18 +379,12 @@ Example::
     OpenStack project and will attempt to clean unattached floating ips that
     may have leaked around restarts.
 
-  ``max-concurrency``
-    Maximum number of node requests that this provider is allowed to handle
-    concurrently. The default, if not specified, is to have no maximum. Since
-    each node request is handled by a separate thread, this can be useful for
-    limiting the number of threads used by the nodepool-launcher daemon.
-
 .. _pools:
 
 pools
 ~~~~~
 
-A pool defines a group of resources from a provider.  Each pool has a
+A pool defines a group of resources from an OpenStack provider. Each pool has a
 maximum number of nodes which can be launched from it, along with a
 number of cloud-related attributes used when launching nodes.
 
