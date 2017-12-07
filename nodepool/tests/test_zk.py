@@ -589,29 +589,29 @@ class TestZooKeeper(tests.DBTestCase):
         with testtools.ExpectedException(StopIteration):
             next(i)
 
-    def test_getNodeRequestLocks(self):
+    def test_getNodeRequestLockIDs(self):
         req = self._create_node_request()
         self.zk.lockNodeRequest(req, blocking=False)
-        locks = self.zk.getNodeRequestLocks()
-        self.assertEqual(1, len(locks))
-        self.assertEqual(req.id, locks[0])
+        lock_ids = self.zk.getNodeRequestLockIDs()
+        self.assertEqual(1, len(lock_ids))
+        self.assertEqual(req.id, lock_ids[0])
         self.zk.unlockNodeRequest(req)
         self.zk.deleteNodeRequest(req)
 
-    def test_getNodeRequestLock(self):
+    def test_getNodeRequestLockStats(self):
         req = self._create_node_request()
         self.zk.lockNodeRequest(req, blocking=False)
-        lock = self.zk.getNodeRequestLock(req.id)
-        self.assertEqual(lock.id, req.id)
-        self.assertIsNotNone(lock.stat)
+        lock_stats = self.zk.getNodeRequestLockStats(req.id)
+        self.assertEqual(lock_stats.lock_id, req.id)
+        self.assertIsNotNone(lock_stats.stat)
         self.zk.unlockNodeRequest(req)
         self.zk.deleteNodeRequest(req)
 
-    def test_nodeRequestLockIterator(self):
+    def test_nodeRequestLockStatsIterator(self):
         req = self._create_node_request()
         self.zk.lockNodeRequest(req, blocking=False)
-        i = self.zk.nodeRequestLockIterator()
-        self.assertEqual(zk.NodeRequestLock(req.id), next(i))
+        i = self.zk.nodeRequestLockStatsIterator()
+        self.assertEqual(zk.NodeRequestLockStats(req.id), next(i))
         with testtools.ExpectedException(StopIteration):
             next(i)
         self.zk.unlockNodeRequest(req)
@@ -634,11 +634,11 @@ class TestZooKeeper(tests.DBTestCase):
         self.zk.deleteNodeRequest(req)
 
         # We expect the lock to linger even after the request is deleted
-        locks = self.zk.getNodeRequestLocks()
-        self.assertEqual(1, len(locks))
-        self.assertEqual(req.id, locks[0])
-        self.zk.deleteNodeRequestLock(locks[0])
-        self.assertEqual([], self.zk.getNodeRequestLocks())
+        lock_ids = self.zk.getNodeRequestLockIDs()
+        self.assertEqual(1, len(lock_ids))
+        self.assertEqual(req.id, lock_ids[0])
+        self.zk.deleteNodeRequestLock(lock_ids[0])
+        self.assertEqual([], self.zk.getNodeRequestLockIDs())
 
 
 class TestZKModel(tests.BaseTestCase):
