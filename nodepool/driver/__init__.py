@@ -20,6 +20,7 @@ import abc
 import six
 
 from nodepool import zk
+from nodepool import exceptions
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -179,7 +180,15 @@ class NodeRequestHandler(object):
                 node.allocated_to = None
                 self.zk.storeNode(node)
             self.unlockNodeSet()
-            self.zk.unlockNodeRequest(self.request)
+            try:
+                self.zk.unlockNodeRequest(self.request)
+            except exceptions.ZKLockException:
+                # If the lock object is invalid that is "ok" since we no
+                # longer have a request either. Just do our best, log and
+                # move on.
+                self.log.debug("Request lock invalid for node request %s "
+                               "when attempting to clean up the lock",
+                               self.request.id)
             return True
 
         if self.launch_manager.failed_nodes:

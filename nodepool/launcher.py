@@ -217,10 +217,19 @@ class PoolWorker(threading.Thread):
         '''
         active_handlers = []
         for r in self.request_handlers:
-            if not r.poll():
+            try:
+                if not r.poll():
+                    active_handlers.append(r)
+                else:
+                    self.log.debug("Removing handler for request %s",
+                                   r.request.id)
+            except Exception:
+                # If we fail to poll a request handler log it but move on
+                # and process the other handlers. We keep this handler around
+                # and will try again later.
+                self.log.exception("Error polling request handler for "
+                                   "request %s", r.request.id)
                 active_handlers.append(r)
-            else:
-                self.log.debug("Removing handler for request %s", r.request.id)
         self.request_handlers = active_handlers
         active_reqs = [r.request.id for r in self.request_handlers]
         self.log.debug("Active requests: %s", active_reqs)
@@ -424,8 +433,8 @@ class CleanupWorker(BaseCleanupWorker):
         Because the node request locks are not direct children of the request
         znode, we need to remove the locks separately after the request has
         been processed. Only remove them after LOCK_CLEANUP seconds have
-        passed. This helps prevent the scenario where a request could go
-        away _while_ a lock is currently held for processing and the cleanup
+        passed. This helps reduce chances of the scenario where a request could
+        go away _while_ a lock is currently held for processing and the cleanup
         thread attempts to delete it. The delay should reduce the chance that
         we delete a currently held lock.
         '''
