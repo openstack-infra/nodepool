@@ -15,11 +15,11 @@
 import math
 import voluptuous as v
 
-from nodepool.driver import ConfigValue
+from nodepool.driver import ConfigPool
 from nodepool.driver import ProviderConfig
 
 
-class TestPool(ConfigValue):
+class TestPool(ConfigPool):
     pass
 
 
@@ -39,6 +39,7 @@ class TestConfig(ProviderConfig):
             testpool.name = pool['name']
             testpool.provider = self
             testpool.max_servers = pool.get('max-servers', math.inf)
+            testpool.labels = pool['labels']
             for label in pool['labels']:
                 self.labels.add(label)
                 newconfig.labels[label].pools.append(testpool)

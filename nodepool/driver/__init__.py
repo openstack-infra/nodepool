@@ -16,9 +16,11 @@
 # limitations under the License.
 
 import abc
+import collections
 import inspect
 import importlib
 import logging
+import math
 import os
 
 import six
@@ -143,13 +145,12 @@ class Provider(object):
 @six.add_metaclass(abc.ABCMeta)
 class NodeRequestHandler(object):
     '''
-    Class to process a single node request.
+    Class to process a single nodeset request.
 
     The PoolWorker thread will instantiate a class of this type for each
     node request that it pulls from ZooKeeper.
 
-    Subclasses are required to implement the run_handler method and the
-    NodeLaunchManager to kick off any threads needed to satisfy the request.
+    Subclasses are required to implement the launch method.
     '''
 
     def __init__(self, pw, request):
@@ -159,11 +160,14 @@ class NodeRequestHandler(object):
         '''
         self.pw = pw
         self.request = request
-        self.launch_manager = None
         self.nodeset = []
         self.done = False
         self.paused = False
         self.launcher_id = self.pw.launcher_id
+
+        self._failed_nodes = []
+        self._ready_nodes = []
+        self._threads = []
 
     def _setFromPoolWorker(self):
         '''
@@ -179,9 +183,229 @@ class NodeRequestHandler(object):
 
     @property
     def alive_thread_count(self):
-        if not self.launch_manager:
-            return 0
-        return self.launch_manager.alive_thread_count
+        count = 0
+        for t in self._threads:
+            if t.isAlive():
+                count += 1
+        return count
+
+    @property
+    def failed_nodes(self):
+        return self._failed_nodes
+
+    @property
+    def ready_nodes(self):
+        return self._ready_nodes
+
+    def _imagesAvailable(self):
+        '''
+        Determines if the requested images are available for this provider.
+
+        ZooKeeper is queried for an image uploaded to the provider that is
+        in the READY state.
+
+        :returns: True if it is available, False otherwise.
+        '''
+        if self.provider.driver.manage_images:
+            for label in self.request.node_types:
+                if self.pool.labels[label].cloud_image:
+                    if not self.manager.labelReady(self.pool.labels[label]):
+                        return False
+                else:
+                    if not self.zk.getMostRecentImageUpload(
+                            self.pool.labels[label].diskimage.name,
+                            self.provider.name):
+                        return False
+        return True
+
+    def _invalidNodeTypes(self):
+        '''
+        Return any node types that are invalid for this provider.
+
+        :returns: A list of node type names that are invalid, or an empty
+            list if all are valid.
+        '''
+        invalid = []
+        for ntype in self.request.node_types:
+            if ntype not in self.pool.labels:
+                invalid.append(ntype)
+        return invalid
+
+    def _waitForNodeSet(self):
+        '''
+        Fill node set for the request.
+
+        Obtain nodes for the request, pausing all new request handling for
+        this provider until the node set can be filled.
+
+        note:: This code is a bit racey in its calculation of the number of
+            nodes in use for quota purposes. It is possible for multiple
+            launchers to be doing this calculation at the same time. Since we
+            currently have no locking mechanism around the "in use"
+            calculation, if we are at the edge of the quota, one of the
+            launchers could attempt to launch a new node after the other
+            launcher has already started doing so. This would cause an
+            expected failure from the underlying library, which is ok for now.
+        '''
+        # Since this code can be called more than once for the same request,
+        # we need to calculate the difference between our current node set
+        # and what was requested. We cannot use set operations here since a
+        # node type can appear more than once in the requested types.
+        saved_types = collections.Counter([n.type for n in self.nodeset])
+        requested_types = collections.Counter(self.request.node_types)
+        diff = requested_types - saved_types
+        needed_types = list(diff.elements())
+
+        ready_nodes = self.zk.getReadyNodesOfTypes(needed_types)
+
+        for ntype in needed_types:
+            # First try to grab from the list of already available nodes.
+            got_a_node = False
+            if self.request.reuse and ntype in ready_nodes:
+                for node in ready_nodes[ntype]:
+                    # Only interested in nodes from this provider and pool
+                    if node.provider != self.provider.name:
+                        continue
+                    if node.pool != self.pool.name:
+                        continue
+                    # Check this driver reuse requirements
+                    if not self.checkReusableNode(node):
+                        continue
+                    try:
+                        self.zk.lockNode(node, blocking=False)
+                    except exceptions.ZKLockException:
+                        # It's already locked so skip it.
+                        continue
+                    else:
+                        if self.paused:
+                            self.log.debug("Unpaused request %s", self.request)
+                            self.paused = False
+
+                        self.log.debug(
+                            "Locked existing node %s for request %s",
+                            node.id, self.request.id)
+                        got_a_node = True
+                        node.allocated_to = self.request.id
+                        self.zk.storeNode(node)
+                        self.nodeset.append(node)
+                        # Notify driver handler about node re-use
+                        self.nodeReused(node)
+                        break
+
+            # Could not grab an existing node, so launch a new one.
+            if not got_a_node:
+                # If we calculate that we're at capacity, pause until nodes
+                # are released by Zuul and removed by the DeletedNodeWorker.
+                if not self.hasRemainingQuota(ntype):
+                    if not self.paused:
+                        self.log.debug(
+                            "Pausing request handling to satisfy request %s",
+                            self.request)
+                    self.paused = True
+                    self.zk.deleteOldestUnusedNode(self.provider.name,
+                                                   self.pool.name)
+                    return
+
+                if self.paused:
+                    self.log.debug("Unpaused request %s", self.request)
+                    self.paused = False
+
+                node = zk.Node()
+                node.state = zk.INIT
+                node.type = ntype
+                node.provider = self.provider.name
+                node.pool = self.pool.name
+                node.launcher = self.launcher_id
+                node.allocated_to = self.request.id
+
+                self.setNodeMetadata(node)
+
+                # Note: It should be safe (i.e., no race) to lock the node
+                # *after* it is stored since nodes in INIT state are not
+                # locked anywhere.
+                self.zk.storeNode(node)
+                self.zk.lockNode(node, blocking=False)
+                self.log.debug("Locked building node %s for request %s",
+                               node.id, self.request.id)
+
+                # Set state AFTER lock so that it isn't accidentally cleaned
+                # up (unlocked BUILDING nodes will be deleted).
+                node.state = zk.BUILDING
+                self.zk.storeNode(node)
+
+                self.nodeset.append(node)
+                thread = self.launch(node)
+                if thread:
+                    thread.start()
+                    self._threads.append(thread)
+
+    def _runHandler(self):
+        '''
+        Main body for the node request handling.
+        '''
+        self._setFromPoolWorker()
+
+        if self.provider is None or self.pool is None:
+            # If the config changed out from underneath us, we could now be
+            # an invalid provider and should stop handling this request.
+            raise Exception("Provider configuration missing")
+
+        # We have the launcher_id attr after _setFromPoolWorker() is called.
+        self.log = logging.getLogger(
+            "nodepool.driver.NodeRequestHandler[%s]" % self.launcher_id)
+
+        declined_reasons = []
+        invalid_types = self._invalidNodeTypes()
+        if invalid_types:
+            declined_reasons.append('node type(s) [%s] not available' %
+                                    ','.join(invalid_types))
+        elif not self._imagesAvailable():
+            declined_reasons.append('images are not available')
+        elif (self.pool.max_servers <= 0 or
+              not self.hasProviderQuota(self.request.node_types)):
+            declined_reasons.append('it would exceed quota')
+        # TODO(tobiash): Maybe also calculate the quota prediction here and
+        # backoff for some seconds if the used quota would be exceeded?
+        # This way we could give another (free) provider the chance to take
+        # this request earlier.
+
+        # For min-ready requests, which do not re-use READY nodes, let's
+        # decline if this provider is already at capacity. Otherwise, we
+        # could end up wedged until another request frees up a node.
+        if self.pool.max_servers is not None and \
+           self.request.requestor == "NodePool:min-ready":
+            current_count = self.zk.countPoolNodes(self.provider.name,
+                                                   self.pool.name)
+            # Use >= because dynamic config changes to max-servers can leave
+            # us with more than max-servers.
+            # TODO: handle this with the quota code
+            if current_count >= self.pool.max_servers:
+                declined_reasons.append("provider cannot satisify min-ready")
+
+        if declined_reasons:
+            self.log.debug("Declining node request %s because %s",
+                           self.request.id, ', '.join(declined_reasons))
+            self.decline_request()
+            self.unlockNodeSet(clear_allocation=True)
+
+            # If conditions have changed for a paused request to now cause us
+            # to decline it, we need to unpause so we don't keep trying it
+            if self.paused:
+                self.paused = False
+
+            self.zk.storeNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+            self.done = True
+            return
+
+        if self.paused:
+            self.log.debug("Retrying node request %s", self.request.id)
+        else:
+            self.log.debug("Accepting node request %s", self.request.id)
+            self.request.state = zk.PENDING
+            self.zk.storeNodeRequest(self.request)
+
+        self._waitForNodeSet()
 
     # ---------------------------------------------------------------
     # Public methods
@@ -236,7 +460,7 @@ class NodeRequestHandler(object):
         fulfilled. The node set is saved and added to between calls.
         '''
         try:
-            self.run_handler()
+            self._runHandler()
         except Exception:
             self.log.exception(
                 "Declining node request %s due to exception in "
@@ -269,7 +493,7 @@ class NodeRequestHandler(object):
         if self.done:
             return True
 
-        if self.launch_manager and not self.launch_manager.poll():
+        if not self.pollLauncher():
             return False
 
         # If the request has been pulled, unallocate the node set so other
@@ -291,9 +515,7 @@ class NodeRequestHandler(object):
                                self.request.id)
             return True
 
-        if self.launch_manager and self.launch_manager.failed_nodes or \
-           len(self.nodeset) != len(self.request.node_types) or \
-           [node for node in self.nodeset if node.state != zk.READY]:
+        if self.failed_nodes:
             self.log.debug("Declining node request %s because nodes failed",
                            self.request.id)
             self.decline_request()
@@ -319,57 +541,10 @@ class NodeRequestHandler(object):
         self.zk.unlockNodeRequest(self.request)
         return True
 
-    @abc.abstractmethod
-    def run_handler(self):
-        pass
-
-
-@six.add_metaclass(abc.ABCMeta)
-class NodeLaunchManager(object):
-    '''
-    Handle launching multiple nodes in parallel.
-
-    Subclasses are required to implement the launch method.
-    '''
-    def __init__(self, zk, pool, provider_manager,
-                 requestor, retries):
-        '''
-        Initialize the launch manager.
-
-        :param ZooKeeper zk: A ZooKeeper object.
-        :param ProviderPool pool: A config ProviderPool object.
-        :param ProviderManager provider_manager: The manager object used to
-            interact with the selected provider.
-        :param str requestor: Identifier for the request originator.
-        :param int retries: Number of times to retry failed launches.
-        '''
-        self._retries = retries
-        self._nodes = []
-        self._failed_nodes = []
-        self._ready_nodes = []
-        self._threads = []
-        self._zk = zk
-        self._pool = pool
-        self._provider_manager = provider_manager
-        self._requestor = requestor
-
-    @property
-    def alive_thread_count(self):
-        count = 0
-        for t in self._threads:
-            if t.isAlive():
-                count += 1
-        return count
-
-    @property
-    def failed_nodes(self):
-        return self._failed_nodes
-
-    @property
-    def ready_nodes(self):
-        return self._ready_nodes
-
-    def poll(self):
+    # ---------------------------------------------------------------
+    # Driver Implementation
+    # ---------------------------------------------------------------
+    def pollLauncher(self):
         '''
         Check if all launch requests have completed.
 
@@ -383,14 +558,14 @@ class NodeLaunchManager(object):
         if self.alive_thread_count:
             return False
 
-        node_states = [node.state for node in self._nodes]
+        node_states = [node.state for node in self.nodeset]
 
         # NOTE: It very important that NodeLauncher always sets one of
         # these states, no matter what.
         if not all(s in (zk.READY, zk.FAILED) for s in node_states):
             return False
 
-        for node in self._nodes:
+        for node in self.nodeset:
             if node.state == zk.READY:
                 self._ready_nodes.append(node)
             else:
@@ -398,8 +573,52 @@ class NodeLaunchManager(object):
 
         return True
 
+    def hasProviderQuota(self, node_types):
+        '''
+        Checks if a provider has enough quota to handle a list of nodes.
+        This does not take our currently existing nodes into account.
+
+        :param node_types: list of node types to check
+        :return: True if the node list fits into the provider, False otherwise
+        '''
+        return True
+
+    def hasRemainingQuota(self, ntype):
+        '''
+        Checks if the predicted quota is enough for an additional node of type
+        ntype.
+
+        :param ntype: node type for the quota check
+        :return: True if there is enough quota, False otherwise
+        '''
+        return True
+
+    def nodeReused(self, node):
+        '''
+        Handler may implement this to be notified when a node is re-used.
+        The OpenStack handler uses this to set the choozen_az.
+        '''
+        pass
+
+    def checkReusableNode(self, node):
+        '''
+        Handler may implement this to verify a node can be re-used.
+        The OpenStack handler uses this to verify the node az is correct.
+        '''
+        return True
+
+    def setNodeMetadata(self, node):
+        '''
+        Handler may implement this to store metadata before building the node.
+        The OpenStack handler uses this to set az, cloud and region.
+        '''
+        pass
+
     @abc.abstractmethod
     def launch(self, node):
+        '''
+        Handler needs to implement this to launch the node.
+        '''
         pass
 
 
@@ -412,6 +631,12 @@ class ConfigValue(object):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+class ConfigPool(ConfigValue):
+    def __init__(self):
+        self.labels = []
+        self.max_servers = math.inf
 
 
 class Driver(ConfigValue):
