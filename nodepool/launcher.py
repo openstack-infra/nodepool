@@ -432,11 +432,11 @@ class CleanupWorker(BaseCleanupWorker):
         zk = self._nodepool.getZK()
         requests = zk.getNodeRequests()
         now = time.time()
-        for lock in zk.nodeRequestLockIterator():
-            if lock.id in requests:
+        for lock_stat in zk.nodeRequestLockStatsIterator():
+            if lock_stat.lock_id in requests:
                 continue
-            if (now - lock.stat.mtime/1000) > LOCK_CLEANUP:
-                zk.deleteNodeRequestLock(lock.id)
+            if (now - lock_stat.stat.mtime/1000) > LOCK_CLEANUP:
+                zk.deleteNodeRequestLock(lock_stat.lock_id)
 
     def _cleanupLeakedInstances(self):
         '''
