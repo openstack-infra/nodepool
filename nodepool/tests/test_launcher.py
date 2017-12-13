@@ -14,8 +14,10 @@
 # limitations under the License.
 
 import logging
+import math
 import time
 import fixtures
+import unittest.mock as mock
 
 from nodepool import tests
 from nodepool import zk
@@ -109,12 +111,22 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[2].type, 'fake-label4')
         self.assertEqual(nodes[3].type, 'fake-label2')
 
-    def test_node_assignment_at_quota(self):
+    @mock.patch('nodepool.driver.fake.provider.get_fake_quota')
+    def _test_node_assignment_at_quota(self, mock_quota,
+                                       config='node_quota.yaml',
+                                       max_cores=100,
+                                       max_instances=20,
+                                       max_ram=1000000):
         '''
         Successful node launch should have unlocked nodes in READY state
-        and assigned to the request.
+        and assigned to the request. This should be run with a quota that
+        fits for two nodes.
         '''
-        configfile = self.setup_config('node_quota.yaml')
+
+        # patch the cloud with requested quota
+        mock_quota.return_value = (max_cores, max_instances, max_ram)
+
+        configfile = self.setup_config(config)
         self._useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
 
@@ -213,6 +225,29 @@ class TestLauncher(tests.DBTestCase):
         req2 = self.waitForNodeRequest(req2)
         self.assertEqual(req2.state, zk.FULFILLED)
         self.assertEqual(len(req2.nodes), 2)
+
+    def test_node_assignment_at_pool_quota_instances(self):
+        self._test_node_assignment_at_quota(
+            config='node_quota_pool_instances.yaml')
+
+
+    def test_node_assignment_at_cloud_cores_quota(self):
+        self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
+                                            max_cores=8,
+                                            max_instances=math.inf,
+                                            max_ram=math.inf)
+
+    def test_node_assignment_at_cloud_instances_quota(self):
+        self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
+                                            max_cores=math.inf,
+                                            max_instances=2,
+                                            max_ram=math.inf)
+
+    def test_node_assignment_at_cloud_ram_quota(self):
+        self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
+                                            max_cores=math.inf,
+                                            max_instances=math.inf,
+                                            max_ram=2*8192)
 
     def test_fail_request_on_launch_failure(self):
         '''
