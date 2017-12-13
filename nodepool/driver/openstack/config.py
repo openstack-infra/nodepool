@@ -63,6 +63,7 @@ class ProviderPool(ConfigValue):
         if (other.labels != self.labels or
             other.max_cores != self.max_cores or
             other.max_servers != self.max_servers or
+            other.max_ram != self.max_ram or
             other.azs != self.azs or
             other.networks != self.networks):
             return False
@@ -162,6 +163,7 @@ class OpenStackProviderConfig(ProviderConfig):
             self.pools[pp.name] = pp
             pp.max_cores = pool.get('max-cores', None)
             pp.max_servers = pool.get('max-servers', None)
+            pp.max_ram = pool.get('max-ram', None)
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
             pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
@@ -248,6 +250,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'auto-floating-ip': bool,
             'max-cores': int,
             'max-servers': int,
+            'max-ram': int,
             'labels': [pool_label],
             'availability-zones': [str],
         }

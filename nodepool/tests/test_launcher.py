@@ -234,6 +234,9 @@ class TestLauncher(tests.DBTestCase):
         self._test_node_assignment_at_quota(
             config='node_quota_pool_instances.yaml')
 
+    def test_node_assignment_at_pool_quota_ram(self):
+        self._test_node_assignment_at_quota(
+            config='node_quota_pool_ram.yaml')
 
     def test_node_assignment_at_cloud_cores_quota(self):
         self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
