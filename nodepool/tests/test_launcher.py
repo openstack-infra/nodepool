@@ -226,6 +226,10 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(req2.state, zk.FULFILLED)
         self.assertEqual(len(req2.nodes), 2)
 
+    def test_node_assignment_at_pool_quota_cores(self):
+        self._test_node_assignment_at_quota(
+            config='node_quota_pool_cores.yaml')
+
     def test_node_assignment_at_pool_quota_instances(self):
         self._test_node_assignment_at_quota(
             config='node_quota_pool_instances.yaml')
