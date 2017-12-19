@@ -1,0 +1,7 @@
+---
+prelude: Amazon Web Services (AWS) EC2 Driver
+features:
+  - The new Amazon Web Services (AWS) EC2 Driver allows launching EC2 instances as nodes.
+issues:
+  - The AWS driver does not support quota management at this time.
+  - The AWS driver does not support custom image building.
