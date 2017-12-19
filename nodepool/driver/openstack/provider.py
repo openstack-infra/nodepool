@@ -173,14 +173,14 @@ class OpenStackProvider(Provider):
             if now < self._current_nodepool_quota['timestamp'] + MAX_QUOTA_AGE:
                 return copy.deepcopy(self._current_nodepool_quota['quota'])
 
-        self.log.debug("Updating quota information")
-
         with shade_inner_exceptions():
             limits = self._client.get_compute_limits()
 
         # This is initialized with the full tenant quota and later becomes
         # the quota available for nodepool.
         nodepool_quota = QuotaInformation.construct_from_limits(limits)
+        self.log.debug("Provider quota for %s: %s",
+                       self.provider.name, nodepool_quota)
 
         # Subtract the unmanaged quota usage from nodepool_max
         # to get the quota available for us.
@@ -191,10 +191,10 @@ class OpenStackProvider(Provider):
             'timestamp': time.monotonic()
         }
 
-        quota = self._current_nodepool_quota['quota']
-        self.log.debug("Available nodepool quota: %s", quota)
+        self.log.debug("Available quota for %s: %s",
+                       self.provider.name, nodepool_quota)
 
-        return copy.deepcopy(self._current_nodepool_quota['quota'])
+        return copy.deepcopy(nodepool_quota)
 
     def invalidateQuotaCache(self):
         self._current_nodepool_quota['timestamp'] = 0
