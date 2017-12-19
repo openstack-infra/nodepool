@@ -40,6 +40,9 @@ class Dummy(object):
             if self.should_fail:
                 raise shade.OpenStackCloudException('This image has '
                                                     'SHOULD_FAIL set to True.')
+            if self.over_quota:
+                raise shade.exc.OpenStackCloudHTTPError(
+                    'Quota exceeded for something', 403)
         except AttributeError:
             pass
 
@@ -112,9 +115,8 @@ class FakeOpenStackCloud(object):
                 return net
         return self.networks[0]
 
-    def _create(
-            self, instance_list, instance_type=Dummy.INSTANCE,
-            done_status='ACTIVE', **kw):
+    def _create(self, instance_list, instance_type=Dummy.INSTANCE,
+                done_status='ACTIVE', max_quota=-1, **kw):
         should_fail = kw.get('SHOULD_FAIL', '').lower() == 'true'
         nics = kw.get('nics', [])
         addresses = None
@@ -142,6 +144,11 @@ class FakeOpenStackCloud(object):
             public_v4 = 'fake'
             private_v4 = 'fake'
             interface_ip = 'fake'
+        over_quota = False
+        if (instance_type == Dummy.INSTANCE and
+            self.max_instances > -1 and
+            len(instance_list) >= self.max_instances):
+            over_quota = True
 
         s = Dummy(instance_type,
                   id=uuid.uuid4().hex,
@@ -158,6 +165,7 @@ class FakeOpenStackCloud(object):
                   manager=self,
                   key_name=kw.get('key_name', None),
                   should_fail=should_fail,
+                  over_quota=over_quota,
                   event=threading.Event())
         instance_list.append(s)
         t = threading.Thread(target=self._finish,

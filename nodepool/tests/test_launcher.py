@@ -256,6 +256,75 @@ class TestLauncher(tests.DBTestCase):
                                             max_instances=math.inf,
                                             max_ram=2*8192)
 
+
+    @mock.patch('nodepool.driver.fake.provider.get_fake_quota')
+    def test_over_quota(self, mock_quota,
+                        config='node_quota_cloud.yaml'):
+        '''
+        This tests what happens when a cloud unexpectedly returns an
+        over-quota error.
+
+        '''
+        # Start with an instance quota of 2
+        max_cores=math.inf
+        max_instances=2
+        max_ram=math.inf
+
+        # patch the cloud with requested quota
+        mock_quota.return_value = (max_cores, max_instances, max_ram)
+
+        configfile = self.setup_config(config)
+        self._useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        nodepool.launcher.LOCK_CLEANUP = 1
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.wait_for_config(pool)
+
+        client = pool.getProviderManager('fake-provider')._getClient()
+
+        # Wait for a single node to be created
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.node_types.append('fake-label')
+        self.log.debug("Adding first request")
+        self.zk.storeNodeRequest(req1)
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+
+        # Now, reduce the quota so the next node unexpectedly
+        # (according to nodepool's quota estimate) fails.
+        client.max_instances = 1
+
+        # Request a second node; this request should fail.
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        self.log.debug("Adding second request")
+        self.zk.storeNodeRequest(req2)
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FAILED)
+
+        # After the second request failed, the internal quota estimate
+        # should be reset, so the next request should pause to wait
+        # for more quota to become available.
+        req3 = zk.NodeRequest()
+        req3.state = zk.REQUESTED
+        req3.node_types.append('fake-label')
+        self.log.debug("Adding third request")
+        self.zk.storeNodeRequest(req3)
+        req3 = self.waitForNodeRequest(req3, (zk.PENDING,))
+        self.assertEqual(req3.state, zk.PENDING)
+
+        # Wait until there is a paused request handler and verify that
+        # there is still only one server built (from the first
+        # request).
+        pool_worker = pool.getPoolWorkers('fake-provider')
+        while not pool_worker[0].paused_handler:
+            time.sleep(0.1)
+        self.assertEqual(len(client._server_list), 1)
+
     def test_fail_request_on_launch_failure(self):
         '''
         Test that provider launch error fails the request.

@@ -169,7 +169,7 @@ class OpenStackProvider(Provider):
         '''
 
         if self._current_nodepool_quota:
-            now = time.monotonic()
+            now = time.time()
             if now < self._current_nodepool_quota['timestamp'] + MAX_QUOTA_AGE:
                 return copy.deepcopy(self._current_nodepool_quota['quota'])
 
@@ -188,7 +188,7 @@ class OpenStackProvider(Provider):
 
         self._current_nodepool_quota = {
             'quota': nodepool_quota,
-            'timestamp': time.monotonic()
+            'timestamp': time.time()
         }
 
         self.log.debug("Available quota for %s: %s",
