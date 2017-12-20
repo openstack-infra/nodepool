@@ -221,8 +221,16 @@ class OpenStackProvider(Provider):
             if node.provider == self.provider.name:
                 if pool and not node.pool == pool.name:
                     continue
+                provider_pool = self.provider.pools.get(node.pool)
+                if not provider_pool:
+                    self.log.warning(
+                        "Cannot find provider pool for node %s" % node)
+                    # This node is in a funny state we log it for debugging
+                    # but move on and don't account it as we can't properly
+                    # calculate its cost without pool info.
+                    continue
                 node_resources = self.quotaNeededByNodeType(
-                    node.type, self.provider.pools.get(node.pool))
+                    node.type, provider_pool)
                 used_quota.add(node_resources)
         return used_quota
 
