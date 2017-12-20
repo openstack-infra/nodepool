@@ -241,7 +241,9 @@ class TestLauncher(tests.DBTestCase):
     def test_node_assignment_at_cloud_cores_quota(self):
         self._test_node_assignment_at_quota(config='node_quota_cloud.yaml',
                                             max_cores=8,
-                                            max_instances=math.inf,
+                                            # check that -1 and inf work for no
+                                            # quota
+                                            max_instances=-1,
                                             max_ram=math.inf)
 
     def test_node_assignment_at_cloud_instances_quota(self):
