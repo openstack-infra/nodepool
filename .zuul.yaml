@@ -32,7 +32,6 @@
       - openstack-infra/zuul
 
 - project:
-    name: openstack-infra/nodepool
     check:
       jobs:
         - tox-docs
