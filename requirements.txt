@@ -1,7 +1,7 @@
 pbr>=1.3
 
 PyYAML
-paramiko>1.11.6,<2.0.0
+paramiko>=2.0.1
 python-daemon>=2.0.4,<2.1.0
 extras
 statsd>=3.0
