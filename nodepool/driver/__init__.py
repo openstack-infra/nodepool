@@ -258,7 +258,7 @@ class NodeLaunchManager(object):
         self._threads = []
         self._zk = zk
         self._pool = pool
-        self._manager = provider_manager
+        self._provider_manager = provider_manager
         self._requestor = requestor
 
     @property

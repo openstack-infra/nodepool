@@ -44,12 +44,12 @@ SUSPEND_WAIT_TIME = 30       # How long to wait between checks for ZooKeeper
 class NodeDeleter(threading.Thread, stats.StatsReporter):
     log = logging.getLogger("nodepool.NodeDeleter")
 
-    def __init__(self, zk, manager, node):
+    def __init__(self, zk, provider_manager, node):
         threading.Thread.__init__(self, name='NodeDeleter for %s %s' %
                                   (node.provider, node.external_id))
         stats.StatsReporter.__init__(self)
         self._zk = zk
-        self._manager = manager
+        self._provider_manager = provider_manager
         self._node = node
 
     @staticmethod
@@ -60,8 +60,8 @@ class NodeDeleter(threading.Thread, stats.StatsReporter):
         This is a class method so we can support instantaneous deletes.
 
         :param ZooKeeper zk_conn: A ZooKeeper object to use.
-        :param ProviderManager manager: ProviderManager object to use for
-            deleting the server.
+        :param ProviderManager provider_manager: ProviderManager object to
+            use fo deleting the server.
         :param Node node: A locked Node object that describes the server to
             delete.
         :param bool node_exists: True if the node actually exists in ZooKeeper.
@@ -101,10 +101,10 @@ class NodeDeleter(threading.Thread, stats.StatsReporter):
         else:
             node_exists = True
 
-        self.delete(self._zk, self._manager, self._node, node_exists)
+        self.delete(self._zk, self._provider_manager, self._node, node_exists)
 
         try:
-            self.updateNodeStats(self._zk, self._manager.provider)
+            self.updateNodeStats(self._zk, self._provider_manager.provider)
         except Exception:
             self.log.exception("Exception while reporting stats:")
 

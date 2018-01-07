@@ -52,23 +52,24 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         self.log = logging.getLogger("nodepool.NodeLauncher-%s" % node.id)
         self._zk = zk
         self._label = provider_label
-        self._manager = provider_manager
+        self._provider_manager = provider_manager
         self._node = node
         self._retries = retries
         self._image_name = None
         self._requestor = requestor
 
         self._pool = self._label.pool
-        self._provider = self._pool.provider
+        self._provider_config = self._pool.provider
         if self._label.diskimage:
-            self._diskimage = self._provider.diskimages[self._label.diskimage.name]
+            self._diskimage = \
+                self._provider_config.diskimages[self._label.diskimage.name]
         else:
             self._diskimage = None
 
     def logConsole(self, server_id, hostname):
         if not self._label.console_log:
             return
-        console = self._manager.getServerConsole(server_id)
+        console = self._provider_manager.getServerConsole(server_id)
         if console:
             self.log.debug('Console log from hostname %s:' % hostname)
             for line in console.splitlines():
@@ -78,12 +79,12 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         if self._label.diskimage:
             # launch using diskimage
             cloud_image = self._zk.getMostRecentImageUpload(
-                self._diskimage.name, self._provider.name)
+                self._diskimage.name, self._provider_config.name)
 
             if not cloud_image:
                 raise exceptions.LaunchNodepoolException(
                     "Unable to find current cloud image %s in %s" %
-                    (self._diskimage.name, self._provider.name)
+                    (self._diskimage.name, self._provider_config.name)
                 )
 
             config_drive = self._diskimage.config_drive
@@ -107,12 +108,13 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             username = self._label.cloud_image.username
             connection_type = self._label.cloud_image.connection_type
 
-        hostname = self._provider.hostname_format.format(
-            label=self._label, provider=self._provider, node=self._node
+        hostname = self._provider_config.hostname_format.format(
+            label=self._label, provider=self._provider_config, node=self._node
         )
 
         self.log.info("Creating server with hostname %s in %s from image %s "
-                      "for node id: %s" % (hostname, self._provider.name,
+                      "for node id: %s" % (hostname,
+                                           self._provider_config.name,
                                            image_name,
                                            self._node.id))
 
@@ -121,7 +123,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         # because that isn't available in ZooKeeper until after the server is
         # active, which could cause a race in leak detection.
 
-        server = self._manager.createServer(
+        server = self._provider_manager.createServer(
             hostname,
             image=image_external,
             min_ram=self._label.min_ram,
@@ -148,8 +150,8 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
 
         self.log.debug("Waiting for server %s for node id: %s" %
                        (server.id, self._node.id))
-        server = self._manager.waitForServer(
-            server, self._provider.launch_timeout,
+        server = self._provider_manager.waitForServer(
+            server, self._provider_config.launch_timeout,
             auto_ip=self._pool.auto_floating_ip)
 
         if server.status != 'ACTIVE':
@@ -196,7 +198,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
         try:
             self.log.debug("Gathering host keys for node %s", self._node.id)
             host_keys = utils.keyscan(
-                interface_ip, timeout=self._provider.boot_timeout)
+                interface_ip, timeout=self._provider_config.boot_timeout)
             if not host_keys:
                 raise exceptions.LaunchKeyscanException(
                     "Unable to gather host keys")
@@ -220,8 +222,10 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
                         attempts, self._retries, self._node.id)
                 # If we created an instance, delete it.
                 if self._node.external_id:
-                    self._manager.cleanupNode(self._node.external_id)
-                    self._manager.waitForNodeCleanup(self._node.external_id)
+                    self._provider_manager.cleanupNode(self._node.external_id)
+                    self._provider_manager.waitForNodeCleanup(
+                        self._node.external_id
+                    )
                     self._node.external_id = None
                     self._node.public_ipv4 = None
                     self._node.public_ipv6 = None
@@ -232,7 +236,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
                 # Invalidate the quota cache if we encountered a quota error.
                 if 'quota exceeded' in str(e).lower():
                     self.log.info("Quota exceeded, invalidating quota cache")
-                    self._manager.invalidateQuotaCache()
+                    self._provider_manager.invalidateQuotaCache()
                 attempts += 1
 
         self._node.state = zk.READY
@@ -261,7 +265,7 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             self.recordLaunchStats(statsd_key, dt, self._image_name,
                                    self._node.provider, self._node.az,
                                    self._requestor)
-            self.updateNodeStats(self._zk, self._provider)
+            self.updateNodeStats(self._zk, self._provider_config)
         except Exception:
             self.log.exception("Exception while reporting stats:")
 
@@ -279,7 +283,7 @@ class OpenStackNodeLaunchManager(NodeLaunchManager):
         '''
         self._nodes.append(node)
         provider_label = self._pool.labels[node.type]
-        t = NodeLauncher(self._zk, provider_label, self._manager,
+        t = NodeLauncher(self._zk, provider_label, self._provider_manager,
                          self._requestor, node, self._retries)
         t.start()
         self._threads.append(t)
