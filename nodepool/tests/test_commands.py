@@ -85,7 +85,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_image_delete(self):
         configfile = self.setup_config("node.yaml")
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         image = self.zk.getMostRecentImageUpload('fake-image', 'fake-provider')
         self.patch_argv("-c", configfile, "image-delete",
@@ -99,7 +99,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_alien_image_list_empty(self):
         configfile = self.setup_config("node.yaml")
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
@@ -118,7 +118,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_list_nodes(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
@@ -128,7 +128,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_list_nodes_detail(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
@@ -144,13 +144,13 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_list(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
 
     def test_dib_image_build_pause(self):
         configfile = self.setup_config('node_diskimage_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.patch_argv("-c", configfile, "image-build", "fake-image")
         with testtools.ExpectedException(Exception):
             nodepoolcmd.main()
@@ -158,7 +158,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_pause(self):
         configfile = self.setup_config('node_diskimage_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         nodes = self.waitForNodes('fake-label2')
@@ -168,7 +168,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_upload_pause(self):
         configfile = self.setup_config('node_image_upload_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         nodes = self.waitForNodes('fake-label2')
@@ -183,7 +183,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
@@ -203,7 +203,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_hold(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
@@ -222,7 +222,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
@@ -243,7 +243,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage( 'fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
@@ -263,7 +263,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_image_build(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
 
         # wait for the scheduled build to arrive
         self.waitForImage('fake-provider', 'fake-image')
@@ -280,7 +280,7 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_request_list(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage( 'fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')

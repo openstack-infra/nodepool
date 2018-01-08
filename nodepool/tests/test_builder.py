@@ -99,7 +99,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_builder_id_file(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         path = os.path.join(self._config_images_dir.path, 'builder_id.txt')
 
         # Validate the unique ID file exists and contents are what we expect
@@ -126,7 +126,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
         pool = self.useNodepool(configfile, watermark_sleep=1)
         # NOTE(pabelanger): Disable CleanupWorker thread for nodepool-builder
         # as we currently race it to validate our failed uploads.
-        self._useBuilder(configfile, cleanup_interval=0)
+        self.useBuilder(configfile, cleanup_interval=0)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
@@ -142,14 +142,14 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_provider_addition(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.replace_config(configfile, 'node_two_provider.yaml')
         self.waitForImage('fake-provider2', 'fake-image')
 
     def test_provider_removal(self):
         configfile = self.setup_config('node_two_provider.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForImage('fake-provider2', 'fake-image')
         image = self.zk.getMostRecentImageUpload('fake-provider', 'fake-image')
@@ -160,14 +160,14 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_image_addition(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.replace_config(configfile, 'node_two_image.yaml')
         self.waitForImage('fake-provider', 'fake-image2')
 
     def test_image_removal(self):
         configfile = self.setup_config('node_two_image.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForImage('fake-provider', 'fake-image2')
         self.replace_config(configfile, 'node_two_image_remove.yaml')
@@ -179,7 +179,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def _test_image_rebuild_age(self, expire=86400):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         build = self.waitForBuild('fake-image', '0000000001')
         image = self.waitForImage('fake-provider', 'fake-image')
         # Expire rebuild-age (default: 1day) to force a new build.
@@ -257,7 +257,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_cleanup_hard_upload_fails(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
 
         upload = self.zk.getUploads('fake-image', '0000000001',
@@ -282,7 +282,7 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_cleanup_failed_image_build(self):
         configfile = self.setup_config('node_diskimage_fail.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         # NOTE(pabelanger): We are racing here, but don't really care. We just
         # need our first image build to fail.
         self.replace_config(configfile, 'node.yaml')
@@ -292,5 +292,5 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
     def test_diskimage_build_only(self):
         configfile = self.setup_config('node_diskimage_only.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForBuild('fake-image', '0000000001')
