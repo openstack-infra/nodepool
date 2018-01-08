@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import configparser as ConfigParser
 import time
 import yaml
 
@@ -66,7 +65,7 @@ def get_provider_config(provider):
         return OpenStackProviderConfig(provider)
 
 
-def loadConfig(config_path):
+def openConfig(path):
     retry = 3
 
     # Since some nodepool code attempts to dynamically re-read its config
@@ -75,7 +74,7 @@ def loadConfig(config_path):
     # attempt to reload it.
     while True:
         try:
-            config = yaml.load(open(config_path))
+            config = yaml.load(open(path))
             break
         except IOError as e:
             if e.errno == 2:
@@ -85,6 +84,11 @@ def loadConfig(config_path):
                 raise e
             if retry == 0:
                 raise e
+    return config
+
+
+def loadConfig(config_path):
+    config = openConfig(config_path)
 
     # Reset the shared os_client_config instance
     OpenStackProviderConfig.os_client_config = None
@@ -126,8 +130,6 @@ def loadConfig(config_path):
         d.rebuild_age = int(diskimage.get('rebuild-age', 86400))
         d.env_vars = diskimage.get('env-vars', {})
         if not isinstance(d.env_vars, dict):
-            #self.log.error("%s: ignoring env-vars; "
-            #               "should be a dict" % d.name)
             d.env_vars = {}
         d.image_types = set(diskimage.get('formats', []))
         d.pause = bool(diskimage.get('pause', False))
@@ -149,7 +151,18 @@ def loadConfig(config_path):
 
 
 def loadSecureConfig(config, secure_config_path):
-    secure = ConfigParser.ConfigParser()
-    secure.readfp(open(secure_config_path))
+    secure = openConfig(secure_config_path)
+    if not secure:   # empty file
+        return
 
-    #config.dburi = secure.get('database', 'dburi')
+    # Eliminate any servers defined in the normal config
+    if secure.get('zookeeper-servers', []):
+        config.zookeeper_servers = {}
+
+    # TODO(Shrews): Support ZooKeeper auth
+    for server in secure.get('zookeeper-servers', []):
+        z = zk.ZooKeeperConnectionConfig(server['host'],
+                                         server.get('port', 2181),
+                                         server.get('chroot', None))
+        name = z.host + '_' + str(z.port)
+        config.zookeeper_servers[name] = z

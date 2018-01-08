@@ -108,13 +108,14 @@ class DibImageFile(object):
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, builder_id, config_path, interval, zk):
+    def __init__(self, builder_id, config_path, secure_path, interval, zk):
         super(BaseWorker, self).__init__()
         self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
         self._running = False
         self._config = None
         self._config_path = config_path
+        self._secure_path = secure_path
         self._zk = zk
         self._hostname = socket.gethostname()
         self._statsd = stats.get_client()
@@ -146,9 +147,10 @@ class CleanupWorker(BaseWorker):
     and any local DIB builds.
     '''
 
-    def __init__(self, name, builder_id, config_path, interval, zk):
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk):
         super(CleanupWorker, self).__init__(builder_id, config_path,
-                                            interval, zk)
+                                            secure_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
         self.name = 'CleanupWorker.%s' % name
 
@@ -507,6 +509,8 @@ class CleanupWorker(BaseWorker):
         Body of run method for exception handling purposes.
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -519,8 +523,9 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    def __init__(self, name, builder_id, config_path, interval, zk, dib_cmd):
-        super(BuildWorker, self).__init__(builder_id, config_path,
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk, dib_cmd):
+        super(BuildWorker, self).__init__(builder_id, config_path, secure_path,
                                           interval, zk)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
         self.name = 'BuildWorker.%s' % name
@@ -781,6 +786,8 @@ class BuildWorker(BaseWorker):
         '''
         # NOTE: For the first iteration, we expect self._config to be None
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -792,9 +799,10 @@ class BuildWorker(BaseWorker):
 
 
 class UploadWorker(BaseWorker):
-    def __init__(self, name, builder_id, config_path, interval, zk):
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk):
         super(UploadWorker, self).__init__(builder_id, config_path,
-                                           interval, zk)
+                                           secure_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
         self.name = 'UploadWorker.%s' % name
 
@@ -803,6 +811,8 @@ class UploadWorker(BaseWorker):
         Reload the nodepool configuration file.
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -1039,17 +1049,19 @@ class NodePoolBuilder(object):
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
-    def __init__(self, config_path, num_builders=1, num_uploaders=4,
-                 fake=False):
+    def __init__(self, config_path, secure_path=None,
+                 num_builders=1, num_uploaders=4, fake=False):
         '''
         Initialize the NodePoolBuilder object.
 
         :param str config_path: Path to configuration file.
+        :param str secure_path: Path to secure configuration file.
         :param int num_builders: Number of build workers to start.
         :param int num_uploaders: Number of upload workers to start.
         :param bool fake: Whether to fake the image builds.
         '''
         self._config_path = config_path
+        self._secure_path = secure_path
         self._config = None
         self._num_builders = num_builders
         self._build_workers = []
@@ -1090,6 +1102,8 @@ class NodePoolBuilder(object):
 
     def _getAndValidateConfig(self):
         config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(config, self._secure_path)
         if not config.zookeeper_servers.values():
             raise RuntimeError('No ZooKeeper servers specified in config.')
         if not config.imagesdir:
@@ -1127,20 +1141,23 @@ class NodePoolBuilder(object):
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(i, builder_id, self._config_path,
+                w = BuildWorker(i, builder_id,
+                                self._config_path, self._secure_path,
                                 self.build_interval, self.zk, self.dib_cmd)
                 w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker(i, builder_id, self._config_path,
+                w = UploadWorker(i, builder_id,
+                                 self._config_path, self._secure_path,
                                  self.upload_interval, self.zk)
                 w.start()
                 self._upload_workers.append(w)
 
             if self.cleanup_interval > 0:
                 self._janitor = CleanupWorker(
-                    0, builder_id, self._config_path,
+                    0, builder_id,
+                    self._config_path, self._secure_path,
                     self.cleanup_interval, self.zk)
                 self._janitor.start()
 

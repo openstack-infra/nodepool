@@ -34,6 +34,8 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolDaemonApp):
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
+        parser.add_argument('-s', dest='secure',
+                            help='path to secure config file')
         parser.add_argument('--build-workers', dest='build_workers',
                             default=1, help='number of build workers',
                             type=int)
@@ -46,10 +48,12 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolDaemonApp):
         return parser
 
     def run(self):
-        self.nb = builder.NodePoolBuilder(self.args.config,
-                                          self.args.build_workers,
-                                          self.args.upload_workers,
-                                          self.args.fake)
+        self.nb = builder.NodePoolBuilder(
+            self.args.config,
+            secure_path=self.args.secure,
+            num_builders=self.args.build_workers,
+            num_uploaders=self.args.upload_workers,
+            fake=self.args.fake)
 
         signal.signal(signal.SIGINT, self.sigint_handler)
 

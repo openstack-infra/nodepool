@@ -56,9 +56,12 @@ Nodepool has one required configuration file, which defaults to
 ``/etc/nodepool/nodepool.yaml``. This can be changed with the ``-c`` option.
 The Nodepool configuration file is described in :ref:`configuration`.
 
-Although there is support for a secure file that is used to store nodepool
-configurations that contain sensitive data, this is currently not used, but
-may be in the future.
+There is support for a secure file that is used to store nodepool
+configurations that contain sensitive data. It currently only supports
+specifying ZooKeeper credentials. If ZooKeeper credentials are defined in
+both configuration files, the data in the secure file takes precedence.
+The secure file location can be changed with the ``-s`` option and follows
+the same file format as the Nodepool configuration file.
 
 There is an optional logging configuration file, specified with the ``-l``
 option. The logging configuration file can accept either:

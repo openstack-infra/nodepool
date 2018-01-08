@@ -862,3 +862,32 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual('fake', label3_nodes[0].public_ipv4)
         self.assertEqual('', label3_nodes[0].public_ipv6)
         self.assertEqual('fake', label3_nodes[0].interface_ip)
+
+    def test_secure_file(self):
+        """Test using secure.conf file"""
+        configfile = self.setup_config('secure_file_config.yaml')
+        securefile = self.setup_secure('secure_file_secure.yaml')
+        pool = self.useNodepool(
+            configfile,
+            secure_conf=securefile,
+            watermark_sleep=1)
+        self._useBuilder(configfile, securefile=securefile)
+        pool.start()
+        self.wait_for_config(pool)
+
+        zk_servers = pool.config.zookeeper_servers
+        self.assertEqual(1, len(zk_servers))
+        key = list(zk_servers.keys())[0]
+        self.assertEqual(self.zookeeper_host, zk_servers[key].host)
+        self.assertEqual(self.zookeeper_port, zk_servers[key].port)
+        self.assertEqual(self.zookeeper_chroot, zk_servers[key].chroot)
+
+        image = self.waitForImage('fake-provider', 'fake-image')
+        self.assertEqual(image.username, 'zuul')
+        nodes = self.waitForNodes('fake-label')
+
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
+        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].username, 'zuul')
+        self.assertNotEqual(nodes[0].host_keys, [])

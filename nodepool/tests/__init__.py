@@ -254,15 +254,17 @@ class BaseTestCase(testtools.TestCase):
 
 
 class BuilderFixture(fixtures.Fixture):
-    def __init__(self, configfile, cleanup_interval):
+    def __init__(self, configfile, cleanup_interval, securefile=None):
         super(BuilderFixture, self).__init__()
         self.configfile = configfile
+        self.securefile = securefile
         self.cleanup_interval = cleanup_interval
         self.builder = None
 
     def setUp(self):
         super(BuilderFixture, self).setUp()
-        self.builder = builder.NodePoolBuilder(self.configfile)
+        self.builder = builder.NodePoolBuilder(
+            self.configfile, secure_path=self.securefile)
         self.builder.cleanup_interval = self.cleanup_interval
         self.builder.build_interval = .1
         self.builder.upload_interval = .1
@@ -278,7 +280,6 @@ class DBTestCase(BaseTestCase):
     def setUp(self):
         super(DBTestCase, self).setUp()
         self.log = logging.getLogger("tests")
-        self.secure_conf = self._setup_secure()
         self.setupZK()
 
     def setup_config(self, filename, images_dir=None):
@@ -306,15 +307,18 @@ class DBTestCase(BaseTestCase):
         new_configfile = self.setup_config(filename, self._config_images_dir)
         os.rename(new_configfile, configfile)
 
-    def _setup_secure(self):
+    def setup_secure(self, filename):
         # replace entries in secure.conf
         configfile = os.path.join(os.path.dirname(__file__),
-                                  'fixtures', 'secure.conf')
+                                  'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
         with open(configfile, 'rb') as conf_fd:
-            config = conf_fd.read()
-            os.write(fd, config)
-            #os.write(fd, config.format(dburi=self.dburi))
+            config = conf_fd.read().decode('utf8')
+            data = config.format(
+                zookeeper_host=self.zookeeper_host,
+                zookeeper_port=self.zookeeper_port,
+                zookeeper_chroot=self.zookeeper_chroot)
+            os.write(fd, data.encode('utf8'))
         os.close(fd)
         return path
 
@@ -458,7 +462,8 @@ class DBTestCase(BaseTestCase):
         return req
 
     def useNodepool(self, *args, **kwargs):
-        args = (self.secure_conf,) + args
+        secure_conf = kwargs.pop('secure_conf', None)
+        args = (secure_conf,) + args
         pool = launcher.NodePool(*args, **kwargs)
         pool.cleanup_interval = .5
         pool.delete_interval = .5
@@ -470,8 +475,10 @@ class DBTestCase(BaseTestCase):
         self.addCleanup(app.stop)
         return app
 
-    def _useBuilder(self, configfile, cleanup_interval=.5):
-        self.useFixture(BuilderFixture(configfile, cleanup_interval))
+    def _useBuilder(self, configfile, securefile=None, cleanup_interval=.5):
+        self.useFixture(
+            BuilderFixture(configfile, cleanup_interval, securefile)
+        )
 
     def setupZK(self):
         f = ZookeeperServerFixture()

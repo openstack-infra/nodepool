@@ -31,7 +31,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         super(TestNodepoolCMD, self).setUp()
 
     def patch_argv(self, *args):
-        argv = ["nodepool", "-s", self.secure_conf]
+        argv = ["nodepool"]
         argv.extend(args)
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
