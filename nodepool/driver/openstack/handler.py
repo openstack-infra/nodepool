@@ -290,6 +290,9 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
     def __init__(self, pw, request):
         super(OpenStackNodeRequestHandler, self).__init__(pw, request)
         self.chosen_az = None
+        self.log = logging.getLogger(
+            "nodepool.driver.openstack.OpenStackNodeRequestHandler[%s]" %
+            self.launcher_id)
 
     def _imagesAvailable(self):
         '''
@@ -522,10 +525,10 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         '''
         self._setFromPoolWorker()
 
-        # We have the launcher_id attr after _setFromPoolWorker() is called.
-        self.log = logging.getLogger(
-            "nodepool.driver.openstack.OpenStackNodeRequestHandler[%s]" %
-            self.launcher_id)
+        if self.provider is None or self.pool is None:
+            # If the config changed out from underneath us, we could now be
+            # an invalid provider and should stop handling this request.
+            raise Exception("Provider configuration missing")
 
         declined_reasons = []
         invalid_types = self._invalidNodeTypes()

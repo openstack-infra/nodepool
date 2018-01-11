@@ -158,6 +158,10 @@ class PoolWorker(threading.Thread):
         the handler for completion.
         '''
         provider = self.getProviderConfig()
+        if not provider:
+            self.log.info("Missing config. Deleted provider?")
+            return
+
         if provider.max_concurrency == 0:
             return
 
@@ -255,10 +259,14 @@ class PoolWorker(threading.Thread):
         return self.nodepool.getZK()
 
     def getProviderConfig(self):
-        return self.nodepool.config.providers[self.provider_name]
+        return self.nodepool.config.providers.get(self.provider_name)
 
     def getPoolConfig(self):
-        return self.getProviderConfig().pools[self.pool_name]
+        provider = self.getProviderConfig()
+        if provider:
+            return provider.pools[self.pool_name]
+        else:
+            return None
 
     def getProviderManager(self):
         return self.nodepool.getProviderManager(self.provider_name)
@@ -900,9 +908,13 @@ class NodePool(threading.Thread):
                     for pool in provider.pools.values():
                         pool_keys.add(provider.name + '-' + pool.name)
 
+                new_pool_threads = {}
                 for key in self._pool_threads.keys():
                     if key not in pool_keys:
                         self._pool_threads[key].stop()
+                    else:
+                        new_pool_threads[key] = self._pool_threads[key]
+                self._pool_threads = new_pool_threads
 
                 # Start (or restart) provider threads for each provider in
                 # the config. Removing a provider from the config and then

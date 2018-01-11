@@ -891,3 +891,16 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[0].type, 'fake-label')
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
+
+    def test_provider_removal(self):
+        """Test that removing a provider stops the worker thread"""
+        configfile = self.setup_config('launcher_two_provider.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=.5)
+        pool.start()
+        self.wait_for_config(pool)
+        self.assertEqual(2, len(pool._pool_threads))
+
+        self.replace_config(configfile, 'launcher_two_provider_remove.yaml')
+        # wait longer than our watermark_sleep time for the config to change
+        time.sleep(1)
+        self.assertEqual(1, len(pool._pool_threads))

@@ -86,6 +86,7 @@ class NodeRequestHandler(object):
         self.nodeset = []
         self.done = False
         self.paused = False
+        self.launcher_id = self.pw.launcher_id
 
     def _setFromPoolWorker(self):
         '''
@@ -98,7 +99,6 @@ class NodeRequestHandler(object):
         self.pool = self.pw.getPoolConfig()
         self.zk = self.pw.getZK()
         self.manager = self.pw.getProviderManager()
-        self.launcher_id = self.pw.launcher_id
 
     @property
     def alive_thread_count(self):
