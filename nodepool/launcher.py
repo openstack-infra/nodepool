@@ -276,9 +276,13 @@ class PoolWorker(threading.Thread):
 
         while self.running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self.zk and (self.zk.suspended or self.zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             # Make sure we're always registered with ZK
             self.zk.registerLauncher(self.launcher_id)
@@ -349,10 +353,14 @@ class BaseCleanupWorker(threading.Thread):
 
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             zk_conn = self._nodepool.getZK()
             while zk_conn and (zk_conn.suspended or zk_conn.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             self._run()
             time.sleep(self._interval)
@@ -885,9 +893,13 @@ class NodePool(threading.Thread):
                 self.updateConfig()
 
                 # Don't do work if we've lost communication with the ZK cluster
+                did_suspend = False
                 while self.zk and (self.zk.suspended or self.zk.lost):
+                    did_suspend = True
                     self.log.info("ZooKeeper suspended. Waiting")
                     time.sleep(SUSPEND_WAIT_TIME)
+                if did_suspend:
+                    self.log.info("ZooKeeper available. Resuming")
 
                 self.createMinReady()
 
