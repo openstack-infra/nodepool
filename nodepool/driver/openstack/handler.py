@@ -537,7 +537,9 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
                                     ','.join(invalid_types))
         elif not self._imagesAvailable():
             declined_reasons.append('images are not available')
-        elif not self._hasProviderQuota(self.request.node_types):
+        elif (self.pool.max_servers == 0 or
+              not self._hasProviderQuota(self.request.node_types)
+        ):
             declined_reasons.append('it would exceed quota')
         # TODO(tobiash): Maybe also calculate the quota prediction here and
         # backoff for some seconds if the used quota would be exceeded?
