@@ -490,9 +490,13 @@ class CleanupWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._run()
@@ -724,9 +728,13 @@ class BuildWorker(BaseWorker):
         # interrupted during the build. If so, wait for it to return.
         # It could transition directly from SUSPENDED to CONNECTED, or go
         # through the LOST state before CONNECTED.
+        did_suspend = False
         while self._zk.suspended or self._zk.lost:
+            did_suspend = True
             self.log.info("ZooKeeper suspended during build. Waiting")
             time.sleep(SUSPEND_WAIT_TIME)
+        if did_suspend:
+            self.log.info("ZooKeeper available. Resuming")
 
         build_data = zk.ImageBuild()
         build_data.builder_id = self._builder_id
@@ -768,9 +776,13 @@ class BuildWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._run()
@@ -1023,9 +1035,13 @@ class UploadWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._reloadConfig()
