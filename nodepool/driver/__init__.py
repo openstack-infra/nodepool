@@ -146,7 +146,9 @@ class NodeRequestHandler(object):
         try:
             self.run_handler()
         except Exception:
-            self.log.exception("Exception in NodeRequestHandler:")
+            self.log.exception(
+                "Exception in NodeRequestHandler for request %s:",
+                self.request.id)
             self.unlockNodeSet(clear_allocation=True)
             self.request.state = zk.FAILED
             self.zk.storeNodeRequest(self.request)
