@@ -134,6 +134,17 @@ class NodeRequestHandler(object):
 
         self.nodeset = []
 
+    def decline_request(self):
+        self.request.declined_by.append(self.launcher_id)
+        launchers = set(self.zk.getRegisteredLaunchers())
+        if launchers.issubset(set(self.request.declined_by)):
+            # All launchers have declined it
+            self.log.debug("Failing declined node request %s",
+                           self.request.id)
+            self.request.state = zk.FAILED
+        else:
+            self.request.state = zk.REQUESTED
+
     def run(self):
         '''
         Execute node request handling.
@@ -147,10 +158,10 @@ class NodeRequestHandler(object):
             self.run_handler()
         except Exception:
             self.log.exception(
-                "Exception in NodeRequestHandler for request %s:",
-                self.request.id)
+                "Declining node request %s due to exception in "
+                "NodeRequestHandler:", self.request.id)
+            self.decline_request()
             self.unlockNodeSet(clear_allocation=True)
-            self.request.state = zk.FAILED
             self.zk.storeNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
             self.done = True
@@ -196,15 +207,7 @@ class NodeRequestHandler(object):
         if self.launch_manager.failed_nodes:
             self.log.debug("Declining node request %s because nodes failed",
                            self.request.id)
-            self.request.declined_by.append(self.launcher_id)
-            launchers = set(self.zk.getRegisteredLaunchers())
-            if launchers.issubset(set(self.request.declined_by)):
-                # All launchers have declined it
-                self.log.debug("Failing declined node request %s",
-                               self.request.id)
-                self.request.state = zk.FAILED
-            else:
-                self.request.state = zk.REQUESTED
+            self.decline_request()
         else:
             # The assigned nodes must be added to the request in the order
             # in which they were requested.

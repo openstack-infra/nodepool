@@ -563,22 +563,13 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))
-            self.request.declined_by.append(self.launcher_id)
-            launchers = set(self.zk.getRegisteredLaunchers())
-            if launchers.issubset(set(self.request.declined_by)):
-                self.log.debug("Failing declined node request %s",
-                               self.request.id)
-                # All launchers have declined it
-                self.request.state = zk.FAILED
+            self.decline_request()
             self.unlockNodeSet(clear_allocation=True)
 
             # If conditions have changed for a paused request to now cause us
             # to decline it, we need to unpause so we don't keep trying it
             if self.paused:
                 self.paused = False
-                # If we didn't mark the request as failed above, reset it.
-                if self.request.state != zk.FAILED:
-                    self.request.state = zk.REQUESTED
 
             self.zk.storeNodeRequest(self.request)
             self.zk.unlockNodeRequest(self.request)
