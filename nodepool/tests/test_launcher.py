@@ -903,3 +903,103 @@ class TestLauncher(tests.DBTestCase):
         # wait longer than our watermark_sleep time for the config to change
         time.sleep(1)
         self.assertEqual(1, len(pool._pool_threads))
+
+    def test_failed_provider(self):
+        """Test that broken provider doesn't fail node requests."""
+        configfile = self.setup_config('launcher_two_provider_max_1.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=.5)
+        pool.start()
+        self.wait_for_config(pool)
+
+        # Steady state at images available.
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        # We have now reached steady state and can manipulate the system to
+        # test failing cloud behavior.
+
+        # Make two requests so that the next requests are paused.
+        # Note we use different provider specific labels here to avoid
+        # a race where a single provider fulfills both of these initial
+        # requests.
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        # fake-provider
+        req.node_types.append('fake-label2')
+        self.zk.storeNodeRequest(req)
+        req = self.waitForNodeRequest(req, zk.FULFILLED)
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        # fake-provider2
+        req.node_types.append('fake-label3')
+        self.zk.storeNodeRequest(req)
+        req = self.waitForNodeRequest(req, zk.FULFILLED)
+        nodes = map(pool.zk.getNode, pool.zk.getNodes())
+        provider1_first = None
+        provider2_first = None
+        for node in nodes:
+            if node.provider == 'fake-provider2':
+                provider2_first = node
+            elif node.provider == 'fake-provider':
+                provider1_first = node
+
+        # Next two requests will go pending one for each provider.
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req1)
+        req1 = self.waitForNodeRequest(req1, zk.PENDING)
+
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req2)
+        req2 = self.waitForNodeRequest(req2, zk.PENDING)
+
+        # Delete node attached to provider2 this will cause provider2 to
+        # fulfill the request it had pending.
+        self.zk.deleteNode(provider2_first)
+
+        while True:
+            # Wait for provider2 node to be created. Also find the request
+            # that was not fulfilled. This is the request that fake-provider
+            # is pending on.
+            req = self.zk.getNodeRequest(req1.id)
+            if req.state == zk.FULFILLED:
+                final_req = req2
+                break
+            req = self.zk.getNodeRequest(req2.id)
+            if req.state == zk.FULFILLED:
+                final_req = req1
+                break
+
+        provider2_second = None
+        nodes = map(pool.zk.getNode, pool.zk.getNodes())
+        for node in nodes:
+            if node.provider == 'fake-provider2':
+                provider2_second = node
+
+        # Now delete the new node we had provider2 build. At this point
+        # The only provider with any requests is fake-provider.
+        self.zk.deleteNode(provider2_second)
+
+        # Set provider1 run_handler to throw exception to simulate a
+        # broken cloud. Note the pool worker instantiates request handlers on
+        # demand which is why we have a somewhat convoluted monkey patch here.
+        # We must patch deep enough in the request handler that
+        # despite being paused fake-provider will still trip over this code.
+        pool_worker = pool.getPoolWorkers('fake-provider')[0]
+        request_handler = pool_worker.request_handlers[0]
+
+        def raise_KeyError(self, node):
+            raise KeyError('fake-provider')
+
+        request_handler.launch_manager.launch = raise_KeyError
+        # Delete instance in fake-provider. This should cause provider2
+        # to service the request that was held pending by fake-provider.
+        self.zk.deleteNode(provider1_first)
+        # Request is fulfilled by provider 2
+        req = self.waitForNodeRequest(final_req)
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(1, len(req.declined_by))
+        self.assertIn('fake-provider-main', req.declined_by[0])
