@@ -24,6 +24,7 @@ from nodepool import zk
 
 log = logging.getLogger("nodepool.stats")
 
+
 def get_client():
     """Return a statsd client object setup from environment variables; or
     None if they are not set
@@ -69,7 +70,7 @@ class StatsReporter(object):
             'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
             'nodepool.launch.image.%s.%s' % (image_name, subkey),
             'nodepool.launch.%s' % (subkey,),
-            ]
+        ]
 
         if node_az:
             keys.append('nodepool.launch.provider.%s.%s.%s' %
@@ -86,7 +87,6 @@ class StatsReporter(object):
         for key in keys:
             self._statsd.timing(key, dt)
             self._statsd.incr(key)
-
 
     def updateNodeStats(self, zk_conn, provider):
         '''
@@ -108,11 +108,11 @@ class StatsReporter(object):
             states[key] = 0
 
         for node in zk_conn.nodeIterator():
-            #nodepool.nodes.STATE
+            # nodepool.nodes.STATE
             key = 'nodepool.nodes.%s' % node.state
             states[key] += 1
 
-            #nodepool.label.LABEL.nodes.STATE
+            # nodepool.label.LABEL.nodes.STATE
             key = 'nodepool.label.%s.nodes.%s' % (node.type, node.state)
             # It's possible we could see node types that aren't in our config
             if key in states:
@@ -120,7 +120,7 @@ class StatsReporter(object):
             else:
                 states[key] = 1
 
-            #nodepool.provider.PROVIDER.nodes.STATE
+            # nodepool.provider.PROVIDER.nodes.STATE
             key = 'nodepool.provider.%s.nodes.%s' % (node.provider, node.state)
             # It's possible we could see providers that aren't in our config
             if key in states:
@@ -131,7 +131,7 @@ class StatsReporter(object):
         for key, count in states.items():
             self._statsd.gauge(key, count)
 
-        #nodepool.provider.PROVIDER.max_servers
+        # nodepool.provider.PROVIDER.max_servers
         key = 'nodepool.provider.%s.max_servers' % provider.name
         max_servers = sum([p.max_servers for p in provider.pools.values()
                            if p.max_servers])

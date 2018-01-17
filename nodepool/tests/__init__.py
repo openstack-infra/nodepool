@@ -163,10 +163,10 @@ class BaseTestCase(testtools.TestCase):
             logging.basicConfig(level=logging.DEBUG)
         l = logging.getLogger('kazoo')
         l.setLevel(logging.INFO)
-        l.propagate=False
+        l.propagate = False
         l = logging.getLogger('stevedore')
         l.setLevel(logging.INFO)
-        l.propagate=False
+        l.propagate = False
         self.useFixture(fixtures.NestedTempfile())
 
         self.subprocesses = []
@@ -292,9 +292,9 @@ class DBTestCase(BaseTestCase):
         with open(configfile, 'rb') as conf_fd:
             config = conf_fd.read().decode('utf8')
             data = config.format(images_dir=images_dir.path,
-                                       zookeeper_host=self.zookeeper_host,
-                                       zookeeper_port=self.zookeeper_port,
-                                       zookeeper_chroot=self.zookeeper_chroot)
+                                 zookeeper_host=self.zookeeper_host,
+                                 zookeeper_port=self.zookeeper_port,
+                                 zookeeper_chroot=self.zookeeper_chroot)
             os.write(fd, data.encode('utf8'))
         os.close(fd)
         self._config_images_dir = images_dir
@@ -500,8 +500,8 @@ class DBTestCase(BaseTestCase):
     def printZKTree(self, node):
         def join(a, b):
             if a.endswith('/'):
-                return a+b
-            return a+'/'+b
+                return a + b
+            return a + '/' + b
 
         data, stat = self.zk.client.get(node)
         self.log.debug("Node: %s" % (node,))

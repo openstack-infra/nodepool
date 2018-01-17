@@ -26,6 +26,7 @@ import requests.exceptions
 
 from nodepool import stats
 
+
 class ManagerStoppedException(Exception):
     pass
 
@@ -106,7 +107,7 @@ class TaskManager(threading.Thread):
                 self.log.debug("Manager %s ran task %s in %ss" %
                                (self.name, type(task).__name__, dt))
                 if self.statsd:
-                    #nodepool.task.PROVIDER.subkey
+                    # nodepool.task.PROVIDER.subkey
                     subkey = type(task).__name__
                     key = 'nodepool.task.%s.%s' % (self.name, subkey)
                     self.statsd.timing(key, int(dt * 1000))

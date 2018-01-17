@@ -29,9 +29,8 @@ from nodepool import exceptions
 
 log = logging.getLogger("nodepool.utils")
 
-
-ITERATE_INTERVAL = 2  # How long to sleep while waiting for something
-                      # in a loop
+# How long to sleep while waiting for something in a loop
+ITERATE_INTERVAL = 2
 
 
 def iterate_timeout(max_seconds, exc, purpose):

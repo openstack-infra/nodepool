@@ -98,7 +98,7 @@ class OpenStackProviderConfig(ProviderConfig):
 
     def load(self, config):
         if OpenStackProviderConfig.os_client_config is None:
-             OpenStackProviderConfig.os_client_config = \
+            OpenStackProviderConfig.os_client_config = \
                 os_client_config.OpenStackConfig()
         cloud_kwargs = self._cloudKwargs()
         self.cloud_config = self.os_client_config.get_one_cloud(**cloud_kwargs)
@@ -140,7 +140,7 @@ class OpenStackProviderConfig(ProviderConfig):
                    any([len(k) > 255 or len(v) > 255
                         for k, v in i.meta.items()]):
                     # soft-fail
-                    #self.log.error("Invalid metadata for %s; ignored"
+                    # self.log.error("Invalid metadata for %s; ignored"
                     #               % i.name)
                     i.meta = {}
 
@@ -200,7 +200,6 @@ class OpenStackProviderConfig(ProviderConfig):
                 top_label = config.labels[pl.name]
                 top_label.pools.append(pp)
 
-
     def get_schema(self):
         provider_diskimage = {
             'name': str,
@@ -238,7 +237,8 @@ class OpenStackProviderConfig(ProviderConfig):
 
         label_diskimage = v.Schema({v.Required('diskimage'): str}, extra=True)
 
-        label_cloud_image = v.Schema({v.Required('cloud-image'): str}, extra=True)
+        label_cloud_image = v.Schema({v.Required('cloud-image'): str},
+                                     extra=True)
 
         pool_label = v.All(pool_label_main,
                            v.Any(label_min_ram, label_flavor_name),
