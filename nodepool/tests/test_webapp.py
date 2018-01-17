@@ -27,7 +27,7 @@ class TestWebApp(tests.DBTestCase):
     def test_image_list(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         webapp = self.useWebApp(pool, port=0)
         webapp.start()
@@ -47,7 +47,7 @@ class TestWebApp(tests.DBTestCase):
     def test_dib_image_list_json(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         webapp = self.useWebApp(pool, port=0)
         webapp.start()

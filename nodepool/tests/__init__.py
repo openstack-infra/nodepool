@@ -475,7 +475,7 @@ class DBTestCase(BaseTestCase):
         self.addCleanup(app.stop)
         return app
 
-    def _useBuilder(self, configfile, securefile=None, cleanup_interval=.5):
+    def useBuilder(self, configfile, securefile=None, cleanup_interval=.5):
         self.useFixture(
             BuilderFixture(configfile, cleanup_interval, securefile)
         )
