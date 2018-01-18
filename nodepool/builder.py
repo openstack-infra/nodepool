@@ -21,20 +21,22 @@ import subprocess
 import threading
 import time
 import shlex
-import sys
+import uuid
 
-import config as nodepool_config
-import exceptions
-import provider_manager
-import stats
-import zk
+from nodepool import config as nodepool_config
+from nodepool import exceptions
+from nodepool import provider_manager
+from nodepool import stats
+from nodepool import zk
 
 
 MINS = 60
 HOURS = 60 * MINS
-IMAGE_TIMEOUT = 6 * HOURS    # How long to wait for an image save
-SUSPEND_WAIT_TIME = 30       # How long to wait between checks for
-                             # ZooKeeper connectivity if it disappears.
+# How long to wait for an image save
+IMAGE_TIMEOUT = 6 * HOURS
+
+# How long to wait between checks for ZooKeeper connectivity if it disappears.
+SUSPEND_WAIT_TIME = 30
 
 # HP Cloud requires qemu compat with 0.10. That version works elsewhere,
 # so just hardcode it for all qcow2 building
@@ -108,17 +110,19 @@ class DibImageFile(object):
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, config_path, interval, zk):
+    def __init__(self, builder_id, config_path, secure_path, interval, zk):
         super(BaseWorker, self).__init__()
         self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
         self._running = False
         self._config = None
         self._config_path = config_path
+        self._secure_path = secure_path
         self._zk = zk
         self._hostname = socket.gethostname()
         self._statsd = stats.get_client()
         self._interval = interval
+        self._builder_id = builder_id
 
     def _checkForZooKeeperChanges(self, new_config):
         '''
@@ -129,7 +133,7 @@ class BaseWorker(threading.Thread):
         '''
         if self._config.zookeeper_servers != new_config.zookeeper_servers:
             self.log.debug("Detected ZooKeeper server changes")
-            self._zk.resetHosts(new_config.zookeeper_servers.values())
+            self._zk.resetHosts(list(new_config.zookeeper_servers.values()))
 
     @property
     def running(self):
@@ -145,9 +149,12 @@ class CleanupWorker(BaseWorker):
     and any local DIB builds.
     '''
 
-    def __init__(self, name, config_path, interval, zk):
-        super(CleanupWorker, self).__init__(config_path, interval, zk)
-        self.log = logging.getLogger("nodepool.builder.CleanupWorker.%s" % name)
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk):
+        super(CleanupWorker, self).__init__(builder_id, config_path,
+                                            secure_path, interval, zk)
+        self.log = logging.getLogger(
+            "nodepool.builder.CleanupWorker.%s" % name)
         self.name = 'CleanupWorker.%s' % name
 
     def _buildUploadRecencyTable(self):
@@ -178,7 +185,7 @@ class CleanupWorker(BaseWorker):
                         )
 
         # Sort uploads by state_time (upload time) and keep the 2 most recent
-        for i in self._rtable.keys():
+        for i in list(self._rtable.keys()):
             for p in self._rtable[i].keys():
                 self._rtable[i][p].sort(key=lambda x: x[2], reverse=True)
                 self._rtable[i][p] = self._rtable[i][p][:2]
@@ -222,27 +229,32 @@ class CleanupWorker(BaseWorker):
             if e.errno != 2:    # No such file or directory
                 raise e
 
-    def _deleteLocalBuild(self, image, build_id, builder):
+    def _deleteLocalBuild(self, image, build):
         '''
         Remove expired image build from local disk.
 
         :param str image: Name of the image whose build we are deleting.
-        :param str build_id: ID of the build we want to delete.
-        :param str builder: hostname of the build.
+        :param ImageBuild build: The build we want to delete.
 
         :returns: True if files were deleted, False if none were found.
         '''
-        base = "-".join([image, build_id])
+        base = "-".join([image, build.id])
         files = DibImageFile.from_image_id(self._config.imagesdir, base)
         if not files:
             # NOTE(pabelanger): It is possible we don't have any files because
             # diskimage-builder failed. So, check to see if we have the correct
             # builder so we can removed the data from zookeeper.
-            if builder == self._hostname:
+
+            # To maintain backward compatibility with builders that didn't
+            # use unique builder IDs before, but do now, always compare to
+            # hostname as well since some ZK data may still reference that.
+            if (build.builder_id == self._builder_id or
+                build.builder == self._hostname
+            ):
                 return True
             return False
 
-        self.log.info("Doing cleanup for %s:%s" % (image, build_id))
+        self.log.info("Doing cleanup for %s:%s" % (image, build.id))
 
         manifest_dir = None
 
@@ -251,7 +263,8 @@ class CleanupWorker(BaseWorker):
             if not manifest_dir:
                 path, ext = filename.rsplit('.', 1)
                 manifest_dir = path + ".d"
-            map(self._removeDibItem, [filename, f.md5_file, f.sha256_file])
+            items = [filename, f.md5_file, f.sha256_file]
+            list(map(self._removeDibItem, items))
 
         try:
             shutil.rmtree(manifest_dir)
@@ -271,8 +284,7 @@ class CleanupWorker(BaseWorker):
             self._deleteUpload(upload)
 
     def _cleanupObsoleteProviderUploads(self, provider, image, build_id):
-        image_names_for_provider = provider.images.keys()
-        if image in image_names_for_provider:
+        if image in provider.diskimages:
             # This image is in use for this provider
             return
 
@@ -353,9 +365,7 @@ class CleanupWorker(BaseWorker):
         for build in builds:
             base = "-".join([image, build.id])
             files = DibImageFile.from_image_id(self._config.imagesdir, base)
-            # If we have local dib files OR if our hostname matches the
-            # recorded owner hostname, consider this our build.
-            if files or (self._hostname == build.builder):
+            if files:
                 ret.append(build)
         return ret
 
@@ -388,7 +398,8 @@ class CleanupWorker(BaseWorker):
                 self.log.info("Removing failed upload record: %s" % upload)
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
             elif upload.state == zk.DELETING:
-                self.log.info("Removing deleted upload and record: %s" % upload)
+                self.log.info(
+                    "Removing deleted upload and record: %s" % upload)
                 self._deleteUpload(upload)
             elif upload.state == zk.FAILED:
                 self.log.info("Removing failed upload and record: %s" % upload)
@@ -403,7 +414,7 @@ class CleanupWorker(BaseWorker):
         all_builds = self._zk.getBuilds(image)
         builds_to_keep = set([b for b in sorted(all_builds, reverse=True,
                                                 key=lambda y: y.state_time)
-                              if b.state==zk.READY][:2])
+                              if b.state == zk.READY][:2])
         local_builds = set(self._filterLocalBuilds(image, all_builds))
         diskimage = self._config.diskimages.get(image)
         if not diskimage and not local_builds:
@@ -471,7 +482,7 @@ class CleanupWorker(BaseWorker):
                         self._zk.storeBuild(image, build, build.id)
 
                 # Release the lock here so we can delete the build znode
-                if self._deleteLocalBuild(image, build.id, build.builder):
+                if self._deleteLocalBuild(image, build):
                     if not self._zk.deleteBuild(image, build.id):
                         self.log.error("Unable to delete build %s because"
                                        " uploads still remain.", build)
@@ -483,9 +494,13 @@ class CleanupWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._run()
@@ -502,6 +517,8 @@ class CleanupWorker(BaseWorker):
         Body of run method for exception handling purposes.
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -514,37 +531,13 @@ class CleanupWorker(BaseWorker):
 
 
 class BuildWorker(BaseWorker):
-    def __init__(self, name, config_path, interval, zk, dib_cmd):
-        super(BuildWorker, self).__init__(config_path, interval, zk)
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk, dib_cmd):
+        super(BuildWorker, self).__init__(builder_id, config_path, secure_path,
+                                          interval, zk)
         self.log = logging.getLogger("nodepool.builder.BuildWorker.%s" % name)
         self.name = 'BuildWorker.%s' % name
         self.dib_cmd = dib_cmd
-
-    def _running_under_virtualenv(self):
-        # NOTE: borrowed from pip:locations.py
-        if hasattr(sys, 'real_prefix'):
-            return True
-        elif sys.prefix != getattr(sys, "base_prefix", sys.prefix):
-            return True
-        return False
-
-    def _activate_virtualenv(self):
-        """Run as a pre-exec function to activate current virtualenv
-
-        If we are invoked directly as /path/ENV/nodepool-builer (as
-        done by an init script, for example) then /path/ENV/bin will
-        not be in our $PATH, meaning we can't find disk-image-create.
-        Apart from that, dib also needs to run in an activated
-        virtualenv so it can find utils like dib-run-parts.  Run this
-        before exec of dib to ensure the current virtualenv (if any)
-        is activated.
-        """
-        if self._running_under_virtualenv():
-            activate_this = os.path.join(sys.prefix, "bin", "activate_this.py")
-            if not os.path.exists(activate_this):
-                raise exceptions.BuilderError("Running in a virtualenv, but "
-                                              "cannot find: %s" % activate_this)
-            execfile(activate_this, dict(__file__=activate_this))
 
     def _checkForScheduledImageUpdates(self):
         '''
@@ -553,7 +546,7 @@ class BuildWorker(BaseWorker):
         for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
-            if not self.running or self._zk.suspended or self._zk.lost:
+            if not self._running or self._zk.suspended or self._zk.lost:
                 return
             try:
                 self._checkImageForScheduledImageUpdates(diskimage)
@@ -586,7 +579,8 @@ class BuildWorker(BaseWorker):
         if (not builds
             or (now - builds[0].state_time) >= diskimage.rebuild_age
             or not set(builds[0].formats).issuperset(diskimage.image_types)
-        ):
+            ):
+
             try:
                 with self._zk.imageBuildLock(diskimage.name, blocking=False):
                     # To avoid locking each image repeatedly, we have an
@@ -595,7 +589,8 @@ class BuildWorker(BaseWorker):
                     # lock acquisition. If it's not the same build as
                     # identified in the first check above, assume another
                     # BuildWorker created the build for us and continue.
-                    builds2 = self._zk.getMostRecentBuilds(1, diskimage.name, zk.READY)
+                    builds2 = self._zk.getMostRecentBuilds(
+                        1, diskimage.name, zk.READY)
                     if builds2 and builds[0].id != builds2[0].id:
                         return
 
@@ -603,6 +598,7 @@ class BuildWorker(BaseWorker):
 
                     data = zk.ImageBuild()
                     data.state = zk.BUILDING
+                    data.builder_id = self._builder_id
                     data.builder = self._hostname
                     data.formats = list(diskimage.image_types)
 
@@ -620,7 +616,7 @@ class BuildWorker(BaseWorker):
         for diskimage in self._config.diskimages.values():
             # Check if we've been told to shutdown
             # or if ZK connection is suspended
-            if not self.running or self._zk.suspended or self._zk.lost:
+            if not self._running or self._zk.suspended or self._zk.lost:
                 return
             try:
                 self._checkImageForManualBuildRequest(diskimage)
@@ -653,6 +649,7 @@ class BuildWorker(BaseWorker):
 
                 data = zk.ImageBuild()
                 data.state = zk.BUILDING
+                data.builder_id = self._builder_id
                 data.builder = self._hostname
                 data.formats = list(diskimage.image_types)
 
@@ -719,7 +716,6 @@ class BuildWorker(BaseWorker):
                 shlex.split(cmd),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                preexec_fn=self._activate_virtualenv,
                 env=env)
         except OSError as e:
             raise exceptions.BuilderError(
@@ -738,19 +734,26 @@ class BuildWorker(BaseWorker):
         # interrupted during the build. If so, wait for it to return.
         # It could transition directly from SUSPENDED to CONNECTED, or go
         # through the LOST state before CONNECTED.
+        did_suspend = False
         while self._zk.suspended or self._zk.lost:
+            did_suspend = True
             self.log.info("ZooKeeper suspended during build. Waiting")
             time.sleep(SUSPEND_WAIT_TIME)
+        if did_suspend:
+            self.log.info("ZooKeeper available. Resuming")
 
         build_data = zk.ImageBuild()
+        build_data.builder_id = self._builder_id
         build_data.builder = self._hostname
+        build_data.username = diskimage.username
 
         if self._zk.didLoseConnection:
             self.log.info("ZooKeeper lost while building %s" % diskimage.name)
             self._zk.resetLostFlag()
             build_data.state = zk.FAILED
         elif p.returncode:
-            self.log.info("DIB failed creating %s" % diskimage.name)
+            self.log.info(
+                "DIB failed creating %s (%s)" % (diskimage.name, p.returncode))
             build_data.state = zk.FAILED
         else:
             self.log.info("DIB image %s is built" % diskimage.name)
@@ -760,7 +763,8 @@ class BuildWorker(BaseWorker):
             if self._statsd:
                 # record stats on the size of each image we create
                 for ext in img_types.split(','):
-                    key = 'nodepool.dib_image_build.%s.%s.size' % (diskimage.name, ext)
+                    key = 'nodepool.dib_image_build.%s.%s.size' % (
+                        diskimage.name, ext)
                     # A bit tricky because these image files may be sparse
                     # files; we only want the true size of the file for
                     # purposes of watching if we've added too much stuff
@@ -780,9 +784,13 @@ class BuildWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._run()
@@ -798,6 +806,8 @@ class BuildWorker(BaseWorker):
         '''
         # NOTE: For the first iteration, we expect self._config to be None
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -809,8 +819,10 @@ class BuildWorker(BaseWorker):
 
 
 class UploadWorker(BaseWorker):
-    def __init__(self, name, config_path, interval, zk):
-        super(UploadWorker, self).__init__(config_path, interval, zk)
+    def __init__(self, name, builder_id, config_path, secure_path,
+                 interval, zk):
+        super(UploadWorker, self).__init__(builder_id, config_path,
+                                           secure_path, interval, zk)
         self.log = logging.getLogger("nodepool.builder.UploadWorker.%s" % name)
         self.name = 'UploadWorker.%s' % name
 
@@ -819,6 +831,8 @@ class UploadWorker(BaseWorker):
         Reload the nodepool configuration file.
         '''
         new_config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(new_config, self._secure_path)
         if not self._config:
             self._config = new_config
 
@@ -827,7 +841,8 @@ class UploadWorker(BaseWorker):
                                                      use_taskmanager=False)
         self._config = new_config
 
-    def _uploadImage(self, build_id, upload_id, image_name, images, provider):
+    def _uploadImage(self, build_id, upload_id, image_name, images, provider,
+                     username):
         '''
         Upload a local DIB image build to a provider.
 
@@ -837,6 +852,7 @@ class UploadWorker(BaseWorker):
         :param list images: A list of DibImageFile objects from this build
             that available for uploading.
         :param provider: The provider from the parsed config file.
+        :param username:
         '''
         start_time = time.time()
         timestamp = int(start_time)
@@ -858,19 +874,15 @@ class UploadWorker(BaseWorker):
 
         filename = image.to_path(self._config.imagesdir, with_extension=True)
 
-        dummy_image = type('obj', (object,),
-                           {'name': image_name, 'id': image.image_id})
-
-        ext_image_name = provider.template_hostname.format(
-            provider=provider, image=dummy_image,
-            timestamp=str(timestamp)
+        ext_image_name = provider.image_name_format.format(
+            image_name=image_name, timestamp=str(timestamp)
         )
 
         self.log.info("Uploading DIB image build %s from %s to %s" %
                       (build_id, filename, provider.name))
 
         manager = self._config.provider_managers[provider.name]
-        provider_image = provider.images.get(image_name)
+        provider_image = provider.diskimages.get(image_name)
         if provider_image is None:
             raise exceptions.BuilderInvalidCommandError(
                 "Could not find matching provider image for %s" % image_name
@@ -910,6 +922,9 @@ class UploadWorker(BaseWorker):
         data.state = zk.READY
         data.external_id = external_id
         data.external_name = ext_image_name
+        data.format = image.extension
+        data.username = username
+
         return data
 
     def _checkForProviderUploads(self):
@@ -920,12 +935,12 @@ class UploadWorker(BaseWorker):
         to providers, do the upload if they are available on the local disk.
         '''
         for provider in self._config.providers.values():
-            for image in provider.images.values():
+            for image in provider.diskimages.values():
                 uploaded = False
 
                 # Check if we've been told to shutdown
                 # or if ZK connection is suspended
-                if not self.running or self._zk.suspended or self._zk.lost:
+                if not self._running or self._zk.suspended or self._zk.lost:
                     return
                 try:
                     uploaded = self._checkProviderImageUpload(provider, image)
@@ -952,7 +967,7 @@ class UploadWorker(BaseWorker):
         :returns: True if an upload was attempted, False otherwise.
         '''
         # Check if image uploads are paused.
-        if provider.images.get(image.name).pause:
+        if provider.diskimages.get(image.name).pause:
             return False
 
         # Search for the most recent 'ready' image build
@@ -1003,11 +1018,14 @@ class UploadWorker(BaseWorker):
                 # New upload number with initial state 'uploading'
                 data = zk.ImageUpload()
                 data.state = zk.UPLOADING
+                data.username = build.username
+
                 upnum = self._zk.storeImageUpload(
                     image.name, build.id, provider.name, data)
 
                 data = self._uploadImage(build.id, upnum, image.name,
-                                         local_images, provider)
+                                         local_images, provider,
+                                         build.username)
 
                 # Set final state
                 self._zk.storeImageUpload(image.name, build.id,
@@ -1025,9 +1043,13 @@ class UploadWorker(BaseWorker):
         self._running = True
         while self._running:
             # Don't do work if we've lost communication with the ZK cluster
+            did_suspend = False
             while self._zk and (self._zk.suspended or self._zk.lost):
+                did_suspend = True
                 self.log.info("ZooKeeper suspended. Waiting")
                 time.sleep(SUSPEND_WAIT_TIME)
+            if did_suspend:
+                self.log.info("ZooKeeper available. Resuming")
 
             try:
                 self._reloadConfig()
@@ -1051,15 +1073,19 @@ class NodePoolBuilder(object):
     '''
     log = logging.getLogger("nodepool.builder.NodePoolBuilder")
 
-    def __init__(self, config_path, num_builders=1, num_uploaders=4):
+    def __init__(self, config_path, secure_path=None,
+                 num_builders=1, num_uploaders=4, fake=False):
         '''
         Initialize the NodePoolBuilder object.
 
         :param str config_path: Path to configuration file.
+        :param str secure_path: Path to secure configuration file.
         :param int num_builders: Number of build workers to start.
         :param int num_uploaders: Number of upload workers to start.
+        :param bool fake: Whether to fake the image builds.
         '''
         self._config_path = config_path
+        self._secure_path = secure_path
         self._config = None
         self._num_builders = num_builders
         self._build_workers = []
@@ -1070,7 +1096,11 @@ class NodePoolBuilder(object):
         self.cleanup_interval = 60
         self.build_interval = 10
         self.upload_interval = 10
-        self.dib_cmd = 'disk-image-create'
+        if fake:
+            self.dib_cmd = os.path.join(os.path.dirname(__file__), '..',
+                                        'nodepool/tests/fake-image-create')
+        else:
+            self.dib_cmd = 'disk-image-create'
         self.zk = None
 
         # This lock is needed because the run() method is started in a
@@ -1079,21 +1109,34 @@ class NodePoolBuilder(object):
         # startup process has completed.
         self._start_lock = threading.Lock()
 
-    #=======================================================================
+    # ======================================================================
     # Private methods
-    #=======================================================================
+    # ======================================================================
+
+    def _getBuilderID(self, id_file):
+        if not os.path.exists(id_file):
+            with open(id_file, "w") as f:
+                builder_id = str(uuid.uuid4())
+                f.write(builder_id)
+            return builder_id
+
+        with open(id_file, "r") as f:
+            builder_id = f.read()
+        return builder_id
 
     def _getAndValidateConfig(self):
         config = nodepool_config.loadConfig(self._config_path)
+        if self._secure_path:
+            nodepool_config.loadSecureConfig(config, self._secure_path)
         if not config.zookeeper_servers.values():
             raise RuntimeError('No ZooKeeper servers specified in config.')
         if not config.imagesdir:
             raise RuntimeError('No images-dir specified in config.')
         return config
 
-    #=======================================================================
+    # ======================================================================
     # Public methods
-    #=======================================================================
+    # ======================================================================
 
     def start(self):
         '''
@@ -1110,28 +1153,36 @@ class NodePoolBuilder(object):
             self._config = self._getAndValidateConfig()
             self._running = True
 
+            builder_id_file = os.path.join(self._config.imagesdir,
+                                           "builder_id.txt")
+            builder_id = self._getBuilderID(builder_id_file)
+
             # All worker threads share a single ZooKeeper instance/connection.
             self.zk = zk.ZooKeeper()
-            self.zk.connect(self._config.zookeeper_servers.values())
+            self.zk.connect(list(self._config.zookeeper_servers.values()))
 
             self.log.debug('Starting listener for build jobs')
 
             # Create build and upload worker objects
             for i in range(self._num_builders):
-                w = BuildWorker(i, self._config_path, self.build_interval,
-                                self.zk, self.dib_cmd)
+                w = BuildWorker(i, builder_id,
+                                self._config_path, self._secure_path,
+                                self.build_interval, self.zk, self.dib_cmd)
                 w.start()
                 self._build_workers.append(w)
 
             for i in range(self._num_uploaders):
-                w = UploadWorker(i, self._config_path, self.upload_interval,
-                                 self.zk)
+                w = UploadWorker(i, builder_id,
+                                 self._config_path, self._secure_path,
+                                 self.upload_interval, self.zk)
                 w.start()
                 self._upload_workers.append(w)
 
             if self.cleanup_interval > 0:
                 self._janitor = CleanupWorker(
-                    0, self._config_path, self.cleanup_interval, self.zk)
+                    0, builder_id,
+                    self._config_path, self._secure_path,
+                    self.cleanup_interval, self.zk)
                 self._janitor.start()
 
             # Wait until all threads are running. Otherwise, we have a race
@@ -1154,7 +1205,14 @@ class NodePoolBuilder(object):
         '''
         with self._start_lock:
             self.log.debug("Stopping. NodePoolBuilder shutting down workers")
-            workers = self._build_workers + self._upload_workers
+            # Note we do not add the upload workers to this list intentionally.
+            # The reason for this is that uploads can take many hours and there
+            # is no good way to stop the blocking writes performed by the
+            # uploads in order to join() below on a reasonable amount of time.
+            # Killing the process will stop the upload then both the record
+            # in zk and in the cloud will be deleted by any other running
+            # builders or when this builder starts again.
+            workers = self._build_workers
             if self._janitor:
                 workers += [self._janitor]
             for worker in (workers):

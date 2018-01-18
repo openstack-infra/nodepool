@@ -27,12 +27,15 @@ from nodepool import zk
 
 
 class TestNodepoolCMD(tests.DBTestCase):
+    def setUp(self):
+        super(TestNodepoolCMD, self).setUp()
+
     def patch_argv(self, *args):
-        argv = ["nodepool", "-s", self.secure_conf]
+        argv = ["nodepool"]
         argv.extend(args)
         self.useFixture(fixtures.MonkeyPatch('sys.argv', argv))
 
-    def assert_listed(self, configfile, cmd, col, val, count):
+    def assert_listed(self, configfile, cmd, col, val, count, col_count=0):
         log = logging.getLogger("tests.PrettyTableMock")
         self.patch_argv("-c", configfile, *cmd)
         with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
@@ -41,13 +44,16 @@ class TestNodepoolCMD(tests.DBTestCase):
             # Find add_rows with the status were looking for
             for args, kwargs in m_add_row.call_args_list:
                 row = args[0]
+                if col_count:
+                    self.assertEquals(len(row), col_count)
                 log.debug(row)
                 if row[col] == val:
                     rows_with_val += 1
             self.assertEquals(rows_with_val, count)
 
     def assert_alien_images_listed(self, configfile, image_cnt, image_id):
-        self.assert_listed(configfile, ['alien-image-list'], 2, image_id, image_cnt)
+        self.assert_listed(configfile, ['alien-image-list'], 2, image_id,
+                           image_cnt)
 
     def assert_alien_images_empty(self, configfile):
         self.assert_alien_images_listed(configfile, 0, 0)
@@ -55,8 +61,16 @@ class TestNodepoolCMD(tests.DBTestCase):
     def assert_images_listed(self, configfile, image_cnt, status="ready"):
         self.assert_listed(configfile, ['image-list'], 6, status, image_cnt)
 
-    def assert_nodes_listed(self, configfile, node_cnt, status="ready"):
-        self.assert_listed(configfile, ['list'], 10, status, node_cnt)
+    def assert_nodes_listed(self, configfile, node_cnt, status="ready",
+                            detail=False, validate_col_count=False):
+        cmd = ['list']
+        col_count = 9
+        if detail:
+            cmd += ['--detail']
+            col_count = 17
+        if not validate_col_count:
+            col_count = 0
+        self.assert_listed(configfile, cmd, 6, status, node_cnt, col_count)
 
     def test_image_list_empty(self):
         self.assert_images_listed(self.setup_config("node_cmd.yaml"), 0)
@@ -72,7 +86,7 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_image_delete(self):
         configfile = self.setup_config("node.yaml")
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         image = self.zk.getMostRecentImageUpload('fake-image', 'fake-provider')
         self.patch_argv("-c", configfile, "image-delete",
@@ -84,20 +98,9 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForUploadRecordDeletion('fake-provider', 'fake-image',
                                          image.build_id, image.id)
 
-    def test_alien_list_fail(self):
-        def fail_list(self):
-            raise RuntimeError('Fake list error')
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
-            fail_list))
-
-        configfile = self.setup_config("node_cmd.yaml")
-        self.patch_argv("-c", configfile, "alien-list")
-        nodepoolcmd.main()
-
     def test_alien_image_list_empty(self):
         configfile = self.setup_config("node.yaml")
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.patch_argv("-c", configfile, "alien-image-list")
         nodepoolcmd.main()
@@ -107,7 +110,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         def fail_list(self):
             raise RuntimeError('Fake list error')
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.fakeprovider.FakeOpenStackCloud.list_servers',
+            'nodepool.driver.fake.provider.FakeOpenStackCloud.list_servers',
             fail_list))
 
         configfile = self.setup_config("node_cmd.yaml")
@@ -116,12 +119,23 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_list_nodes(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        self.assert_nodes_listed(configfile, 1)
+        self.waitForNodes('fake-label')
+        self.assert_nodes_listed(configfile, 1, detail=False,
+                                 validate_col_count=True)
+
+    def test_list_nodes_detail(self):
+        configfile = self.setup_config('node.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForNodes('fake-label')
+        self.assert_nodes_listed(configfile, 1, detail=True,
+                                 validate_col_count=True)
 
     def test_config_validate(self):
         config = os.path.join(os.path.dirname(tests.__file__),
@@ -131,13 +145,13 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_list(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.waitForImage('fake-provider', 'fake-image')
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
 
     def test_dib_image_build_pause(self):
         configfile = self.setup_config('node_diskimage_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         self.patch_argv("-c", configfile, "image-build", "fake-image")
         with testtools.ExpectedException(Exception):
             nodepoolcmd.main()
@@ -145,19 +159,21 @@ class TestNodepoolCMD(tests.DBTestCase):
 
     def test_dib_image_pause(self):
         configfile = self.setup_config('node_diskimage_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label2')
+        self.assertEqual(len(nodes), 1)
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 0)
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
 
     def test_dib_image_upload_pause(self):
         configfile = self.setup_config('node_image_upload_pause.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label2')
+        self.assertEqual(len(nodes), 1)
         # Make sure diskimages were built.
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image', 1)
         self.assert_listed(configfile, ['dib-image-list'], 1, 'fake-image2', 1)
@@ -168,10 +184,11 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_dib_image_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
         # Check the image exists
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 1)
         builds = self.zk.getMostRecentBuilds(1, 'fake-image', zk.READY)
@@ -187,52 +204,67 @@ class TestNodepoolCMD(tests.DBTestCase):
     def test_hold(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        nodes = self.waitForNodes('fake-label')
+        node_id = nodes[0].id
         # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_listed(configfile, ['list'], 0, node_id, 1)
         self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Hold node 1
-        self.patch_argv('-c', configfile, 'hold', '1')
+        # Hold node 0000000000
+        self.patch_argv(
+            '-c', configfile, 'hold', node_id, '--reason', 'testing')
         nodepoolcmd.main()
         # Assert the state changed to HOLD
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_listed(configfile, ['list'], 0, node_id, 1)
         self.assert_nodes_listed(configfile, 1, 'hold')
 
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
-        self.waitForNodes(pool)
-        # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        # Assert one node exists and it is nodes[0].id in a ready state.
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 1)
         self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Delete node 1
-        self.assert_listed(configfile, ['delete', '1'], 10, 'delete', 1)
+
+        # Delete node
+        self.patch_argv('-c', configfile, 'delete', nodes[0].id)
+        nodepoolcmd.main()
+        self.waitForNodeDeletion(nodes[0])
+
+        # Assert the node is gone
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 0)
 
     def test_delete_now(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
         pool.start()
-        self.waitForImage( 'fake-provider', 'fake-image')
-        self.waitForNodes(pool)
+        self.waitForImage('fake-provider', 'fake-image')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
         # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, 1, 1)
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 1)
         self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Delete node 1
-        self.patch_argv('-c', configfile, 'delete', '--now', '1')
+
+        # Delete node
+        self.patch_argv('-c', configfile, 'delete', '--now', nodes[0].id)
         nodepoolcmd.main()
+        self.waitForNodeDeletion(nodes[0])
+
         # Assert the node is gone
-        self.assert_listed(configfile, ['list'], 0, 1, 0)
+        self.assert_listed(configfile, ['list'], 0, nodes[0].id, 0)
 
     def test_image_build(self):
         configfile = self.setup_config('node.yaml')
-        self._useBuilder(configfile)
+        self.useBuilder(configfile)
 
         # wait for the scheduled build to arrive
         self.waitForImage('fake-provider', 'fake-image')
@@ -246,19 +278,25 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image', [image])
         self.assert_listed(configfile, ['dib-image-list'], 4, zk.READY, 2)
 
-    def test_job_create(self):
+    def test_request_list(self):
         configfile = self.setup_config('node.yaml')
-        self.patch_argv("-c", configfile, "job-create", "fake-job",
-                        "--hold-on-failure", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
 
-    def test_job_delete(self):
-        configfile = self.setup_config('node.yaml')
-        self.patch_argv("-c", configfile, "job-create", "fake-job",
-                        "--hold-on-failure", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 2, 1, 1)
-        self.patch_argv("-c", configfile, "job-delete", "1")
-        nodepoolcmd.main()
-        self.assert_listed(configfile, ['job-list'], 0, 1, 0)
+        req = zk.NodeRequest()
+        req.state = zk.PENDING   # so it will be ignored
+        req.node_types = ['fake-label']
+        req.requestor = 'test_request_list'
+        self.zk.storeNodeRequest(req)
+
+        self.assert_listed(configfile, ['request-list'], 0, req.id, 1)
+
+    def test_without_argument(self):
+        configfile = self.setup_config("node_cmd.yaml")
+        self.patch_argv("-c", configfile)
+        result = nodepoolcmd.main()
+        self.assertEqual(1, result)

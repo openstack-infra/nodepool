@@ -14,8 +14,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-NODEPOOL_KEY=$HOME/.ssh/id_nodepool
-NODEPOOL_KEY_NAME=root
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 NODEPOOL_INSTALL=$HOME/nodepool-venv
 NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
@@ -34,7 +32,7 @@ function install_shade {
         # BUT - install shade into a virtualenv so that we don't have issues
         # with OpenStack constraints affecting the shade dependency install.
         # This particularly shows up with os-client-config
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/shade
+        $NODEPOOL_INSTALL/bin/pip install $DEST/shade
     fi
 }
 
@@ -45,7 +43,7 @@ function install_diskimage_builder {
         GITBRANCH["diskimage-builder"]=$DISKIMAGE_BUILDER_REPO_REF
         git_clone_by_name "diskimage-builder"
         setup_dev_lib "diskimage-builder"
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/diskimage-builder
+        $NODEPOOL_INSTALL/bin/pip install $DEST/diskimage-builder
     fi
 }
 
@@ -56,37 +54,29 @@ function install_glean {
         GITBRANCH["glean"]=$GLEAN_REPO_REF
         git_clone_by_name "glean"
         setup_dev_lib "glean"
-        $NODEPOOL_INSTALL/bin/pip install -e $DEST/glean
+        $NODEPOOL_INSTALL/bin/pip install $DEST/glean
     fi
 }
 
 
 # Install nodepool code
 function install_nodepool {
-    virtualenv $NODEPOOL_INSTALL
+    if python3_enabled; then
+        VENV="virtualenv -p python${PYTHON3_VERSION}"
+    else
+        VENV="virtualenv -p python${PYTHON2_VERSION}"
+    fi
+    $VENV $NODEPOOL_INSTALL
     install_shade
     install_diskimage_builder
     install_glean
 
     setup_develop $DEST/nodepool
-    $NODEPOOL_INSTALL/bin/pip install -e $DEST/nodepool
+    $NODEPOOL_INSTALL/bin/pip install $DEST/nodepool
 }
 
 # requires some globals from devstack, which *might* not be stable api
 # points. If things break, investigate changes in those globals first.
-
-function nodepool_create_keypairs {
-    if [[ ! -f $NODEPOOL_KEY ]]; then
-        ssh-keygen -f $NODEPOOL_KEY -P ""
-    fi
-
-    cat > /tmp/ssh_wrapper <<EOF
-#!/bin/bash -ex
-sudo -H -u stack ssh -o StrictHostKeyChecking=no -i $NODEPOOL_KEY root@\$@
-
-EOF
-    sudo chmod 0755 /tmp/ssh_wrapper
-}
 
 function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
@@ -118,7 +108,6 @@ EOF
 function nodepool_write_config {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)
     sudo mkdir -p $(dirname $NODEPOOL_SECURE)
-    local dburi=$(database_connection_url nodepool)
 
     cat > /tmp/logging.conf <<EOF
 [formatters]
@@ -178,12 +167,7 @@ EOF
     sudo mv /tmp/logging.conf $NODEPOOL_LOGGING
 
     cat > /tmp/secure.conf << EOF
-[database]
-# The mysql password here may be different depending on your
-# devstack install, you should double check it (the devstack var
-# is MYSQL_PASSWORD and if unset devstack should prompt you for
-# the value).
-dburi: $dburi
+# Empty
 EOF
     sudo mv /tmp/secure.conf $NODEPOOL_SECURE
 
@@ -197,14 +181,47 @@ EOF
     if [ -f $NODEPOOL_CACHE_GET_PIP ] ; then
         DIB_GET_PIP="DIB_REPOLOCATION_pip_and_virtualenv: file://$NODEPOOL_CACHE_GET_PIP"
     fi
-    if [ -f /etc/ci/mirror_info.sh ] ; then
-        source /etc/ci/mirror_info.sh
+    if [ -f /etc/nodepool/provider ] ; then
+        source /etc/nodepool/provider
+
+        NODEPOOL_MIRROR_HOST=${NODEPOOL_MIRROR_HOST:-mirror.$NODEPOOL_REGION.$NODEPOOL_CLOUD.openstack.org}
+        NODEPOOL_MIRROR_HOST=$(echo $NODEPOOL_MIRROR_HOST|tr '[:upper:]' '[:lower:]')
+
+        NODEPOOL_CENTOS_MIRROR=${NODEPOOL_CENTOS_MIRROR:-http://$NODEPOOL_MIRROR_HOST/centos}
+        NODEPOOL_DEBIAN_MIRROR=${NODEPOOL_DEBIAN_MIRROR:-http://$NODEPOOL_MIRROR_HOST/debian}
+        NODEPOOL_UBUNTU_MIRROR=${NODEPOOL_UBUNTU_MIRROR:-http://$NODEPOOL_MIRROR_HOST/ubuntu}
 
         DIB_DISTRIBUTION_MIRROR_CENTOS="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_CENTOS_MIRROR"
         DIB_DISTRIBUTION_MIRROR_DEBIAN="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_DEBIAN_MIRROR"
-        DIB_DISTRIBUTION_MIRROR_FEDORA="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_FEDORA_MIRROR"
         DIB_DISTRIBUTION_MIRROR_UBUNTU="DIB_DISTRIBUTION_MIRROR: $NODEPOOL_UBUNTU_MIRROR"
         DIB_DEBOOTSTRAP_EXTRA_ARGS="DIB_DEBOOTSTRAP_EXTRA_ARGS: '--no-check-gpg'"
+    fi
+
+    NODEPOOL_CENTOS_7_MIN_READY=1
+    NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
+    # TODO(pabelanger): Remove fedora-25 after fedora-26 is online
+    NODEPOOL_FEDORA_25_MIN_READY=1
+    NODEPOOL_FEDORA_26_MIN_READY=1
+    NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
+    NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
+
+    if $NODEPOOL_PAUSE_CENTOS_7_DIB ; then
+       NODEPOOL_CENTOS_7_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB ; then
+       NODEPOOL_DEBIAN_JESSIE_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_FEDORA_25_DIB ; then
+       NODEPOOL_FEDORA_25_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_FEDORA_26_DIB ; then
+       NODEPOOL_FEDORA_26_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB ; then
+       NODEPOOL_UBUNTU_TRUSTY_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB ; then
+       NODEPOOL_UBUNTU_XENIAL_MIN_READY=0
     fi
 
     cat > /tmp/nodepool.yaml <<EOF
@@ -213,115 +230,80 @@ EOF
 # example element.
 elements-dir: $(dirname $NODEPOOL_CONFIG)/elements
 images-dir: $NODEPOOL_DIB_BASE_PATH/images
-# The mysql password here may be different depending on your
-# devstack install, you should double check it (the devstack var
-# is MYSQL_PASSWORD and if unset devstack should prompt you for
-# the value).
-dburi: '$dburi'
 
 zookeeper-servers:
   - host: localhost
     port: 2181
 
-gearman-servers:
-  - host: localhost
-    port: 8991
-zmq-publishers: []
-# Need to have at least one target for node allocations, but
-# this does not need to be a jenkins target.
-targets:
-  - name: dummy
-    assign-via-gearman: True
-
-cron:
-  cleanup: '*/1 * * * *'
-  check: '*/15 * * * *'
-
 labels:
   - name: centos-7
-    image: centos-7
-    min-ready: 1
-    providers:
-      - name: devstack
+    min-ready: $NODEPOOL_CENTOS_7_MIN_READY
   - name: debian-jessie
-    image: debian-jessie
-    min-ready: 1
-    providers:
-      - name: devstack
+    min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
+  - name: fedora-25
+    min-ready: $NODEPOOL_FEDORA_25_MIN_READY
   - name: fedora-26
-    image: fedora-26
-    min-ready: 1
-    providers:
-      - name: devstack
-  - name: opensuse-423
-    image: opensuse-423
-    min-ready: 1
-    providers:
-      - name: devstack
+    min-ready: $NODEPOOL_FEDORA_26_MIN_READY
   - name: ubuntu-trusty
-    image: ubuntu-trusty
-    min-ready: 1
-    providers:
-      - name: devstack
+    min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
-    image: ubuntu-xenial
-    min-ready: 1
-    providers:
-      - name: devstack
+    min-ready: $NODEPOOL_UBUNTU_XENIAL_MIN_READY
 
 providers:
   - name: devstack
     region-name: '$REGION_NAME'
     cloud: devstack
-    api-timeout: 60
     # Long boot timeout to deal with potentially nested virt.
     boot-timeout: 600
     launch-timeout: 900
-    max-servers: 5
     rate: 0.25
-    images:
+    diskimages:
       - name: centos-7
-        min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
       - name: debian-jessie
-        min-ram: 512
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
+      - name: fedora-25
+        config-drive: true
       - name: fedora-26
-        min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
-      - name: opensuse-423
-        min-ram: 1024
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
-        config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
       - name: ubuntu-trusty
-        min-ram: 512
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
       - name: ubuntu-xenial
-        min-ram: 512
-        name-filter: 'nodepool'
-        username: devuser
-        private-key: $NODEPOOL_KEY
         config-drive: true
-        key-name: $NODEPOOL_KEY_NAME
+    pools:
+      - name: main
+        max-servers: 5
+        labels:
+          - name: centos-7
+            diskimage: centos-7
+            min-ram: 1024
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: debian-jessie
+            diskimage: debian-jessie
+            min-ram: 512
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: fedora-25
+            diskimage: fedora-25
+            min-ram: 1024
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: fedora-26
+            diskimage: fedora-26
+            min-ram: 1024
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: ubuntu-trusty
+            diskimage: ubuntu-trusty
+            min-ram: 512
+            flavor-name: 'nodepool'
+            console-log: True
+          - name: ubuntu-xenial
+            diskimage: ubuntu-xenial
+            min-ram: 512
+            flavor-name: 'nodepool'
+            console-log: True
 
 diskimages:
   - name: centos-7
@@ -369,6 +351,26 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
+  - name: fedora-25
+    pause: $NODEPOOL_PAUSE_FEDORA_25_DIB
+    rebuild-age: 86400
+    elements:
+      - fedora-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: 25
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
   - name: fedora-26
     pause: $NODEPOOL_PAUSE_FEDORA_26_DIB
     rebuild-age: 86400
@@ -380,27 +382,6 @@ diskimages:
       - openssh-server
       - nodepool-setup
     release: 26
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      $DIB_DISTRIBUTION_MIRROR_FEDORA
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
-  - name: opensuse-423
-    pause: $NODEPOOL_PAUSE_OPENSUSE_423_DIB
-    rebuild-age: 86400
-    elements:
-      - opensuse-minimal
-      - vm
-      - simple-init
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: 42.3
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
@@ -474,27 +455,22 @@ cache:
     floating-ip: 5
     server: 5
     port: 5
+# TODO(pabelanger): Remove once glean fully supports IPv6.
+client:
+  force_ipv4: True
 EOF
     sudo mv /tmp/clouds.yaml /etc/openstack/clouds.yaml
     mkdir -p $HOME/.cache/openstack/
 }
 
-# Initialize database
 # Create configs
 # Setup custom flavor
 function configure_nodepool {
-    # build a dedicated keypair for nodepool to use with guests
-    nodepool_create_keypairs
-
     # write the nodepool config
     nodepool_write_config
 
     # write the elements
     nodepool_write_elements
-
-    # builds a fresh db
-    recreate_database nodepool
-
 }
 
 function start_nodepool {
@@ -513,24 +489,19 @@ function start_nodepool {
         openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol tcp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
 
         openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol udp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
-
     fi
 
-    # create root keypair to use with glean for devstack cloud.
-    nova --os-project-name demo --os-username demo \
-        keypair-add --pub-key $NODEPOOL_PUBKEY $NODEPOOL_KEY_NAME
-
     export PATH=$NODEPOOL_INSTALL/bin:$PATH
-
-    # start gearman server
-    run_process geard "$NODEPOOL_INSTALL/bin/geard -p 8991 -d"
 
     # run a fake statsd so we test stats sending paths
     export STATSD_HOST=localhost
     export STATSD_PORT=8125
     run_process statsd "/usr/bin/socat -u udp-recv:$STATSD_PORT -"
 
-    run_process nodepool "$NODEPOOL_INSTALL/bin/nodepoold -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
+    # Ensure our configuration is valid.
+    $NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG config-validate
+
+    run_process nodepool-launcher "$NODEPOOL_INSTALL/bin/nodepool-launcher -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE -l $NODEPOOL_LOGGING -d"
     run_process nodepool-builder "$NODEPOOL_INSTALL/bin/nodepool-builder -c $NODEPOOL_CONFIG -l $NODEPOOL_LOGGING -d"
     :
 }
@@ -545,7 +516,7 @@ function cleanup_nodepool {
 }
 
 # check for service enabled
-if is_service_enabled nodepool; then
+if is_service_enabled nodepool-launcher; then
 
     if [[ "$1" == "stack" && "$2" == "install" ]]; then
         # Perform installation of service source

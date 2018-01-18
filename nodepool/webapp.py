@@ -20,7 +20,7 @@ from paste import httpserver
 import webob
 from webob import dec
 
-import status
+from nodepool import status
 
 """Nodepool main web app.
 
@@ -54,14 +54,17 @@ class Cache(object):
 class WebApp(threading.Thread):
     log = logging.getLogger("nodepool.WebApp")
 
-    def __init__(self, nodepool, port=8005, cache_expiry=1):
+    def __init__(self, nodepool, port=8005, listen_address='0.0.0.0',
+                 cache_expiry=1):
         threading.Thread.__init__(self)
         self.nodepool = nodepool
         self.port = port
+        self.listen_address = listen_address
         self.cache = Cache(cache_expiry)
         self.cache_expiry = cache_expiry
         self.daemon = True
-        self.server = httpserver.serve(dec.wsgify(self.app), host='0.0.0.0',
+        self.server = httpserver.serve(dec.wsgify(self.app),
+                                       host=self.listen_address,
                                        port=self.port, start_loop=False)
 
     def run(self):
@@ -96,6 +99,7 @@ class WebApp(threading.Thread):
             content_type = 'text/plain'
 
         response = webob.Response(body=output,
+                                  charset='UTF-8',
                                   content_type=content_type)
         response.headers['Access-Control-Allow-Origin'] = '*'
 

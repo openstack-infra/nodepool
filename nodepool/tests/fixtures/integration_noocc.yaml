@@ -1,0 +1,29 @@
+images-dir: '{images_dir}'
+
+zookeeper-servers:
+  - host: localhost
+
+labels:
+  - name: real-label
+    min-ready: 1
+
+providers:
+  - name: real-provider
+    region-name: real-region
+    rate: 0.0001
+    diskimages:
+      - name: fake-image
+        meta:
+          key: value
+          key2: value
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+          - name: real-label
+            diskimage: fake-image
+            min-ram: 8192
+            flavor-name: 'Real'
+
+diskimages:
+  - name: fake-image

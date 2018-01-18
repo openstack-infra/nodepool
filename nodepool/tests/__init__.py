@@ -15,27 +15,25 @@
 
 """Common utilities used in testing"""
 
-import errno
 import glob
 import logging
 import os
-import pymysql
 import random
-import re
+import select
 import string
+import socket
 import subprocess
 import threading
 import tempfile
 import time
-import uuid
 
 import fixtures
-import gear
-import lockfile
 import kazoo.client
 import testtools
 
-from nodepool import allocation, builder, fakeprovider, nodepool, nodedb, webapp
+from nodepool import builder
+from nodepool import launcher
+from nodepool import webapp
 from nodepool import zk
 from nodepool.cmd.config_validator import ConfigValidator
 
@@ -44,74 +42,6 @@ TRUE_VALUES = ('true', '1', 'yes')
 
 class LoggingPopen(subprocess.Popen):
     pass
-
-
-class FakeGearmanServer(gear.Server):
-    def __init__(self, port=0):
-        self.hold_jobs_in_queue = False
-        super(FakeGearmanServer, self).__init__(port)
-
-    def getJobForConnection(self, connection, peek=False):
-        for queue in [self.high_queue, self.normal_queue, self.low_queue]:
-            for job in queue:
-                if not hasattr(job, 'waiting'):
-                    if job.name.startswith('build:'):
-                        job.waiting = self.hold_jobs_in_queue
-                    else:
-                        job.waiting = False
-                if job.waiting:
-                    continue
-                if job.name in connection.functions:
-                    if not peek:
-                        queue.remove(job)
-                        connection.related_jobs[job.handle] = job
-                        job.worker_connection = connection
-                    job.running = True
-                    return job
-        return None
-
-    def release(self, regex=None):
-        released = False
-        qlen = (len(self.high_queue) + len(self.normal_queue) +
-                len(self.low_queue))
-        self.log.debug("releasing queued job %s (%s)" % (regex, qlen))
-        for job in self.getQueue():
-            cmd, name = job.name.split(':')
-            if cmd != 'build':
-                continue
-            if not regex or re.match(regex, name):
-                self.log.debug("releasing queued job %s" %
-                               job.unique)
-                job.waiting = False
-                released = True
-            else:
-                self.log.debug("not releasing queued job %s" %
-                               job.unique)
-        if released:
-            self.wakeConnections()
-        qlen = (len(self.high_queue) + len(self.normal_queue) +
-                len(self.low_queue))
-        self.log.debug("done releasing queued jobs %s (%s)" % (regex, qlen))
-
-
-class GearmanServerFixture(fixtures.Fixture):
-    def __init__(self, port=0):
-        self._port = port
-
-    def setUp(self):
-        super(GearmanServerFixture, self).setUp()
-        self.gearman_server = FakeGearmanServer(self._port)
-        self.addCleanup(self.shutdownGearman)
-
-    def shutdownGearman(self):
-        #TODO:greghaynes remove try once gear client protects against this
-        try:
-            self.gearman_server.shutdown()
-        except OSError as e:
-            if e.errno == errno.EBADF:
-                pass
-            else:
-                raise
 
 
 class ZookeeperServerFixture(fixtures.Fixture):
@@ -171,35 +101,38 @@ class ChrootedKazooFixture(fixtures.Fixture):
         _tmp_client.close()
 
 
-class GearmanClient(gear.Client):
-    def __init__(self):
-        super(GearmanClient, self).__init__(client_id='test_client')
-        self.__log = logging.getLogger("tests.GearmanClient")
+class StatsdFixture(fixtures.Fixture):
+    def _setUp(self):
+        self.running = True
+        self.thread = threading.Thread(target=self.run)
+        self.thread.daemon = True
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(('', 0))
+        self.port = self.sock.getsockname()[1]
+        self.wake_read, self.wake_write = os.pipe()
+        self.stats = []
+        self.thread.start()
+        self.addCleanup(self._cleanup)
 
-    def get_queued_image_jobs(self):
-        'Count the number of image-build and upload jobs queued.'
-        queued = 0
-        for connection in self.active_connections:
-            try:
-                req = gear.StatusAdminRequest()
-                connection.sendAdminRequest(req)
-            except Exception:
-                self.__log.exception("Exception while listing functions")
-                self._lostConnection(connection)
-                continue
-            for line in req.response.split('\n'):
-                parts = [x.strip() for x in line.split('\t')]
-                # parts[0] - function name
-                # parts[1] - total jobs queued (including building)
-                # parts[2] - jobs building
-                # parts[3] - workers registered
-                if not parts or parts[0] == '.':
-                    continue
-                if (not parts[0].startswith('image-build:') and
-                    not parts[0].startswith('image-upload:')):
-                    continue
-                queued += int(parts[1])
-        return queued
+    def run(self):
+        while self.running:
+            poll = select.poll()
+            poll.register(self.sock, select.POLLIN)
+            poll.register(self.wake_read, select.POLLIN)
+            ret = poll.poll()
+            for (fd, event) in ret:
+                if fd == self.sock.fileno():
+                    data = self.sock.recvfrom(1024)
+                    if not data:
+                        return
+                    self.stats.append(data[0])
+                if fd == self.wake_read:
+                    return
+
+    def _cleanup(self):
+        self.running = False
+        os.write(self.wake_write, b'1\n')
+        self.thread.join()
 
 
 class BaseTestCase(testtools.TestCase):
@@ -230,7 +163,10 @@ class BaseTestCase(testtools.TestCase):
             logging.basicConfig(level=logging.DEBUG)
         l = logging.getLogger('kazoo')
         l.setLevel(logging.INFO)
-        l.propagate=False
+        l.propagate = False
+        l = logging.getLogger('stevedore')
+        l.setLevel(logging.INFO)
+        l.propagate = False
         self.useFixture(fixtures.NestedTempfile())
 
         self.subprocesses = []
@@ -240,48 +176,46 @@ class BaseTestCase(testtools.TestCase):
             self.subprocesses.append(p)
             return p
 
+        self.statsd = StatsdFixture()
+        self.useFixture(self.statsd)
+
+        # note, use 127.0.0.1 rather than localhost to avoid getting ipv6
+        # see: https://github.com/jsocol/pystatsd/issues/61
+        os.environ['STATSD_HOST'] = '127.0.0.1'
+        os.environ['STATSD_PORT'] = str(self.statsd.port)
+
         self.useFixture(fixtures.MonkeyPatch('subprocess.Popen',
                                              LoggingPopenFactory))
         self.setUpFakes()
 
     def setUpFakes(self):
-        log = logging.getLogger("nodepool.test")
-        log.debug("set up fakes")
-        fake_client = fakeprovider.FakeOpenStackCloud()
-
-        def get_fake_client(*args, **kwargs):
-            return fake_client
-
+        clouds_path = os.path.join(os.path.dirname(__file__),
+                                   'fixtures', 'clouds.yaml')
         self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.provider_manager.ProviderManager._getClient',
-            get_fake_client))
-        self.useFixture(fixtures.MonkeyPatch(
-            'nodepool.nodepool._get_one_cloud',
-            fakeprovider.fake_get_one_cloud))
+            'os_client_config.config.CONFIG_FILES', [clouds_path]))
 
     def wait_for_threads(self):
-        whitelist = ['APScheduler',
-                     'MainThread',
+        # Wait until all transient threads (node launches, deletions,
+        # etc.) are all complete.  Whitelist any long-running threads.
+        whitelist = ['MainThread',
                      'NodePool',
                      'NodePool Builder',
-                     'NodeUpdateListener',
-                     'Gearman client connect',
-                     'Gearman client poll',
                      'fake-provider',
                      'fake-provider1',
                      'fake-provider2',
                      'fake-provider3',
-                     'fake-dib-provider',
-                     'fake-jenkins',
-                     'fake-target',
-                     'DiskImageBuilder queue',
+                     'CleanupWorker',
+                     'DeletedNodeWorker',
+                     'pydevd.CommandThread',
+                     'pydevd.Reader',
+                     'pydevd.Writer',
                      ]
 
         while True:
             done = True
             for t in threading.enumerate():
                 if t.name.startswith("Thread-"):
-                    # apscheduler thread pool
+                    # Kazoo
                     continue
                 if t.name.startswith("worker "):
                     # paste web server
@@ -292,93 +226,45 @@ class BaseTestCase(testtools.TestCase):
                     continue
                 if t.name.startswith("CleanupWorker"):
                     continue
+                if t.name.startswith("PoolWorker"):
+                    continue
                 if t.name not in whitelist:
                     done = False
             if done:
                 return
             time.sleep(0.1)
 
+    def assertReportedStat(self, key, value=None, kind=None):
+        start = time.time()
+        while time.time() < (start + 5):
+            for stat in self.statsd.stats:
+                k, v = stat.decode('utf8').split(':')
+                if key == k:
+                    if value is None and kind is None:
+                        return
+                    elif value:
+                        if value == v:
+                            return
+                    elif kind:
+                        if v.endswith('|' + kind):
+                            return
+            time.sleep(0.1)
 
-class AllocatorTestCase(object):
-    def setUp(self):
-        super(AllocatorTestCase, self).setUp()
-        self.agt = []
-
-    def test_allocator(self):
-        for i, amount in enumerate(self.results):
-            print self.agt[i]
-        for i, amount in enumerate(self.results):
-            self.assertEqual(self.agt[i].amount, amount,
-                             'Error at pos %d, '
-                             'expected %s and got %s' % (i, self.results,
-                                                         [x.amount
-                                                          for x in self.agt]))
-
-
-class RoundRobinTestCase(object):
-    def setUp(self):
-        super(RoundRobinTestCase, self).setUp()
-        self.allocations = []
-
-    def test_allocator(self):
-        for i, label in enumerate(self.results):
-            self.assertEqual(self.results[i], self.allocations[i],
-                             'Error at pos %d, '
-                             'expected %s and got %s' % (i, self.results,
-                                                         self.allocations))
-
-
-class MySQLSchemaFixture(fixtures.Fixture):
-    def setUp(self):
-        super(MySQLSchemaFixture, self).setUp()
-
-        random_bits = ''.join(random.choice(string.ascii_lowercase +
-                                            string.ascii_uppercase)
-                              for x in range(8))
-        self.name = '%s_%s' % (random_bits, os.getpid())
-        self.passwd = uuid.uuid4().hex
-        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
-        with lock:
-            db = pymysql.connect(host="localhost",
-                                 user="openstack_citest",
-                                 passwd="openstack_citest",
-                                 db="openstack_citest")
-            cur = db.cursor()
-            cur.execute("create database %s" % self.name)
-            cur.execute(
-                "grant all on %s.* to '%s'@'localhost' identified by '%s'" %
-                (self.name, self.name, self.passwd))
-            cur.execute("flush privileges")
-
-        self.dburi = 'mysql+pymysql://%s:%s@localhost/%s' % (self.name,
-                                                             self.passwd,
-                                                             self.name)
-        self.addDetail('dburi', testtools.content.text_content(self.dburi))
-        self.addCleanup(self.cleanup)
-
-    def cleanup(self):
-        lock = lockfile.LockFile('/tmp/nodepool-db-schema-lockfile')
-        with lock:
-            db = pymysql.connect(host="localhost",
-                                 user="openstack_citest",
-                                 passwd="openstack_citest",
-                                 db="openstack_citest")
-            cur = db.cursor()
-            cur.execute("drop database %s" % self.name)
-            cur.execute("drop user '%s'@'localhost'" % self.name)
-            cur.execute("flush privileges")
+        raise Exception("Key %s not found in reported stats" % key)
 
 
 class BuilderFixture(fixtures.Fixture):
-    def __init__(self, configfile, cleanup_interval):
+    def __init__(self, configfile, cleanup_interval, securefile=None):
         super(BuilderFixture, self).__init__()
         self.configfile = configfile
+        self.securefile = securefile
         self.cleanup_interval = cleanup_interval
         self.builder = None
 
     def setUp(self):
         super(BuilderFixture, self).setUp()
-        self.builder = builder.NodePoolBuilder(self.configfile)
+        self.builder = builder.NodePoolBuilder(
+            self.configfile, secure_path=self.securefile)
         self.builder.cleanup_interval = self.cleanup_interval
         self.builder.build_interval = .1
         self.builder.upload_interval = .1
@@ -394,15 +280,6 @@ class DBTestCase(BaseTestCase):
     def setUp(self):
         super(DBTestCase, self).setUp()
         self.log = logging.getLogger("tests")
-        f = MySQLSchemaFixture()
-        self.useFixture(f)
-        self.dburi = f.dburi
-        self.secure_conf = self._setup_secure()
-
-        gearman_fixture = GearmanServerFixture()
-        self.useFixture(gearman_fixture)
-        self.gearman_server = gearman_fixture.gearman_server
-
         self.setupZK()
 
     def setup_config(self, filename, images_dir=None):
@@ -412,13 +289,13 @@ class DBTestCase(BaseTestCase):
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
-        with open(configfile) as conf_fd:
-            config = conf_fd.read()
-            os.write(fd, config.format(images_dir=images_dir.path,
-                                       gearman_port=self.gearman_server.port,
-                                       zookeeper_host=self.zookeeper_host,
-                                       zookeeper_port=self.zookeeper_port,
-                                       zookeeper_chroot=self.zookeeper_chroot))
+        with open(configfile, 'rb') as conf_fd:
+            config = conf_fd.read().decode('utf8')
+            data = config.format(images_dir=images_dir.path,
+                                 zookeeper_host=self.zookeeper_host,
+                                 zookeeper_port=self.zookeeper_port,
+                                 zookeeper_chroot=self.zookeeper_chroot)
+            os.write(fd, data.encode('utf8'))
         os.close(fd)
         self._config_images_dir = images_dir
         validator = ConfigValidator(path)
@@ -430,14 +307,18 @@ class DBTestCase(BaseTestCase):
         new_configfile = self.setup_config(filename, self._config_images_dir)
         os.rename(new_configfile, configfile)
 
-    def _setup_secure(self):
+    def setup_secure(self, filename):
         # replace entries in secure.conf
         configfile = os.path.join(os.path.dirname(__file__),
-                                  'fixtures', 'secure.conf')
+                                  'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
-        with open(configfile) as conf_fd:
-            config = conf_fd.read()
-            os.write(fd, config.format(dburi=self.dburi))
+        with open(configfile, 'rb') as conf_fd:
+            config = conf_fd.read().decode('utf8')
+            data = config.format(
+                zookeeper_host=self.zookeeper_host,
+                zookeeper_port=self.zookeeper_port,
+                zookeeper_chroot=self.zookeeper_chroot)
+            os.write(fd, data.encode('utf8'))
         os.close(fd)
         return path
 
@@ -527,35 +408,65 @@ class DBTestCase(BaseTestCase):
 
         self.wait_for_threads()
 
-    def waitForNodes(self, pool):
-        self.wait_for_config(pool)
-        allocation_history = allocation.AllocationHistory()
+    def waitForNodeDeletion(self, node):
+        while True:
+            exists = False
+            for n in self.zk.nodeIterator():
+                if node.id == n.id:
+                    exists = True
+                    break
+            if not exists:
+                break
+            time.sleep(1)
+
+    def waitForInstanceDeletion(self, manager, instance_id):
+        while True:
+            servers = manager.listNodes()
+            if not (instance_id in [s.id for s in servers]):
+                break
+            time.sleep(1)
+
+    def waitForNodeRequestLockDeletion(self, request_id):
+        while True:
+            exists = False
+            for lock_id in self.zk.getNodeRequestLockIDs():
+                if request_id == lock_id:
+                    exists = True
+                    break
+            if not exists:
+                break
+            time.sleep(1)
+
+    def waitForNodes(self, label, count=1):
         while True:
             self.wait_for_threads()
-            with pool.getDB().getSession() as session:
-                needed = pool.getNeededNodes(session, allocation_history)
-                if not needed:
-                    nodes = session.getNodes(state=nodedb.BUILDING)
-                    if not nodes:
-                        break
+            ready_nodes = self.zk.getReadyNodesOfTypes([label])
+            if label in ready_nodes and len(ready_nodes[label]) == count:
+                break
             time.sleep(1)
         self.wait_for_threads()
+        return ready_nodes[label]
 
-    def waitForJobs(self):
-        # XXX:greghaynes - There is a very narrow race here where nodepool
-        # is who actually updates the database so this may return before the
-        # image rows are updated.
-        client = GearmanClient()
-        client.addServer('localhost', self.gearman_server.port)
-        client.waitForServer()
+    def waitForNodeRequest(self, req, states=None):
+        '''
+        Wait for a node request to transition to a final state.
+        '''
+        if states is None:
+            states = (zk.FULFILLED, zk.FAILED)
+        while True:
+            req = self.zk.getNodeRequest(req.id)
+            if req.state in states:
+                break
+            time.sleep(1)
 
-        while client.get_queued_image_jobs() > 0:
-            time.sleep(.2)
-        client.shutdown()
+        return req
 
     def useNodepool(self, *args, **kwargs):
-        args = (self.secure_conf,) + args
-        pool = nodepool.NodePool(*args, **kwargs)
+        secure_conf = kwargs.pop('secure_conf', None)
+        args = (secure_conf,) + args
+        pool = launcher.NodePool(*args, **kwargs)
+        pool.cleanup_interval = .5
+        pool.delete_interval = .5
         self.addCleanup(pool.stop)
         return pool
 
@@ -564,8 +475,10 @@ class DBTestCase(BaseTestCase):
         self.addCleanup(app.stop)
         return app
 
-    def _useBuilder(self, configfile, cleanup_interval=.5):
-        self.useFixture(BuilderFixture(configfile, cleanup_interval))
+    def useBuilder(self, configfile, securefile=None, cleanup_interval=.5):
+        self.useFixture(
+            BuilderFixture(configfile, cleanup_interval, securefile)
+        )
 
     def setupZK(self):
         f = ZookeeperServerFixture()
@@ -587,8 +500,8 @@ class DBTestCase(BaseTestCase):
     def printZKTree(self, node):
         def join(a, b):
             if a.endswith('/'):
-                return a+b
-            return a+'/'+b
+                return a + b
+            return a + '/' + b
 
         data, stat = self.zk.client.get(node)
         self.log.debug("Node: %s" % (node,))

@@ -25,18 +25,33 @@ from kazoo.recipe.lock import Lock
 from nodepool import exceptions as npe
 
 # States:
-# We are building this image but it is not ready for use.
+# We are building this image (or node) but it is not ready for use.
 BUILDING = 'building'
 # The image is being uploaded.
 UPLOADING = 'uploading'
-# The image/upload is ready for use.
+# The image/upload/node is ready for use.
 READY = 'ready'
-# The image/upload should be deleted.
+# The image/upload/node should be deleted.
 DELETING = 'deleting'
 # The build failed.
 FAILED = 'failed'
+# Node request is submitted/unhandled.
+REQUESTED = 'requested'
+# Node request has been processed successfully.
+FULFILLED = 'fulfilled'
+# Node request is being worked.
+PENDING = 'pending'
+# Node is being tested
+TESTING = 'testing'
+# Node is being used
+IN_USE = 'in-use'
+# Node has been used
+USED = 'used'
+# Node is being held
+HOLD = 'hold'
+# Initial node state
+INIT = 'init'
 
-STATES = set([BUILDING, UPLOADING, READY, DELETING, FAILED])
 
 class ZooKeeperConnectionConfig(object):
     '''
@@ -106,10 +121,16 @@ class ZooKeeperWatchEvent(object):
         self.image = image
 
 
-class BaseBuilderModel(object):
+class BaseModel(object):
+    VALID_STATES = set([])
+
     def __init__(self, o_id):
         if o_id:
+            # Call the setter for id so we can validate the incoming type.
             self.id = o_id
+        else:
+            # Bypass the setter for id to set the default.
+            self._id = None
         self._state = None
         self.state_time = None
         self.stat = None
@@ -130,14 +151,14 @@ class BaseBuilderModel(object):
 
     @state.setter
     def state(self, value):
-        if value not in STATES:
+        if value not in self.VALID_STATES:
             raise TypeError("'%s' is not a valid state" % value)
         self._state = value
         self.state_time = time.time()
 
     def toDict(self):
         '''
-        Convert a BaseBuilderModel object's attributes to a dictionary.
+        Convert a BaseModel object's attributes to a dictionary.
         '''
         d = {}
         d['state'] = self.state
@@ -156,16 +177,34 @@ class BaseBuilderModel(object):
         if 'state_time' in d:
             self.state_time = d['state_time']
 
+    def serialize(self):
+        '''
+        Return a representation of the object as a string.
 
-class ImageBuild(BaseBuilderModel):
+        Used for storing the object data in ZooKeeper.
+        '''
+        return json.dumps(self.toDict()).encode('utf8')
+
+
+class ImageBuild(BaseModel):
     '''
     Class representing a DIB image build within the ZooKeeper cluster.
+
+    Note that the 'builder' attribute used to be used to uniquely identify
+    the owner of an image build in ZooKeeper. Because hostname was used, if
+    it ever changed, then we would get orphaned znodes. The 'builder_id'
+    attribute was added as a replacement, keeping 'builder' to mean the
+    same thing (which is why this attribute is not called 'hostname' or
+    similar).
     '''
+    VALID_STATES = set([BUILDING, READY, DELETING, FAILED])
 
     def __init__(self, build_id=None):
         super(ImageBuild, self).__init__(build_id)
         self._formats = []
-        self.builder = None          # Builder hostname
+        self.builder = None       # Hostname
+        self.builder_id = None    # Unique ID
+        self.username = None
 
     def __repr__(self):
         d = self.toDict()
@@ -193,8 +232,11 @@ class ImageBuild(BaseBuilderModel):
         d = super(ImageBuild, self).toDict()
         if self.builder is not None:
             d['builder'] = self.builder
+        if self.builder_id is not None:
+            d['builder_id'] = self.builder_id
         if len(self.formats):
             d['formats'] = ','.join(self.formats)
+        d['username'] = self.username
         return d
 
     @staticmethod
@@ -210,23 +252,28 @@ class ImageBuild(BaseBuilderModel):
         o = ImageBuild(o_id)
         super(ImageBuild, o).fromDict(d)
         o.builder = d.get('builder')
+        o.builder_id = d.get('builder_id')
+        o.username = d.get('username', 'zuul')
         # Only attempt the split on non-empty string
         if d.get('formats', ''):
             o.formats = d.get('formats', '').split(',')
         return o
 
 
-class ImageUpload(BaseBuilderModel):
+class ImageUpload(BaseModel):
     '''
     Class representing a provider image upload within the ZooKeeper cluster.
     '''
+    VALID_STATES = set([UPLOADING, READY, DELETING, FAILED])
 
     def __init__(self, build_id=None, provider_name=None, image_name=None,
-                 upload_id=None):
+                 upload_id=None, username=None):
         super(ImageUpload, self).__init__(upload_id)
         self.build_id = build_id
         self.provider_name = provider_name
         self.image_name = image_name
+        self.format = None
+        self.username = username
         self.external_id = None      # Provider ID of the image
         self.external_name = None    # Provider name of the image
 
@@ -236,6 +283,7 @@ class ImageUpload(BaseBuilderModel):
         d['build_id'] = self.build_id
         d['provider_name'] = self.provider_name
         d['image_name'] = self.image_name
+        d['format'] = self.format
         d['stat'] = self.stat
         return '<ImageUpload %s>' % d
 
@@ -244,7 +292,8 @@ class ImageUpload(BaseBuilderModel):
             return (self.id == other.id and
                     self.provider_name == other.provider_name and
                     self.build_id == other.build_id and
-                    self.image_name == other.image_name)
+                    self.image_name == other.image_name and
+                    self.format == other.format)
         else:
             return False
 
@@ -255,6 +304,8 @@ class ImageUpload(BaseBuilderModel):
         d = super(ImageUpload, self).toDict()
         d['external_id'] = self.external_id
         d['external_name'] = self.external_name
+        d['format'] = self.format
+        d['username'] = self.username
         return d
 
     @staticmethod
@@ -274,6 +325,230 @@ class ImageUpload(BaseBuilderModel):
         super(ImageUpload, o).fromDict(d)
         o.external_id = d.get('external_id')
         o.external_name = d.get('external_name')
+        o.format = d.get('format')
+        o.username = d.get('username', 'zuul')
+        return o
+
+
+class NodeRequestLockStats(object):
+    '''
+    Class holding the stats of a node request lock znode.
+
+    This doesn't need to derive from BaseModel since this class exists only
+    to associate the znode stats with the lock.
+    '''
+    def __init__(self, lock_id=None):
+        self.lock_id = lock_id
+        self.stat = None
+
+    def __eq__(self, other):
+        if isinstance(other, NodeRequestLockStats):
+            return (self.lock_id == other.lock_id)
+        else:
+            return False
+
+    def __repr__(self):
+        return '<NodeRequestLockStats %s>' % self.lock_id
+
+
+class NodeRequest(BaseModel):
+    '''
+    Class representing a node request.
+    '''
+    VALID_STATES = set([REQUESTED, PENDING, FULFILLED, FAILED])
+
+    def __init__(self, id=None):
+        super(NodeRequest, self).__init__(id)
+        self.lock = None
+        self.declined_by = []
+        self.node_types = []
+        self.nodes = []
+        self.reuse = True
+        self.requestor = None
+
+    def __repr__(self):
+        d = self.toDict()
+        d['id'] = self.id
+        d['stat'] = self.stat
+        return '<NodeRequest %s>' % d
+
+    def __eq__(self, other):
+        if isinstance(other, NodeRequest):
+            return (self.id == other.id and
+                    self.declined_by == other.declined_by and
+                    self.node_types == other.node_types and
+                    self.nodes == other.nodes and
+                    self.reuse == other.reuse and
+                    self.requestor == other.requestor)
+        else:
+            return False
+
+    def toDict(self):
+        '''
+        Convert a NodeRequest object's attributes to a dictionary.
+        '''
+        d = super(NodeRequest, self).toDict()
+        d['declined_by'] = self.declined_by
+        d['node_types'] = self.node_types
+        d['nodes'] = self.nodes
+        d['reuse'] = self.reuse
+        d['requestor'] = self.requestor
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create a NodeRequest object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized NodeRequest object.
+        '''
+        o = NodeRequest(o_id)
+        super(NodeRequest, o).fromDict(d)
+        o.declined_by = d.get('declined_by', [])
+        o.node_types = d.get('node_types', [])
+        o.nodes = d.get('nodes', [])
+        o.reuse = d.get('reuse', True)
+        o.requestor = d.get('requestor')
+        return o
+
+
+class Node(BaseModel):
+    '''
+    Class representing a launched node.
+    '''
+    VALID_STATES = set([BUILDING, TESTING, READY, IN_USE, USED,
+                        HOLD, DELETING, FAILED, INIT])
+
+    def __init__(self, id=None):
+        super(Node, self).__init__(id)
+        self.lock = None
+        self.cloud = None
+        self.provider = None
+        self.pool = None
+        self.type = None
+        self.allocated_to = None
+        self.az = None
+        self.region = None
+        self.public_ipv4 = None
+        self.private_ipv4 = None
+        self.public_ipv6 = None
+        self.interface_ip = None
+        self.connection_port = 22
+        self.image_id = None
+        self.launcher = None
+        self.created_time = None
+        self.external_id = None
+        self.hostname = None
+        self.comment = None
+        self.hold_job = None
+        self.username = None
+        self.connection_type = None
+        self.host_keys = []
+
+    def __repr__(self):
+        d = self.toDict()
+        d['id'] = self.id
+        d['stat'] = self.stat
+        return '<Node %s>' % d
+
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return (self.id == other.id and
+                    self.cloud == other.cloud and
+                    self.state == other.state and
+                    self.state_time == other.state_time and
+                    self.provider == other.provider and
+                    self.pool == other.pool and
+                    self.type == other.type and
+                    self.allocated_to == other.allocated_to and
+                    self.az == other.az and
+                    self.region == other.region and
+                    self.public_ipv4 == other.public_ipv4 and
+                    self.private_ipv4 == other.private_ipv4 and
+                    self.public_ipv6 == other.public_ipv6 and
+                    self.interface_ip == other.interface_ip and
+                    self.image_id == other.image_id and
+                    self.launcher == other.launcher and
+                    self.created_time == other.created_time and
+                    self.external_id == other.external_id and
+                    self.hostname == other.hostname and
+                    self.comment == other.comment and
+                    self.hold_job == other.hold_job and
+                    self.username == other.username and
+                    self.connection_type == other.connection_type and
+                    self.host_keys == other.host_keys)
+        else:
+            return False
+
+    def toDict(self):
+        '''
+        Convert a Node object's attributes to a dictionary.
+        '''
+        d = super(Node, self).toDict()
+        d['cloud'] = self.cloud
+        d['provider'] = self.provider
+        d['pool'] = self.pool
+        d['type'] = self.type
+        d['allocated_to'] = self.allocated_to
+        d['az'] = self.az
+        d['region'] = self.region
+        d['public_ipv4'] = self.public_ipv4
+        d['private_ipv4'] = self.private_ipv4
+        d['public_ipv6'] = self.public_ipv6
+        d['interface_ip'] = self.interface_ip
+        d['connection_port'] = self.connection_port
+        # TODO(tobiash): ssh_port is kept for backwards compatibility reasons
+        # to zuul. It should be removed after some deprecation time.
+        d['ssh_port'] = self.connection_port
+        d['image_id'] = self.image_id
+        d['launcher'] = self.launcher
+        d['created_time'] = self.created_time
+        d['external_id'] = self.external_id
+        d['hostname'] = self.hostname
+        d['comment'] = self.comment
+        d['hold_job'] = self.hold_job
+        d['host_keys'] = self.host_keys
+        d['username'] = self.username
+        d['connection_type'] = self.connection_type
+        return d
+
+    @staticmethod
+    def fromDict(d, o_id=None):
+        '''
+        Create a Node object from a dictionary.
+
+        :param dict d: The dictionary.
+        :param str o_id: The object ID.
+
+        :returns: An initialized Node object.
+        '''
+        o = Node(o_id)
+        super(Node, o).fromDict(d)
+        o.cloud = d.get('cloud')
+        o.provider = d.get('provider')
+        o.pool = d.get('pool')
+        o.type = d.get('type')
+        o.allocated_to = d.get('allocated_to')
+        o.az = d.get('az')
+        o.region = d.get('region')
+        o.public_ipv4 = d.get('public_ipv4')
+        o.private_ipv4 = d.get('private_ipv4')
+        o.public_ipv6 = d.get('public_ipv6')
+        o.interface_ip = d.get('interface_ip')
+        o.connection_port = d.get('connection_port', d.get('ssh_port', 22))
+        o.image_id = d.get('image_id')
+        o.launcher = d.get('launcher')
+        o.created_time = d.get('created_time')
+        o.external_id = d.get('external_id')
+        o.hostname = d.get('hostname')
+        o.comment = d.get('comment')
+        o.hold_job = d.get('hold_job')
+        o.username = d.get('username', 'zuul')
+        o.connection_type = d.get('connection_type')
+        o.host_keys = d.get('host_keys', [])
         return o
 
 
@@ -296,6 +571,10 @@ class ZooKeeper(object):
     log = logging.getLogger("nodepool.zk.ZooKeeper")
 
     IMAGE_ROOT = "/nodepool/images"
+    LAUNCHER_ROOT = "/nodepool/launchers"
+    NODE_ROOT = "/nodepool/nodes"
+    REQUEST_ROOT = "/nodepool/requests"
+    REQUEST_LOCK_ROOT = "/nodepool/requests-lock"
 
     def __init__(self):
         '''
@@ -304,9 +583,9 @@ class ZooKeeper(object):
         self.client = None
         self._became_lost = False
 
-    #========================================================================
+    # =======================================================================
     # Private Methods
-    #========================================================================
+    # =======================================================================
 
     def _imagePath(self, image):
         return "%s/%s" % (self.IMAGE_ROOT, image)
@@ -337,11 +616,23 @@ class ZooKeeper(object):
         return "%s/lock" % self._imageUploadPath(image, build_number,
                                                  provider)
 
-    def _dictToStr(self, data):
-        return json.dumps(data)
+    def _launcherPath(self, launcher):
+        return "%s/%s" % (self.LAUNCHER_ROOT, launcher)
 
-    def _strToDict(self, data):
-        return json.loads(data)
+    def _nodePath(self, node):
+        return "%s/%s" % (self.NODE_ROOT, node)
+
+    def _nodeLockPath(self, node):
+        return "%s/%s/lock" % (self.NODE_ROOT, node)
+
+    def _requestPath(self, request):
+        return "%s/%s" % (self.REQUEST_ROOT, request)
+
+    def _requestLockPath(self, request):
+        return "%s/%s" % (self.REQUEST_LOCK_ROOT, request)
+
+    def _bytesToDict(self, data):
+        return json.loads(data.decode('utf8'))
 
     def _getImageBuildLock(self, image, blocking=True, timeout=None):
         lock_path = self._imageBuildLockPath(image)
@@ -351,6 +642,9 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image build not found for locking: %s", image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -368,6 +662,10 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image build number not found for locking: %s, %s",
+                           build_number, image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -385,6 +683,10 @@ class ZooKeeper(object):
         except kze.LockTimeout:
             raise npe.TimeoutException(
                 "Timeout trying to acquire lock %s" % lock_path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Image upload not found for locking: %s, %s, %s",
+                           build_number, provider, image)
 
         # If we aren't blocking, it's possible we didn't get the lock
         # because someone else has it.
@@ -407,10 +709,9 @@ class ZooKeeper(object):
         else:
             self.log.debug("ZooKeeper connection: CONNECTED")
 
-
-    #========================================================================
+    # =======================================================================
     # Public Methods and Properties
-    #========================================================================
+    # =======================================================================
 
     @property
     def connected(self):
@@ -645,7 +946,7 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return None
 
-        d = ImageBuild.fromDict(self._strToDict(data), build_number)
+        d = ImageBuild.fromDict(self._bytesToDict(data), build_number)
         d.stat = stat
         return d
 
@@ -732,13 +1033,13 @@ class ZooKeeper(object):
         if build_number is None:
             path = self.client.create(
                 build_path,
-                value=self._dictToStr(build_data.toDict()),
+                value=build_data.serialize(),
                 sequence=True,
                 makepath=True)
             build_number = path.split("/")[-1]
         else:
             path = build_path + build_number
-            self.client.set(path, self._dictToStr(build_data.toDict()))
+            self.client.set(path, build_data.serialize())
 
         return build_number
 
@@ -763,9 +1064,11 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return None
 
-        d = ImageUpload.fromDict(
-            self._strToDict(data), build_number, provider, image, upload_number
-        )
+        d = ImageUpload.fromDict(self._bytesToDict(data),
+                                 build_number,
+                                 provider,
+                                 image,
+                                 upload_number)
         d.stat = stat
         return d
 
@@ -794,9 +1097,11 @@ class ZooKeeper(object):
             if upload == 'lock':
                 continue
             data = self.getImageUpload(image, build_number, provider, upload)
+            if not data:
+                continue
             if states is None:
                 matches.append(data)
-            elif data and data.state in states:
+            elif data.state in states:
                 matches.append(data)
 
         return matches
@@ -830,7 +1135,7 @@ class ZooKeeper(object):
         return uploads[:count]
 
     def getMostRecentImageUpload(self, image, provider,
-                                 state="ready"):
+                                 state=READY):
         '''
         Retrieve the most recent image upload data with the given state.
 
@@ -854,7 +1159,8 @@ class ZooKeeper(object):
             for upload in uploads:
                 if upload == 'lock':   # skip the upload lock node
                     continue
-                data = self.getImageUpload(image, build_number, provider, upload)
+                data = self.getImageUpload(
+                    image, build_number, provider, upload)
                 if not data or data.state != state:
                     continue
                 elif (recent_data is None or
@@ -897,18 +1203,19 @@ class ZooKeeper(object):
         # Generate a path for the upload. This doesn't have to exist yet
         # since we'll create new provider/upload ID znodes automatically.
         # Append trailing / so the sequence node is created as a child node.
-        upload_path = self._imageUploadPath(image, build_number, provider) + "/"
+        upload_path = self._imageUploadPath(
+            image, build_number, provider) + "/"
 
         if upload_number is None:
             path = self.client.create(
                 upload_path,
-                value=self._dictToStr(image_data.toDict()),
+                value=image_data.serialize(),
                 sequence=True,
                 makepath=True)
             upload_number = path.split("/")[-1]
         else:
             path = upload_path + upload_number
-            self.client.set(path, self._dictToStr(image_data.toDict()))
+            self.client.set(path, image_data.serialize())
 
         return upload_number
 
@@ -964,8 +1271,8 @@ class ZooKeeper(object):
 
         # Verify that no upload znodes exist.
         for prov in self.getBuildProviders(image, build_number):
-             if self.getImageUploadNumbers(image, build_number, prov):
-                 return False
+            if self.getImageUploadNumbers(image, build_number, prov):
+                return False
 
         try:
             # NOTE: Need to do recursively to remove lock znodes
@@ -990,3 +1297,385 @@ class ZooKeeper(object):
             self.client.delete(path)
         except kze.NoNodeError:
             pass
+
+    def registerLauncher(self, launcher):
+        '''
+        Register an active node launcher.
+
+        The launcher is automatically de-registered once it terminates or
+        otherwise disconnects from ZooKeeper. It will need to re-register
+        after a lost connection. This method is safe to call multiple times.
+
+        :param str launcher: Unique name for the launcher.
+        '''
+        path = self._launcherPath(launcher)
+
+        try:
+            self.client.create(path, makepath=True, ephemeral=True)
+        except kze.NodeExistsError:
+            pass
+
+    def getRegisteredLaunchers(self):
+        '''
+        Get a list of all launchers that have registered with ZooKeeper.
+
+        :returns: A list of launcher names, or empty list if none are found.
+        '''
+        try:
+            launchers = self.client.get_children(self.LAUNCHER_ROOT)
+        except kze.NoNodeError:
+            return []
+
+        return launchers
+
+    def getNodeRequests(self):
+        '''
+        Get the current list of all node requests in priority sorted order.
+
+        :returns: A list of request nodes.
+        '''
+        try:
+            requests = self.client.get_children(self.REQUEST_ROOT)
+        except kze.NoNodeError:
+            return []
+
+        return sorted(requests)
+
+    def getNodeRequestLockIDs(self):
+        '''
+        Get the current list of all node request lock ids.
+        '''
+        try:
+            lock_ids = self.client.get_children(self.REQUEST_LOCK_ROOT)
+        except kze.NoNodeError:
+            return []
+        return lock_ids
+
+    def getNodeRequestLockStats(self, lock_id):
+        '''
+        Get the data for a specific node request lock.
+
+        Note that there is no user data set on a node request lock znode. The
+        main purpose for this method is to get the ZK stat data for the lock
+        so we can inspect it and use it for lock deletion.
+
+        :param str lock_id: The node request lock ID.
+
+        :returns: A NodeRequestLockStats object.
+        '''
+        path = self._requestLockPath(lock_id)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+        d = NodeRequestLockStats(lock_id)
+        d.stat = stat
+        return d
+
+    def deleteNodeRequestLock(self, lock_id):
+        '''
+        Delete the znode for a node request lock id.
+
+        :param str lock_id: The lock ID.
+        '''
+        path = self._requestLockPath(lock_id)
+        try:
+            self.client.delete(path, recursive=True)
+        except kze.NoNodeError:
+            pass
+
+    def getNodeRequest(self, request):
+        '''
+        Get the data for a specific node request.
+
+        :param str request: The request ID.
+
+        :returns: The request data, or None if the request was not found.
+        '''
+        path = self._requestPath(request)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+
+        d = NodeRequest.fromDict(self._bytesToDict(data), request)
+        d.stat = stat
+        return d
+
+    def storeNodeRequest(self, request, priority="100"):
+        '''
+        Store a new or existing node request.
+
+        :param NodeRequest request: The node request to update.
+        :param str priority: Priority of a new request. Ignored on updates.
+        '''
+        if not request.id:
+            path = "%s/%s-" % (self.REQUEST_ROOT, priority)
+            path = self.client.create(
+                path,
+                value=request.serialize(),
+                ephemeral=True,
+                sequence=True,
+                makepath=True)
+            request.id = path.split("/")[-1]
+
+        # Validate it still exists before updating
+        else:
+            if not self.getNodeRequest(request.id):
+                raise Exception(
+                    "Attempt to update non-existing request %s" % request)
+
+            path = self._requestPath(request.id)
+            self.client.set(path, request.serialize())
+
+    def deleteNodeRequest(self, request):
+        '''
+        Delete a node request.
+
+        :param NodeRequest request: The request to delete.
+        '''
+        if not request.id:
+            return
+
+        path = self._requestPath(request.id)
+        try:
+            self.client.delete(path)
+        except kze.NoNodeError:
+            pass
+
+    def lockNodeRequest(self, request, blocking=True, timeout=None):
+        '''
+        Lock a node request.
+
+        This will set the `lock` attribute of the request object when the
+        lock is successfully acquired.
+
+        :param NodeRequest request: The request to lock.
+        :param bool blocking: Whether or not to block on trying to
+            acquire the lock
+        :param int timeout: When blocking, how long to wait for the lock
+            to get acquired. None, the default, waits forever.
+
+        :raises: TimeoutException if we failed to acquire the lock when
+            blocking with a timeout. ZKLockException if we are not blocking
+            and could not get the lock, or a lock is already held.
+        '''
+        path = self._requestLockPath(request.id)
+        try:
+            lock = Lock(self.client, path)
+            have_lock = lock.acquire(blocking, timeout)
+        except kze.LockTimeout:
+            raise npe.TimeoutException(
+                "Timeout trying to acquire lock %s" % path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Request not found for locking: %s", request)
+
+        # If we aren't blocking, it's possible we didn't get the lock
+        # because someone else has it.
+        if not have_lock:
+            raise npe.ZKLockException("Did not get lock on %s" % path)
+
+        request.lock = lock
+
+    def unlockNodeRequest(self, request):
+        '''
+        Unlock a node request.
+
+        The request must already have been locked.
+
+        :param NodeRequest request: The request to unlock.
+
+        :raises: ZKLockException if the request is not currently locked.
+        '''
+        if request.lock is None:
+            raise npe.ZKLockException(
+                "Request %s does not hold a lock" % request)
+        request.lock.release()
+        request.lock = None
+
+    def lockNode(self, node, blocking=True, timeout=None):
+        '''
+        Lock a node.
+
+        This will set the `lock` attribute of the Node object when the
+        lock is successfully acquired.
+
+        :param Node node: The node to lock.
+        :param bool blocking: Whether or not to block on trying to
+            acquire the lock
+        :param int timeout: When blocking, how long to wait for the lock
+            to get acquired. None, the default, waits forever.
+
+        :raises: TimeoutException if we failed to acquire the lock when
+            blocking with a timeout. ZKLockException if we are not blocking
+            and could not get the lock, or a lock is already held.
+        '''
+        path = self._nodeLockPath(node.id)
+        try:
+            lock = Lock(self.client, path)
+            have_lock = lock.acquire(blocking, timeout)
+        except kze.LockTimeout:
+            raise npe.TimeoutException(
+                "Timeout trying to acquire lock %s" % path)
+        except kze.NoNodeError:
+            have_lock = False
+            self.log.error("Node not found for locking: %s", node)
+
+        # If we aren't blocking, it's possible we didn't get the lock
+        # because someone else has it.
+        if not have_lock:
+            raise npe.ZKLockException("Did not get lock on %s" % path)
+
+        node.lock = lock
+
+    def unlockNode(self, node):
+        '''
+        Unlock a node.
+
+        The node must already have been locked.
+
+        :param Node node: The node to unlock.
+
+        :raises: ZKLockException if the node is not currently locked.
+        '''
+        if node.lock is None:
+            raise npe.ZKLockException("Node %s does not hold a lock" % node)
+        node.lock.release()
+        node.lock = None
+
+    def getNodes(self):
+        '''
+        Get the current list of all nodes.
+
+        :returns: A list of nodes.
+        '''
+        try:
+            return self.client.get_children(self.NODE_ROOT)
+        except kze.NoNodeError:
+            return []
+
+    def getNode(self, node):
+        '''
+        Get the data for a specific node.
+
+        :param str node: The node ID.
+
+        :returns: The node data, or None if the node was not found.
+        '''
+        path = self._nodePath(node)
+        try:
+            data, stat = self.client.get(path)
+        except kze.NoNodeError:
+            return None
+        if not data:
+            return None
+
+        d = Node.fromDict(self._bytesToDict(data), node)
+        d.id = node
+        d.stat = stat
+        return d
+
+    def storeNode(self, node):
+        '''
+        Store an new or existing node.
+
+        If this is a new node, then node.id will be set with the newly created
+        node identifier. Otherwise, node.id is used to identify the node to
+        update.
+
+        :param Node node: The Node object to store.
+        '''
+        if not node.id:
+            node_path = "%s/" % self.NODE_ROOT
+
+            # We expect a new node to always have a state already set, so
+            # use that state_time for created_time for consistency. But have
+            # this check, just in case.
+            if node.state_time:
+                node.created_time = node.state_time
+            else:
+                node.created_time = time.time()
+
+            path = self.client.create(
+                node_path,
+                value=node.serialize(),
+                sequence=True,
+                makepath=True)
+            node.id = path.split("/")[-1]
+        else:
+            path = self._nodePath(node.id)
+            self.client.set(path, node.serialize())
+
+    def deleteNode(self, node):
+        '''
+        Delete a node.
+
+        :param Node node: The Node object representing the ZK node to delete.
+        '''
+        if not node.id:
+            return
+
+        path = self._nodePath(node.id)
+        try:
+            self.client.delete(path, recursive=True)
+        except kze.NoNodeError:
+            pass
+
+    def getReadyNodesOfTypes(self, labels):
+        '''
+        Query ZooKeeper for unused/ready nodes.
+
+        :param list labels: The node types we want.
+
+        :returns: A dictionary, keyed by node type, with lists of Node objects
+            that are ready, or an empty dict if none are found.
+        '''
+        ret = {}
+        for node in self.nodeIterator():
+            if (node.state == READY and
+                    not node.allocated_to and node.type in labels):
+                if node.type not in ret:
+                    ret[node.type] = []
+                ret[node.type].append(node)
+        return ret
+
+    def nodeIterator(self):
+        '''
+        Utility generator method for iterating through all nodes.
+        '''
+        for node_id in self.getNodes():
+            node = self.getNode(node_id)
+            if node:
+                yield node
+
+    def nodeRequestLockStatsIterator(self):
+        '''
+        Utility generator method for iterating through all nodes request locks.
+        '''
+        for lock_id in self.getNodeRequestLockIDs():
+            lock_stats = self.getNodeRequestLockStats(lock_id)
+            if lock_stats:
+                yield lock_stats
+
+    def nodeRequestIterator(self):
+        '''
+        Utility generator method for iterating through all nodes requests.
+        '''
+        for req_id in self.getNodeRequests():
+            req = self.getNodeRequest(req_id)
+            if req:
+                yield req
+
+    def countPoolNodes(self, provider_name, pool_name):
+        '''
+        Count the number of nodes that exist for the given provider pool.
+
+        :param str provider_name: The provider name.
+        :param str pool_name: The pool name.
+        '''
+        count = 0
+        for node in self.nodeIterator():
+            if node.provider == provider_name and node.pool == pool_name:
+                count = count + 1
+        return count

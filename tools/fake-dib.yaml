@@ -1,16 +1,6 @@
 elements-dir: .
 images-dir: /tmp/nodepool_dib
 
-cron:
-  check: '*/15 * * * *'
-  cleanup: '*/1 * * * *'
-
-zmq-publishers:
-  - tcp://localhost:8881
-
-gearman-servers:
-  - host: localhost
-
 diskimages:
   - name: fake-dib-image
     elements:
@@ -31,16 +21,10 @@ labels:
 
 providers:
   - name: fake-provider
+    driver: fake
     region-name: 'fake-region'
-    username: 'fake'
-    password: 'fake'
-    auth-url: 'fake'
-    project-id: 'fake'
     max-servers: 96
     images:
       - name: fake-dib-image
         min-ram: 8192
         diskimage: fake-dib-image
-
-targets:
-  - name: fake-jenkins

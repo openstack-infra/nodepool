@@ -5,12 +5,16 @@ Operation
 
 Nodepool has two components which run as daemons.  The
 ``nodepool-builder`` daemon is responsible for building diskimages and
-uploading them to providers, and the ``nodepoold`` daemon is
+uploading them to providers, and the ``nodepool-launcher`` daemon is
 responsible for launching and deleting nodes.
 
 Both daemons frequently re-read their configuration file after
 starting to support adding or removing new images and providers, or
 otherwise altering the configuration.
+
+These daemons communicate with each other via a Zookeeper database.
+You must run Zookeeper and at least one of each of these daemons to
+have a functioning Nodepool installation.
 
 Nodepool-builder
 ----------------
@@ -31,14 +35,14 @@ safe, it is recommended to run a single instance of
 only a single build thread (the default).
 
 
-Nodepoold
----------
+Nodepool-launcher
+-----------------
 
-The main nodepool daemon is named ``nodepoold`` and is responsible for
-launching instances from the images created and uploaded by
-``nodepool-builder``.
+The main nodepool daemon is named ``nodepool-launcher`` and is
+responsible for managing cloud instances launched from the images
+created and uploaded by ``nodepool-builder``.
 
-When a new image is created and uploaded, ``nodepoold`` will
+When a new image is created and uploaded, ``nodepool-launcher`` will
 immediately start using it when launching nodes (Nodepool always uses
 the most recent image for a given provider in the ``ready`` state).
 Nodepool will delete images if they are not the most recent or second
@@ -51,9 +55,9 @@ using the previous image.
 Daemon usage
 ------------
 
-To start the main Nodepool daemon, run **nodepoold**:
+To start the main Nodepool daemon, run **nodepool-launcher**:
 
-.. program-output:: nodepoold --help
+.. program-output:: nodepool-launcher --help
    :nostderr:
 
 To start the nodepool-builder daemon, run **nodepool--builder**:
@@ -77,21 +81,73 @@ When Nodepool creates instances, it will assign the following nova
 metadata:
 
   groups
-    A json-encoded list containing the name of the image and the name
+    A comma separated list containing the name of the image and the name
     of the provider.  This may be used by the Ansible OpenStack
     inventory plugin.
 
-  nodepool
-    A json-encoded dictionary with the following entries:
+  nodepool_image_name
+    The name of the image as a string.
 
-    image_name
-      The name of the image as a string.
+  nodepool_provider_name
+    The name of the provider as a string.
 
-    provider_name
-      The name of the provider as a string.
+  nodepool_node_id
+    The nodepool id of the node as an integer.
 
-    node_id
-      The nodepool id of the node as an integer.
+Common Management Tasks
+-----------------------
+
+In the course of running a Nodepool service you will find that there are
+some common operations that will be performed. Like the services
+themselves these are split into two groups, image management and
+instance management.
+
+Image Management
+~~~~~~~~~~~~~~~~
+
+Before Nodepool can launch any cloud instances it must have images to boot
+off of. ``nodepool dib-image-list`` will show you which images are available
+locally on disk. These images on disk are then uploaded to clouds,
+``nodepool image-list`` will show you what images are bootable in your
+various clouds.
+
+If you need to force a new image to be built to pick up a new feature more
+quickly than the normal rebuild cycle (which defaults to 24 hours) you can
+manually trigger a rebuild. Using ``nodepool image-build`` you can tell
+Nodepool to begin a new image build now. Note that depending on work that
+the nodepool-builder is already performing this may queue the build. Check
+``nodepool dib-image-list`` to see the current state of the builds. Once
+the image is built it is automatically uploaded to all of the clouds
+configured to use that image.
+
+At times you may need to stop using an existing image because it is broken.
+Your two major options here are to build a new image to replace the existing
+image or to delete the existing image and have Nodepool fall back on using
+the previous image. Rebuilding and uploading can be slow so typically the
+best option is to simply ``nodepool image-delete`` the most recent image
+which will cause Nodepool to fallback on using the previous image. Howevever,
+if you do this without "pausing" the image it will be immediately reuploaded.
+You will want to pause the image if you need to further investigate why
+the image is not being built correctly. If you know the image will be built
+correctly you can simple delete the built image and remove it from all clouds
+which will cause it to be rebuilt using ``nodepool dib-image-delete``.
+
+Instance Management
+~~~~~~~~~~~~~~~~~~~
+
+With working images in providers you should see Nodepool launching instances
+in these providers using the images it built. You may find that you need to
+debug a particular job failure manually. An easy way to do this is to
+``nodepool hold`` an instance then log in to the instance and perform any
+necessary debugging steps. Note that this doesn't stop the job running there,
+what it will do is prevent Nodepool from automatically deleting this instance
+once the job is complete.
+
+In some circumstances like manually holding an instance above, or wanting to
+force a job restart you may want to delete a running instance. You can issue
+a ``nodepool delete`` to force nodepool to do this.
+
+Complete command help info is below.
 
 Command Line Tools
 ------------------
@@ -151,36 +207,9 @@ If Nodepool's database gets out of sync with reality, the following
 commands can help identify compute instances or images that are
 unknown to Nodepool:
 
-alien-list
-^^^^^^^^^^
-.. program-output:: nodepool alien-list --help
-   :nostderr:
-
 alien-image-list
 ^^^^^^^^^^^^^^^^
 .. program-output:: nodepool alien-image-list --help
-   :nostderr:
-
-In the case that a job is randomly failing for an unknown cause, it
-may be necessary to instruct nodepool to automatically hold a node on
-which that job has failed.  To do so, use the ``job-create``
-command to specify the job name and how many failed nodes should be
-held.  When debugging is complete, use ''job-delete'' to disable the
-feature.
-
-job-create
-^^^^^^^^^^
-.. program-output:: nodepool job-create --help
-   :nostderr:
-
-job-list
-^^^^^^^^
-.. program-output:: nodepool job-list --help
-   :nostderr:
-
-job-delete
-^^^^^^^^^^
-.. program-output:: nodepool job-delete --help
    :nostderr:
 
 Removing a Provider

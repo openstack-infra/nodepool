@@ -18,12 +18,14 @@
 
 import sys
 import threading
+import six
 from six.moves import queue as Queue
 import logging
 import time
 import requests.exceptions
 
-import stats
+from nodepool import stats
+
 
 class ManagerStoppedException(Exception):
     pass
@@ -49,7 +51,7 @@ class Task(object):
     def wait(self):
         self._wait_event.wait()
         if self._exception:
-            raise self._exception, None, self._traceback
+            six.reraise(self._exception, None, self._traceback)
         return self._result
 
     def run(self, client):
@@ -105,7 +107,7 @@ class TaskManager(threading.Thread):
                 self.log.debug("Manager %s ran task %s in %ss" %
                                (self.name, type(task).__name__, dt))
                 if self.statsd:
-                    #nodepool.task.PROVIDER.subkey
+                    # nodepool.task.PROVIDER.subkey
                     subkey = type(task).__name__
                     key = 'nodepool.task.%s.%s' % (self.name, subkey)
                     self.statsd.timing(key, int(dt * 1000))

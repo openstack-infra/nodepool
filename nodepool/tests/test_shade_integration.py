@@ -18,10 +18,13 @@ import os
 import fixtures
 import shade
 import testtools
+import voluptuous
 import yaml
 
+from nodepool import config as nodepool_config
+from nodepool import provider_manager
 from nodepool import tests
-from nodepool.provider_manager import shade_inner_exceptions
+from nodepool.driver.openstack.provider import shade_inner_exceptions
 
 
 class TestShadeIntegration(tests.IntegrationTestCase):
@@ -41,40 +44,38 @@ class TestShadeIntegration(tests.IntegrationTestCase):
 
         self.addCleanup(self._cleanup_cloud_config)
 
-    def test_nodepool_provider_config(self):
-        configfile = self.setup_config('integration.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.updateConfig()
-        provider_manager = pool.config.provider_managers['real-provider']
-        auth_data = {'username': 'real',
-                     'project_id': 'real',
-                     'password': 'real',
-                     'auth_url': 'real'}
-        self.assertEqual(provider_manager._client.auth, auth_data)
-        self.assertEqual(provider_manager._client.region_name, 'real-region')
+    def test_nodepool_provider_config_bad(self):
+        # nodepool doesn't support clouds.yaml-less config anymore
+        # Assert that we get a nodepool error and not an os-client-config
+        # error.
+        self.assertRaises(
+            voluptuous.MultipleInvalid,
+            self.setup_config, 'integration_noocc.yaml')
 
-    def test_nodepool_osc_config(self):
-        configfile = self.setup_config('integration_osc.yaml')
+    def test_nodepool_occ_config(self):
+        configfile = self.setup_config('integration_occ.yaml')
         auth_data = {'username': 'os_real',
                      'project_name': 'os_real',
                      'password': 'os_real',
                      'auth_url': 'os_real'}
-        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
-        self._use_cloud_config(osc_config)
+        occ_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
+        self._use_cloud_config(occ_config)
 
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.updateConfig()
-        provider_manager = pool.config.provider_managers['real-provider']
-        self.assertEqual(provider_manager._client.auth, auth_data)
+        config = nodepool_config.loadConfig(configfile)
+        self.assertIn('real-provider', config.providers)
+        pm = provider_manager.get_provider(
+            config.providers['real-provider'], use_taskmanager=False)
+        pm.start()
+        self.assertEqual(pm._client.auth, auth_data)
 
-    def test_nodepool_osc_config_reload(self):
-        configfile = self.setup_config('integration_osc.yaml')
+    def test_nodepool_occ_config_reload(self):
+        configfile = self.setup_config('integration_occ.yaml')
         auth_data = {'username': 'os_real',
                      'project_name': 'os_real',
                      'password': 'os_real',
                      'auth_url': 'os_real'}
-        osc_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
-        self._use_cloud_config(osc_config)
+        occ_config = {'clouds': {'real-cloud': {'auth': auth_data}}}
+        self._use_cloud_config(occ_config)
 
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.updateConfig()
@@ -85,7 +86,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         auth_data['password'] = 'os_new_real'
         os.remove(self.clouds_path)
         with open(self.clouds_path, 'w') as h:
-            yaml.safe_dump(osc_config, h)
+            yaml.safe_dump(occ_config, h)
 
         pool.updateConfig()
         provider_manager = pool.config.provider_managers['real-provider']

@@ -17,8 +17,6 @@
 import json
 import time
 
-from nodepool import nodedb
-
 from prettytable import PrettyTable
 
 
@@ -31,21 +29,101 @@ def age(timestamp):
     return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
 
-def node_list(db, node_id=None):
-    t = PrettyTable(["ID", "Provider", "AZ", "Label", "Target",
-                     "Manager", "Hostname", "NodeName", "Server ID",
-                     "IP", "State", "Age", "Comment"])
+def node_list(zk, node_id=None, detail=False):
+    headers = [
+        "ID",
+        "Provider",
+        "Label",
+        "Server ID",
+        "Public IPv4",
+        "IPv6",
+        "State",
+        "Age",
+        "Locked"
+    ]
+    detail_headers = [
+        "Hostname",
+        "Private IPv4",
+        "AZ",
+        "Port",
+        "Launcher",
+        "Allocated To",
+        "Hold Job",
+        "Comment"
+    ]
+    if detail:
+        headers += detail_headers
+
+    t = PrettyTable(headers)
     t.align = 'l'
-    with db.getSession() as session:
-        for node in session.getNodes():
-            if node_id and node.id != node_id:
-                continue
-            t.add_row([node.id, node.provider_name, node.az,
-                       node.label_name, node.target_name,
-                       node.manager_name, node.hostname,
-                       node.nodename, node.external_id, node.ip,
-                       nodedb.STATE_NAMES[node.state],
-                       age(node.state_time), node.comment])
+
+    if node_id:
+        node = zk.getNode(node_id)
+        if node:
+            locked = "unlocked"
+            try:
+                zk.lockNode(node, blocking=False)
+            except Exception:
+                locked = "locked"
+            else:
+                zk.unlockNode(node)
+
+            values = [
+                node.id,
+                node.provider,
+                node.type,
+                node.external_id,
+                node.public_ipv4,
+                node.public_ipv6,
+                node.state,
+                age(node.state_time),
+                locked
+            ]
+            if detail:
+                values += [
+                    node.hostname,
+                    node.private_ipv4,
+                    node.az,
+                    node.connection_port,
+                    node.launcher,
+                    node.allocated_to,
+                    node.hold_job,
+                    node.comment
+                ]
+            t.add_row(values)
+    else:
+        for node in zk.nodeIterator():
+            locked = "unlocked"
+            try:
+                zk.lockNode(node, blocking=False)
+            except Exception:
+                locked = "locked"
+            else:
+                zk.unlockNode(node)
+
+            values = [
+                node.id,
+                node.provider,
+                node.type,
+                node.external_id,
+                node.public_ipv4,
+                node.public_ipv6,
+                node.state,
+                age(node.state_time),
+                locked
+            ]
+            if detail:
+                values += [
+                    node.hostname,
+                    node.private_ipv4,
+                    node.az,
+                    node.connection_port,
+                    node.launcher,
+                    node.allocated_to,
+                    node.hold_job,
+                    node.comment
+                ]
+            t.add_row(values)
     return str(t)
 
 
@@ -67,14 +145,15 @@ def dib_image_list_json(zk):
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
             build = zk.getBuild(image_name, build_no)
-            objs.append({'id' : '-'.join([image_name, build_no]),
+            objs.append({'id': '-'.join([image_name, build_no]),
                          'image': image_name,
                          'builder': build.builder,
                          'formats': build.formats,
                          'state': build.state,
                          'age': int(build.state_time)
-            })
+                         })
     return json.dumps(objs)
+
 
 def image_list(zk):
     t = PrettyTable(["Build ID", "Upload ID", "Provider", "Image",
@@ -93,4 +172,16 @@ def image_list(zk):
                                upload.external_id,
                                upload.state,
                                age(upload.state_time)])
+    return str(t)
+
+
+def request_list(zk):
+    t = PrettyTable(["Request ID", "State", "Requestor", "Node Types", "Nodes",
+                     "Declined By"])
+    t.align = 'l'
+    for req in zk.nodeRequestIterator():
+        t.add_row([req.id, req.state, req.requestor,
+                   ','.join(req.node_types),
+                   ','.join(req.nodes),
+                   ','.join(req.declined_by)])
     return str(t)

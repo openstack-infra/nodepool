@@ -1,0 +1,15 @@
+clouds:
+  fake:
+    auth:
+      username: 'fake'
+      password: 'fake'
+      project_id: 'fake'
+      auth_url: 'fake'
+
+  fake-vhd:
+    auth:
+      username: 'fake'
+      password: 'fake'
+      project_id: 'fake'
+      auth_url: 'fake'
+    image_format: 'vhd'

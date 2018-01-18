@@ -3,50 +3,11 @@
 Installation
 ============
 
-Nodepool consists of a set of long-running daemons which use an SQL
-database, a ZooKeeper cluster, and communicates with Jenkins using
-ZeroMQ.
+Nodepool consists of a long-running daemon which uses ZooKeeper
+for coordination with Zuul.
 
 External Requirements
 ---------------------
-
-Jenkins
-~~~~~~~
-
-You should have a Jenkins server running with the `ZMQ Event Publisher
-<http://git.openstack.org/cgit/openstack-infra/zmq-event-publisher/tree/README>`_
-plugin installed (it is available in the Jenkins Update Center).  Be
-sure that the machine where you plan to run Nodepool can connect to
-the ZMQ port specified by the plugin on your Jenkins master(s).
-
-Zuul
-~~~~
-
-If you plan to use Nodepool with Zuul (it is optional), you should
-ensure that Nodepool can connect to the gearman port on your Zuul
-server (TCP 4730 by default).  This will allow Nodepool to respond to
-current Zuul demand.  If you elect not to connect Nodepool to Zuul, it
-will still operate in a node-replacement mode.
-
-Database
-~~~~~~~~
-
-Nodepool requires an SQL server.  MySQL with the InnoDB storage engine
-is tested and recommended.  PostgreSQL should work fine.  Due to the
-high number of concurrent connections from Nodepool, SQLite is not
-recommended.  When adding or deleting nodes, Nodepool will hold open a
-database connection for each node.  Be sure to configure the database
-server to support at least a number of connections equal to twice the
-number of nodes you expect to be in use at once.
-
-All that is necessary is that the database is created. Nodepool will
-handle the schema by itself when it is run.
-
-MySQL Example::
-
-  CREATE USER 'nodepool'@'localhost' IDENTIFIED BY '<password>';
-  CREATE DATABASE nodepooldb;
-  GRANT ALL ON nodepooldb.* TO 'nodepool'@'localhost';
 
 ZooKeeper
 ~~~~~~~~~
@@ -88,22 +49,28 @@ Or install directly from a git checkout with::
 
   pip install .
 
-Note that some distributions provide a libzmq1 which does not support
-RCVTIMEO.  Removing this libzmq1 from the system libraries will ensure
-pip compiles a libzmq1 with appropriate options for the version of
-pyzmq used by nodepool.
-
 Configuration
 -------------
 
-Nodepool has two required configuration files: secure.conf and
-nodepool.yaml, and an optional logging configuration file logging.conf.
-The secure.conf file is used to store nodepool configurations that contain
-sensitive data, such as the Nodepool database password and Jenkins
-api key. The nodepool.yaml files is used to store all other
-configurations.
+Nodepool has one required configuration file, which defaults to
+``/etc/nodepool/nodepool.yaml``. This can be changed with the ``-c`` option.
+The Nodepool configuration file is described in :ref:`configuration`.
 
-The logging configuration file is in the standard python logging
-`configuration file format
-<http://docs.python.org/2/library/logging.config.html#configuration-file-format>`_.
+There is support for a secure file that is used to store nodepool
+configurations that contain sensitive data. It currently only supports
+specifying ZooKeeper credentials. If ZooKeeper credentials are defined in
+both configuration files, the data in the secure file takes precedence.
+The secure file location can be changed with the ``-s`` option and follows
+the same file format as the Nodepool configuration file.
+
+There is an optional logging configuration file, specified with the ``-l``
+option. The logging configuration file can accept either:
+
+* the traditional ini python logging `configuration file format
+  <https://docs.python.org/2/library/logging.config.html#configuration-file-format>`_.
+
+* a `.yml` or `.yaml` suffixed file that will be parsed and loaded as the newer
+  `dictConfig format
+  <https://docs.python.org/2/library/logging.config.html#configuration-dictionary-schema>`_.
+
 The Nodepool configuration file is described in :ref:`configuration`.

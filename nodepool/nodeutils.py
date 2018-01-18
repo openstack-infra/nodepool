@@ -17,21 +17,20 @@
 # limitations under the License.
 
 import errno
+import ipaddress
 import time
+import six
 import socket
 import logging
-from sshclient import SSHClient
 
-import fakeprovider
 import paramiko
 
-import exceptions
+from nodepool import exceptions
 
 log = logging.getLogger("nodepool.utils")
 
-
-ITERATE_INTERVAL = 2  # How long to sleep while waiting for something
-                      # in a loop
+# How long to sleep while waiting for something in a loop
+ITERATE_INTERVAL = 2
 
 
 def iterate_timeout(max_seconds, exc, purpose):
@@ -44,32 +43,57 @@ def iterate_timeout(max_seconds, exc, purpose):
     raise exc("Timeout waiting for %s" % purpose)
 
 
-def ssh_connect(ip, username, connect_kwargs={}, timeout=60):
+def keyscan(ip, port=22, timeout=60):
+    '''
+    Scan the IP address for public SSH keys.
+
+    Keys are returned formatted as: "<type> <base64_string>"
+    '''
     if 'fake' in ip:
-        return fakeprovider.FakeSSHClient()
-    # HPcloud may return ECONNREFUSED or EHOSTUNREACH
-    # for about 30 seconds after adding the IP
+        return ['ssh-rsa FAKEKEY']
+
+    if ipaddress.ip_address(six.text_type(ip)).version < 6:
+        family = socket.AF_INET
+        sockaddr = (ip, port)
+    else:
+        family = socket.AF_INET6
+        sockaddr = (ip, port, 0, 0)
+
+    keys = []
+    key = None
     for count in iterate_timeout(
             timeout, exceptions.SSHTimeoutException, "ssh access"):
+        sock = None
+        t = None
         try:
-            client = SSHClient(ip, username, **connect_kwargs)
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect(sockaddr)
+            t = paramiko.transport.Transport(sock)
+            t.start_client(timeout=timeout)
+            key = t.get_remote_server_key()
             break
-        except paramiko.SSHException as e:
-            # NOTE(pabelanger): Currently paramiko only returns a string with
-            # error code. If we want finer granularity we'll need to regex the
-            # string.
-            log.exception('Failed to negotiate SSH: %s' % (e))
-        except paramiko.AuthenticationException as e:
-            # This covers the case where the cloud user is created
-            # after sshd is up (Fedora for example)
-            log.info('Auth exception for %s@%s. Try number %i...' %
-                     (username, ip, count))
         except socket.error as e:
-            if e[0] not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
+            if e.errno not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
                 log.exception(
-                    'Exception while testing ssh access to %s:' % ip)
+                    'Exception with ssh access to %s:' % ip)
+        except Exception as e:
+            log.exception("ssh-keyscan failure: %s", e)
+        finally:
+            try:
+                if t:
+                    t.close()
+            except Exception as e:
+                log.exception('Exception closing paramiko: %s', e)
+            try:
+                if sock:
+                    sock.close()
+            except Exception as e:
+                log.exception('Exception closing socket: %s', e)
 
-    out = client.ssh("test ssh access", "echo access okay", output=True)
-    if "access okay" in out:
-        return client
-    return None
+    # Paramiko, at this time, seems to return only the ssh-rsa key, so
+    # only the single key is placed into the list.
+    if key:
+        keys.append("%s %s" % (key.get_name(), key.get_base64()))
+
+    return keys

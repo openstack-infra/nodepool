@@ -12,6 +12,5 @@ doc/build/*
 zuul/versioninfo
 dist/
 venv/
-nodepool.yaml
 *~
 .*.swp

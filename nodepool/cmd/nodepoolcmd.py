@@ -14,37 +14,31 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import argparse
 import logging.config
 import sys
 
-from nodepool import nodedb
-from nodepool import nodepool
+from prettytable import PrettyTable
+
+from nodepool import launcher
+from nodepool import provider_manager
 from nodepool import status
 from nodepool import zk
 from nodepool.cmd import NodepoolApp
-from nodepool.version import version_info as npc_version_info
-from config_validator import ConfigValidator
-from prettytable import PrettyTable
+from nodepool.cmd.config_validator import ConfigValidator
 
 log = logging.getLogger(__name__)
 
 
 class NodePoolCmd(NodepoolApp):
 
-    def parse_arguments(self):
-        parser = argparse.ArgumentParser(description='Node pool.')
+    def create_parser(self):
+        parser = super(NodePoolCmd, self).create_parser()
+
         parser.add_argument('-c', dest='config',
                             default='/etc/nodepool/nodepool.yaml',
                             help='path to config file')
         parser.add_argument('-s', dest='secure',
-                            default='/etc/nodepool/secure.conf',
                             help='path to secure file')
-        parser.add_argument('-l', dest='logconfig',
-                            help='path to log config file')
-        parser.add_argument('--version', action='version',
-                            version=npc_version_info.version_string(),
-                            help='show version')
         parser.add_argument('--debug', dest='debug', action='store_true',
                             help='show DEBUG level logging')
 
@@ -55,6 +49,9 @@ class NodePoolCmd(NodepoolApp):
 
         cmd_list = subparsers.add_parser('list', help='list nodes')
         cmd_list.set_defaults(func=self.list)
+        cmd_list.add_argument('--detail', action='store_true',
+                              help='Output detailed node info')
+
         cmd_image_list = subparsers.add_parser(
             'image-list', help='list images from providers')
         cmd_image_list.set_defaults(func=self.image_list)
@@ -70,13 +67,6 @@ class NodePoolCmd(NodepoolApp):
         cmd_image_build.add_argument('image', help='image name')
         cmd_image_build.set_defaults(func=self.image_build)
 
-        cmd_alien_list = subparsers.add_parser(
-            'alien-list',
-            help='list nodes not accounted for by nodepool')
-        cmd_alien_list.set_defaults(func=self.alien_list)
-        cmd_alien_list.add_argument('provider', help='provider name',
-                                    nargs='?')
-
         cmd_alien_image_list = subparsers.add_parser(
             'alien-image-list',
             help='list images not accounted for by nodepool')
@@ -90,7 +80,8 @@ class NodePoolCmd(NodepoolApp):
         cmd_hold.set_defaults(func=self.hold)
         cmd_hold.add_argument('id', help='node id')
         cmd_hold.add_argument('--reason',
-                              help='Optional reason this node is held')
+                              help='Reason this node is held',
+                              required=True)
 
         cmd_delete = subparsers.add_parser(
             'delete',
@@ -116,7 +107,8 @@ class NodePoolCmd(NodepoolApp):
 
         cmd_dib_image_delete = subparsers.add_parser(
             'dib-image-delete',
-            help='delete image built with diskimage-builder')
+            help='Delete a dib built image from disk along with all cloud '
+                 'uploads of this image')
         cmd_dib_image_delete.set_defaults(func=self.dib_image_delete)
         cmd_dib_image_delete.add_argument('id', help='dib image id')
 
@@ -125,47 +117,39 @@ class NodePoolCmd(NodepoolApp):
             help='Validate configuration file')
         cmd_config_validate.set_defaults(func=self.config_validate)
 
-        cmd_job_list = subparsers.add_parser('job-list', help='list jobs')
-        cmd_job_list.set_defaults(func=self.job_list)
+        cmd_request_list = subparsers.add_parser(
+            'request-list',
+            help='list the current node requests')
+        cmd_request_list.set_defaults(func=self.request_list)
 
-        cmd_job_create = subparsers.add_parser('job-create', help='create job')
-        cmd_job_create.add_argument(
-            'name',
-            help='job name')
-        cmd_job_create.add_argument('--hold-on-failure',
-                                    help='number of nodes to hold when this job fails')
-        cmd_job_create.set_defaults(func=self.job_create)
-
-        cmd_job_delete = subparsers.add_parser(
-            'job-delete',
-            help='delete job')
-        cmd_job_delete.set_defaults(func=self.job_delete)
-        cmd_job_delete.add_argument('id', help='job id')
-
-        self.args = parser.parse_args()
+        return parser
 
     def setup_logging(self):
+        # NOTE(jamielennox): This should just be the same as other apps
         if self.args.debug:
-            logging.basicConfig(level=logging.DEBUG,
-                                format='%(asctime)s %(levelname)s %(name)s: '
-                                       '%(message)s')
+            m = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+            logging.basicConfig(level=logging.DEBUG, format=m)
+
         elif self.args.logconfig:
-            NodepoolApp.setup_logging(self)
+            super(NodePoolCmd, self).setup_logging()
+
         else:
-            logging.basicConfig(level=logging.INFO,
-                                format='%(asctime)s %(levelname)s %(name)s: '
-                                       '%(message)s')
+            m = '%(asctime)s %(levelname)s %(name)s: %(message)s'
+            logging.basicConfig(level=logging.INFO, format=m)
+
             l = logging.getLogger('kazoo')
             l.setLevel(logging.WARNING)
 
-    def list(self, node_id=None):
-        print status.node_list(self.pool.getDB(), node_id)
+    def list(self, node_id=None, detail=False):
+        if hasattr(self.args, 'detail'):
+            detail = self.args.detail
+        print(status.node_list(self.zk, node_id, detail))
 
     def dib_image_list(self):
-        print status.dib_image_list(self.zk)
+        print(status.dib_image_list(self.zk))
 
     def image_list(self):
-        print status.image_list(self.zk)
+        print(status.image_list(self.zk))
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -180,31 +164,8 @@ class NodePoolCmd(NodepoolApp):
 
         self.zk.submitBuildRequest(diskimage)
 
-    def alien_list(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
-
-        t = PrettyTable(["Provider", "Hostname", "Server ID", "IP"])
-        t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for provider in self.pool.config.providers.values():
-                if (self.args.provider and
-                        provider.name != self.args.provider):
-                    continue
-                manager = self.pool.getProviderManager(provider)
-
-                try:
-                    for server in manager.listServers():
-                        if not session.getNodeByExternalID(
-                                provider.name, server['id']):
-                            t.add_row([provider.name, server['name'],
-                                       server['id'], server['public_v4']])
-                except Exception as e:
-                    log.warning("Exception listing aliens for %s: %s"
-                                % (provider.name, str(e.message)))
-        print t
-
     def alien_image_list(self):
-        self.pool.reconfigureManagers(self.pool.config, False)
+        self.pool.updateConfig()
 
         t = PrettyTable(["Provider", "Name", "Image ID"])
         t.align = 'l'
@@ -213,7 +174,7 @@ class NodePoolCmd(NodepoolApp):
             if (self.args.provider and
                     provider.name != self.args.provider):
                 continue
-            manager = self.pool.getProviderManager(provider)
+            manager = self.pool.getProviderManager(provider.name)
 
             # Build list of provider images as known by the provider
             provider_images = []
@@ -227,11 +188,11 @@ class NodePoolCmd(NodepoolApp):
                     if 'nodepool_build_id' in image['properties']]
             except Exception as e:
                 log.warning("Exception listing alien images for %s: %s"
-                            % (provider.name, str(e.message)))
+                            % (provider.name, str(e)))
 
             alien_ids = []
             uploads = []
-            for image in provider.images:
+            for image in provider.diskimages:
                 # Build list of provider images as recorded in ZK
                 for bnum in self.zk.getBuildNumbers(image):
                     uploads.extend(
@@ -249,30 +210,46 @@ class NodePoolCmd(NodepoolApp):
                 if image['id'] in alien_ids:
                     t.add_row([provider.name, image['name'], image['id']])
 
-        print t
+        print(t)
 
     def hold(self):
-        node_id = None
-        with self.pool.getDB().getSession() as session:
-            node = session.getNode(self.args.id)
-            node.state = nodedb.HOLD
-            if self.args.reason:
-                node.comment = self.args.reason
-            node_id = node.id
-        self.list(node_id=node_id)
+        node = self.zk.getNode(self.args.id)
+        if not node:
+            print("Node id %s not found" % self.args.id)
+            return
+
+        node.state = zk.HOLD
+        node.comment = self.args.reason
+        print("Waiting for lock...")
+        self.zk.lockNode(node, blocking=True)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        self.list(node_id=self.args.id)
 
     def delete(self):
+        node = self.zk.getNode(self.args.id)
+        if not node:
+            print("Node id %s not found" % self.args.id)
+            return
+
+        self.zk.lockNode(node, blocking=True, timeout=5)
+
         if self.args.now:
-            self.pool.reconfigureManagers(self.pool.config)
-        with self.pool.getDB().getSession() as session:
-            node = session.getNode(self.args.id)
-            if not node:
-                print "Node %s not found." % self.args.id
-            elif self.args.now:
-                self.pool._deleteNode(session, node)
-            else:
-                node.state = nodedb.DELETE
-                self.list(node_id=node.id)
+            if node.provider not in self.pool.config.providers:
+                print("Provider %s for node %s not defined on this launcher" %
+                      (node.provider, node.id))
+                return
+            provider = self.pool.config.providers[node.provider]
+            manager = provider_manager.get_provider(provider, True)
+            manager.start()
+            launcher.NodeDeleter.delete(self.zk, manager, node)
+            manager.stop()
+        else:
+            node.state = zk.DELETING
+            self.zk.storeNode(node)
+            self.zk.unlockNode(node)
+
+        self.list(node_id=node.id)
 
     def dib_image_delete(self):
         (image, build_num) = self.args.id.rsplit('-', 1)
@@ -312,53 +289,38 @@ class NodePoolCmd(NodepoolApp):
         validator = ConfigValidator(self.args.config)
         validator.validate()
         log.info("Configuration validation complete")
-        #TODO(asselin,yolanda): add validation of secure.conf
+        # TODO(asselin,yolanda): add validation of secure.conf
 
-    def job_list(self):
-        t = PrettyTable(["ID", "Name", "Hold on Failure"])
-        t.align = 'l'
-        with self.pool.getDB().getSession() as session:
-            for job in session.getJobs():
-                t.add_row([job.id, job.name, job.hold_on_failure])
-            print t
-
-    def job_create(self):
-        with self.pool.getDB().getSession() as session:
-            session.createJob(self.args.name,
-                              hold_on_failure=self.args.hold_on_failure)
-        self.job_list()
-
-    def job_delete(self):
-        with self.pool.getDB().getSession() as session:
-            job = session.getJob(self.args.id)
-            if not job:
-                print "Job %s not found." % self.args.id
-            else:
-                job.delete()
+    def request_list(self):
+        print(status.request_list(self.zk))
 
     def _wait_for_threads(self, threads):
         for t in threads:
             if t:
                 t.join()
 
-    def main(self):
+    def run(self):
         self.zk = None
 
+        # no arguments, print help messaging, then exit with error(1)
+        if not self.args.command:
+            self.parser.print_help()
+            return 1
         # commands which do not need to start-up or parse config
         if self.args.command in ('config-validate'):
             return self.args.func()
 
-        self.pool = nodepool.NodePool(self.args.secure, self.args.config)
+        self.pool = launcher.NodePool(self.args.secure, self.args.config)
         config = self.pool.loadConfig()
 
         # commands needing ZooKeeper
         if self.args.command in ('image-build', 'dib-image-list',
                                  'image-list', 'dib-image-delete',
-                                 'image-delete', 'alien-image-list'):
+                                 'image-delete', 'alien-image-list',
+                                 'list', 'hold', 'delete',
+                                 'request-list'):
             self.zk = zk.ZooKeeper()
-            self.zk.connect(config.zookeeper_servers.values())
-        else:
-            self.pool.reconfigureDatabase(config)
+            self.zk.connect(list(config.zookeeper_servers.values()))
 
         self.pool.setConfig(config)
         self.args.func()
@@ -366,11 +328,9 @@ class NodePoolCmd(NodepoolApp):
         if self.zk:
             self.zk.disconnect()
 
+
 def main():
-    npc = NodePoolCmd()
-    npc.parse_arguments()
-    npc.setup_logging()
-    return npc.main()
+    return NodePoolCmd.main()
 
 
 if __name__ == "__main__":

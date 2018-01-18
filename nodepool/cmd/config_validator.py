@@ -14,6 +14,8 @@ import logging
 import voluptuous as v
 import yaml
 
+from nodepool.config import get_provider_config
+
 log = logging.getLogger(__name__)
 
 
@@ -24,88 +26,19 @@ class ConfigValidator:
         self.config_file = config_file
 
     def validate(self):
-        cron = {
-            'check': str,
-            'cleanup': str,
-        }
-
-        images = {
-            'name': str,
-            'pause': bool,
-            'min-ram': int,
-            'name-filter': str,
-            'key-name': str,
-            'diskimage': str,
-            'meta': dict,
-            'username': str,
-            'user-home': str,
-            'private-key': str,
-            'config-drive': bool,
-        }
-
-        old_network = {
-            'net-id': str,
-            'net-label': str,
-        }
-
-        network = {
+        provider = {
             'name': v.Required(str),
-            'public': bool,  # Ignored, but kept for backwards compat
+            'driver': str,
+            'max-concurrency': int,
         }
 
-        providers = {
+        label = {
             'name': str,
-            'region-name': str,
-            'service-type': str,
-            'service-name': str,
-            'availability-zones': [str],
-            'cloud': str,
-            'username': str,
-            'password': str,
-            'auth-url': str,
-            'project-id': str,
-            'project-name': str,
-            'max-servers': int,
-            'pool': str,  # Ignored, but kept for backwards compat
-            'image-type': str,
-            'networks': [v.Any(old_network, network)],
-            'ipv6-preferred': bool,
-            'boot-timeout': int,
-            'api-timeout': int,
-            'launch-timeout': int,
-            'nodepool-id': str,
-            'rate': float,
-            'images': [images],
-            'template-hostname': str,
-            'clean-floating-ips': bool,
-        }
-
-        labels = {
-            'name': str,
-            'image': str,
             'min-ready': int,
-            'ready-script': str,
-            'subnodes': int,
-            'providers': [{
-                'name': str,
-            }],
+            'max-ready-age': int,
         }
 
-        targets = {
-            'name': str,
-            'hostname': str,
-            'subnode-hostname': str,
-            'assign-via-gearman': bool,
-            'jenkins': {
-                'url': str,
-                'user': str,
-                'apikey': str,
-                'credentials-id': str,
-                'test-job': str
-            }
-        }
-
-        diskimages = {
+        diskimage = {
             'name': str,
             'pause': bool,
             'elements': [str],
@@ -113,27 +46,26 @@ class ConfigValidator:
             'release': v.Any(str, int),
             'rebuild-age': int,
             'env-vars': {str: str},
+            'username': str,
+        }
+
+        webapp = {
+            'port': int,
+            'listen_address': str,
         }
 
         top_level = {
+            'webapp': webapp,
             'elements-dir': str,
             'images-dir': str,
-            'dburi': str,
-            'zmq-publishers': [str],
-            'gearman-servers': [{
-                'host': str,
-                'port': int,
-            }],
             'zookeeper-servers': [{
                 'host': str,
                 'port': int,
                 'chroot': str,
             }],
-            'cron': cron,
-            'providers': [providers],
-            'labels': [labels],
-            'targets': [targets],
-            'diskimages': [diskimages],
+            'providers': list,
+            'labels': [label],
+            'diskimages': [diskimage],
         }
 
         log.info("validating %s" % self.config_file)
@@ -142,12 +74,6 @@ class ConfigValidator:
         # validate the overall schema
         schema = v.Schema(top_level)
         schema(config)
-
-        # labels must list valid providers
-        all_providers = [p['name'] for p in config['providers']]
-        for label in config['labels']:
-            for provider in label['providers']:
-                if not provider['name'] in all_providers:
-                    raise AssertionError('label %s requests '
-                                         'non-existent provider %s'
-                                         % (label['name'], provider['name']))
+        for provider_dict in config.get('providers', []):
+            provider_schema = get_provider_config(provider_dict).get_schema()
+            provider_schema.extend(provider)(provider_dict)

@@ -1,21 +1,9 @@
 elements-dir: /etc/nodepool/elements
 images-dir: /opt/nodepool_dib
 
-cron:
-  cleanup: '*/1 * * * *'
-  check: '*/15 * * * *'
-
-zmq-publishers:
-  - tcp://jenkins01.openstack.org:8888
-  - tcp://jenkins02.openstack.org:8888
-  - tcp://jenkins03.openstack.org:8888
-  - tcp://jenkins04.openstack.org:8888
-  - tcp://jenkins05.openstack.org:8888
-  - tcp://jenkins06.openstack.org:8888
-  - tcp://jenkins07.openstack.org:8888
-
-gearman-servers:
-  - host: zuul.openstack.org
+webapp:
+  port: 8005
+  listen_address: '0.0.0.0'
 
 zookeeper-servers:
   - host: zk1.openstack.org
@@ -24,60 +12,69 @@ zookeeper-servers:
 
 labels:
   - name: trusty
-    image: trusty
-    ready-script: configure_mirror.sh
+    max-ready-age: 3600
     min-ready: 1
-    providers:
-      - name: cloud1
-      - name: cloud2
   - name: trusty-2-node
-    image: trusty
-    ready-script: multinode_setup.sh
-    subnodes: 1
     min-ready: 0
-    providers:
-      - name: cloud1
-      - name: cloud2
+  - name: trusty-external
+    min-ready: 1
 
 providers:
   - name: cloud1
+    driver: openstack
+    cloud: vanilla-cloud
     region-name: 'vanilla'
-    service-type: 'compute'
-    service-name: 'cloudServersOpenStack'
-    username: '<%= username %>'
-    password: '<%= password %>'
-    project-id: '<%= project %>'
-    auth-url: 'https://identity.example.com/v2.0/'
     boot-timeout: 120
-    max-servers: 184
+    max-concurrency: 10
+    launch-retries: 3
     rate: 0.001
-    images:
+    diskimages:
       - name: trusty
-        min-ram: 8192
-        username: jenkins
-        user-home: /home/jenkins
-        private-key: /home/nodepool/.ssh/id_rsa
+    pools:
+      - name: main
+        max-servers: 184
+        auto-floating-ip: True
+        labels:
+          - name: trusty
+            diskimage: trusty
+            min-ram: 8192
+            console-log: True
+          - name: trusty-2-node
+            diskimage: trusty
+            min-ram: 8192
+            boot-from-volume: True
+            volume-size: 100
+
   - name: cloud2
+    driver: openstack
+    cloud: chocolate-cloud
     region-name: 'chocolate'
-    service-type: 'compute'
-    service-name: 'cloudServersOpenStack'
-    username: '<%= username %>'
-    password: '<%= password %>'
-    project-id: '<%= project %>'
-    auth-url: 'https://identity.example.com/v2.0/'
     boot-timeout: 120
-    max-servers: 184
     rate: 0.001
-    images:
+    diskimages:
       - name: trusty
         pause: False
-        min-ram: 8192
-        username: jenkins
-        user-home: /home/jenkins
-        private-key: /home/nodepool/.ssh/id_rsa
-
-targets:
-  - name: zuul
+        connection-type: ssh
+    cloud-images:
+      - name: trusty-unmanaged
+        config-drive: true
+      - name: windows-unmanaged
+        username: winzuul
+        connection-type: winrm
+    pools:
+      - name: main
+        max-servers: 184
+        auto-floating-ip: False
+        labels:
+          - name: trusty
+            diskimage: trusty
+            min-ram: 8192
+          - name: trusty-2-node
+            diskimage: trusty
+            min-ram: 8192
+          - name: trusty-external
+            cloud-image: trusty-unmanaged
+            min-ram: 8192
 
 diskimages:
   - name: trusty

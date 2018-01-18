@@ -13,6 +13,26 @@
 # under the License.
 
 
+class NotFound(Exception):
+    pass
+
+
+class LaunchNodepoolException(Exception):
+    statsd_key = 'error.nodepool'
+
+
+class LaunchStatusException(Exception):
+    statsd_key = 'error.status'
+
+
+class LaunchNetworkException(Exception):
+    statsd_key = 'error.network'
+
+
+class LaunchKeyscanException(Exception):
+    statsd_key = 'error.keyscan'
+
+
 class BuilderError(RuntimeError):
     pass
 
@@ -44,8 +64,10 @@ class ServerDeleteException(TimeoutException):
 class ImageCreateException(TimeoutException):
     statsd_key = 'error.imagetimeout'
 
+
 class ZKException(Exception):
     pass
+
 
 class ZKLockException(ZKException):
     pass
