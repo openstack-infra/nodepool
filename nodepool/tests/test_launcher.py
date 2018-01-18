@@ -976,7 +976,7 @@ class TestLauncher(tests.DBTestCase):
         provider2_second = None
         nodes = map(pool.zk.getNode, pool.zk.getNodes())
         for node in nodes:
-            if node.provider == 'fake-provider2':
+            if node and node.provider == 'fake-provider2':
                 provider2_second = node
 
         # Now delete the new node we had provider2 build. At this point
