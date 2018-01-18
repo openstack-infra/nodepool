@@ -300,3 +300,49 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.patch_argv("-c", configfile)
         result = nodepoolcmd.main()
         self.assertEqual(1, result)
+
+    def test_info(self):
+        configfile = self.setup_config('info_cmd_two_provider.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        p1_image = self.waitForImage('fake-provider', 'fake-image')
+        p1_nodes = self.waitForNodes('fake-label')
+        p2_nodes = self.waitForNodes('fake-label2')
+
+        # Get rid of the second provider so that when we remove its
+        # data from ZooKeeper, the builder and launcher don't attempt to
+        # recreate the data.
+        self.replace_config(configfile, 'info_cmd_two_provider_remove.yaml')
+
+        # Verify that the second provider image is listed
+        self.assert_listed(
+            configfile,
+            ['info', 'fake-provider2'],
+            0, 'fake-image', 1)
+
+        # Verify that the second provider node is listed. We go ahead
+        # and erase the data here (after it has been displayed) so that
+        # we can verify the erase in the next steps.
+        self.assert_listed(
+            configfile,
+            ['info', 'fake-provider2', '--erase', '--force'],
+            0, p2_nodes[0].id, 1)
+
+        # Verify that no build or node for the second provider is listed
+        # after the previous erase
+        self.assert_listed(
+            configfile,
+            ['info', 'fake-provider2'],
+            0, 'fake-image', 0)
+        self.assert_listed(
+            configfile,
+            ['info', 'fake-provider2'],
+            0, p2_nodes[0].id, 0)
+
+        # Verify that we did not affect the first provider
+        image = self.waitForImage('fake-provider', 'fake-image')
+        self.assertEqual(p1_image, image)
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(1, len(nodes))
+        self.assertEqual(p1_nodes[0], nodes[0])
