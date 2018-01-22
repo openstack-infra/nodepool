@@ -13,6 +13,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import json
 import logging
 import threading
 import time
@@ -73,30 +74,54 @@ class WebApp(threading.Thread):
     def stop(self):
         self.server.server_close()
 
-    def get_cache(self, path):
-        result = self.cache.get(path)
+    def get_cache(self, path, params):
+        # TODO quick and dirty way to take query parameters
+        # into account when caching data
+        if params:
+            index = path + json.dumps(params.dict_of_lists(), sort_keys=True)
+        else:
+            index = path
+        result = self.cache.get(index)
         if result:
             return result
         if path == '/image-list':
-            output = status.image_list(self.nodepool.getZK())
+            output = status.image_list(self.nodepool.getZK(),
+                                       format='pretty')
+        elif path == '/image-list.json':
+            output = status.image_list(self.nodepool.getZK(),
+                                       format='json')
         elif path == '/dib-image-list':
-            output = status.dib_image_list(self.nodepool.getZK())
+            output = status.dib_image_list(self.nodepool.getZK(),
+                                           format='pretty')
         elif path == '/dib-image-list.json':
-            output = status.dib_image_list_json(self.nodepool.getZK())
+            output = status.dib_image_list(self.nodepool.getZK(),
+                                           format='json')
         elif path == '/node-list':
-            output = status.node_list(self.nodepool.getZK())
+            output = status.node_list(self.nodepool.getZK(),
+                                      format='pretty',
+                                      node_id=params.get('node_id'))
         elif path == '/node-list.json':
-            output = status.node_list_json(self.nodepool.getZK())
+            output = status.node_list(self.nodepool.getZK(),
+                                      format='json',
+                                      node_id=params.get('node_id'))
         elif path == '/label-list':
-            output = status.label_list(self.nodepool.getZK())
+            output = status.label_list(self.nodepool.getZK(),
+                                       format='pretty')
         elif path == '/label-list.json':
-            output = status.label_list_json(self.nodepool.getZK())
+            output = status.label_list(self.nodepool.getZK(),
+                                       format='json')
+        elif path == '/request-list':
+            output = status.request_list(self.nodepool.getZK(),
+                                         format='pretty')
+        elif path == '/request-list.json':
+            output = status.request_list(self.nodepool.getZK(),
+                                         format='json')
         else:
             return None
-        return self.cache.put(path, output)
+        return self.cache.put(index, output)
 
     def app(self, request):
-        result = self.get_cache(request.path)
+        result = self.get_cache(request.path, request.params)
         if result is None:
             raise webob.exc.HTTPNotFound()
         last_modified, output = result

@@ -14,6 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from collections import OrderedDict
 import json
 import time
 
@@ -29,30 +30,54 @@ def age(timestamp):
     return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
 
-def node_list(zk, node_id=None, detail=False):
-    headers = [
-        "ID",
-        "Provider",
-        "Label",
-        "Server ID",
-        "Public IPv4",
-        "IPv6",
-        "State",
-        "Age",
-        "Locked"
+def _to_pretty_table(objs, headers_table):
+    headers = headers_table.values()
+    t = PrettyTable(headers)
+    t.align = 'l'
+    for obj in objs:
+        values = []
+        for k in headers_table:
+            if k == 'age':
+                try:
+                    obj_age = age(int(obj[k]))
+                except ValueError:
+                    # already converted
+                    obj_age = obj[k]
+                values.append(obj_age)
+            else:
+                if isinstance(obj[k], list):
+                    values.append(','.join(obj[k]))
+                else:
+                    values.append(obj[k])
+        t.add_row(values)
+    return t
+
+
+def node_list(zk, node_id=None, detail=False, format='pretty'):
+    headers_table = [
+        ("id", "ID"),
+        ("provider", "Provider"),
+        ("label", "Label"),
+        ("server_id", "Server ID"),
+        ("public_ipv4", "Public IPv4"),
+        ("ipv6", "IPv6"),
+        ("state", "State"),
+        ("age", "Age"),
+        ("locked", "Locked")
     ]
-    detail_headers = [
-        "Hostname",
-        "Private IPv4",
-        "AZ",
-        "Port",
-        "Launcher",
-        "Allocated To",
-        "Hold Job",
-        "Comment"
+    detail_headers_table = [
+        ("hostname", "Hostname"),
+        ("private_ipv4", "Private IPv4"),
+        ("AZ", "AZ"),
+        ("connection_port", "Port"),
+        ("launcher", "Launcher"),
+        ("allocated_to", "Allocated To"),
+        ("hold_job", "Hold Job"),
+        ("comment", "Comment")
     ]
     if detail:
-        headers += detail_headers
+        headers_table += detail_headers_table
+    headers_table = OrderedDict(headers_table)
 
     def _get_node_values(node):
         locked = "unlocked"
@@ -87,56 +112,53 @@ def node_list(zk, node_id=None, detail=False):
             ]
         return values
 
-    t = PrettyTable(headers)
-    t.align = 'l'
-
+    objs = []
     if node_id:
         node = zk.getNode(node_id)
         if node:
             values = _get_node_values(node)
-            t.add_row(values)
+            objs.append(dict(zip(headers_table.keys(),
+                                 values)))
     else:
         for node in zk.nodeIterator():
             values = _get_node_values(node)
-            t.add_row(values)
-    return str(t)
+
+            objs.append(dict(zip(headers_table.keys(),
+                                 values)))
+
+    if format == 'pretty':
+        t = _to_pretty_table(objs, headers_table)
+        return str(t)
+    elif format == 'json':
+        return json.dumps(objs)
+    else:
+        raise ValueError('Unknown format "%s"' % format)
 
 
-def node_list_json(zk):
-    return json.dumps([node.toDict() for node in zk.nodeIterator()])
-
-
-def label_list(zk):
+def label_list(zk, format='pretty'):
     labels = set()
     for node in zk.nodeIterator():
         labels.add(node.type)
-    t = PrettyTable(["Label"])
-    for label in sorted(labels.keys()):
-        t.add_row((label,))
-    return str(t)
+    if format == 'pretty':
+        t = PrettyTable(["Label", ])
+        t.align = 'l'
+        for label in labels:
+            t.add_row(label)
+        return str(t)
+    elif format == 'json':
+        return json.dumps(list(labels))
+    else:
+        raise ValueError('Unknown format "%s"' % format)
 
 
-def label_list_json(zk):
-    labels = set()
-    for node in zk.nodeIterator():
-        labels.add(node.type)
-    return json.dumps(labels)
-
-
-def dib_image_list(zk):
-    t = PrettyTable(["ID", "Image", "Builder", "Formats",
-                     "State", "Age"])
-    t.align = 'l'
-    for image_name in zk.getImageNames():
-        for build_no in zk.getBuildNumbers(image_name):
-            build = zk.getBuild(image_name, build_no)
-            t.add_row(['-'.join([image_name, build_no]), image_name,
-                       build.builder, ','.join(build.formats),
-                       build.state, age(build.state_time)])
-    return str(t)
-
-
-def dib_image_list_json(zk):
+def dib_image_list(zk, format='pretty'):
+    headers_table = OrderedDict([
+        ("id", "ID"),
+        ("image", "Image"),
+        ("builder", "Builder"),
+        ("formats", "Formats"),
+        ("state", "State"),
+        ("age", "Age")])
     objs = []
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
@@ -148,14 +170,26 @@ def dib_image_list_json(zk):
                          'state': build.state,
                          'age': int(build.state_time)
                          })
-    return json.dumps(objs)
+    if format == 'pretty':
+        t = _to_pretty_table(objs, headers_table)
+        return str(t)
+    elif format == 'json':
+        return json.dumps(objs)
+    else:
+        raise ValueError('Unknown format "%s"' % format)
 
 
-def image_list(zk):
-    t = PrettyTable(["Build ID", "Upload ID", "Provider", "Image",
-                     "Provider Image Name", "Provider Image ID", "State",
-                     "Age"])
-    t.align = 'l'
+def image_list(zk, format='pretty'):
+    headers_table = OrderedDict([
+        ("id", "Build ID"),
+        ("upload_id", "Upload ID"),
+        ("provider", "Provider"),
+        ("image", "Image"),
+        ("external_name", "Provider Image Name"),
+        ("external_id", "Provider Image ID"),
+        ("state", "State"),
+        ("age", "Age")])
+    objs = []
     for image_name in zk.getImageNames():
         for build_no in zk.getBuildNumbers(image_name):
             for provider in zk.getBuildProviders(image_name, build_no):
@@ -163,21 +197,42 @@ def image_list(zk):
                         image_name, build_no, provider):
                     upload = zk.getImageUpload(image_name, build_no,
                                                provider, upload_no)
-                    t.add_row([build_no, upload_no, provider, image_name,
-                               upload.external_name,
-                               upload.external_id,
-                               upload.state,
-                               age(upload.state_time)])
-    return str(t)
+                    values = [build_no, upload_no, provider, image_name,
+                              upload.external_name,
+                              upload.external_id,
+                              upload.state,
+                              int(upload.state_time)]
+                    objs.append(dict(zip(headers_table.keys(),
+                                         values)))
+    if format == 'pretty':
+        t = _to_pretty_table(objs, headers_table)
+        return str(t)
+    elif format == 'json':
+        return json.dumps(objs)
+    else:
+        raise ValueError('Unknown format "%s"' % format)
 
 
-def request_list(zk):
-    t = PrettyTable(["Request ID", "State", "Requestor", "Node Types", "Nodes",
-                     "Declined By"])
-    t.align = 'l'
+def request_list(zk, format='pretty'):
+    headers_table = OrderedDict([
+        ("id", "Request ID"),
+        ("state", "State"),
+        ("requestor", "Requestor"),
+        ("node_types", "Node Types"),
+        ("nodes", "Nodes"),
+        ("declined_by", "Declined By")])
+    objs = []
     for req in zk.nodeRequestIterator():
-        t.add_row([req.id, req.state, req.requestor,
-                   ','.join(req.node_types),
-                   ','.join(req.nodes),
-                   ','.join(req.declined_by)])
-    return str(t)
+        values = [req.id, req.state, req.requestor,
+                  req.node_types,
+                  req.nodes,
+                  req.declined_by]
+        objs.append(dict(zip(headers_table.keys(),
+                             values)))
+    if format == 'pretty':
+        t = _to_pretty_table(objs, headers_table)
+        return str(t)
+    elif format == 'json':
+        return json.dumps(objs)
+    else:
+        raise ValueError('Unknown format "%s"' % format)
