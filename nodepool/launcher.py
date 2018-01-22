@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import logging
+import math
 import os
 import os.path
 import socket
@@ -538,6 +539,62 @@ class CleanupWorker(BaseCleanupWorker):
                 finally:
                     zk_conn.unlockNode(node)
 
+    def _cleanupMaxHoldAge(self):
+        '''
+        Delete any held server past their max-hold-age.
+
+        Remove any servers which are longer than max-hold-age in hold state.
+        '''
+        self.log.debug('Cleaning up held nodes...')
+
+        zk_conn = self._nodepool.getZK()
+        held_nodes = [n for n in zk_conn.nodeIterator() if n.state == zk.HOLD]
+        for node in held_nodes:
+            # Can't do anything if we aren't configured for this provider.
+            if node.provider not in self._nodepool.config.providers:
+                continue
+
+            if node.hold_expiration is not None and node.hold_expiration > 0:
+                expiration = node.hold_expiration
+            else:
+                expiration = math.inf
+            max_uptime = min(expiration, self._nodepool.config.max_hold_age)
+            if math.isinf(max_uptime):
+                continue
+
+            # check state time against now
+            now = int(time.time())
+            if (now - node.state_time) < max_uptime:
+                continue
+
+            try:
+                zk_conn.lockNode(node, blocking=False)
+            except exceptions.ZKLockException:
+                continue
+
+            # Double check the state now that we have a lock since it
+            # may have changed on us.
+            if node.state != zk.HOLD:
+                zk_conn.unlockNode(node)
+                continue
+
+            self.log.debug("Node %s exceeds max hold age (%s): %s >= %s",
+                           node.id,
+                           ("manual setting"
+                            and node.hold_expiration == max_uptime
+                            or "configuration setting"),
+                           now - node.state_time,
+                           max_uptime)
+
+            try:
+                node.state = zk.DELETING
+                zk_conn.storeNode(node)
+            except Exception:
+                self.log.exception(
+                    "Failure marking aged node %s for delete:", node.id)
+            finally:
+                zk_conn.unlockNode(node)
+
     def _run(self):
         '''
         Catch exceptions individually so that other cleanup routines may
@@ -566,6 +623,12 @@ class CleanupWorker(BaseCleanupWorker):
         except Exception:
             self.log.exception(
                 "Exception in CleanupWorker (max ready age cleanup):")
+
+        try:
+            self._cleanupMaxHoldAge()
+        except Exception:
+            self.log.exception(
+                "Exception in CleanupWorker (max hold age cleanup):")
 
 
 class DeletedNodeWorker(BaseCleanupWorker):

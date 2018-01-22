@@ -68,6 +68,7 @@ class ConfigValidator:
             'providers': list,
             'labels': [label],
             'diskimages': [diskimage],
+            'max-hold-age': int,
         }
 
         log.info("validating %s" % self.config_file)
