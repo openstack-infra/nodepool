@@ -27,6 +27,7 @@ from nodepool.driver import Provider
 from nodepool.nodeutils import iterate_timeout
 from nodepool.task_manager import ManagerStoppedException
 from nodepool.task_manager import TaskManager
+from nodepool import version
 
 
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
@@ -143,6 +144,8 @@ class OpenStackProvider(Provider):
         return shade.OpenStackCloud(
             cloud_config=self.provider.cloud_config,
             manager=manager,
+            app_name='nodepool',
+            app_version=version.version_info.version_string(),
             **self.provider.cloud_config.config)
 
     def quotaNeededByNodeType(self, ntype, pool):
