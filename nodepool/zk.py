@@ -52,6 +52,9 @@ USED = 'used'
 HOLD = 'hold'
 # Initial node state
 INIT = 'init'
+# Aborted due to a transient error like overquota that should not count as a
+# failed launch attempt
+ABORTED = 'aborted'
 
 
 # NOTE(Shrews): Importing this from nodepool.config causes an import error
@@ -484,7 +487,7 @@ class Node(BaseModel):
     Class representing a launched node.
     '''
     VALID_STATES = set([BUILDING, TESTING, READY, IN_USE, USED,
-                        HOLD, DELETING, FAILED, INIT])
+                        HOLD, DELETING, FAILED, INIT, ABORTED])
 
     def __init__(self, id=None):
         super(Node, self).__init__(id)

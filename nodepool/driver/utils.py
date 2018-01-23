@@ -22,6 +22,7 @@ import time
 
 from kazoo import exceptions as kze
 
+from nodepool import exceptions
 from nodepool import stats
 from nodepool import zk
 
@@ -69,6 +70,16 @@ class NodeLauncher(threading.Thread,
                 self.node.id)
             self.node.state = zk.FAILED
             statsd_key = 'error.zksession'
+        except exceptions.QuotaException:
+            # We encountered a quota error when trying to launch a
+            # node. In this case we need to abort the launch. The upper
+            # layers will take care of this and reschedule a new node once
+            # the quota is ok again.
+            self.log.info("Aborting node %s due to quota failure" %
+                          self.node.id)
+            self.node.state = zk.ABORTED
+            self.zk.storeNode(self.node)
+            statsd_key = 'error.quota'
         except Exception as e:
             self.log.exception("Launch failed for node %s:", self.node.id)
             self.node.state = zk.FAILED

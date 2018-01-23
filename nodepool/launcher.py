@@ -224,6 +224,8 @@ class PoolWorker(threading.Thread):
             try:
                 if not r.poll():
                     active_handlers.append(r)
+                    if r.paused:
+                        self.paused_handler = r
                 else:
                     self.log.debug("Removing handler for request %s",
                                    r.request.id)
@@ -662,7 +664,7 @@ class DeletedNodeWorker(BaseCleanupWorker):
         Delete instances from providers and nodes entries from ZooKeeper.
         '''
         cleanup_states = (zk.USED, zk.IN_USE, zk.BUILDING, zk.FAILED,
-                          zk.DELETING)
+                          zk.DELETING, zk.ABORTED)
 
         zk_conn = self._nodepool.getZK()
         for node in zk_conn.nodeIterator():

@@ -300,6 +300,15 @@ class LabelRecorder(object):
         self.data.remove({'label': label, 'node_id': node_id})
         return node_id
 
+    def removeNode(self, id):
+        '''
+        Remove the node with the specified ID.
+        '''
+        for d in self.data:
+            if d['node_id'] == id:
+                self.data.remove(d)
+                return
+
 
 class NodeRequestHandlerNotifications(object):
     """
@@ -645,9 +654,18 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
             return False
 
         # Launches are complete, so populate ready_nodes and failed_nodes.
-        for node in self.nodeset:
+        aborted_nodes = []
+        for node in self.nodeset[:]:
             if node.state == zk.READY:
                 self.ready_nodes.append(node)
+            elif node.state == zk.ABORTED:
+                # ABORTED is a transient error triggered by overquota. In order
+                # to handle this gracefully don't count this as failed so the
+                # node is relaunched within this provider. Unlock the node so
+                # the DeletedNodeWorker cleans up the zNode.
+                aborted_nodes.append(node)
+                self.nodeset.remove(node)
+                self.zk.unlockNode(node)
             else:
                 self.failed_nodes.append(node)
 
@@ -674,6 +692,14 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
             self.log.debug("Declining node request %s because nodes failed",
                            self.request.id)
             self.decline_request()
+        elif aborted_nodes:
+            # Because nodes are added to the satisfied types list before they
+            # are ready we need to remove the aborted nodes again so they can
+            # be created again.
+            for node in aborted_nodes:
+                self._satisfied_types.removeNode(node.id)
+            self.paused = True
+            return False
         else:
             # The assigned nodes must be added to the request in the order
             # in which they were requested.

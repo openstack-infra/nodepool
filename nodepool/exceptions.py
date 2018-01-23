@@ -45,6 +45,10 @@ class DibFailedError(BuilderError):
     pass
 
 
+class QuotaException(Exception):
+    pass
+
+
 class TimeoutException(Exception):
     pass
 
