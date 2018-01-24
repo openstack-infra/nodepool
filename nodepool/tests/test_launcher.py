@@ -901,9 +901,10 @@ class TestLauncher(tests.DBTestCase):
     def test_provider_removal(self):
         """Test that removing a provider stops the worker thread"""
         configfile = self.setup_config('launcher_two_provider.yaml')
+        self.useBuilder(configfile)
         pool = self.useNodepool(configfile, watermark_sleep=.5)
         pool.start()
-        self.wait_for_config(pool)
+        self.waitForNodes('fake-label')
         self.assertEqual(2, len(pool._pool_threads))
 
         self.replace_config(configfile, 'launcher_two_provider_remove.yaml')
