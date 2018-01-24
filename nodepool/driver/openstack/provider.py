@@ -16,7 +16,6 @@
 
 import copy
 import logging
-from contextlib import contextmanager
 import math
 import operator
 import time
@@ -32,15 +31,6 @@ from nodepool.task_manager import TaskManager
 
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 MAX_QUOTA_AGE = 5 * 60  # How long to keep the quota information cached
-
-
-@contextmanager
-def shade_inner_exceptions():
-    try:
-        yield
-    except shade.OpenStackCloudException as e:
-        e.log_error()
-        raise
 
 
 class QuotaInformation:
@@ -180,8 +170,7 @@ class OpenStackProvider(Provider):
             if now < self._current_nodepool_quota['timestamp'] + MAX_QUOTA_AGE:
                 return copy.deepcopy(self._current_nodepool_quota['quota'])
 
-        with shade_inner_exceptions():
-            limits = self._client.get_compute_limits()
+        limits = self._client.get_compute_limits()
 
         # This is initialized with the full tenant quota and later becomes
         # the quota available for nodepool.
@@ -299,8 +288,7 @@ class OpenStackProvider(Provider):
         if name in self._images:
             return self._images[name]
 
-        with shade_inner_exceptions():
-            image = self._client.get_image(name)
+        image = self._client.get_image(name)
         self._images[name] = image
         return image
 
@@ -308,8 +296,7 @@ class OpenStackProvider(Provider):
         if name in self._networks:
             return self._networks[name]
 
-        with shade_inner_exceptions():
-            network = self._client.get_network(name)
+        network = self._client.get_network(name)
         self._networks[name] = network
         return network
 
@@ -317,8 +304,7 @@ class OpenStackProvider(Provider):
         if name in self._images:
             del self._images[name]
 
-        with shade_inner_exceptions():
-            return self._client.delete_image(name)
+        return self._client.delete_image(name)
 
     def createServer(self, name, image,
                      flavor_name=None, min_ram=None,
@@ -376,25 +362,21 @@ class OpenStackProvider(Provider):
             meta['nodepool_node_label'] = nodepool_node_label
         create_args['meta'] = meta
 
-        with shade_inner_exceptions():
-            return self._client.create_server(wait=False, **create_args)
+        return self._client.create_server(wait=False, **create_args)
 
     def getServer(self, server_id):
-        with shade_inner_exceptions():
-            return self._client.get_server(server_id)
+        return self._client.get_server(server_id)
 
     def getServerConsole(self, server_id):
         try:
-            with shade_inner_exceptions():
-                return self._client.get_server_console(server_id)
+            return self._client.get_server_console(server_id)
         except shade.OpenStackCloudException:
             return None
 
     def waitForServer(self, server, timeout=3600, auto_ip=True):
-        with shade_inner_exceptions():
-            return self._client.wait_for_server(
-                server=server, auto_ip=auto_ip,
-                reuse=False, timeout=timeout)
+        return self._client.wait_for_server(
+            server=server, auto_ip=auto_ip,
+            reuse=False, timeout=timeout)
 
     def waitForNodeCleanup(self, server_id, timeout=600):
         for count in iterate_timeout(
@@ -441,13 +423,11 @@ class OpenStackProvider(Provider):
                 return image
 
     def createImage(self, server, image_name, meta):
-        with shade_inner_exceptions():
-            return self._client.create_image_snapshot(
-                image_name, server, **meta)
+        return self._client.create_image_snapshot(
+            image_name, server, **meta)
 
     def getImage(self, image_id):
-        with shade_inner_exceptions():
-            return self._client.get_image(image_id)
+        return self._client.get_image(image_id)
 
     def labelReady(self, label):
         if not label.cloud_image:
@@ -480,40 +460,34 @@ class OpenStackProvider(Provider):
             meta = {}
         if image_type:
             meta['disk_format'] = image_type
-        with shade_inner_exceptions():
-            image = self._client.create_image(
-                name=image_name,
-                filename=filename,
-                is_public=False,
-                wait=True,
-                md5=md5,
-                sha256=sha256,
-                **meta)
+        image = self._client.create_image(
+            name=image_name,
+            filename=filename,
+            is_public=False,
+            wait=True,
+            md5=md5,
+            sha256=sha256,
+            **meta)
         return image.id
 
     def listImages(self):
-        with shade_inner_exceptions():
-            return self._client.list_images()
+        return self._client.list_images()
 
     def listFlavors(self):
-        with shade_inner_exceptions():
-            return self._client.list_flavors(get_extra=False)
+        return self._client.list_flavors(get_extra=False)
 
     def listFlavorsById(self):
-        with shade_inner_exceptions():
-            flavors = {}
-            for flavor in self._client.list_flavors(get_extra=False):
-                flavors[flavor.id] = flavor
+        flavors = {}
+        for flavor in self._client.list_flavors(get_extra=False):
+            flavors[flavor.id] = flavor
         return flavors
 
     def listNodes(self):
-        # shade list_servers carries the nodepool server list caching logic
-        with shade_inner_exceptions():
-            return self._client.list_servers()
+        # list_servers carries the nodepool server list caching logic
+        return self._client.list_servers()
 
     def deleteServer(self, server_id):
-        with shade_inner_exceptions():
-            return self._client.delete_server(server_id, delete_ips=True)
+        return self._client.delete_server(server_id, delete_ips=True)
 
     def cleanupNode(self, server_id):
         server = self.getServer(server_id)
@@ -525,8 +499,7 @@ class OpenStackProvider(Provider):
 
     def cleanupLeakedResources(self):
         if self.provider.clean_floating_ips:
-            with shade_inner_exceptions():
-                self._client.delete_unattached_floating_ips()
+            self._client.delete_unattached_floating_ips()
 
     def getAZs(self):
         if self.__azs is None:
