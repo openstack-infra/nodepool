@@ -1679,3 +1679,61 @@ class ZooKeeper(object):
             if node.provider == provider_name and node.pool == pool_name:
                 count = count + 1
         return count
+
+    def getProviderBuilds(self, provider_name):
+        '''
+        Get all builds for a provider for each image.
+
+        :param str provider_name: The provider name.
+        :returns: A dict of lists of build IDs, keyed by image name.
+        '''
+        provider_builds = {}
+        image_names = self.getImageNames()
+        for image in image_names:
+            build_numbers = self.getBuildNumbers(image)
+            for build in build_numbers:
+                providers = self.getBuildProviders(image, build)
+                for p in providers:
+                    if p == provider_name:
+                        if image not in provider_builds:
+                            provider_builds[image] = []
+                        provider_builds[image].append(build)
+        return provider_builds
+
+    def getProviderNodes(self, provider_name):
+        '''
+        Get all nodes for a provider.
+
+        :param str provider_name: The provider name.
+        :returns: A list of Node objects.
+        '''
+        provider_nodes = []
+        for node in self.nodeIterator():
+            if node.provider == provider_name:
+                provider_nodes.append(node)
+        return provider_nodes
+
+    def removeProviderBuilds(self, provider_name, provider_builds):
+        '''
+        Remove ZooKeeper build data for a provider.
+
+        :param str provider_name: The provider name.
+        :param dict provider_builds: Data as returned by getProviderBuilds().
+        '''
+        for image, builds in provider_builds.items():
+            for build in builds:
+                path = self._imageProviderPath(image, build)
+                path = "%s/%s" % (path, provider_name)
+                try:
+                    self.client.delete(path, recursive=True)
+                except kze.NoNodeError:
+                    pass
+
+    def removeProviderNodes(self, provider_name, provider_nodes):
+        '''
+        Remove ZooKeeper node data for a provider.
+        :param str provider_name: The provider name.
+        :param dict provider_nodes: Data as returned by getProviderNodes().
+        '''
+        for node in provider_nodes:
+            self.deleteNode(node)
