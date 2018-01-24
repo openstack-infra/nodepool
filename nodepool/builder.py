@@ -434,6 +434,9 @@ class CleanupWorker(BaseWorker):
             # (since this should be done regardless of the build
             # state).
             for provider in known_providers:
+                if not provider.driver.manage_images:
+                    # This provider doesn't manage images
+                    continue
                 try:
                     self._cleanupObsoleteProviderUploads(provider, image,
                                                          build.id)
@@ -460,6 +463,9 @@ class CleanupWorker(BaseWorker):
                     continue
 
             for provider in known_providers:
+                if not provider.driver.manage_images:
+                    # This provider doesn't manage images
+                    continue
                 try:
                     self._cleanupProvider(provider, image, build.id)
                 except Exception:
@@ -935,6 +941,8 @@ class UploadWorker(BaseWorker):
         to providers, do the upload if they are available on the local disk.
         '''
         for provider in self._config.providers.values():
+            if not provider.driver.manage_images:
+                continue
             for image in provider.diskimages.values():
                 uploaded = False
 

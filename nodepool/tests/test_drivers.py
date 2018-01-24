@@ -37,3 +37,8 @@ class TestDrivers(tests.DBTestCase):
         pool.start()
         nodes = self.waitForNodes('test-label')
         self.assertEqual(len(nodes), 1)
+
+    def test_multi_drivers_manage_images(self):
+        configfile = self.setup_config('multi_drivers.yaml')
+        self.useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
