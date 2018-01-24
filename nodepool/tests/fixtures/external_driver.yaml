@@ -1,0 +1,16 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: test-label
+    min-ready: 1
+
+providers:
+  - name: test-provider
+    driver: test
+    pools:
+      - name: test-pool
+        labels:
+          - test-label

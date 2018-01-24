@@ -96,6 +96,10 @@ class OpenStackProviderConfig(ProviderConfig):
                 cloud_kwargs[arg] = self.provider[arg]
         return cloud_kwargs
 
+    @staticmethod
+    def reset():
+        OpenStackProviderConfig.os_client_config = None
+
     def load(self, config):
         if OpenStackProviderConfig.os_client_config is None:
             OpenStackProviderConfig.os_client_config = \

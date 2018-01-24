@@ -66,12 +66,12 @@ class Dummy(object):
         setattr(self, key, value)
 
 
-def get_fake_quota():
-    return 100, 20, 1000000
-
-
 class FakeOpenStackCloud(object):
     log = logging.getLogger("nodepool.FakeOpenStackCloud")
+
+    @staticmethod
+    def _get_quota():
+        return 100, 20, 1000000
 
     def __init__(self, images=None, networks=None):
         self.pause_creates = False
@@ -100,7 +100,8 @@ class FakeOpenStackCloud(object):
                   vcpus=4),
         ]
         self._server_list = []
-        self.max_cores, self.max_instances, self.max_ram = get_fake_quota()
+        self.max_cores, self.max_instances, self.max_ram = FakeOpenStackCloud.\
+            _get_quota()
 
     def _get(self, name_or_id, instance_list):
         self.log.debug("Get %s in %s" % (name_or_id, repr(instance_list)))
@@ -287,9 +288,11 @@ class FakeUploadFailCloud(FakeOpenStackCloud):
 
 
 class FakeProvider(OpenStackProvider):
+    fake_cloud = FakeOpenStackCloud
+
     def __init__(self, provider, use_taskmanager):
         self.createServer_fails = 0
-        self.__client = FakeOpenStackCloud()
+        self.__client = FakeProvider.fake_cloud()
         super(FakeProvider, self).__init__(provider, use_taskmanager)
 
     def _getClient(self):
