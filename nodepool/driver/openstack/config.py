@@ -112,7 +112,7 @@ class OpenStackProviderConfig(ProviderConfig):
         self.image_type = self.cloud_config.config['image_format']
         self.driver.manage_images = True
         self.region_name = self.provider.get('region-name')
-        self.rate = self.provider.get('rate', 1.0)
+        self.rate = float(self.provider.get('rate', 1.0))
         self.boot_timeout = self.provider.get('boot-timeout', 60)
         self.launch_timeout = self.provider.get('launch-timeout', 3600)
         self.launch_retries = self.provider.get('launch-retries', 3)
@@ -270,7 +270,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'launch-timeout': int,
             'launch-retries': int,
             'nodepool-id': str,
-            'rate': float,
+            'rate': v.Coerce(float),
             'hostname-format': str,
             'image-name-format': str,
             'clean-floating-ips': bool,

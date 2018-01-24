@@ -28,7 +28,7 @@ providers:
     boot-timeout: 120
     max-concurrency: 10
     launch-retries: 3
-    rate: 0.001
+    rate: 1
     diskimages:
       - name: trusty
     pools:
