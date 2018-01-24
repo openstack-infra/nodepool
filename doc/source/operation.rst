@@ -210,6 +210,11 @@ info
 .. program-output:: nodepool info --help
    :nostderr:
 
+erase
+^^^^^
+.. program-output:: nodepool erase --help
+   :nostderr:
+
 If Nodepool's database gets out of sync with reality, the following
 commands can help identify compute instances or images that are
 unknown to Nodepool:

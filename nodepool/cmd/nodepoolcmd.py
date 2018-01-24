@@ -127,17 +127,22 @@ class NodePoolCmd(NodepoolApp):
             help='Show provider data from zookeeper')
         cmd_info.add_argument(
             'provider',
-            help='provider name',
+            help='Provider name',
             metavar='PROVIDER')
-        cmd_info.add_argument(
-            '--erase',
-            help='erase ZooKeeper data for this provider',
-            action='store_true')
-        cmd_info.add_argument(
-            '--force',
-            help='used with --erase to bypass the warning prompt',
-            action='store_true')
         cmd_info.set_defaults(func=self.info)
+
+        cmd_erase = subparsers.add_parser(
+            'erase',
+            help='Erase provider data from zookeeper')
+        cmd_erase.add_argument(
+            'provider',
+            help='Provider name',
+            metavar='PROVIDER')
+        cmd_erase.add_argument(
+            '--force',
+            help='Bypass the warning prompt',
+            action='store_true')
+        cmd_erase.set_defaults(func=self.erase)
 
         return parser
 
@@ -302,11 +307,27 @@ class NodePoolCmd(NodepoolApp):
         self.zk.storeImageUpload(image.image_name, image.build_id,
                                  image.provider_name, image, image.id)
 
-    def erase(self, provider_name, provider_builds, provider_nodes):
-        print("\nErasing build data for %s..." % provider_name)
-        self.zk.removeProviderBuilds(provider_name, provider_builds)
-        print("Erasing node data for %s..." % provider_name)
-        self.zk.removeProviderNodes(provider_name, provider_nodes)
+    def erase(self):
+        def do_erase(provider_name, provider_builds, provider_nodes):
+            print("Erasing build data for %s..." % provider_name)
+            self.zk.removeProviderBuilds(provider_name, provider_builds)
+            print("Erasing node data for %s..." % provider_name)
+            self.zk.removeProviderNodes(provider_name, provider_nodes)
+
+        provider_name = self.args.provider
+        provider_builds = self.zk.getProviderBuilds(provider_name)
+        provider_nodes = self.zk.getProviderNodes(provider_name)
+
+        if self.args.force:
+            do_erase(provider_name, provider_builds, provider_nodes)
+        else:
+            print("\nWARNING! This action is not reversible!")
+            answer = input("Erase ZooKeeper data for provider %s? [N/y] " %
+                           provider_name)
+            if answer.lower() != 'y':
+                print("Aborting. No data erased.")
+            else:
+                do_erase(provider_name, provider_builds, provider_nodes)
 
     def info(self):
         provider_name = self.args.provider
@@ -328,19 +349,6 @@ class NodePoolCmd(NodepoolApp):
         for node in provider_nodes:
             t.add_row([node.id, node.external_id])
         print(t)
-
-        if self.args.erase:
-            if self.args.force:
-                self.erase(provider_name, provider_builds, provider_nodes)
-                return
-
-            print("\nWARNING! This action is not reversible!")
-            answer = input("Erase ZooKeeper data for provider %s? [N/y] " %
-                           provider_name)
-            if answer.lower() != 'y':
-                print("Aborting. No data erased.")
-            else:
-                self.erase(provider_name, provider_builds, provider_nodes)
 
     def config_validate(self):
         validator = ConfigValidator(self.args.config)
@@ -375,7 +383,7 @@ class NodePoolCmd(NodepoolApp):
                                  'image-list', 'dib-image-delete',
                                  'image-delete', 'alien-image-list',
                                  'list', 'hold', 'delete',
-                                 'request-list', 'info'):
+                                 'request-list', 'info', 'erase'):
             self.zk = zk.ZooKeeper()
             self.zk.connect(list(config.zookeeper_servers.values()))
 

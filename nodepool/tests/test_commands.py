@@ -301,7 +301,7 @@ class TestNodepoolCMD(tests.DBTestCase):
         result = nodepoolcmd.main()
         self.assertEqual(1, result)
 
-    def test_info(self):
+    def test_info_and_erase(self):
         configfile = self.setup_config('info_cmd_two_provider.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self.useBuilder(configfile)
@@ -321,13 +321,16 @@ class TestNodepoolCMD(tests.DBTestCase):
             ['info', 'fake-provider2'],
             0, 'fake-image', 1)
 
-        # Verify that the second provider node is listed. We go ahead
-        # and erase the data here (after it has been displayed) so that
-        # we can verify the erase in the next steps.
+        # Verify that the second provider node is listed.
         self.assert_listed(
             configfile,
-            ['info', 'fake-provider2', '--erase', '--force'],
+            ['info', 'fake-provider2'],
             0, p2_nodes[0].id, 1)
+
+        # Erase the data for the second provider
+        self.patch_argv(
+            "-c", configfile, 'erase', 'fake-provider2', '--force')
+        nodepoolcmd.main()
 
         # Verify that no build or node for the second provider is listed
         # after the previous erase
