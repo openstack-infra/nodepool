@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import math
 import voluptuous as v
 
 from nodepool.driver import ConfigValue
@@ -36,6 +37,7 @@ class TestConfig(ProviderConfig):
             testpool = TestPool()
             testpool.name = pool['name']
             testpool.provider = self
+            testpool.max_servers = pool.get('max-servers', math.inf)
             for label in pool['labels']:
                 newconfig.labels[label].pools.append(testpool)
             self.pools[pool['name']] = testpool
