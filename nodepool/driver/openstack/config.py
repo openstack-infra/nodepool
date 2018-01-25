@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os_client_config
 import voluptuous as v
 
@@ -165,9 +166,9 @@ class OpenStackProviderConfig(ProviderConfig):
             pp.name = pool['name']
             pp.provider = self
             self.pools[pp.name] = pp
-            pp.max_cores = pool.get('max-cores', None)
-            pp.max_servers = pool.get('max-servers', None)
-            pp.max_ram = pool.get('max-ram', None)
+            pp.max_cores = pool.get('max-cores', math.inf)
+            pp.max_servers = pool.get('max-servers', math.inf)
+            pp.max_ram = pool.get('max-ram', math.inf)
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
             pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
