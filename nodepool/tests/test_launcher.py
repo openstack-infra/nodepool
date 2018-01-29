@@ -984,8 +984,10 @@ class TestLauncher(tests.DBTestCase):
         provider2_second = None
         nodes = map(pool.zk.getNode, pool.zk.getNodes())
         for node in nodes:
-            if node and node.provider == 'fake-provider2':
+            if (node and node.provider == 'fake-provider2' and
+                    node.state == zk.READY):
                 provider2_second = node
+                break
 
         # Now delete the new node we had provider2 build. At this point
         # The only provider with any requests is fake-provider.
@@ -999,7 +1001,7 @@ class TestLauncher(tests.DBTestCase):
         pool_worker = pool.getPoolWorkers('fake-provider')[0]
         request_handler = pool_worker.request_handlers[0]
 
-        def raise_KeyError(self, node):
+        def raise_KeyError(node):
             raise KeyError('fake-provider')
 
         request_handler.launch_manager.launch = raise_KeyError
