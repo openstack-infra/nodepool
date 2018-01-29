@@ -1013,3 +1013,24 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(req.state, zk.FULFILLED)
         self.assertEqual(1, len(req.declined_by))
         self.assertIn('fake-provider-main', req.declined_by[0])
+
+    def test_disabled_provider(self):
+        '''
+        A request should fail even with a provider that is disabled by
+        setting max-servers to 0. Because we look to see that all providers
+        decline a request by comparing the declined_by request attribute to
+        the list of registered launchers, this means that each must attempt
+        to handle it at least once, and thus decline it.
+        '''
+        configfile = self.setup_config('disabled_provider.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FAILED)

@@ -157,13 +157,11 @@ class PoolWorker(threading.Thread):
         the handler for completion.
         '''
         provider = self.getProviderConfig()
-        if not provider or (self.pool_name not in provider.pools):
+        if not provider:
             self.log.info("Missing config. Deleted provider?")
             return
 
-        pool_config = provider.pools[self.pool_name]
-
-        if provider.max_concurrency == 0 or pool_config.max_servers <= 0:
+        if provider.max_concurrency == 0:
             return
 
         for req_id in self.zk.getNodeRequests():
