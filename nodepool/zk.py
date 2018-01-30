@@ -715,14 +715,20 @@ class ZooKeeper(object):
 
     @property
     def connected(self):
+        if self.client is None:
+            return False
         return self.client.state == KazooState.CONNECTED
 
     @property
     def suspended(self):
+        if self.client is None:
+            return True
         return self.client.state == KazooState.SUSPENDED
 
     @property
     def lost(self):
+        if self.client is None:
+            return True
         return self.client.state == KazooState.LOST
 
     @property
