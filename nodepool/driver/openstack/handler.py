@@ -490,6 +490,8 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
                             "Pausing request handling to satisfy request %s",
                             self.request)
                     self.paused = True
+                    self.zk.deleteOldestUnusedNode(self.provider.name,
+                                                   self.pool.name)
                     return
 
                 if self.paused:
