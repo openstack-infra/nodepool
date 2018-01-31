@@ -201,25 +201,6 @@ class TestNodepoolCMD(tests.DBTestCase):
         self.assert_listed(
             configfile, ['dib-image-list'], 0, 'fake-image-0000000001', 0)
 
-    def test_hold(self):
-        configfile = self.setup_config('node.yaml')
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        self.useBuilder(configfile)
-        pool.start()
-        self.waitForImage('fake-provider', 'fake-image')
-        nodes = self.waitForNodes('fake-label')
-        node_id = nodes[0].id
-        # Assert one node exists and it is node 1 in a ready state.
-        self.assert_listed(configfile, ['list'], 0, node_id, 1)
-        self.assert_nodes_listed(configfile, 1, zk.READY)
-        # Hold node 0000000000
-        self.patch_argv(
-            '-c', configfile, 'hold', node_id, '--reason', 'testing')
-        nodepoolcmd.main()
-        # Assert the state changed to HOLD
-        self.assert_listed(configfile, ['list'], 0, node_id, 1)
-        self.assert_nodes_listed(configfile, 1, 'hold')
-
     def test_delete(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
