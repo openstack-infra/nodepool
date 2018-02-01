@@ -53,6 +53,14 @@ class DiskImage(ConfigValue):
         return "<DiskImage %s>" % self.name
 
 
+def as_list(item):
+    if not item:
+        return []
+    if isinstance(item, list):
+        return item
+    return [item]
+
+
 def get_provider_config(provider):
     provider.setdefault('driver', 'openstack')
     # Ensure legacy configuration still works when using fake cloud

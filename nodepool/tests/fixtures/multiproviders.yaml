@@ -1,0 +1,33 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: fake-static-label
+    min-ready: 1
+
+  - name: fake-openstack-label
+    min-ready: 1
+
+providers:
+  - name: static-provider
+    driver: static
+    pools:
+      - name: main
+        nodes:
+          - name: fake-host-1
+            labels: fake-static-label
+            max-parallel-jobs: 1
+
+  - name: openstack-provider
+    cloud: fake
+    driver: fake
+    cloud-images:
+      - name: fake-image
+    pools:
+      - name: main
+        labels:
+          - name: fake-openstack-label
+            min-ram: 1
+            cloud-image: fake-image
