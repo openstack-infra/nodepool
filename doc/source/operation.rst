@@ -132,23 +132,6 @@ the image is not being built correctly. If you know the image will be built
 correctly you can simple delete the built image and remove it from all clouds
 which will cause it to be rebuilt using ``nodepool dib-image-delete``.
 
-Instance Management
-~~~~~~~~~~~~~~~~~~~
-
-With working images in providers you should see Nodepool launching instances
-in these providers using the images it built. You may find that you need to
-debug a particular job failure manually. An easy way to do this is to
-``nodepool hold`` an instance then log in to the instance and perform any
-necessary debugging steps. Note that this doesn't stop the job running there,
-what it will do is prevent Nodepool from automatically deleting this instance
-once the job is complete.
-
-In some circumstances like manually holding an instance above, or wanting to
-force a job restart you may want to delete a running instance. You can issue
-a ``nodepool delete`` to force nodepool to do this.
-
-Complete command help info is below.
-
 Command Line Tools
 ------------------
 
@@ -191,11 +174,6 @@ The following subcommands deal with nodepool nodes:
 list
 ^^^^
 .. program-output:: nodepool list --help
-   :nostderr:
-
-hold
-^^^^
-.. program-output:: nodepool hold --help
    :nostderr:
 
 delete
