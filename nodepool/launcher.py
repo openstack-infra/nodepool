@@ -861,7 +861,7 @@ class NodePool(threading.Thread):
             if label.name not in needed_labels:
                 continue
             min_ready = label.min_ready
-            if min_ready == -1:
+            if min_ready <= 0:
                 continue   # disabled
 
             # Calculate how many nodes of this type we need created
