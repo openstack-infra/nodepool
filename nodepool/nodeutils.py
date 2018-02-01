@@ -17,9 +17,7 @@
 # limitations under the License.
 
 import errno
-import ipaddress
 import time
-import six
 import socket
 import logging
 
@@ -52,12 +50,9 @@ def keyscan(ip, port=22, timeout=60):
     if 'fake' in ip:
         return ['ssh-rsa FAKEKEY']
 
-    if ipaddress.ip_address(six.text_type(ip)).version < 6:
-        family = socket.AF_INET
-        sockaddr = (ip, port)
-    else:
-        family = socket.AF_INET6
-        sockaddr = (ip, port, 0, 0)
+    addrinfo = socket.getaddrinfo(ip, port)[0]
+    family = addrinfo[0]
+    sockaddr = addrinfo[4]
 
     keys = []
     key = None
