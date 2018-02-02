@@ -212,7 +212,11 @@ class NodeRequestHandler(object):
         self.nodeset = []
 
     def decline_request(self):
-        self.request.declined_by.append(self.launcher_id)
+        # Technically, this check to see if we've already declined it should
+        # not be necessary. But if there is a bug (and there has been), we
+        # want to make sure we don't continuously grow this array.
+        if self.launcher_id not in self.request.declined_by:
+            self.request.declined_by.append(self.launcher_id)
         launchers = set(self.zk.getRegisteredLaunchers())
         if launchers.issubset(set(self.request.declined_by)):
             # All launchers have declined it
@@ -239,8 +243,14 @@ class NodeRequestHandler(object):
                 "NodeRequestHandler:", self.request.id)
             self.decline_request()
             self.unlockNodeSet(clear_allocation=True)
-            self.zk.storeNodeRequest(self.request)
-            self.zk.unlockNodeRequest(self.request)
+            try:
+                self.zk.storeNodeRequest(self.request)
+                self.zk.unlockNodeRequest(self.request)
+            except Exception:
+                # If the request is gone for some reason, we need to make
+                # sure that self.done still gets set.
+                self.log.exception("Unable to decline missing request %s",
+                                   self.request.id)
             self.done = True
 
     def poll(self):
