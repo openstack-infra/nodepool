@@ -23,13 +23,18 @@
 
 - job:
     name: nodepool-zuul-functional
-    parent: legacy-base
-    run: playbooks/nodepool-zuul-functional/run.yaml
-    post-run: playbooks/nodepool-zuul-functional/post.yaml
-    timeout: 1800
+    parent: tox
+    description: |
+      Test that zuul works with current nodepool sources.
+
+      This test runs the zuul project ``nodepool`` environment.
+    pre-run: playbooks/nodepool-zuul-functional/pre.yaml
     required-projects:
       - openstack-infra/nodepool
       - openstack-infra/zuul
+    vars:
+      zuul_work_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
+      tox_envlist: nodepool
 
 - project:
     check:

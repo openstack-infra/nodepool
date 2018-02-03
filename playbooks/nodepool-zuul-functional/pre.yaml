@@ -1,0 +1,8 @@
+- hosts: all
+  name: Zuul setup for nodepool test
+  tasks:
+
+    - name: Run tools/nodepool-integration-setup.sh from zuul
+      shell:
+        cmd: tools/nodepool-integration-setup.sh
+        chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
