@@ -1646,6 +1646,69 @@ class ZooKeeper(object):
                 ret[node.type].append(node)
         return ret
 
+    def deleteOldestUnusedNode(self, provider_name, pool_name):
+        '''
+        Deletes the oldest unused (READY+unlocked) node for a provider's pool.
+
+        If we discover that this provider pool already has a node that is
+        being deleted, and whose state is less than 5 minutes old, do nothing.
+
+        :param str provider_name: Name of the provider.
+        :param str pool_name: Pool name for the given provider.
+
+        :returns: True if a delete was requested, False otherwise.
+        '''
+        def age(timestamp):
+            now = time.time()
+            dt = now - timestamp
+            m, s = divmod(dt, 60)
+            h, m = divmod(m, 60)
+            d, h = divmod(h, 24)
+            return '%02d:%02d:%02d:%02d' % (d, h, m, s)
+
+        MAX_DELETE_AGE = 5 * 60
+
+        candidates = []
+        for node in self.nodeIterator():
+            if node.provider == provider_name and node.pool == pool_name:
+                if node.state == READY:
+                    candidates.append(node)
+                elif (node.state == DELETING and
+                      (time.time() - node.state_time / 1000) < MAX_DELETE_AGE
+                ):
+                    return False
+
+        candidates.sort(key=lambda n: n.state_time)
+        for node in candidates:
+            try:
+                self.lockNode(node, blocking=False)
+            except npe.ZKLockException:
+                continue
+
+            # Make sure the state didn't change on us
+            n = self.getNode(node.id)
+            if n.state != READY:
+                self.unlockNode(node)
+                continue
+
+            node.state = DELETING
+            try:
+                self.log.debug("Deleting unused node %s (age: %s)",
+                               node.id, age(node.state_time))
+                self.storeNode(node)
+            except Exception:
+                self.log.exception(
+                    "Error attempting to update unused node %s:", node.id)
+                continue
+            finally:
+                self.unlockNode(node)
+
+            # If we got here, we found and requested a delete for the
+            # oldest unused node.
+            return True
+
+        return False
+
     def nodeIterator(self):
         '''
         Utility generator method for iterating through all nodes.
