@@ -54,75 +54,50 @@ def node_list(zk, node_id=None, detail=False):
     if detail:
         headers += detail_headers
 
+    def _get_node_values(node):
+        locked = "unlocked"
+        try:
+            zk.lockNode(node, blocking=False)
+        except Exception:
+            locked = "locked"
+        else:
+            zk.unlockNode(node)
+
+        values = [
+            node.id,
+            node.provider,
+            node.type,
+            node.external_id,
+            node.public_ipv4,
+            node.public_ipv6,
+            node.state,
+            age(node.state_time),
+            locked
+        ]
+        if detail:
+            values += [
+                node.hostname,
+                node.private_ipv4,
+                node.az,
+                node.connection_port,
+                node.launcher,
+                node.allocated_to,
+                node.hold_job,
+                node.comment
+            ]
+        return values
+
     t = PrettyTable(headers)
     t.align = 'l'
 
     if node_id:
         node = zk.getNode(node_id)
         if node:
-            locked = "unlocked"
-            try:
-                zk.lockNode(node, blocking=False)
-            except Exception:
-                locked = "locked"
-            else:
-                zk.unlockNode(node)
-
-            values = [
-                node.id,
-                node.provider,
-                node.type,
-                node.external_id,
-                node.public_ipv4,
-                node.public_ipv6,
-                node.state,
-                age(node.state_time),
-                locked
-            ]
-            if detail:
-                values += [
-                    node.hostname,
-                    node.private_ipv4,
-                    node.az,
-                    node.connection_port,
-                    node.launcher,
-                    node.allocated_to,
-                    node.hold_job,
-                    node.comment
-                ]
+            values = _get_node_values(node)
             t.add_row(values)
     else:
         for node in zk.nodeIterator():
-            locked = "unlocked"
-            try:
-                zk.lockNode(node, blocking=False)
-            except Exception:
-                locked = "locked"
-            else:
-                zk.unlockNode(node)
-
-            values = [
-                node.id,
-                node.provider,
-                node.type,
-                node.external_id,
-                node.public_ipv4,
-                node.public_ipv6,
-                node.state,
-                age(node.state_time),
-                locked
-            ]
-            if detail:
-                values += [
-                    node.hostname,
-                    node.private_ipv4,
-                    node.az,
-                    node.connection_port,
-                    node.launcher,
-                    node.allocated_to,
-                    node.hold_job,
-                    node.comment
-                ]
+            values = _get_node_values(node)
             t.add_row(values)
     return str(t)
 
