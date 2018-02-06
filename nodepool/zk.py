@@ -1691,10 +1691,10 @@ class ZooKeeper(object):
                 self.unlockNode(node)
                 continue
 
-            node.state = DELETING
             try:
                 self.log.debug("Deleting unused node %s (age: %s)",
                                node.id, age(node.state_time))
+                node.state = DELETING
                 self.storeNode(node)
             except Exception:
                 self.log.exception(
