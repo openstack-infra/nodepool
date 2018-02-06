@@ -961,8 +961,9 @@ class TestLauncher(tests.DBTestCase):
         req2 = self.waitForNodeRequest(req2, zk.PENDING)
 
         # Delete node attached to provider2 this will cause provider2 to
-        # fulfill the request it had pending. Simply unlocking here should
-        # cause it to be deleted.
+        # fulfill the request it had pending.
+        provider2_first.state = zk.DELETING
+        self.zk.storeNode(provider2_first)
         self.zk.unlockNode(provider2_first)
         self.waitForNodeDeletion(provider2_first)
 
@@ -1005,9 +1006,10 @@ class TestLauncher(tests.DBTestCase):
 
         request_handler.launch_manager.launch = raise_KeyError
 
-        # Delete instance in fake-provider by unlocking it and allowing it to
-        # become unused. This should cause provider2 to service the request
-        # that was held pending by fake-provider.
+        # Delete instance in fake-provider. This should cause provider2
+        # to service the request that was held pending by fake-provider.
+        provider1_first.state = zk.DELETING
+        self.zk.storeNode(provider1_first)
         self.zk.unlockNode(provider1_first)
 
         # Request is fulfilled by provider 2

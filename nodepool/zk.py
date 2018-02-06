@@ -1671,7 +1671,11 @@ class ZooKeeper(object):
         candidates = []
         for node in self.nodeIterator():
             if node.provider == provider_name and node.pool == pool_name:
-                if node.state == READY:
+                # A READY node that has been allocated will not be considered
+                # a candidate at this point. If allocated_to gets reset during
+                # the cleanup phase b/c the request disappears, then it can
+                # become a candidate.
+                if node.state == READY and not node.allocated_to:
                     candidates.append(node)
                 elif (node.state == DELETING and
                       (time.time() - node.state_time / 1000) < MAX_DELETE_AGE
