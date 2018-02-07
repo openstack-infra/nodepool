@@ -1,21 +1,48 @@
 - job:
-    name: nodepool-functional-py35
-    parent: legacy-dsvm-base
-    run: playbooks/nodepool-functional-py35/run.yaml
-    post-run: playbooks/nodepool-functional-py35/post.yaml
+    name: nodepool-functional-base
+    parent: devstack
+    pre-run: playbooks/nodepool-functional-base/pre.yaml
+    post-run: playbooks/nodepool-functional-base/post.yaml
     timeout: 5400
     required-projects:
-      - openstack-infra/devstack-gate
       - openstack-infra/nodepool
+    vars:
+      devstack_services:
+        horizon: false
+        ceilometer-acentral: false
+        ceilometer-acompute: false
+        ceilometer-alarm-evaluator: false
+        ceilometer-alarm-notifier: false
+        ceilometer-anotification: false
+        ceilometer-api: false
+        ceilometer-collector: false
+        cinder: false
+        c-bak: false
+        c-sch: false
+        c-api: false
+        c-vol: false
+        s-account: false
+        s-container: false
+        s-object: false
+        s-proxy: false
+      devstack_plugins:
+        nodepool: https://git.openstack.org/openstack-infra/nodepool
+
+- job:
+    name: nodepool-functional-py35
+    parent: nodepool-functional-base
+    description: |
+      Run nodepool functional tests for py35
+    run: playbooks/nodepool-functional-py35/run.yaml
 
 - job:
     name: nodepool-functional-py35-src
-    parent: legacy-dsvm-base
+    parent: nodepool-functional-base
     run: playbooks/nodepool-functional-py35-src/run.yaml
-    post-run: playbooks/nodepool-functional-py35-src/post.yaml
-    timeout: 5400
+    vars:
+      devstack_localrc:
+        LIBS_FROM_GIT: shade,glean,diskimage-builder
     required-projects:
-      - openstack-infra/devstack-gate
       - openstack-infra/glean
       - openstack-infra/nodepool
       - openstack-infra/shade

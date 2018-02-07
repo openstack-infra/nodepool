@@ -1,0 +1,11 @@
+- hosts: all
+  roles:
+    - run-devstack
+    - role: bindep
+      bindep_profile: default
+
+  tasks:
+    - name: Ensure nodepool output log directory
+      file:
+        path: '{{ ansible_user_dir }}/work/logs/nodepool'
+        state: directory
