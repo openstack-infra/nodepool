@@ -115,6 +115,7 @@ class BaseWorker(threading.Thread):
         self.log = logging.getLogger("nodepool.builder.BaseWorker")
         self.daemon = True
         self._running = False
+        self._stop_event = threading.Event()
         self._config = None
         self._config_path = config_path
         self._secure_path = secure_path
@@ -141,6 +142,7 @@ class BaseWorker(threading.Thread):
 
     def shutdown(self):
         self._running = False
+        self._stop_event.set()
 
 
 class CleanupWorker(BaseWorker):
@@ -514,7 +516,7 @@ class CleanupWorker(BaseWorker):
                 self.log.exception("Exception in CleanupWorker:")
                 time.sleep(10)
 
-            time.sleep(self._interval)
+            self._stop_event.wait(self._interval)
 
         provider_manager.ProviderManager.stopProviders(self._config)
 
@@ -804,7 +806,7 @@ class BuildWorker(BaseWorker):
                 self.log.exception("Exception in BuildWorker:")
                 time.sleep(10)
 
-            time.sleep(self._interval)
+            self._stop_event.wait(self._interval)
 
     def _run(self):
         '''
@@ -1066,7 +1068,7 @@ class UploadWorker(BaseWorker):
                 self.log.exception("Exception in UploadWorker:")
                 time.sleep(10)
 
-            time.sleep(self._interval)
+            self._stop_event.wait(self._interval)
 
         provider_manager.ProviderManager.stopProviders(self._config)
 
