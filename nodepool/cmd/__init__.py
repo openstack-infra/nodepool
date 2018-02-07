@@ -26,10 +26,8 @@ import sys
 import threading
 import traceback
 
-import yaml
-
 from nodepool.version import version_info as npd_version_info
-
+from nodepool import logconfig
 
 # as of python-daemon 1.6 it doesn't bundle pidlockfile anymore
 # instead it depends on lockfile-0.9.1 which uses pidfile.
@@ -103,21 +101,20 @@ class NodepoolApp(object):
     def setup_logging(self):
         if self.args.logconfig:
             fp = os.path.expanduser(self.args.logconfig)
-
-            if not os.path.exists(fp):
-                m = "Unable to read logging config file at %s" % fp
-                raise Exception(m)
-
-            if os.path.splitext(fp)[1] in ('.yml', '.yaml'):
-                with open(fp, 'r') as f:
-                    logging.config.dictConfig(yaml.safe_load(f))
-
-            else:
-                logging.config.fileConfig(fp)
-
+            logging_config = logconfig.load_config(fp)
         else:
-            m = '%(asctime)s %(levelname)s %(name)s: %(message)s'
-            logging.basicConfig(level=logging.DEBUG, format=m)
+            # If someone runs in the foreground and doesn't give a logging
+            # config, leave the config set to emit to stdout.
+            if hasattr(self.args, 'nodaemon') and self.args.nodaemon:
+                logging_config = logconfig.ServerLoggingConfig()
+                logging_config.setDebug()
+            else:
+                # Setting a server value updates the defaults to use
+                # WatchedFileHandler on /var/log/nodepool/{server}-debug.log
+                # and /var/log/nodepool/{server}.log
+                logging_config = logconfig.ServerLoggingConfig(
+                    server=self.app_name)
+        logging_config.apply()
 
     def _main(self, argv=None):
         if argv is None:
