@@ -66,7 +66,6 @@
 - project:
     check:
       jobs:
-        - tox-docs
         - tox-cover
         - tox-pep8
         - tox-py35
@@ -74,10 +73,19 @@
             voting: false
         - nodepool-functional-py35-src:
             voting: false
+        - build-sphinx-docs:
+            vars:
+              sphinx_python: python3
     gate:
       jobs:
         - tox-pep8
         - tox-py35
+        - build-sphinx-docs:
+            vars:
+              sphinx_python: python3
+    post:
+      jobs:
+        - publish-openstack-sphinx-docs-infra-python3
     experimental:
       jobs:
         - nodepool-zuul-functional
