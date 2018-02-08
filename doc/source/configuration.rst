@@ -107,10 +107,16 @@ written to run on nodes of a certain label. Example::
     this is exceeded the node will be deleted. A value of 0 disables this.
     Defaults to 0.
 
-  ``min-ready`` (default: 2)
-    Minimum instances that should be in a ready state. Set to -1 to have the
-    label considered disabled. ``min-ready`` is best-effort based on available
-    capacity and is not a guaranteed allocation.
+  ``min-ready`` (default: 0)
+    Minimum number of instances that should be in a ready
+    state. Nodepool always creates more nodes as necessary in response
+    to demand, but setting ``min-ready`` can speed processing by
+    attempting to keep nodes on-hand and ready for immedate use.
+    ``min-ready`` is best-effort based on available capacity and is
+    not a guaranteed allocation.  The default of 0 means that nodepool
+    will only create nodes of this label when there is demand.  Set
+    to -1 to have the label considered disabled, so that no nodes will
+    be created at all.
 
 .. _diskimages:
 
