@@ -27,6 +27,8 @@
         s-proxy: false
       devstack_plugins:
         nodepool: https://git.openstack.org/openstack-infra/nodepool
+      zuul_copy_output:
+        '/var/log/nodepool/builds': 'logs'
 
 - job:
     name: nodepool-functional-py35

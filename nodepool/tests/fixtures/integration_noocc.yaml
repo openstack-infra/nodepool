@@ -1,4 +1,5 @@
 images-dir: '{images_dir}'
+build-log-dir: '{build_log_dir}'
 
 zookeeper-servers:
   - host: localhost
