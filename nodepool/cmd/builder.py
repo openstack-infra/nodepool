@@ -47,10 +47,16 @@ class NodePoolBuilderApp(nodepool.cmd.NodepoolDaemonApp):
                             '(used for testing)')
         return parser
 
+    def parse_args(self):
+        args = super(NodePoolBuilderApp, self).parse_args()
+        self.config_file = self.get_path(args.config)
+        self.secure_file = self.get_path(args.secure)
+        return args
+
     def run(self):
         self.nb = builder.NodePoolBuilder(
-            self.args.config,
-            secure_path=self.args.secure,
+            self.config_file,
+            secure_path=self.secure_file,
             num_builders=self.args.build_workers,
             num_uploaders=self.args.upload_workers,
             fake=self.args.fake)

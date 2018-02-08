@@ -41,6 +41,12 @@ class NodePoolLauncherApp(nodepool.cmd.NodepoolDaemonApp):
         parser.add_argument('--no-webapp', action='store_true')
         return parser
 
+    def parse_args(self):
+        args = super(NodePoolLauncherApp, self).parse_args()
+        self.config_file = self.get_path(args.config)
+        self.secure_file = self.get_path(args.secure)
+        return args
+
     def exit_handler(self, signum, frame):
         self.pool.stop()
         if not self.args.no_webapp:
@@ -51,8 +57,8 @@ class NodePoolLauncherApp(nodepool.cmd.NodepoolDaemonApp):
         os._exit(0)
 
     def run(self):
-        self.pool = nodepool.launcher.NodePool(self.args.secure,
-                                               self.args.config)
+        self.pool = nodepool.launcher.NodePool(self.secure_file,
+                                               self.config_file)
         if not self.args.no_webapp:
             config = self.pool.loadConfig()
             self.webapp = nodepool.webapp.WebApp(self.pool,

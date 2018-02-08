@@ -85,6 +85,11 @@ class NodepoolApp(object):
         self.parser = None
         self.args = None
 
+    def get_path(self, path):
+        if path is None:
+            return None
+        return os.path.abspath(os.path.expanduser(path))
+
     def create_parser(self):
         parser = argparse.ArgumentParser(description=self.app_description)
 
@@ -98,10 +103,14 @@ class NodepoolApp(object):
 
         return parser
 
+    def parse_args(self):
+        args = self.parser.parse_args()
+        self.logconfig = self.get_path(args.logconfig)
+        return args
+
     def setup_logging(self):
-        if self.args.logconfig:
-            fp = os.path.expanduser(self.args.logconfig)
-            logging_config = logconfig.load_config(fp)
+        if self.logconfig:
+            logging_config = logconfig.load_config(self.logconfig)
         else:
             # If someone runs in the foreground and doesn't give a logging
             # config, leave the config set to emit to stdout.
@@ -121,7 +130,7 @@ class NodepoolApp(object):
             argv = sys.argv[1:]
 
         self.parser = self.create_parser()
-        self.args = self.parser.parse_args()
+        self.args = self.parse_args()
         return self._do_run()
 
     def _do_run(self):
@@ -156,12 +165,17 @@ class NodepoolDaemonApp(NodepoolApp):
 
         return parser
 
+    def parse_args(self):
+        args = super(NodepoolDaemonApp, self).parse_args()
+        self.pidfile = self.get_path(args.pidfile)
+        return args
+
     def _do_run(self):
         if self.args.nodaemon:
             return super(NodepoolDaemonApp, self)._do_run()
 
         else:
-            pid = pid_file_module.TimeoutPIDLockFile(self.args.pidfile, 10)
+            pid = pid_file_module.TimeoutPIDLockFile(self.pidfile, 10)
 
             if is_pidfile_stale(pid):
                 pid.break_lock()
