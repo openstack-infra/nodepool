@@ -110,6 +110,8 @@ def loadConfig(config_path):
     newconfig.labels = {}
     newconfig.elementsdir = config.get('elements-dir')
     newconfig.imagesdir = config.get('images-dir')
+    newconfig.build_log_dir = config.get('build-log-dir')
+    newconfig.build_log_retention = config.get('build-log-retention', 7)
     newconfig.provider_managers = {}
     newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}

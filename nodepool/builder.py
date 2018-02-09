@@ -547,6 +547,29 @@ class BuildWorker(BaseWorker):
         self.name = 'BuildWorker.%s' % name
         self.dib_cmd = dib_cmd
 
+    def _getBuildLogRoot(self, name):
+        log_dir = self._config.build_log_dir
+        if not log_dir:
+            log_dir = '/var/log/nodepool/builds'
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        return log_dir
+
+    def _pruneBuildLogs(self, name):
+        log_dir = self._getBuildLogRoot(name)
+        keep = max(self._config.build_log_retention, 1)
+        existing = sorted(os.listdir(log_dir))
+        existing = [f for f in existing if f.startswith(name)]
+        delete = existing[:0 - keep]
+        for f in delete:
+            fp = os.path.join(log_dir, f)
+            self.log.info("Deleting old build log %s" % (fp,))
+            os.unlink(fp)
+
+    def _getBuildLog(self, name, build_id):
+        log_dir = self._getBuildLogRoot(name)
+        return os.path.join(log_dir, '%s-%s.log' % (name, build_id))
+
     def _checkForScheduledImageUpdates(self):
         '''
         Check every DIB image to see if it has aged out and needs rebuilt.
@@ -714,10 +737,11 @@ class BuildWorker(BaseWorker):
                (self.dib_cmd, img_types, qemu_img_options, filename,
                 img_elements))
 
-        log = logging.getLogger("nodepool.image.build.%s" %
-                                (diskimage.name,))
+        self._pruneBuildLogs(diskimage.name)
+        log_fn = self._getBuildLog(diskimage.name, build_id)
 
-        self.log.info('Running %s' % cmd)
+        self.log.info('Running %s' % (cmd,))
+        self.log.info('Logging to %s' % (log_fn,))
 
         try:
             p = subprocess.Popen(
@@ -730,13 +754,17 @@ class BuildWorker(BaseWorker):
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
 
-        while True:
-            ln = p.stdout.readline()
-            log.info(ln.strip())
-            if not ln:
-                break
+        with open(log_fn, 'wb') as log:
+            while True:
+                ln = p.stdout.readline()
+                log.write(ln)
+                log.flush()
+                if not ln:
+                    break
 
-        p.wait()
+            rc = p.wait()
+            m = "Exit code: %s\n" % rc
+            log.write(m.encode('utf8'))
 
         # It's possible the connection to the ZK cluster could have been
         # interrupted during the build. If so, wait for it to return.

@@ -184,12 +184,18 @@ class TestNodePoolBuilder(tests.DBTestCase):
         configfile = self.setup_config('node.yaml')
         self.useBuilder(configfile)
         build = self.waitForBuild('fake-image', '0000000001')
+        log_path1 = os.path.join(self._config_build_log_dir.path,
+                                 'fake-image-0000000001.log')
+        self.assertTrue(os.path.exists(log_path1))
         image = self.waitForImage('fake-provider', 'fake-image')
         # Expire rebuild-age (default: 1day) to force a new build.
         build.state_time -= expire
         with self.zk.imageBuildLock('fake-image', blocking=True, timeout=1):
             self.zk.storeBuild('fake-image', build, '0000000001')
         self.waitForBuild('fake-image', '0000000002')
+        log_path2 = os.path.join(self._config_build_log_dir.path,
+                                 'fake-image-0000000002.log')
+        self.assertTrue(os.path.exists(log_path2))
         self.waitForImage('fake-provider', 'fake-image', [image])
         builds = self.zk.getBuilds('fake-image', zk.READY)
         self.assertEqual(len(builds), 2)
@@ -205,6 +211,16 @@ class TestNodePoolBuilder(tests.DBTestCase):
             self.zk.storeBuild('fake-image', build, '0000000002')
         self.waitForBuildDeletion('fake-image', '0000000001')
         self.waitForBuild('fake-image', '0000000003')
+        log_path1 = os.path.join(self._config_build_log_dir.path,
+                                 'fake-image-0000000001.log')
+        log_path2 = os.path.join(self._config_build_log_dir.path,
+                                 'fake-image-0000000002.log')
+        log_path3 = os.path.join(self._config_build_log_dir.path,
+                                 'fake-image-0000000003.log')
+        # Our log retention is set to 1, so the first log should be deleted.
+        self.assertFalse(os.path.exists(log_path1))
+        self.assertTrue(os.path.exists(log_path2))
+        self.assertTrue(os.path.exists(log_path3))
         builds = self.zk.getBuilds('fake-image', zk.READY)
         self.assertEqual(len(builds), 2)
 

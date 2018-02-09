@@ -65,6 +65,34 @@ Example::
 
   images-dir: /path/to/images/dir
 
+.. _build-log-dir:
+
+build-log-dir
+-------------
+
+The builder will store build logs in this directory.  It will create
+one file for each build, named `<image>-<build-id>.log`; for example,
+`fedora-0000000004.log`.  It defaults to ``/var/log/nodepool/builds``.
+
+Example::
+
+  build-log-dir: /path/to/log/dir
+
+.. _build-log-retention:
+
+build-log-retention
+-------------------
+
+At the start of each build, the builder will remove old build logs if
+they exceed a certain number.  This option specifies how many will be
+kept (usually you will see one more, as deletion happens before
+starting a new build).  By default, the last 7 old build logs are
+kept.
+
+Example::
+
+  build-log-retention: 14
+
 zookeeper-servers
 -----------------
 Lists the ZooKeeper servers uses for coordinating information between

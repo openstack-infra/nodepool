@@ -168,6 +168,9 @@ EOF
 EOF
     sudo mv /tmp/secure.conf $NODEPOOL_SECURE
 
+    sudo mkdir /var/log/nodepool
+    sudo chown -R stack:stack /var/log/nodepool
+
     if use_library_from_git "glean"; then
         git --git-dir=$DEST/glean/.git checkout -b devstack
         DIB_GLEAN_INSTALLTYPE="DIB_INSTALLTYPE_simple_init: 'repo'"

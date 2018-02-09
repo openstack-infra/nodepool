@@ -286,18 +286,22 @@ class DBTestCase(BaseTestCase):
         if images_dir is None:
             images_dir = fixtures.TempDir()
             self.useFixture(images_dir)
+        build_log_dir = fixtures.TempDir()
+        self.useFixture(build_log_dir)
         configfile = os.path.join(os.path.dirname(__file__),
                                   'fixtures', filename)
         (fd, path) = tempfile.mkstemp()
         with open(configfile, 'rb') as conf_fd:
             config = conf_fd.read().decode('utf8')
             data = config.format(images_dir=images_dir.path,
+                                 build_log_dir=build_log_dir.path,
                                  zookeeper_host=self.zookeeper_host,
                                  zookeeper_port=self.zookeeper_port,
                                  zookeeper_chroot=self.zookeeper_chroot)
             os.write(fd, data.encode('utf8'))
         os.close(fd)
         self._config_images_dir = images_dir
+        self._config_build_log_dir = build_log_dir
         validator = ConfigValidator(path)
         validator.validate()
         return path
