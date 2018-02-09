@@ -166,6 +166,11 @@ class NodepoolDaemonApp(NodepoolApp):
             if is_pidfile_stale(pid):
                 pid.break_lock()
 
+            # Exercise the pidfile before we do anything else (including
+            # logging or daemonizing)
+            with pid:
+                pass
+
             with daemon.DaemonContext(pidfile=pid):
                 return super(NodepoolDaemonApp, self)._do_run()
 
