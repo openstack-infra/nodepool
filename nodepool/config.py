@@ -146,7 +146,7 @@ def loadConfig(config_path):
         l.name = label['name']
         newconfig.labels[l.name] = l
         l.max_ready_age = label.get('max-ready-age', 0)
-        l.min_ready = label.get('min-ready', 2)
+        l.min_ready = label.get('min-ready', 0)
         l.pools = []
 
     for provider in config.get('providers', []):
