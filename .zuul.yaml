@@ -38,7 +38,7 @@
     run: playbooks/nodepool-functional-py35/run.yaml
 
 - job:
-    name: nodepool-functional-py35-src
+    name: nodepool-functional-py35-src-base
     parent: nodepool-functional-base
     run: playbooks/nodepool-functional-py35-src/run.yaml
     vars:
@@ -49,6 +49,13 @@
       - openstack-infra/nodepool
       - openstack-infra/shade
       - openstack/diskimage-builder
+
+- job:
+    name: nodepool-functional-py35-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB: false
 
 - job:
     name: nodepool-zuul-functional
@@ -64,6 +71,38 @@
     vars:
       zuul_work_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
       tox_envlist: nodepool
+
+# Distro functional tests.  This is used by projects such as
+# diskimage-builder and glean as live-boot tests
+- job:
+    name: nodepool-functional-py35-redhat-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_CENTOS_7_DIB: false
+        NODEPOOL_PAUSE_FEDORA_26_DIB: false
+
+- job:
+    name: nodepool-functional-py35-suse-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_OPENSUSE_423_DIB: false
+
+- job:
+    name: nodepool-functional-py35-ubuntu-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB: false
+        NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB: false
+
+- job:
+    name: nodepool-functional-py35-debian-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB: false
 
 - project:
     check:

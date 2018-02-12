@@ -3,4 +3,4 @@
     - name: Run nodepool tests
       command: tools/check_devstack_plugin.sh {{ ansible_user_dir }}/work/logs/nodepool
       args:
-        chdir: '{{ zuul.project.src_dir }}'
+        chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/nodepool'].src_dir }}"

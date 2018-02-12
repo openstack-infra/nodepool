@@ -204,6 +204,7 @@ EOF
     NODEPOOL_FEDORA_26_MIN_READY=1
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
+    NODEPOOL_OPENSUSE_423_MIN_READY=1
 
     if $NODEPOOL_PAUSE_CENTOS_7_DIB ; then
        NODEPOOL_CENTOS_7_MIN_READY=0
@@ -222,6 +223,9 @@ EOF
     fi
     if $NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB ; then
        NODEPOOL_UBUNTU_XENIAL_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_OPENSUSE_423_DIB ; then
+        NODEPOOL_OPENSUSE_423_MIN_READY=0
     fi
 
     cat > /tmp/nodepool.yaml <<EOF
@@ -248,6 +252,8 @@ labels:
     min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
     min-ready: $NODEPOOL_UBUNTU_XENIAL_MIN_READY
+  - name: opensuse-423
+    min-ready: $NODEPOOL_OPENSUSE_423_MIN_READY
 
 providers:
   - name: devstack
@@ -269,6 +275,8 @@ providers:
       - name: ubuntu-trusty
         config-drive: true
       - name: ubuntu-xenial
+        config-drive: true
+      - name: opensuse-423
         config-drive: true
     pools:
       - name: main
@@ -304,6 +312,12 @@ providers:
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
+          - name: opensuse-423
+            diskimage: opensuse-423
+            min-ram: 512
+            flavor-name: 'nodepool'
+            console-log: True
+
 
 diskimages:
   - name: centos-7
@@ -437,6 +451,26 @@ diskimages:
       DIB_DEBIAN_COMPONENTS: 'main,universe'
       $DIB_DISTRIBUTION_MIRROR_UBUNTU
       $DIB_DEBOOTSTRAP_EXTRA_ARGS
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: opensuse-423
+    pause: $NODEPOOL_PAUSE_OPENSUSE_423_DIB
+    rebuild-age: 86400
+    elements:
+      - opensuse-minimal
+      - vm
+      - simple-init
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: '42.3'
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
