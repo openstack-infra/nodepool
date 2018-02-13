@@ -1,4 +1,21 @@
 - job:
+    name: nodepool-zuul-functional
+    parent: tox
+    description: |
+      Test that zuul works with current nodepool sources.
+
+      This test runs the zuul project ``nodepool`` environment.
+    pre-run: playbooks/nodepool-zuul-functional/pre.yaml
+    required-projects:
+      - openstack-infra/nodepool
+      - openstack-infra/zuul
+    vars:
+      zuul_work_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
+      tox_envlist: nodepool
+
+# NOTE(ianw): this job doesn't really do anything unless you set
+# "NODEPOOL_PAUSE_something_DIB: false" to unpause one or more builds.
+- job:
     name: nodepool-functional-base
     parent: devstack
     pre-run: playbooks/nodepool-functional-base/pre.yaml
@@ -36,6 +53,9 @@
     description: |
       Run nodepool functional tests for py35
     run: playbooks/nodepool-functional-py35/run.yaml
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB: false
 
 - job:
     name: nodepool-functional-py35-src-base
@@ -56,21 +76,6 @@
     vars:
       devstack_localrc:
         NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB: false
-
-- job:
-    name: nodepool-zuul-functional
-    parent: tox
-    description: |
-      Test that zuul works with current nodepool sources.
-
-      This test runs the zuul project ``nodepool`` environment.
-    pre-run: playbooks/nodepool-zuul-functional/pre.yaml
-    required-projects:
-      - openstack-infra/nodepool
-      - openstack-infra/zuul
-    vars:
-      zuul_work_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
-      tox_envlist: nodepool
 
 # Distro functional tests.  This is used by projects such as
 # diskimage-builder and glean as live-boot tests
