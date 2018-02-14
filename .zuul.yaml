@@ -100,6 +100,7 @@
     parent: nodepool-functional-py35-src-base
     vars:
       devstack_localrc:
+        NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB: false
         NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB: false
         NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB: false
 
