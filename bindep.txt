@@ -3,6 +3,6 @@
 
 libffi-devel [platform:rpm]
 libffi-dev [platform:dpkg]
-python-dev [platform:dpkg test]
-python-devel [platform:rpm test]
+python3-dev [platform:dpkg test]
+python3-devel [platform:rpm test]
 zookeeperd [platform:dpkg test]
