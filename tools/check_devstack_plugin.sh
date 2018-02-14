@@ -24,7 +24,6 @@ else
 fi
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-True}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-True}
-NODEPOOL_PAUSE_FEDORA_25_DIB=${NODEPOOL_PAUSE_FEDORA_25_DIB:-True}
 NODEPOOL_PAUSE_FEDORA_26_DIB=${NODEPOOL_PAUSE_FEDORA_26_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-True}
@@ -64,13 +63,6 @@ if [ ${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB,,} = 'false' ]; then
     waitforimage debian-jessie
     # check image was bootable
     waitfornode debian-jessie
-fi
-
-if [ ${NODEPOOL_PAUSE_FEDORA_25_DIB,,} = 'false' ]; then
-    # check that image built
-    waitforimage fedora-25
-    # check image was bootable
-    waitfornode fedora-25
 fi
 
 if [ ${NODEPOOL_PAUSE_FEDORA_26_DIB,,} = 'false' ]; then
