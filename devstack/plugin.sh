@@ -199,7 +199,7 @@ EOF
 
     NODEPOOL_CENTOS_7_MIN_READY=1
     NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
-    NODEPOOL_FEDORA_26_MIN_READY=1
+    NODEPOOL_FEDORA_27_MIN_READY=1
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
     NODEPOOL_OPENSUSE_423_MIN_READY=1
@@ -210,8 +210,8 @@ EOF
     if $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB ; then
        NODEPOOL_DEBIAN_JESSIE_MIN_READY=0
     fi
-    if $NODEPOOL_PAUSE_FEDORA_26_DIB ; then
-       NODEPOOL_FEDORA_26_MIN_READY=0
+    if $NODEPOOL_PAUSE_FEDORA_27_DIB ; then
+       NODEPOOL_FEDORA_27_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB ; then
        NODEPOOL_UBUNTU_TRUSTY_MIN_READY=0
@@ -239,8 +239,8 @@ labels:
     min-ready: $NODEPOOL_CENTOS_7_MIN_READY
   - name: debian-jessie
     min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
-  - name: fedora-26
-    min-ready: $NODEPOOL_FEDORA_26_MIN_READY
+  - name: fedora-27
+    min-ready: $NODEPOOL_FEDORA_27_MIN_READY
   - name: ubuntu-trusty
     min-ready: $NODEPOOL_UBUNTU_TRUSTY_MIN_READY
   - name: ubuntu-xenial
@@ -261,7 +261,7 @@ providers:
         config-drive: true
       - name: debian-jessie
         config-drive: true
-      - name: fedora-26
+      - name: fedora-27
         config-drive: true
       - name: ubuntu-trusty
         config-drive: true
@@ -283,8 +283,8 @@ providers:
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-          - name: fedora-26
-            diskimage: fedora-26
+          - name: fedora-27
+            diskimage: fedora-27
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
@@ -351,8 +351,8 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
-  - name: fedora-26
-    pause: $NODEPOOL_PAUSE_FEDORA_26_DIB
+  - name: fedora-27
+    pause: $NODEPOOL_PAUSE_FEDORA_27_DIB
     rebuild-age: 86400
     elements:
       - fedora-minimal
@@ -361,7 +361,7 @@ diskimages:
       - devuser
       - openssh-server
       - nodepool-setup
-    release: 26
+    release: 27
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
