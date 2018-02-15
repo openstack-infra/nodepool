@@ -14,6 +14,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+NODEPOOL_KEY=$HOME/.ssh/id_nodepool
+NODEPOOL_KEY_NAME=root
 NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 NODEPOOL_INSTALL=$HOME/nodepool-venv
 NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
@@ -74,6 +76,19 @@ function install_nodepool {
 
 # requires some globals from devstack, which *might* not be stable api
 # points. If things break, investigate changes in those globals first.
+
+function nodepool_create_keypairs {
+    if [[ ! -f $NODEPOOL_KEY ]]; then
+        ssh-keygen -f $NODEPOOL_KEY -P ""
+    fi
+
+    cat > /tmp/ssh_wrapper <<EOF
+#!/bin/bash -ex
+sudo -H -u stack ssh -o StrictHostKeyChecking=no -i $NODEPOOL_KEY root@\$@
+
+EOF
+    sudo chmod 0755 /tmp/ssh_wrapper
+}
 
 function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
@@ -278,32 +293,37 @@ providers:
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
+            key-name: root
           - name: debian-jessie
             diskimage: debian-jessie
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
+            key-name: root
           - name: fedora-27
             diskimage: fedora-27
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
+            key-name: root
           - name: ubuntu-trusty
             diskimage: ubuntu-trusty
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
+            key-name: root
           - name: ubuntu-xenial
             diskimage: ubuntu-xenial
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
+            key-name: root
           - name: opensuse-423
             diskimage: opensuse-423
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-
+            key-name: root
 
 diskimages:
   - name: centos-7
@@ -466,6 +486,9 @@ EOF
 # Create configs
 # Setup custom flavor
 function configure_nodepool {
+    # build a dedicated keypair for nodepool to use with guests
+    nodepool_create_keypairs
+
     # write the nodepool config
     nodepool_write_config
 
@@ -490,6 +513,10 @@ function start_nodepool {
 
         openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol udp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
     fi
+
+    # create root keypair to use with glean for devstack cloud.
+    nova --os-project-name demo --os-username demo \
+        keypair-add --pub-key $NODEPOOL_PUBKEY $NODEPOOL_KEY_NAME
 
     export PATH=$NODEPOOL_INSTALL/bin:$PATH
 
