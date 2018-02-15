@@ -1,5 +1,12 @@
 - hosts: all
   name: Zuul setup for nodepool test
+  roles:
+    - role: bindep
+      bindep_profile: default
+      bindep_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
+    # TODO(AJaeger): Remove once legacy script is removed from zuul
+    - legacy-copy-jenkins-scripts
+
   tasks:
 
     - name: Run tools/nodepool-integration-setup.sh from zuul

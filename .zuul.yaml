@@ -6,6 +6,7 @@
 
       This test runs the zuul project ``nodepool`` environment.
     pre-run: playbooks/nodepool-zuul-functional/pre.yaml
+    post-run: playbooks/nodepool-zuul-functional/post.yaml
     required-projects:
       - openstack-infra/nodepool
       - openstack-infra/zuul
@@ -115,6 +116,8 @@
         - tox-cover
         - tox-pep8
         - tox-py35
+        - nodepool-zuul-functional:
+            voting: false
         - nodepool-functional-py35:
             voting: false
         - nodepool-functional-py35-src:
@@ -132,6 +135,3 @@
     post:
       jobs:
         - publish-openstack-sphinx-docs-infra-python3
-    experimental:
-      jobs:
-        - nodepool-zuul-functional

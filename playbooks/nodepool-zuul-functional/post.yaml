@@ -1,0 +1,8 @@
+- hosts: all
+  tasks:
+    - name: Copy nodepool logs from /tmp
+      synchronize:
+        src: '/tmp/nodepool/'
+        dest: '{{ zuul.executor.log_root }}/nodepool/'
+        mode: pull
+        verify_host: true

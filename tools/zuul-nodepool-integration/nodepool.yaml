@@ -1,4 +1,5 @@
 images-dir: /tmp/nodepool/images
+build-log-dir: /tmp/nodepool/builds
 
 zookeeper-servers:
   - host: localhost
