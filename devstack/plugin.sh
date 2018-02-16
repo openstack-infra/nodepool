@@ -293,37 +293,37 @@ providers:
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
           - name: debian-jessie
             diskimage: debian-jessie
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
           - name: fedora-27
             diskimage: fedora-27
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
           - name: ubuntu-trusty
             diskimage: ubuntu-trusty
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
           - name: ubuntu-xenial
             diskimage: ubuntu-xenial
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
           - name: opensuse-423
             diskimage: opensuse-423
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
-            key-name: root
+            key-name: $NODEPOOL_KEY_NAME
 
 diskimages:
   - name: centos-7
