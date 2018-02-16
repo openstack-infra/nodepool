@@ -28,6 +28,7 @@ NODEPOOL_PAUSE_FEDORA_27_DIB=${NODEPOOL_PAUSE_FEDORA_27_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-True}
 NODEPOOL_PAUSE_OPENSUSE_423_DIB=${NODEPOOL_PAUSE_OPENSUSE_423_DIB:-True}
+NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB=${NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB:-True}
 
 function sshintonode {
     name=$1
@@ -111,6 +112,14 @@ if [ ${NODEPOOL_PAUSE_OPENSUSE_423_DIB,,} = 'false' ]; then
     waitfornode opensuse-423
     # check ssh for root user
     sshintonode opensuse-423
+fi
+if [ ${NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB,,} = 'false' ]; then
+    # check that image built
+    waitforimage opensuse-tumbleweed
+    # check image was bootable
+    waitfornode opensuse-tumbleweed
+    # check ssh for root user
+    sshintonode opensuse-tumbleweed
 fi
 
 set -o errexit
