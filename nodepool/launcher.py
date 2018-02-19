@@ -380,6 +380,15 @@ class CleanupWorker(BaseCleanupWorker):
             nodepool, interval, name='CleanupWorker')
         self.log = logging.getLogger("nodepool.CleanupWorker")
 
+        # List of callable tasks we want to perform during cleanup, and a
+        # brief description of the task.
+        self._tasks = [
+            (self._cleanupNodeRequestLocks, 'node request lock cleanup'),
+            (self._cleanupLeakedInstances, 'leaked instance cleanup'),
+            (self._cleanupLostRequests, 'lost request cleanup'),
+            (self._cleanupMaxReadyAge, 'max ready age cleanup'),
+        ]
+
     def _resetLostRequest(self, zk_conn, req):
         '''
         Reset the request state and deallocate nodes.
@@ -563,29 +572,12 @@ class CleanupWorker(BaseCleanupWorker):
         Catch exceptions individually so that other cleanup routines may
         have a chance.
         '''
-        try:
-            self._cleanupNodeRequestLocks()
-        except Exception:
-            self.log.exception(
-                "Exception in CleanupWorker (node request lock cleanup):")
-
-        try:
-            self._cleanupLeakedInstances()
-        except Exception:
-            self.log.exception(
-                "Exception in CleanupWorker (leaked instance cleanup):")
-
-        try:
-            self._cleanupLostRequests()
-        except Exception:
-            self.log.exception(
-                "Exception in CleanupWorker (lost request cleanup):")
-
-        try:
-            self._cleanupMaxReadyAge()
-        except Exception:
-            self.log.exception(
-                "Exception in CleanupWorker (max ready age cleanup):")
+        for task, description in self._tasks:
+            try:
+                task()
+            except Exception:
+                self.log.exception(
+                    "Exception in %s (%s)", self.name, description)
 
 
 class DeletedNodeWorker(BaseCleanupWorker):
