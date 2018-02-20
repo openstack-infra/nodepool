@@ -284,7 +284,6 @@ class ImageUpload(BaseModel):
         d['provider_name'] = self.provider_name
         d['image_name'] = self.image_name
         d['format'] = self.format
-        d['stat'] = self.stat
         return '<ImageUpload %s>' % d
 
     def __eq__(self, other):
