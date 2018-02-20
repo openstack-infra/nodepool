@@ -7,7 +7,9 @@
 
   tasks:
 
-    - name: Run tools/nodepool-integration-setup.sh from zuul
+    - name: Install packages and  run zuul-nodepool-integration/start.sh
       shell:
-        cmd: tools/nodepool-integration-setup.sh
-        chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
+        cmd: |
+          sudo pip3 install .
+          ./tools/zuul-nodepool-integration/start.sh
+        chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/nodepool'].src_dir }}"
