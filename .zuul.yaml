@@ -25,6 +25,8 @@
     required-projects:
       - openstack-infra/nodepool
     vars:
+      devstack_localrc:
+        USE_PYTHON3: True
       devstack_services:
         horizon: false
         ceilometer-acentral: false
