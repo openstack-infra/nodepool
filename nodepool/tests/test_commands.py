@@ -226,6 +226,17 @@ class TestNodepoolCMD(tests.DBTestCase):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self.useBuilder(configfile)
+
+        # (Shrews): This is a hack to avoid a race with the DeletedNodeWorker
+        # thread where it may see that our direct call to NodeDeleter.delete()
+        # has changed the node state to DELETING and lock the node during the
+        # act of deletion, but *after* the lock znode child has been deleted
+        # and *before* kazoo has fully removed the node znode itself. This race
+        # causes the rare kazoo.exceptions.NotEmptyError in this test because
+        # a new lock znode gets created (that the original delete does not see)
+        # preventing the node znode from being deleted.
+        pool.delete_interval = 5
+
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         nodes = self.waitForNodes('fake-label')
