@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import time
 import yaml
 
@@ -115,6 +116,9 @@ def loadConfig(config_path):
     newconfig.provider_managers = {}
     newconfig.zookeeper_servers = {}
     newconfig.diskimages = {}
+    newconfig.max_hold_age = config.get('max-hold-age', math.inf)
+    if newconfig.max_hold_age <= 0:
+        newconfig.max_hold_age = math.inf
 
     for server in config.get('zookeeper-servers', []):
         z = zk.ZooKeeperConnectionConfig(server['host'],

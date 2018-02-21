@@ -447,6 +447,7 @@ class Node(BaseModel):
         self.username = None
         self.connection_type = None
         self.host_keys = []
+        self.hold_expiration = None
 
     def __repr__(self):
         d = self.toDict()
@@ -479,7 +480,8 @@ class Node(BaseModel):
                     self.hold_job == other.hold_job and
                     self.username == other.username and
                     self.connection_type == other.connection_type and
-                    self.host_keys == other.host_keys)
+                    self.host_keys == other.host_keys and
+                    self.hold_expiration == other.hold_expiration)
         else:
             return False
 
@@ -513,6 +515,7 @@ class Node(BaseModel):
         d['host_keys'] = self.host_keys
         d['username'] = self.username
         d['connection_type'] = self.connection_type
+        d['hold_expiration'] = self.hold_expiration
         return d
 
     @staticmethod
@@ -549,6 +552,7 @@ class Node(BaseModel):
         o.username = d.get('username', 'zuul')
         o.connection_type = d.get('connection_type')
         o.host_keys = d.get('host_keys', [])
+        o.hold_expiration = d.get('hold_expiration')
         return o
 
 

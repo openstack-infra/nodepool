@@ -660,6 +660,143 @@ class TestLauncher(tests.DBTestCase):
         manager = pool.getProviderManager('fake-provider')
         self.waitForInstanceDeletion(manager, nodes[0].external_id)
 
+    def test_max_hold_age(self):
+        """Test a held node with exceeded max-hold-age is deleted"""
+        configfile = self.setup_config('node_max_hold_age.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label')
+        self.log.debug("...done waiting for initial pool.")
+        node = nodes[0]
+        self.log.debug("Holding node %s..." % node.id)
+        # hold the node
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        # Wait for the instance to be cleaned up
+        manager = pool.getProviderManager('fake-provider')
+        self.waitForInstanceDeletion(manager, node.external_id)
+
+    def test_hold_expiration_no_default(self):
+        """Test a held node is deleted when past its operator-specified TTL,
+        no max-hold-age set"""
+        configfile = self.setup_config('node_max_ready_age.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label')
+        self.log.debug("...done waiting for initial pool.")
+        node = nodes[0]
+        self.log.debug("Holding node %s..." % node.id)
+        # hold the node
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        node.hold_expiration = 5
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        # Wait for the instance to be cleaned up
+        manager = pool.getProviderManager('fake-provider')
+        self.waitForInstanceDeletion(manager, node.external_id)
+
+    def test_hold_expiration_lower_than_default(self):
+        """Test a held node is deleted when past its operator-specified TTL,
+        with max-hold-age set in the configuration"""
+        configfile = self.setup_config('node_max_hold_age_2.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.log.debug("...done waiting for initial pool.")
+        node_custom = nodes[0]
+        # TODO make it a fraction of fixture's max-hold-age
+        hold_expiration = 2
+        node = nodes[1]
+        self.log.debug("Holding node %s... (default)" % node.id)
+        self.log.debug("Holding node %s...(%s seconds)" % (node_custom.id,
+                                                           hold_expiration))
+        # hold the nodes
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        node_custom.state = zk.HOLD
+        node_custom.comment = 'testing hold_expiration'
+        node_custom.hold_expiration = hold_expiration
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        self.zk.lockNode(node_custom, blocking=False)
+        self.zk.storeNode(node_custom)
+        self.zk.unlockNode(node_custom)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        znode_custom = self.zk.getNode(node_custom.id)
+        self.log.debug("Node %s in state '%s'" % (znode_custom.id,
+                                                  znode_custom.state))
+        # Wait for the instance to be cleaned up
+        manager = pool.getProviderManager('fake-provider')
+        self.waitForInstanceDeletion(manager, node_custom.external_id)
+        # control node should still be held
+        held_nodes = [n for n in self.zk.nodeIterator() if n.state == zk.HOLD]
+        self.assertTrue(any(n.id == node.id for n in held_nodes),
+                        held_nodes)
+        # finally, control node gets deleted
+        self.waitForInstanceDeletion(manager, node.external_id)
+
+    def test_hold_expiration_higher_than_default(self):
+        """Test a held node is deleted after max-hold-age seconds if the
+        operator specifies a larger TTL"""
+        configfile = self.setup_config('node_max_hold_age_2.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.log.debug("...done waiting for initial pool.")
+        node_custom = nodes[0]
+        # TODO make it a multiple of fixture's max-hold-age
+        hold_expiration = 20
+        node = nodes[1]
+        self.log.debug("Holding node %s... (default)" % node.id)
+        self.log.debug("Holding node %s...(%s seconds)" % (node_custom.id,
+                                                           hold_expiration))
+        # hold the nodes
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        node_custom.state = zk.HOLD
+        node_custom.comment = 'testing hold_expiration'
+        node_custom.hold_expiration = hold_expiration
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        self.zk.lockNode(node_custom, blocking=False)
+        self.zk.storeNode(node_custom)
+        self.zk.unlockNode(node_custom)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        znode_custom = self.zk.getNode(node_custom.id)
+        self.log.debug("Node %s in state '%s'" % (znode_custom.id,
+                                                  znode_custom.state))
+        # Wait for the instance to be cleaned up
+        manager = pool.getProviderManager('fake-provider')
+        self.waitForInstanceDeletion(manager, node.external_id)
+        # custom node should be deleted as well
+        held_nodes = [n for n in self.zk.nodeIterator() if n.state == zk.HOLD]
+        self.assertEqual(0, len(held_nodes), held_nodes)
+
     def test_label_provider(self):
         """Test that only providers listed in the label satisfy the request"""
         configfile = self.setup_config('node_label_provider.yaml')

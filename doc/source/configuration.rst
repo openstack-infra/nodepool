@@ -146,6 +146,17 @@ written to run on nodes of a certain label. Example::
     to -1 to have the label considered disabled, so that no nodes will
     be created at all.
 
+.. _maxholdage:
+
+max-hold-age
+------------
+
+Maximum number of seconds a node shall be in "hold" state. If
+this is exceeded the node will be deleted. A value of 0 disables this.
+Defaults to 0.
+
+This setting is applied to all nodes, regardless of label or provider.
+
 .. _diskimages:
 
 diskimages
