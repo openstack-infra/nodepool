@@ -214,7 +214,7 @@ class ImageBuild(BaseModel):
 
     @property
     def formats(self):
-        return self._formats
+        return sorted(self._formats)
 
     @formats.setter
     def formats(self, value):
