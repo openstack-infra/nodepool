@@ -327,27 +327,6 @@ class BaseCleanupWorker(threading.Thread):
         self._running = False
         self._stop_event = threading.Event()
 
-    def _deleteInstance(self, node):
-        '''
-        Delete an instance from a provider.
-
-        A thread will be spawned to delete the actual instance from the
-        provider.
-
-        :param Node node: A Node object representing the instance to delete.
-        '''
-        self.log.info("Deleting %s instance %s from %s",
-                      node.state, node.external_id, node.provider)
-        try:
-            t = NodeDeleter(
-                self._nodepool.getZK(),
-                self._nodepool.getProviderManager(node.provider),
-                node)
-            t.start()
-        except Exception:
-            self.log.exception("Could not delete instance %s on provider %s",
-                               node.external_id, node.provider)
-
     def run(self):
         self.log.info("Starting")
         self._running = True
@@ -490,7 +469,7 @@ class CleanupWorker(BaseCleanupWorker):
 
                 if not zk_conn.getNode(meta['nodepool_node_id']):
                     self.log.warning(
-                        "Deleting leaked instance %s (%s) in %s "
+                        "Marking for delete leaked instance %s (%s) in %s "
                         "(unknown node id %s)",
                         server.name, server.id, provider.name,
                         meta['nodepool_node_id']
@@ -499,7 +478,8 @@ class CleanupWorker(BaseCleanupWorker):
                     node = zk.Node()
                     node.external_id = server.id
                     node.provider = provider.name
-                    self._deleteInstance(node)
+                    node.state = zk.DELETING
+                    zk_conn.storeNode(node)
 
             manager.cleanupLeakedResources()
 
@@ -549,13 +529,13 @@ class CleanupWorker(BaseCleanupWorker):
                                node.id, now - node.state_time,
                                label.max_ready_age)
 
-                # The NodeDeleter thread will unlock and remove the
-                # node from ZooKeeper if it succeeds.
                 try:
-                    self._deleteInstance(node)
+                    node.state = zk.DELETING
+                    zk_conn.storeNode(node)
                 except Exception:
-                    self.log.exception("Failure deleting aged node %s:",
-                                       node.id)
+                    self.log.exception(
+                        "Failure marking aged node %s for delete:", node.id)
+                finally:
                     zk_conn.unlockNode(node)
 
     def _run(self):
@@ -589,10 +569,35 @@ class CleanupWorker(BaseCleanupWorker):
 
 
 class DeletedNodeWorker(BaseCleanupWorker):
+    '''
+    Class for deleting all nodes with state of DELETING.
+    '''
+
     def __init__(self, nodepool, interval):
         super(DeletedNodeWorker, self).__init__(
             nodepool, interval, name='DeletedNodeWorker')
         self.log = logging.getLogger("nodepool.DeletedNodeWorker")
+
+    def _deleteInstance(self, node):
+        '''
+        Delete an instance from a provider.
+
+        A thread will be spawned to delete the actual instance from the
+        provider.
+
+        :param Node node: A Node object representing the instance to delete.
+        '''
+        self.log.info("Deleting %s instance %s from %s",
+                      node.state, node.external_id, node.provider)
+        try:
+            t = NodeDeleter(
+                self._nodepool.getZK(),
+                self._nodepool.getProviderManager(node.provider),
+                node)
+            t.start()
+        except Exception:
+            self.log.exception("Could not delete instance %s on provider %s",
+                               node.external_id, node.provider)
 
     def _cleanupNodes(self):
         '''
