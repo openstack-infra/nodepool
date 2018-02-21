@@ -1,26 +1,19 @@
 #!/bin/bash -ex
 
-# NOTE(ianw): remove this and "/opt/stack/new" path when native only
-# jobs that pass this arg
-LOGDIR=${1:-$WORKSPACE/logs/}
-if [[ -d /opt/stack/nodepool-venv ]]; then
-    DS_HOME=/opt/stack
-else
-    DS_HOME=/opt/stack/new
-fi
+LOGDIR=$1
 
-NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-${DS_HOME}/nodepool-venv}
+NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-/opt/stack/nodepool-venv}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
 NODEPOOL_SECURE=${NODEPOOL_SECURE:-/etc/nodepool/secure.conf}
 NODEPOOL="$NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG -s $NODEPOOL_SECURE"
 
 # Source stackrc so that we get the variables about enabled images set
 # from the devstack job.  That's the ones we'll wait for below.
-if [[ ! -f ${DS_HOME}/devstack/stackrc ]]; then
+if [[ ! -f /opt/stack/devstack/stackrc ]]; then
     echo "Can not find enabled images from devstack run!"
     exit 1
 else
-    source ${DS_HOME}/devstack/stackrc
+    source /opt/stack/devstack/stackrc
 fi
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-True}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-True}
