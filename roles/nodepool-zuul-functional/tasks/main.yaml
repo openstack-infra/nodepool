@@ -1,0 +1,6 @@
+- name: Install packages and run zuul-nodepool-integration/start.sh
+  shell:
+    cmd: |
+      sudo pip3 install .
+      ./tools/zuul-nodepool-integration/start.sh
+    chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/nodepool'].src_dir }}"

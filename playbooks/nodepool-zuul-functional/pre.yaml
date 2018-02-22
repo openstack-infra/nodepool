@@ -4,12 +4,4 @@
     - role: bindep
       bindep_profile: default
       bindep_dir: "{{ zuul.projects['git.openstack.org/openstack-infra/zuul'].src_dir }}"
-
-  tasks:
-
-    - name: Install packages and  run zuul-nodepool-integration/start.sh
-      shell:
-        cmd: |
-          sudo pip3 install .
-          ./tools/zuul-nodepool-integration/start.sh
-        chdir: "{{ zuul.projects['git.openstack.org/openstack-infra/nodepool'].src_dir }}"
+    - nodepool-zuul-functional
