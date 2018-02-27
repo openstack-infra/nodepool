@@ -53,13 +53,26 @@ def age(timestamp):
     return '%02d:%02d:%02d:%02d' % (d, h, m, s)
 
 
-def _to_pretty_table(objs, headers_table):
+def _to_pretty_table(objs, headers_table, fields):
+    '''Construct a pretty table output
+
+    :param objs: list of output objects
+    :param headers_table: list of (key, desr) header tuples
+    :param fields: list of fields to show; None means all
+
+    :return str: text output
+    '''
+    if fields:
+        headers_table = OrderedDict(
+            [h for h in headers_table.items() if h[0] in fields])
     headers = headers_table.values()
     t = PrettyTable(headers)
     t.align = 'l'
     for obj in objs:
         values = []
         for k in headers_table:
+            if fields and k not in fields:
+                continue
             if k == 'age':
                 try:
                     obj_age = age(int(obj[k]))
@@ -76,10 +89,18 @@ def _to_pretty_table(objs, headers_table):
     return t
 
 
-def output(results, fmt):
+def output(results, fmt, fields=None):
+    '''Generate output for webapp results
+
+    :param results: tuple (objs, headers) as returned by various _list
+                    functions
+    :param fmt: select from ascii pretty-table or json
+    :param fields: list of fields to show in pretty-table output
+    '''
     objs, headers_table = results
+
     if fmt == 'pretty':
-        t = _to_pretty_table(objs, headers_table)
+        t = _to_pretty_table(objs, headers_table, fields)
         return str(t)
     elif fmt == 'json':
         return json.dumps(objs)
@@ -87,7 +108,7 @@ def output(results, fmt):
         raise ValueError('Unknown format "%s"' % fmt)
 
 
-def node_list(zk, node_id=None, detail=False):
+def node_list(zk, node_id=None):
     headers_table = [
         ("id", "ID"),
         ("provider", "Provider"),
@@ -97,9 +118,7 @@ def node_list(zk, node_id=None, detail=False):
         ("ipv6", "IPv6"),
         ("state", "State"),
         ("age", "Age"),
-        ("locked", "Locked")
-    ]
-    detail_headers_table = [
+        ("locked", "Locked"),
         ("hostname", "Hostname"),
         ("private_ipv4", "Private IPv4"),
         ("AZ", "AZ"),
@@ -109,8 +128,6 @@ def node_list(zk, node_id=None, detail=False):
         ("hold_job", "Hold Job"),
         ("comment", "Comment")
     ]
-    if detail:
-        headers_table += detail_headers_table
     headers_table = OrderedDict(headers_table)
 
     def _get_node_values(node):
@@ -131,19 +148,16 @@ def node_list(zk, node_id=None, detail=False):
             node.public_ipv6,
             node.state,
             age(node.state_time),
-            locked
+            locked,
+            node.hostname,
+            node.private_ipv4,
+            node.az,
+            node.connection_port,
+            node.launcher,
+            node.allocated_to,
+            node.hold_job,
+            node.comment
         ]
-        if detail:
-            values += [
-                node.hostname,
-                node.private_ipv4,
-                node.az,
-                node.connection_port,
-                node.launcher,
-                node.allocated_to,
-                node.hold_job,
-                node.comment
-            ]
         return values
 
     objs = []
