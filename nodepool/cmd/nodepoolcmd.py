@@ -156,13 +156,16 @@ class NodePoolCmd(NodepoolApp):
     def list(self, node_id=None, detail=False):
         if hasattr(self.args, 'detail'):
             detail = self.args.detail
-        print(status.node_list(self.zk, node_id, detail))
+        results = status.node_list(self.zk, node_id, detail)
+        print(status.output(results, 'pretty'))
 
     def dib_image_list(self):
-        print(status.dib_image_list(self.zk))
+        results = status.dib_image_list(self.zk)
+        print(status.output(results, 'pretty'))
 
     def image_list(self):
-        print(status.image_list(self.zk))
+        results = status.image_list(self.zk)
+        print(status.output(results, 'pretty'))
 
     def image_build(self, diskimage=None):
         diskimage = diskimage or self.args.image
@@ -334,7 +337,8 @@ class NodePoolCmd(NodepoolApp):
         # TODO(asselin,yolanda): add validation of secure.conf
 
     def request_list(self):
-        print(status.request_list(self.zk))
+        results = status.request_list(self.zk)
+        print(status.output(results, 'pretty'))
 
     def _wait_for_threads(self, threads):
         for t in threads:

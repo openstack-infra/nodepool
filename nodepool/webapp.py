@@ -84,34 +84,29 @@ class WebApp(threading.Thread):
         result = self.cache.get(index)
         if result:
             return result
+
+        if path.endswith('.json'):
+            out_fmt = 'json'
+            path = path[:-5]
+        else:
+            out_fmt = 'pretty'
+
+        zk = self.nodepool.getZK()
+
         if path == '/image-list':
-            output = status.image_list(self.nodepool.getZK(),
-                                       format='pretty')
-        elif path == '/image-list.json':
-            output = status.image_list(self.nodepool.getZK(),
-                                       format='json')
+            results = status.image_list(zk)
         elif path == '/dib-image-list':
-            output = status.dib_image_list(self.nodepool.getZK(),
-                                           format='pretty')
-        elif path == '/dib-image-list.json':
-            output = status.dib_image_list(self.nodepool.getZK(),
-                                           format='json')
+            results = status.dib_image_list(zk)
         elif path == '/node-list':
-            output = status.node_list(self.nodepool.getZK(),
-                                      format='pretty',
-                                      node_id=params.get('node_id'))
-        elif path == '/node-list.json':
-            output = status.node_list(self.nodepool.getZK(),
-                                      format='json',
-                                      node_id=params.get('node_id'))
+            results = status.node_list(zk,
+                                       node_id=params.get('node_id'))
         elif path == '/request-list':
-            output = status.request_list(self.nodepool.getZK(),
-                                         format='pretty')
-        elif path == '/request-list.json':
-            output = status.request_list(self.nodepool.getZK(),
-                                         format='json')
+            results = status.request_list(zk)
         else:
             return None
+
+        output = status.output(results, out_fmt)
+
         return self.cache.put(index, output)
 
     def app(self, request):
