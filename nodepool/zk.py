@@ -14,6 +14,7 @@
 
 from contextlib import contextmanager
 from copy import copy
+import abc
 import json
 import logging
 import six
@@ -121,7 +122,69 @@ class ZooKeeperWatchEvent(object):
         self.image = image
 
 
-class BaseModel(object):
+class Serializable(abc.ABC):
+    '''
+    Abstract base class for objects that will be stored in ZooKeeper.
+    '''
+
+    @abc.abstractmethod
+    def toDict(self):
+        '''
+        Return a dictionary representation of the object.
+        '''
+        pass
+
+    def serialize(self):
+        '''
+        Return a representation of the object as a string.
+
+        Used for storing the object data in ZooKeeper.
+        '''
+        return json.dumps(self.toDict()).encode('utf8')
+
+
+class Launcher(Serializable):
+    '''
+    Class to describe a nodepool launcher.
+    '''
+
+    def __init__(self):
+        self.id = None
+        self._supported_labels = set()
+
+    def __eq__(self, other):
+        if isinstance(other, Launcher):
+            return (self.id == other.id and
+                    self.supported_labels == other.supported_labels)
+        else:
+            return False
+
+    @property
+    def supported_labels(self):
+        return self._supported_labels
+
+    @supported_labels.setter
+    def supported_labels(self, value):
+        if not isinstance(value, set):
+            raise TypeError("'supported_labels' attribute must be a set")
+        self._supported_labels = value
+
+    def toDict(self):
+        d = {}
+        d['id'] = self.id
+        # sets are not JSON serializable, so use a sorted list
+        d['supported_labels'] = sorted(self.supported_labels)
+        return d
+
+    @staticmethod
+    def fromDict(d):
+        obj = Launcher()
+        obj.id = d.get('id')
+        obj.supported_labels = set(d.get('supported_labels', []))
+        return obj
+
+
+class BaseModel(Serializable):
     VALID_STATES = set([])
 
     def __init__(self, o_id):
@@ -176,14 +239,6 @@ class BaseModel(object):
             self.state = d['state']
         if 'state_time' in d:
             self.state_time = d['state_time']
-
-    def serialize(self):
-        '''
-        Return a representation of the object as a string.
-
-        Used for storing the object data in ZooKeeper.
-        '''
-        return json.dumps(self.toDict()).encode('utf8')
 
 
 class ImageBuild(BaseModel):
@@ -1316,27 +1371,44 @@ class ZooKeeper(object):
         otherwise disconnects from ZooKeeper. It will need to re-register
         after a lost connection. This method is safe to call multiple times.
 
-        :param str launcher: Unique name for the launcher.
+        :param Launcher launcher: Object describing the launcher.
         '''
-        path = self._launcherPath(launcher)
+        path = self._launcherPath(launcher.id)
 
-        try:
-            self.client.create(path, makepath=True, ephemeral=True)
-        except kze.NodeExistsError:
-            pass
+        if self.client.exists(path):
+            data, _ = self.client.get(path)
+            obj = Launcher.fromDict(self._bytesToDict(data))
+            if obj != launcher:
+                self.client.set(path, launcher.serialize())
+                self.log.debug("Updated registration for launcher %s",
+                               launcher.id)
+        else:
+            self.client.create(path, value=launcher.serialize(),
+                               makepath=True, ephemeral=True)
+            self.log.debug("Registered launcher %s", launcher.id)
 
     def getRegisteredLaunchers(self):
         '''
         Get a list of all launchers that have registered with ZooKeeper.
 
-        :returns: A list of launcher names, or empty list if none are found.
+        :returns: A list of Launcher objects, or empty list if none are found.
         '''
         try:
-            launchers = self.client.get_children(self.LAUNCHER_ROOT)
+            launcher_ids = self.client.get_children(self.LAUNCHER_ROOT)
         except kze.NoNodeError:
             return []
 
-        return launchers
+        objs = []
+        for launcher in launcher_ids:
+            path = self._launcherPath(launcher)
+            try:
+                data, _ = self.client.get(path)
+            except kze.NoNodeError:
+                # launcher disappeared
+                continue
+
+            objs.append(Launcher.fromDict(self._bytesToDict(data)))
+        return objs
 
     def getNodeRequests(self):
         '''

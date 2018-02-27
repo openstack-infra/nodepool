@@ -418,19 +418,21 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertIsNone(self.zk.client.exists(path))
 
     def test_registerLauncher(self):
-        name = "launcher-000-001"
-        self.zk.registerLauncher(name)
+        launcher = zk.Launcher()
+        launcher.id = "launcher-000-001"
+        self.zk.registerLauncher(launcher)
         launchers = self.zk.getRegisteredLaunchers()
         self.assertEqual(1, len(launchers))
-        self.assertEqual(name, launchers[0])
+        self.assertEqual(launcher.id, launchers[0].id)
 
     def test_registerLauncher_safe_repeat(self):
-        name = "launcher-000-001"
-        self.zk.registerLauncher(name)
-        self.zk.registerLauncher(name)
+        launcher = zk.Launcher()
+        launcher.id = "launcher-000-001"
+        self.zk.registerLauncher(launcher)
+        self.zk.registerLauncher(launcher)
         launchers = self.zk.getRegisteredLaunchers()
         self.assertEqual(1, len(launchers))
-        self.assertEqual(name, launchers[0])
+        self.assertEqual(launcher.id, launchers[0].id)
 
     def test_getNodeRequests_empty(self):
         self.assertEqual([], self.zk.getNodeRequests())

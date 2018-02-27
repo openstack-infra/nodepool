@@ -1209,3 +1209,27 @@ class TestLauncher(tests.DBTestCase):
         self.waitForNodeDeletion(label1_nodes[0])
         req = self.waitForNodeRequest(req)
         self.assertEqual(req.state, zk.FULFILLED)
+
+    def test_launcher_registers_config_change(self):
+        '''
+        Launchers register themselves and some config info with ZooKeeper.
+        Validate that a config change will propogate to ZooKeeper.
+        '''
+        configfile = self.setup_config('launcher_reg1.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.waitForNodes('fake-label')
+        launchers = self.zk.getRegisteredLaunchers()
+        self.assertEqual(1, len(launchers))
+
+        # the fake-label-unused label should not appear
+        self.assertEqual({'fake-label'}, launchers[0].supported_labels)
+
+        self.replace_config(configfile, 'launcher_reg2.yaml')
+
+        # we should get 1 additional label now
+        while launchers[0].supported_labels != {'fake-label', 'fake-label2'}:
+            time.sleep(1)
+            launchers = self.zk.getRegisteredLaunchers()
