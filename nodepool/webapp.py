@@ -74,22 +74,19 @@ class WebApp(threading.Thread):
     def stop(self):
         self.server.server_close()
 
-    def get_cache(self, path, params):
+    def get_cache(self, path, params, request_type):
         # TODO quick and dirty way to take query parameters
         # into account when caching data
         if params:
-            index = path + json.dumps(params.dict_of_lists(), sort_keys=True)
+            index = "%s.%s.%s" % (path,
+                                  json.dumps(params.dict_of_lists(),
+                                             sort_keys=True),
+                                  request_type)
         else:
-            index = path
+            index = "%s.%s" % (path, request_type)
         result = self.cache.get(index)
         if result:
             return result
-
-        if path.endswith('.json'):
-            out_fmt = 'json'
-            path = path[:-5]
-        else:
-            out_fmt = 'pretty'
 
         zk = self.nodepool.getZK()
 
@@ -109,16 +106,32 @@ class WebApp(threading.Thread):
         if params.get('fields'):
             fields = params.get('fields').split(',')
 
-        output = status.output(results, out_fmt, fields)
+        output = status.output(results, request_type, fields)
         return self.cache.put(index, output)
 
+    def _request_wants(self, request):
+        '''Find request content-type
+
+        :param request: The incoming request
+        :return str: Best guess of either 'pretty' or 'json'
+        '''
+        best = request.accept.best_match(
+            ['application/json', 'text/plain'])
+        if best == 'application/json':
+            return 'json'
+        else:
+            return 'pretty'
+
     def app(self, request):
-        result = self.get_cache(request.path, request.params)
+
+        request_type = self._request_wants(request)
+        result = self.get_cache(request.path, request.params,
+                                request_type)
         if result is None:
             raise webob.exc.HTTPNotFound()
         last_modified, output = result
 
-        if request.path.endswith('.json'):
+        if request_type == 'json':
             content_type = 'application/json'
         else:
             content_type = 'text/plain'
