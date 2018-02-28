@@ -263,3 +263,12 @@ launchers, all will provide the same information.
    :reqheader Accept: ``application/json`` or ``text/*``
    :resheader Content-Type: ``application/json`` or ``text/plain``
                             depending on the :http:header:`Accept` header
+
+.. http:get:: /label-list
+
+   All available labels as reported by all launchers
+
+   :query fields: comma-separated list of fields to display
+   :reqheader Accept: ``application/json`` or ``text/*``
+   :resheader Content-Type: ``application/json`` or ``text/plain``
+                            depending on the :http:header:`Accept` header

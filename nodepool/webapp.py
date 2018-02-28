@@ -99,6 +99,8 @@ class WebApp(threading.Thread):
                                        node_id=params.get('node_id'))
         elif path == '/request-list':
             results = status.request_list(zk)
+        elif path == '/label-list':
+            results = status.label_list(zk)
         else:
             return None
 
