@@ -192,6 +192,8 @@ class CleanupWorker(BaseWorker):
                 self._rtable[i][p].sort(key=lambda x: x[2], reverse=True)
                 self._rtable[i][p] = self._rtable[i][p][:2]
 
+        self.log.debug("Upload recency table: %s", self._rtable)
+
     def _isRecentUpload(self, image, provider, build_id, upload_id):
         '''
         Search for an upload for a build within the recency table.
@@ -322,6 +324,7 @@ class CleanupWorker(BaseWorker):
                     "Unable to delete image %s from %s:",
                     upload.external_name, upload.provider_name)
             else:
+                self.log.debug("Deleting image upload: %s", upload)
                 self._zk.deleteUpload(upload.image_name, upload.build_id,
                                       upload.provider_name, upload.id)
 
