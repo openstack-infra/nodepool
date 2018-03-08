@@ -65,7 +65,7 @@ class StaticProviderConfig(ProviderConfig):
                     pp.labels.add(label)
                     config.labels[label].pools.append(pp)
 
-    def get_schema(self):
+    def getSchema(self):
         pool_node = {
             v.Required('name'): str,
             v.Required('labels'): v.Any(str, [str]),

@@ -449,5 +449,5 @@ class ProviderConfig(ConfigValue):
         pass
 
     @abc.abstractmethod
-    def get_schema(self):
+    def getSchema(self):
         pass

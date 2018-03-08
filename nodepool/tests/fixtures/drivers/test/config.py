@@ -42,7 +42,7 @@ class TestConfig(ProviderConfig):
                 newconfig.labels[label].pools.append(testpool)
             self.pools[pool['name']] = testpool
 
-    def get_schema(self):
+    def getSchema(self):
         pool = {'name': str,
                 'labels': [str]}
         return v.Schema({'pools': [pool]})
