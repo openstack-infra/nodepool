@@ -33,12 +33,14 @@ class TestConfig(ProviderConfig):
 
     def load(self, newconfig):
         self.pools = {}
+        self.labels = set()
         for pool in self.provider.get('pools', []):
             testpool = TestPool()
             testpool.name = pool['name']
             testpool.provider = self
             testpool.max_servers = pool.get('max-servers', math.inf)
             for label in pool['labels']:
+                self.labels.add(label)
                 newconfig.labels[label].pools.append(testpool)
             self.pools[pool['name']] = testpool
 
@@ -46,3 +48,6 @@ class TestConfig(ProviderConfig):
         pool = {'name': str,
                 'labels': [str]}
         return v.Schema({'pools': [pool]})
+
+    def getSupportedLabels(self):
+        return self.labels

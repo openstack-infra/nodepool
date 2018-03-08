@@ -451,3 +451,10 @@ class ProviderConfig(ConfigValue):
     @abc.abstractmethod
     def getSchema(self):
         pass
+
+    @abc.abstractmethod
+    def getSupportedLabels(self):
+        '''
+        Return a set of label names supported by this provider.
+        '''
+        pass

@@ -80,3 +80,9 @@ class StaticProviderConfig(ProviderConfig):
             'nodes': [pool_node],
         }
         return v.Schema({'pools': [pool]})
+
+    def getSupportedLabels(self):
+        labels = set()
+        for pool in self.pools.values():
+            labels.update(pool.labels)
+        return labels

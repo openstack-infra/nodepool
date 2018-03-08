@@ -275,3 +275,9 @@ class OpenStackProviderConfig(ProviderConfig):
             'diskimages': [provider_diskimage],
             'cloud-images': [provider_cloud_images],
         })
+
+    def getSupportedLabels(self):
+        labels = set()
+        for pool in self.pools.values():
+            labels.update(pool.labels.keys())
+        return labels
