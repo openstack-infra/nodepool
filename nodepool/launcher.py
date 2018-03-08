@@ -288,17 +288,7 @@ class PoolWorker(threading.Thread):
             launcher = zk.Launcher()
             launcher.id = self.launcher_id
             for prov_cfg in self.nodepool.config.providers.values():
-                if prov_cfg.driver.name in ('openstack', 'fake'):
-                    for pool_cfg in prov_cfg.pools.values():
-                        launcher.supported_labels.update(
-                            set(pool_cfg.labels.keys()))
-                elif prov_cfg.driver.name == 'static':
-                    for pool_cfg in prov_cfg.pools.values():
-                        launcher.supported_labels.update(pool_cfg.labels)
-                else:
-                    self.log.error(
-                        "Launcher registration unhandled driver: %s",
-                        prov_cfg.driver.name)
+                launcher.supported_labels.update(prov_cfg.getSupportedLabels())
             self.zk.registerLauncher(launcher)
 
             try:
