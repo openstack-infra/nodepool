@@ -205,7 +205,7 @@ class OpenStackProviderConfig(ProviderConfig):
                 top_label = config.labels[pl.name]
                 top_label.pools.append(pp)
 
-    def get_schema(self):
+    def getSchema(self):
         provider_diskimage = {
             'name': str,
             'pause': bool,

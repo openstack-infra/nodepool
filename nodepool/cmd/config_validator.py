@@ -78,5 +78,5 @@ class ConfigValidator:
         schema = v.Schema(top_level)
         schema(config)
         for provider_dict in config.get('providers', []):
-            provider_schema = get_provider_config(provider_dict).get_schema()
+            provider_schema = get_provider_config(provider_dict).getSchema()
             provider_schema.extend(provider)(provider_dict)
