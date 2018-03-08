@@ -285,7 +285,21 @@ class PoolWorker(threading.Thread):
                 self.log.info("ZooKeeper available. Resuming")
 
             # Make sure we're always registered with ZK
-            self.zk.registerLauncher(self.launcher_id)
+            launcher = zk.Launcher()
+            launcher.id = self.launcher_id
+            for prov_cfg in self.nodepool.config.providers.values():
+                if prov_cfg.driver.name in ('openstack', 'fake'):
+                    for pool_cfg in prov_cfg.pools.values():
+                        launcher.supported_labels.update(
+                            set(pool_cfg.labels.keys()))
+                elif prov_cfg.driver.name == 'static':
+                    for pool_cfg in prov_cfg.pools.values():
+                        launcher.supported_labels.update(pool_cfg.labels)
+                else:
+                    self.log.error(
+                        "Launcher registration unhandled driver: %s",
+                        prov_cfg.driver.name)
+            self.zk.registerLauncher(launcher)
 
             try:
                 if not self.paused_handler:
