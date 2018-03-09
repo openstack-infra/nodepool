@@ -20,6 +20,29 @@ import time
 
 from prettytable import PrettyTable
 
+# General notes:
+#
+# All the _list functions should return a tuple
+#
+#  ([ {obj}, {obj}, ...], headers_table)
+#
+# The headers_table is an OrderedDict that maps the fields in the
+# returned objs to pretty-printable headers.  Each obj in the list
+# should be a dictionary with fields as described by the
+# headers_table.
+#
+# e.g.
+#
+#   headers_table = OrderedDict({
+#         'key1': 'Key One',
+#         'key2': 'Key Two'})
+#   objs = [ { 'key1': 'value', 'key2': 123 },
+#            { 'key1': 'value2', 'key2': 456 } ]
+#   return(objs, headers_table)
+#
+# The output() function takes this tuple result and a format to
+# produce results for consumption by the caller.
+
 
 def age(timestamp):
     now = time.time()
@@ -53,7 +76,18 @@ def _to_pretty_table(objs, headers_table):
     return t
 
 
-def node_list(zk, node_id=None, detail=False, format='pretty'):
+def output(results, fmt):
+    objs, headers_table = results
+    if fmt == 'pretty':
+        t = _to_pretty_table(objs, headers_table)
+        return str(t)
+    elif fmt == 'json':
+        return json.dumps(objs)
+    else:
+        raise ValueError('Unknown format "%s"' % fmt)
+
+
+def node_list(zk, node_id=None, detail=False):
     headers_table = [
         ("id", "ID"),
         ("provider", "Provider"),
@@ -126,16 +160,10 @@ def node_list(zk, node_id=None, detail=False, format='pretty'):
             objs.append(dict(zip(headers_table.keys(),
                                  values)))
 
-    if format == 'pretty':
-        t = _to_pretty_table(objs, headers_table)
-        return str(t)
-    elif format == 'json':
-        return json.dumps(objs)
-    else:
-        raise ValueError('Unknown format "%s"' % format)
+    return (objs, headers_table)
 
 
-def dib_image_list(zk, format='pretty'):
+def dib_image_list(zk):
     headers_table = OrderedDict([
         ("id", "ID"),
         ("image", "Image"),
@@ -154,16 +182,10 @@ def dib_image_list(zk, format='pretty'):
                          'state': build.state,
                          'age': int(build.state_time)
                          })
-    if format == 'pretty':
-        t = _to_pretty_table(objs, headers_table)
-        return str(t)
-    elif format == 'json':
-        return json.dumps(objs)
-    else:
-        raise ValueError('Unknown format "%s"' % format)
+    return (objs, headers_table)
 
 
-def image_list(zk, format='pretty'):
+def image_list(zk):
     headers_table = OrderedDict([
         ("id", "Build ID"),
         ("upload_id", "Upload ID"),
@@ -188,16 +210,10 @@ def image_list(zk, format='pretty'):
                               int(upload.state_time)]
                     objs.append(dict(zip(headers_table.keys(),
                                          values)))
-    if format == 'pretty':
-        t = _to_pretty_table(objs, headers_table)
-        return str(t)
-    elif format == 'json':
-        return json.dumps(objs)
-    else:
-        raise ValueError('Unknown format "%s"' % format)
+    return (objs, headers_table)
 
 
-def request_list(zk, format='pretty'):
+def request_list(zk):
     headers_table = OrderedDict([
         ("id", "Request ID"),
         ("state", "State"),
@@ -213,10 +229,4 @@ def request_list(zk, format='pretty'):
                   req.declined_by]
         objs.append(dict(zip(headers_table.keys(),
                              values)))
-    if format == 'pretty':
-        t = _to_pretty_table(objs, headers_table)
-        return str(t)
-    elif format == 'json':
-        return json.dumps(objs)
-    else:
-        raise ValueError('Unknown format "%s"' % format)
+    return (objs, headers_table)
