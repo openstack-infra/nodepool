@@ -244,3 +244,24 @@ def request_list(zk):
         objs.append(dict(zip(headers_table.keys(),
                              values)))
     return (objs, headers_table)
+
+
+def label_list(zk):
+    headers_table = OrderedDict([
+        ("label", "Label"),
+    ])
+    objs = []
+
+    # Walk all launchers, find the labels they support and stick it
+    # all in a set.
+    # NOTE(ianw): maybe add to each entry a list of which
+    #             launchers support the label?
+    labels = set()
+    launchers = zk.getRegisteredLaunchers()
+    for launcher in launchers:
+        labels.update(launcher.supported_labels)
+
+    for label in labels:
+        objs.append({'label': label})
+
+    return (objs, headers_table)

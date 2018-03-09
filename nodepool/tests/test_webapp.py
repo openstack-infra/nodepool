@@ -206,6 +206,28 @@ class TestWebApp(tests.DBTestCase):
                                        'requestor': 'test_request_list', },
                                       objs[0])
 
+    def test_label_list_json(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        webapp = self.useWebApp(pool, port=0)
+        webapp.start()
+        port = webapp.server.socket.getsockname()[1]
+
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForNodes('fake-label')
+
+        req = request.Request(
+            "http://localhost:%s/label-list" % port)
+        req.add_header('Accept', 'application/json')
+        f = request.urlopen(req)
+        self.assertEqual(f.info().get('Content-Type'),
+                         'application/json')
+        data = f.read()
+        objs = json.loads(data.decode('utf8'))
+        self.assertEqual([{'label': 'fake-label'}], objs)
+
     def test_webapp_config(self):
         configfile = self.setup_config('webapp.yaml')
         config = yaml.safe_load(open(configfile))
