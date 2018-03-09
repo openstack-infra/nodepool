@@ -218,3 +218,65 @@ same and makes it easy to turn the provider back on).
 If urgency is required you can delete the nodes directly instead of
 waiting for them to go through their normal lifecycle but the effect
 is the same.
+
+Web interface
+-------------
+
+If configured (see :ref:`webapp-conf`), a ``nodepool-launcher``
+instance can provide a range of end-points that can provide
+information in text and ``json`` format.  Note if there are multiple
+launchers, all will provide the same information.
+
+.. http:get:: /image-list
+
+   The status of uploaded images
+
+   :query fields: comma-separated list of fields to display
+   :resheader Content-Type: text/plain
+
+.. http:get:: /image-list.json
+
+   The status of uploaded images
+
+   :resheader Content-Type: application/json
+
+.. http:get:: /dib-image-list
+
+   The status of images built by ``diskimage-builder``
+
+   :query fields: comma-separated list of fields to display
+   :resheader Content-Type: text/plain
+
+.. http:get:: /dib-image-list.json
+
+   The status of images built by ``diskimage-builder``
+
+   :resheader Content-Type: application/json
+
+.. http:get:: /node-list
+
+   The status of currently active nodes
+
+   :query node_id: restrict to a specific node
+   :query fields: comma-separated list of fields to display
+   :resheader Content-Type: text/plain
+
+.. http:get:: /node-list.json
+
+   The status of currently active nodes
+
+   :query node_id: restrict to a specific node
+   :resheader Content-Type: application/json
+
+.. http:get:: /request-list
+
+   Outstanding requests
+
+   :query fields: comma-separated list of fields to display
+   :resheader Content-Type: text/plain
+
+.. http:get:: /request-list.json
+
+   Outstanding requests
+
+   :resheader Content-Type: application/json

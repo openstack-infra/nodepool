@@ -105,8 +105,11 @@ class WebApp(threading.Thread):
         else:
             return None
 
-        output = status.output(results, out_fmt)
+        fields = None
+        if params.get('fields'):
+            fields = params.get('fields').split(',')
 
+        output = status.output(results, out_fmt, fields)
         return self.cache.put(index, output)
 
     def app(self, request):

@@ -45,6 +45,27 @@ class TestWebApp(tests.DBTestCase):
         data = f.read()
         self.assertTrue('fake-image' in data.decode('utf8'))
 
+    def test_image_list_filtered(self):
+        configfile = self.setup_config('node.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        webapp = self.useWebApp(pool, port=0)
+        webapp.start()
+        port = webapp.server.socket.getsockname()[1]
+
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForNodes('fake-label')
+
+        req = request.Request(
+            "http://localhost:%s/image-list?fields=id,image,state" % port)
+        f = request.urlopen(req)
+        self.assertEqual(f.info().get('Content-Type'),
+                         'text/plain; charset=UTF-8')
+        data = f.read()
+        self.assertIn("| 0000000001 | fake-image | ready |",
+                      data.decode('utf8'))
+
     def test_image_list_json(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

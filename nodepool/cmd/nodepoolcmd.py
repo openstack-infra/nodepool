@@ -156,8 +156,16 @@ class NodePoolCmd(NodepoolApp):
     def list(self, node_id=None, detail=False):
         if hasattr(self.args, 'detail'):
             detail = self.args.detail
-        results = status.node_list(self.zk, node_id, detail)
-        print(status.output(results, 'pretty'))
+
+        fields = ['id', 'provider', 'label', 'server_id',
+                  'public_ipv4', 'ipv6', 'state', 'age', 'locked']
+        if detail:
+            fields.extend(['hostname', 'private_ipv4', 'AZ',
+                           'connection_port', 'launcher',
+                           'allocated_to', 'hold_job',
+                           'comment'])
+        results = status.node_list(self.zk, node_id)
+        print(status.output(results, 'pretty', fields))
 
     def dib_image_list(self):
         results = status.dib_image_list(self.zk)
