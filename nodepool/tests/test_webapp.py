@@ -39,6 +39,9 @@ class TestWebApp(tests.DBTestCase):
 
         req = request.Request(
             "http://localhost:%s/image-list" % port)
+        # NOTE(ianw): we want pretty printed text/plain back, but
+        # simulating a normal web-browser request.
+        req.add_header('Accept', 'text/html')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'text/plain; charset=UTF-8')
@@ -59,6 +62,7 @@ class TestWebApp(tests.DBTestCase):
 
         req = request.Request(
             "http://localhost:%s/image-list?fields=id,image,state" % port)
+        req.add_header('Accept', 'text/html')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'text/plain; charset=UTF-8')
@@ -79,7 +83,8 @@ class TestWebApp(tests.DBTestCase):
         self.waitForNodes('fake-label')
 
         req = request.Request(
-            "http://localhost:%s/image-list.json" % port)
+            "http://localhost:%s/image-list" % port)
+        req.add_header('Accept', 'application/json')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
@@ -103,7 +108,8 @@ class TestWebApp(tests.DBTestCase):
         self.waitForNodes('fake-label')
 
         req = request.Request(
-            "http://localhost:%s/dib-image-list.json" % port)
+            "http://localhost:%s/dib-image-list" % port)
+        req.add_header('Accept', 'application/json')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
@@ -128,7 +134,8 @@ class TestWebApp(tests.DBTestCase):
         self.waitForNodes('fake-label')
 
         req = request.Request(
-            "http://localhost:%s/node-list.json" % port)
+            "http://localhost:%s/node-list" % port)
+        req.add_header('Accept', 'application/json')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
@@ -143,9 +150,10 @@ class TestWebApp(tests.DBTestCase):
                                        'state': 'ready'}, objs[0])
         # specify valid node_id
         req = request.Request(
-            "http://localhost:%s/node-list.json?node_id=%s" % (port,
-                                                               '0000000000'))
+            "http://localhost:%s/node-list?node_id=%s" % (port,
+                                                          '0000000000'))
         f = request.urlopen(req)
+        req.add_header('Accept', 'application/json')
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
         data = f.read()
@@ -159,8 +167,9 @@ class TestWebApp(tests.DBTestCase):
                                        'state': 'ready'}, objs[0])
         # node_id not found
         req = request.Request(
-            "http://localhost:%s/node-list.json?node_id=%s" % (port,
-                                                               '999999'))
+            "http://localhost:%s/node-list?node_id=%s" % (port,
+                                                          '999999'))
+        req.add_header('Accept', 'application/json')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
@@ -186,7 +195,8 @@ class TestWebApp(tests.DBTestCase):
         self.zk.storeNodeRequest(req)
 
         http_req = request.Request(
-            "http://localhost:%s/request-list.json" % port)
+            "http://localhost:%s/request-list" % port)
+        http_req.add_header('Accept', 'application/json')
         f = request.urlopen(http_req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')

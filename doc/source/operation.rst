@@ -232,26 +232,18 @@ launchers, all will provide the same information.
    The status of uploaded images
 
    :query fields: comma-separated list of fields to display
-   :resheader Content-Type: text/plain
-
-.. http:get:: /image-list.json
-
-   The status of uploaded images
-
-   :resheader Content-Type: application/json
+   :reqheader Accept: ``application/json`` or ``text/*``
+   :resheader Content-Type: ``application/json`` or ``text/plain``
+                            depending on the :http:header:`Accept` header
 
 .. http:get:: /dib-image-list
 
    The status of images built by ``diskimage-builder``
 
    :query fields: comma-separated list of fields to display
-   :resheader Content-Type: text/plain
-
-.. http:get:: /dib-image-list.json
-
-   The status of images built by ``diskimage-builder``
-
-   :resheader Content-Type: application/json
+   :reqheader Accept: ``application/json`` or ``text/*``
+   :resheader Content-Type: ``application/json`` or ``text/plain``
+                            depending on the :http:header:`Accept` header
 
 .. http:get:: /node-list
 
@@ -259,24 +251,15 @@ launchers, all will provide the same information.
 
    :query node_id: restrict to a specific node
    :query fields: comma-separated list of fields to display
-   :resheader Content-Type: text/plain
-
-.. http:get:: /node-list.json
-
-   The status of currently active nodes
-
-   :query node_id: restrict to a specific node
-   :resheader Content-Type: application/json
+   :reqheader Accept: ``application/json`` or ``text/*``
+   :resheader Content-Type: ``application/json`` or ``text/plain``
+                            depending on the :http:header:`Accept` header
 
 .. http:get:: /request-list
 
    Outstanding requests
 
    :query fields: comma-separated list of fields to display
-   :resheader Content-Type: text/plain
-
-.. http:get:: /request-list.json
-
-   Outstanding requests
-
-   :resheader Content-Type: application/json
+   :reqheader Accept: ``application/json`` or ``text/*``
+   :resheader Content-Type: ``application/json`` or ``text/plain``
+                            depending on the :http:header:`Accept` header
