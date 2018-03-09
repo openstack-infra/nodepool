@@ -135,22 +135,6 @@ def node_list(zk, node_id=None, detail=False, format='pretty'):
         raise ValueError('Unknown format "%s"' % format)
 
 
-def label_list(zk, format='pretty'):
-    labels = set()
-    for node in zk.nodeIterator():
-        labels.add(node.type)
-    if format == 'pretty':
-        t = PrettyTable(["Label", ])
-        t.align = 'l'
-        for label in labels:
-            t.add_row(label)
-        return str(t)
-    elif format == 'json':
-        return json.dumps(list(labels))
-    else:
-        raise ValueError('Unknown format "%s"' % format)
-
-
 def dib_image_list(zk, format='pretty'):
     headers_table = OrderedDict([
         ("id", "ID"),
