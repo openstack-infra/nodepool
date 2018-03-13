@@ -21,6 +21,8 @@ import random
 import threading
 import time
 
+from kazoo import exceptions as kze
+
 from nodepool import exceptions
 from nodepool import nodeutils as utils
 from nodepool import stats
@@ -215,6 +217,10 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
             try:
                 self._launchNode()
                 break
+            except kze.SessionExpiredError:
+                # If we lost our ZooKeeper session, we've lost our node lock
+                # so there's no need to continue.
+                raise
             except Exception as e:
                 if attempts <= self._retries:
                     self.log.exception(
@@ -249,6 +255,16 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
 
         try:
             self._run()
+        except kze.SessionExpiredError:
+            # Our node lock is gone, leaving the node state as BUILDING.
+            # This will get cleaned up in ZooKeeper automatically, but we
+            # must still set our cached node state to FAILED for the
+            # NodeLaunchManager's poll() method.
+            self.log.error(
+                "Lost ZooKeeper session trying to launch for node %s",
+                self._node.id)
+            self._node.state = zk.FAILED
+            statsd_key = 'error.zksession'
         except Exception as e:
             self.log.exception("Launch failed for node %s:",
                                self._node.id)
