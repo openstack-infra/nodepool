@@ -138,4 +138,5 @@
               sphinx_python: python3
     post:
       jobs:
+        - publish-zuul-docs
         - publish-openstack-sphinx-docs-infra-python3
