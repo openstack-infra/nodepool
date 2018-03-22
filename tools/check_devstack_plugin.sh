@@ -2,6 +2,9 @@
 
 LOGDIR=$1
 
+# Set to indiciate an error return
+RETURN=0
+
 NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-/opt/stack/nodepool-venv}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
 NODEPOOL_SECURE=${NODEPOOL_SECURE:-/etc/nodepool/secure.conf}
@@ -32,6 +35,15 @@ function sshintonode {
 
     node=`$NODEPOOL list | grep $name | grep $state | cut -d '|' -f6 | tr -d ' '`
     /tmp/ssh_wrapper $node ls /
+
+    # Check that the root partition grew on boot; it should be a 5GiB
+    # partition, but subtract some space for boot region.
+    root_size=$(/tmp/ssh_wrapper $node -- lsblk -rbno SIZE /dev/vda1)
+    expected_root_size=$(( (5 * 1024 * 1024 * 1024) - ( 2048 * 1024 ) ))
+    if [[ $root_size -lt $expected_root_size ]]; then
+        echo "Root device does not appear to have grown: $root_size"
+        RETURN=1
+    fi
 }
 
 function waitforimage {
@@ -153,3 +165,5 @@ $NODEPOOL delete --now 0000000000
 
 # show the deleted nodes (and their replacements may be building)
 $NODEPOOL list
+
+exit $RETURN

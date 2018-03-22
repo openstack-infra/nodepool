@@ -383,12 +383,14 @@ diskimages:
       - centos-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_DISTRIBUTION_MIRROR_CENTOS
@@ -403,6 +405,7 @@ diskimages:
       - debian-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -410,6 +413,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -428,6 +432,7 @@ diskimages:
       - debian-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -435,6 +440,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -451,6 +457,7 @@ diskimages:
       - fedora-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -458,6 +465,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
@@ -471,6 +479,7 @@ diskimages:
       - ubuntu-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -478,6 +487,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -496,6 +506,7 @@ diskimages:
       - ubuntu-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -503,6 +514,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -521,6 +533,7 @@ diskimages:
       - ubuntu-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -528,6 +541,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_APT_LOCAL_CACHE: '0'
       DIB_DISABLE_APT_CLEANUP: '1'
@@ -546,6 +560,7 @@ diskimages:
       - opensuse-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -553,6 +568,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
@@ -566,6 +582,7 @@ diskimages:
       - opensuse-minimal
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
@@ -573,6 +590,7 @@ diskimages:
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
@@ -586,12 +604,14 @@ diskimages:
       - gentoo
       - vm
       - simple-init
+      - growroot
       - devuser
       - openssh-server
       - nodepool-setup
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_GET_PIP
@@ -635,13 +655,14 @@ function configure_nodepool {
 }
 
 function start_nodepool {
-    # build a custom flavor that's more friendly to nodepool
+    # build a custom flavor that's more friendly to nodepool; give
+    # disks a little room to grow
     local available_flavors=$(nova flavor-list)
     if [[ ! ( $available_flavors =~ 'nodepool-512' ) ]]; then
-        nova flavor-create nodepool-512 64 512 0 1
+        nova flavor-create nodepool-512 64 512 5 1
     fi
     if [[ ! ( $available_flavors =~ 'nodepool-1024' ) ]]; then
-        nova flavor-create nodepool-1024 128 1024 0 1
+        nova flavor-create nodepool-1024 128 1024 5 1
     fi
 
     # build sec group rules to reach the nodes, we need to do this
