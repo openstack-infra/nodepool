@@ -99,6 +99,13 @@
         NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB: false
 
 - job:
+    name: nodepool-functional-py35-gentoo-src
+    parent: nodepool-functional-py35-src-base
+    vars:
+      devstack_localrc:
+        NODEPOOL_PAUSE_GENTOO_17_0_SYSTEMD_DIB: false
+
+- job:
     name: nodepool-functional-py35-ubuntu-src
     parent: nodepool-functional-py35-src-base
     vars:
