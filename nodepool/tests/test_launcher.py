@@ -407,6 +407,23 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
 
+    def test_node_host_key_checking_false(self):
+        """Test that an image and node are created"""
+        configfile = self.setup_config('node-host-key-checking.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        image = self.waitForImage('fake-provider', 'fake-image')
+        self.assertEqual(image.username, 'zuul')
+        nodes = self.waitForNodes('fake-label')
+
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].provider, 'fake-provider')
+        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].username, 'zuul')
+        # We have no host_keys because host-key-checking is False.
+        self.assertEqual(nodes[0].host_keys, [])
+
     def test_multiple_launcher(self):
         """Test that an image and node are created with 2 launchers"""
         # nodepool-builder needs access to both providers to upload images

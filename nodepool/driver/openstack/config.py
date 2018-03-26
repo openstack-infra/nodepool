@@ -66,6 +66,7 @@ class ProviderPool(ConfigValue):
             other.max_servers != self.max_servers or
             other.max_ram != self.max_ram or
             other.azs != self.azs or
+            other.host_key_checking != self.host_key_checking or
             other.networks != self.networks):
             return False
         return True
@@ -172,6 +173,7 @@ class OpenStackProviderConfig(ProviderConfig):
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
             pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
+            pp.host_key_checking = bool(pool.get('host-key-checking', True))
             pp.labels = {}
             for label in pool.get('labels', []):
                 pl = ProviderLabel()
@@ -253,6 +255,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'name': str,
             'networks': [str],
             'auto-floating-ip': bool,
+            'host-key-checking': bool,
             'max-cores': int,
             'max-servers': int,
             'max-ram': int,
