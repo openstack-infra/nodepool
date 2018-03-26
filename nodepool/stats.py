@@ -37,6 +37,8 @@ def get_client():
         statsd_args['host'] = os.environ['STATSD_HOST']
     if os.getenv('STATSD_PORT', None):
         statsd_args['port'] = os.environ['STATSD_PORT']
+    if os.getenv('STATSD_IPV6', False):
+        statsd_args['ipv6'] = os.environ['STATSD_IPV6']
     if statsd_args:
         return statsd.StatsClient(**statsd_args)
     else:
