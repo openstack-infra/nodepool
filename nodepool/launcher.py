@@ -24,6 +24,8 @@ import socket
 import threading
 import time
 
+from kazoo import exceptions as kze
+
 from nodepool import exceptions
 from nodepool import provider_manager
 from nodepool import stats
@@ -227,6 +229,10 @@ class PoolWorker(threading.Thread):
                 else:
                     self.log.debug("Removing handler for request %s",
                                    r.request.id)
+            except kze.SessionExpiredError:
+                # If we lost our ZooKeeper session, we've lost our NodeRequest
+                # lock so it's no longer active
+                continue
             except Exception:
                 # If we fail to poll a request handler log it but move on
                 # and process the other handlers. We keep this handler around
