@@ -448,6 +448,7 @@ Example::
       networks:
         - some-network-name
       auto-floating-ip: False
+      host-key-checking: True
       labels:
         - name: trusty
           min-ram: 8192
@@ -504,6 +505,12 @@ Example::
     for nodes. When zuul instances and nodes are deployed in the same
     internal private network, set the option to False to save floating ip
     for cloud provider. The default value is True.
+
+  ``host-key-checking`` (bool)
+    Specify custom behavior of validation of SSH host keys.  When set to False,
+    nodepool-launcher will not ssh-keyscan nodes after they are booted. This
+    might be needed if nodepool-launcher and the nodes it launches are on
+    different networks.  The default value is True.
 
 .. _provider_diskimages:
 
