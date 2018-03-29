@@ -15,6 +15,7 @@ Contents:
    configuration
    operation
    devguide
+   releasenotes
 
 Indices and tables
 ==================
