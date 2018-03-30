@@ -120,6 +120,7 @@
     vars:
       devstack_localrc:
         NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB: false
+        NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB: false
 
 - project:
     check:
@@ -147,3 +148,6 @@
       jobs:
         - publish-zuul-docs
         - publish-openstack-sphinx-docs-infra-python3
+    experimental:
+      jobs:
+        - nodepool-functional-py35-debian-src

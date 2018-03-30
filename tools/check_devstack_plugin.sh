@@ -17,6 +17,7 @@ else
 fi
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-True}
 NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-True}
+NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB=${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB:-True}
 NODEPOOL_PAUSE_FEDORA_27_DIB=${NODEPOOL_PAUSE_FEDORA_27_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB=${NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-True}
@@ -71,6 +72,15 @@ if [ ${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB,,} = 'false' ]; then
     waitfornode debian-jessie
     # check ssh for root user
     sshintonode debian-jessie
+fi
+
+if [ ${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB,,} = 'false' ]; then
+    # check that image built
+    waitforimage debian-stretch
+    # check image was bootable
+    waitfornode debian-stretch
+    # check ssh for root user
+    sshintonode debian-stretch
 fi
 
 if [ ${NODEPOOL_PAUSE_FEDORA_27_DIB,,} = 'false' ]; then
