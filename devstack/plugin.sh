@@ -101,6 +101,7 @@ EOF
     cat > /tmp/50-apt-allow-unauthenticated <<EOF
 if [ -d "\$TARGET_ROOT/etc/apt/apt.conf.d" ]; then
     echo "APT::Get::AllowUnauthenticated \"true\";" | sudo tee \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
+    echo "Acquire::AllowInsecureRepositories \"true\";" | sudo tee -a \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
 fi
 EOF
     sudo mv /tmp/01-nodepool-setup \
@@ -482,11 +483,8 @@ diskimages:
       DIB_DISABLE_APT_CLEANUP: '1'
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       DIB_DEBIAN_COMPONENTS: 'main,universe'
-      # NOTE(pabelanger): Due to an issue with reprepro and empty repo, we
-      # cannot use AFS mirrors until bionic-updates / bionic-backports actually
-      # have packages.
-      #$DIB_DISTRIBUTION_MIRROR_UBUNTU
-      #$DIB_DEBOOTSTRAP_EXTRA_ARGS
+      $DIB_DISTRIBUTION_MIRROR_UBUNTU
+      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
