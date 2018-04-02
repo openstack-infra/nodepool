@@ -400,14 +400,15 @@ class CleanupWorker(BaseWorker):
                                             upload.id)
                 if upload.state != u.state:
                     continue
-                self.log.info("Removing failed upload record: %s" % upload)
+                self.log.debug("Removing failed upload record: %s" % upload)
                 self._zk.deleteUpload(image, build_id, provider, upload.id)
             elif upload.state == zk.DELETING:
-                self.log.info(
+                self.log.debug(
                     "Removing deleted upload and record: %s" % upload)
                 self._deleteUpload(upload)
             elif upload.state == zk.FAILED:
-                self.log.info("Removing failed upload and record: %s" % upload)
+                self.log.debug(
+                    "Removing failed upload and record: %s" % upload)
                 self._deleteUpload(upload)
 
     def _cleanupImage(self, known_providers, image):
