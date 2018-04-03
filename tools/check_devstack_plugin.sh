@@ -39,7 +39,7 @@ function sshintonode {
     # Check that the root partition grew on boot; it should be a 5GiB
     # partition, but subtract some space for boot region.
     root_size=$(/tmp/ssh_wrapper $node -- lsblk -rbno SIZE /dev/vda1)
-    expected_root_size=$(( (5 * 1024 * 1024 * 1024) - ( 2048 * 1024 ) ))
+    expected_root_size=$(( (5 * 1024 * 1024 * 1024) - ( 4096 * 1024 ) ))
     if [[ $root_size -lt $expected_root_size ]]; then
         echo "Root device does not appear to have grown: $root_size"
         RETURN=1
