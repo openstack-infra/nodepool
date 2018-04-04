@@ -47,12 +47,19 @@ function sshintonode {
 }
 
 function waitforimage {
-    name=$1
-    state='ready'
+    local name=$1
+    local state='ready'
+    local builds
 
     while ! $NODEPOOL image-list | grep $name | grep $state; do
         $NODEPOOL image-list > ${LOGDIR}/nodepool-image-list.txt
         $NODEPOOL list > ${LOGDIR}/nodepool-list.txt
+
+        builds=$(ls -l /var/log/nodepool/builds/ | grep $name | wc -l)
+        if [[ ${builds} -ge 4 ]]; then
+            echo "*** Build of $name failed at least 3 times, aborting"
+            exit 1
+        fi
         sleep 10
     done
 }
