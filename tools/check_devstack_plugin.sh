@@ -4,6 +4,7 @@ LOGDIR=$1
 
 # Set to indiciate an error return
 RETURN=0
+FAILURE_REASON=""
 
 NODEPOOL_INSTALL=${NODEPOOL_INSTALL:-/opt/stack/nodepool-venv}
 NODEPOOL_CONFIG=${NODEPOOL_CONFIG:-/etc/nodepool/nodepool.yaml}
@@ -37,11 +38,16 @@ function sshintonode {
     /tmp/ssh_wrapper $node ls /
 
     # Check that the root partition grew on boot; it should be a 5GiB
-    # partition, but subtract some space for boot region.
+    # partition minus some space for the boot partition.  However
+    # emperical evidence suggests there is some modulo maths going on,
+    # (possibly with alignment?) that means we can vary up to even
+    # 64MiB.  Thus we choose an expected value that gives us enough
+    # slop to avoid false matches, but still indicates we resized up.
     root_size=$(/tmp/ssh_wrapper $node -- lsblk -rbno SIZE /dev/vda1)
-    expected_root_size=$(( (5 * 1024 * 1024 * 1024) - ( 4096 * 1024 ) ))
+    expected_root_size=$(( 5000000000 ))
     if [[ $root_size -lt $expected_root_size ]]; then
-        echo "Root device does not appear to have grown: $root_size"
+        echo "*** Root device does not appear to have grown: $root_size"
+        FAILURE_REASON="Root partition of $name does not appear to have grown: $root_size < $expected_root_size"
         RETURN=1
     fi
 }
@@ -173,4 +179,7 @@ $NODEPOOL delete --now 0000000000
 # show the deleted nodes (and their replacements may be building)
 $NODEPOOL list
 
+if [[ -n "${FAILURE_REASON}" ]]; then
+    echo "${FAILURE_REASON}"
+fi
 exit $RETURN
