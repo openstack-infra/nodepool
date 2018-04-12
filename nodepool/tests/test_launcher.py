@@ -17,11 +17,14 @@ import logging
 import math
 import time
 import fixtures
+import mock
 
 from nodepool import tests
 from nodepool import zk
 from nodepool.driver import Drivers
 import nodepool.launcher
+
+from kazoo import exceptions as kze
 
 
 class TestLauncher(tests.DBTestCase):
@@ -1277,3 +1280,33 @@ class TestLauncher(tests.DBTestCase):
         while launchers[0].supported_labels != {'fake-label', 'fake-label2'}:
             time.sleep(1)
             launchers = self.zk.getRegisteredLaunchers()
+
+    @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
+    def test_launchNode_session_expired(self, mock_launch):
+        '''
+        Test ZK session lost during _launchNode().
+        '''
+        mock_launch.side_effect = kze.SessionExpiredError()
+
+        # use a config with min-ready of 0
+        configfile = self.setup_config('node_launch_retry.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = 60
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        # A session loss during node launch should at least try to set the
+        # request state to FAILED (in a non-test scenario, it may actually
+        # be missing).
+        req = self.waitForNodeRequest(req, states=(zk.FAILED,))
+        self.assertEqual(1, mock_launch.call_count)
+
+        # Any znodes created for the request should eventually get deleted.
+        while self.zk.countPoolNodes('fake-provider', 'main'):
+            time.sleep(0)
