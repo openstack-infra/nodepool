@@ -1310,3 +1310,30 @@ class TestLauncher(tests.DBTestCase):
         # Any znodes created for the request should eventually get deleted.
         while self.zk.countPoolNodes('fake-provider', 'main'):
             time.sleep(0)
+
+    @mock.patch('nodepool.driver.NodeRequestHandler.poll')
+    def test_handler_poll_session_expired(self, mock_poll):
+        '''
+        Test ZK session lost during handler poll().
+        '''
+        mock_poll.side_effect = kze.SessionExpiredError()
+
+        # use a config with min-ready of 0
+        configfile = self.setup_config('node_launch_retry.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = 60
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        # A session loss during handler poll should at least remove the
+        # request from active handlers
+        req = self.waitForNodeRequest(req, states=(zk.PENDING,))
+        self.assertEqual(1, mock_poll.call_count)
+        self.assertEqual(0, len(
+            pool._pool_threads["fake-provider-main"].request_handlers))
