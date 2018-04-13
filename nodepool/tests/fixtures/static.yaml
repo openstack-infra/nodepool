@@ -10,6 +10,9 @@ labels:
   - name: fake-concurrent-label
     min-ready: 2
 
+  - name: fake-windows-label
+    min-ready: 2
+
 providers:
   - name: static-provider
     driver: static
@@ -20,10 +23,14 @@ providers:
             labels: fake-label
             host-key: ssh-rsa FAKEKEY
             timeout: 13
-            ssh-port: 22022
+            connection-port: 22022
             username: zuul
             max-parallel-jobs: 1
           - name: fake-host-2
             labels: fake-concurrent-label
             host-key: ssh-rsa FAKEKEY
             max-parallel-jobs: 2
+          - name: fake-host-3
+            labels: fake-windows-label
+            max-parallel-jobs: 1
+            connection-type: winrm

@@ -120,8 +120,8 @@ class StaticNodeRequestHandler(NodeRequestHandler):
             node.hostname = static_node["name"]
             node.username = static_node["username"]
             node.interface_ip = static_node["name"]
-            node.connection_port = static_node["ssh-port"]
-            node.connection_type = "ssh"
+            node.connection_port = static_node["connection-port"]
+            node.connection_type = static_node["connection-type"]
             nodeutils.set_node_ip(node)
             node.host_keys = self.manager.nodes_keys[static_node["name"]]
             node.provider = self.provider.name
