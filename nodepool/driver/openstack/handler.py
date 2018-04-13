@@ -196,18 +196,23 @@ class NodeLauncher(threading.Thread, stats.StatsReporter):
              self._node.interface_ip, self._node.public_ipv4,
              self._node.public_ipv6))
 
-        # Get the SSH public keys for the new node and record in ZooKeeper
+        # wait and scan the new node and record in ZooKeeper
         host_keys = []
         if self._pool.host_key_checking:
             try:
                 self.log.debug(
                     "Gathering host keys for node %s", self._node.id)
-                host_keys = utils.keyscan(
-                    interface_ip, timeout=self._provider_config.boot_timeout)
-                if not host_keys:
+                # only gather host keys if the connection type is ssh
+                gather_host_keys = connection_type == 'ssh'
+                host_keys = utils.nodescan(
+                    interface_ip,
+                    timeout=self._provider_config.boot_timeout,
+                    gather_hostkeys=gather_host_keys)
+
+                if gather_host_keys and not host_keys:
                     raise exceptions.LaunchKeyscanException(
                         "Unable to gather host keys")
-            except exceptions.SSHTimeoutException:
+            except exceptions.ConnectionTimeoutException:
                 self.logConsole(self._node.external_id, self._node.hostname)
                 raise
 

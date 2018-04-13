@@ -16,7 +16,7 @@ import logging
 
 from nodepool import exceptions
 from nodepool.driver import Provider
-from nodepool.nodeutils import keyscan
+from nodepool.nodeutils import nodescan
 
 
 class StaticNodeError(Exception):
@@ -36,11 +36,12 @@ class StaticNodeProvider(Provider):
     def checkHost(self, node):
         # Check node is reachable
         try:
-            keys = keyscan(node["name"],
-                           port=node["ssh-port"],
-                           timeout=node["timeout"])
-        except exceptions.SSHTimeoutException:
-            raise StaticNodeError("%s: SSHTimeoutException" % node["name"])
+            keys = nodescan(node["name"],
+                            port=node["ssh-port"],
+                            timeout=node["timeout"])
+        except exceptions.ConnectionTimeoutException:
+            raise StaticNodeError(
+                "%s: ConnectionTimeoutException" % node["name"])
 
         # Check node host-key
         if set(node["host-key"]).issubset(set(keys)):

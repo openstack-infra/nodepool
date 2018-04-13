@@ -952,6 +952,7 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(len(nodes), 1)
         self.assertEqual('zuul', nodes[0].username)
         self.assertEqual('winrm', nodes[0].connection_type)
+        self.assertEqual(nodes[0].host_keys, [])
 
     def test_unmanaged_image_provider_name(self):
         """
