@@ -92,7 +92,7 @@ def nodescan(ip, port=22, timeout=60, gather_hostkeys=True):
         except socket.error as e:
             if e.errno not in [errno.ECONNREFUSED, errno.EHOSTUNREACH, None]:
                 log.exception(
-                    'Exception with ssh access to %s:' % ip)
+                    'Exception connecting to %s on port %s:' % (ip, port))
         except Exception as e:
             log.exception("ssh-keyscan failure: %s", e)
         finally:

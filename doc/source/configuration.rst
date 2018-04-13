@@ -262,7 +262,7 @@ Example configuration::
     When set to True, nodepool-builder will not build the diskimage.
 
   ``username`` (string)
-    The username that a consumer should use when connecting onto the node. Defaults
+    The username that a consumer should use when connecting to the node. Defaults
     to ``zuul``.
 
 .. _provider:
@@ -536,6 +536,7 @@ Example configuration::
           key2: value
     - name: windows
       connection-type: winrm
+      connection-port: 5986
 
 **required**
 
@@ -559,10 +560,14 @@ Example configuration::
     values must be 255 characters or less.
 
   ``connection-type`` (string)
-    The connection type that a consumer should use when connecting onto the
+    The connection type that a consumer should use when connecting to the
     node. For most diskimages this is not necessary. However when creating
     Windows images this could be 'winrm' to enable access via ansible.
 
+  ``connection-port`` (int)
+    The port that a consumer should use when connecting to the
+    node. For most diskimages this is not necessary. This defaults to 22 for
+    ssh and 5986 for winrm.
 
 .. _provider_cloud_images:
 
@@ -580,6 +585,7 @@ Example configuration::
       config-drive: False
     - name: windows-external
       connection-type: winrm
+      connection-port: 5986
 
 **required**
 
@@ -608,12 +614,17 @@ Example configuration::
     provider by this name or ID.  Mutually exclusive with ``image-id``.
 
   ``username`` (str)
-    The username that a consumer should use when connecting onto the node.
+    The username that a consumer should use when connecting to the node.
 
   ``connection-type`` (str)
-    The connection type that a consumer should use when connecting onto the
+    The connection type that a consumer should use when connecting to the
     node. For most diskimages this is not necessary. However when creating
     Windows images this could be 'winrm' to enable access via ansible.
+
+  ``connection-port`` (int)
+    The port that a consumer should use when connecting to the
+    node. For most diskimages this is not necessary. This defaults to 22
+    for ssh and 5986 for winrm.
 
 .. _pool_labels:
 

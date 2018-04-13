@@ -125,6 +125,12 @@ class OpenStackProviderConfig(ProviderConfig):
             'image-name-format',
             '{image_name}-{timestamp}'
         )
+
+        default_port_mapping = {
+            'ssh': 22,
+            'winrm': 5986,
+        }
+
         self.diskimages = {}
         for image in self.provider.get('diskimages', []):
             i = ProviderDiskImage()
@@ -135,6 +141,9 @@ class OpenStackProviderConfig(ProviderConfig):
             i.pause = bool(image.get('pause', False))
             i.config_drive = image.get('config-drive', None)
             i.connection_type = image.get('connection-type', 'ssh')
+            i.connection_port = image.get(
+                'connection-port',
+                default_port_mapping.get(i.connection_type, 22))
 
             # This dict is expanded and used as custom properties when
             # the image is uploaded.
@@ -159,6 +168,9 @@ class OpenStackProviderConfig(ProviderConfig):
             i.image_name = image.get('image-name', None)
             i.username = image.get('username', None)
             i.connection_type = image.get('connection-type', 'ssh')
+            i.connection_port = image.get(
+                'connection-port',
+                default_port_mapping.get(i.connection_type, 22))
             self.cloud_images[i.name] = i
 
         self.pools = {}
@@ -214,12 +226,14 @@ class OpenStackProviderConfig(ProviderConfig):
             'meta': dict,
             'config-drive': bool,
             'connection-type': str,
+            'connection-port': int,
         }
 
         provider_cloud_images = {
             'name': str,
             'config-drive': bool,
             'connection-type': str,
+            'connection-port': int,
             v.Exclusive('image-id', 'cloud-image-name-or-id'): str,
             v.Exclusive('image-name', 'cloud-image-name-or-id'): str,
             'username': str,

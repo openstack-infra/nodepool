@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    The connection port can now be configured in the provider diskimages
+    section.
