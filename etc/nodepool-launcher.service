@@ -1,0 +1,15 @@
+[Unit]
+Description=Nodepool Launcher Service
+After=syslog.target network.target
+
+[Service]
+Type=forking
+# Options to pass to nodepool-launcher.
+Group=nodepool
+User=nodepool
+RuntimeDirectory=nodepool
+ExecStart=/usr/local/bin/nodepool-launcher
+PIDFile=/var/run/nodepool/nodepool.pid
+
+[Install]
+WantedBy=multi-user.target
