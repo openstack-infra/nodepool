@@ -2,7 +2,9 @@ images-dir: '{images_dir}'
 build-log-dir: '{build_log_dir}'
 
 zookeeper-servers:
-  - host: localhost
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
 
 labels:
   - name: fake-label
