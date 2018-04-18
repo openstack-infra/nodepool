@@ -714,7 +714,7 @@ Example::
               labels: trusty-static
               host-key: fake-key
               timeout: 13
-              ssh-port: 22022
+              connection-port: 22022
               username: zuul
               max-parallel-jobs: 1
 
@@ -747,8 +747,14 @@ corresponding label.
   ``host-key``
   The ssh host key of the node.
 
-  ``ssh-port``
-  The ssh port, default to *22*
+  ``connection-type`` (string)
+    The connection type that a consumer should use when connecting to the
+    node. Should be set to either 'ssh' or 'winrm'. Defaults to 'ssh'.
+
+  ``connection-port`` (int)
+    The port that a consumer should use when connecting to the node.
+    For most nodes this is not necessary. This defaults to 22 when
+    ``connection-type`` is 'ssh' and 5986 when it is 'winrm'.
 
   ``max-parallel-jobs``
   The number of jobs that can run in parallel on this node, default to *1*.

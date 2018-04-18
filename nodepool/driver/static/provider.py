@@ -35,9 +35,11 @@ class StaticNodeProvider(Provider):
 
     def checkHost(self, node):
         # Check node is reachable
+        if node["connection-type"] != "ssh":
+            return
         try:
             keys = nodescan(node["name"],
-                            port=node["ssh-port"],
+                            port=node["connection-port"],
                             timeout=node["timeout"])
         except exceptions.ConnectionTimeoutException:
             raise StaticNodeError(

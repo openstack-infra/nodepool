@@ -57,7 +57,10 @@ class StaticProviderConfig(ProviderConfig):
                     'labels': as_list(node['labels']),
                     'host-key': as_list(node.get('host-key', [])),
                     'timeout': int(node.get('timeout', 5)),
-                    'ssh-port': int(node.get('ssh-port', 22)),
+                    # Read ssh-port values for backward compat, but prefer port
+                    'connection-port': int(
+                        node.get('port', node.get('ssh-port', 22))),
+                    'connection-type': node.get('connection-type', 'ssh'),
                     'username': node.get('username', 'zuul'),
                     'max-parallel-jobs': int(node.get('max-parallel-jobs', 1)),
                 })
@@ -72,7 +75,8 @@ class StaticProviderConfig(ProviderConfig):
             'username': str,
             'timeout': int,
             'host-key': v.Any(str, [str]),
-            'ssh-port': int,
+            'connection-port': int,
+            'connection-type': str,
             'max-parallel-jobs': int,
         }
         pool = {

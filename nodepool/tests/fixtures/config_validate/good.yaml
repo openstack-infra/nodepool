@@ -90,7 +90,7 @@ providers:
             labels: trusty-static
             host-key: fake-key
             timeout: 13
-            ssh-port: 22022
+            connection-port: 22022
             username: zuul
             max-parallel-jobs: 1
 

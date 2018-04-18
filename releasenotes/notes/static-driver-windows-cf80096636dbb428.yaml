@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Added support for configuring windows static nodes. A static node can now
+    define a ``connection-type``. The ``ssh-port`` option has been renamed
+    to ``connection-port``.
+deprecations:
+  - |
+    ``ssh-port`` in static node config is deprecated. Please update config to
+    use ``connection-port`` instead.
