@@ -21,7 +21,7 @@ from nodepool import builder
 from nodepool import provider_manager
 from nodepool import tests
 from nodepool import zk
-from nodepool.driver.openstack.handler import OpenStackNodeLaunchManager
+from nodepool.driver.openstack.handler import OpenStackNodeRequestHandler
 
 
 class TestNodeLaunchManager(tests.DBTestCase):
@@ -47,21 +47,45 @@ class TestNodeLaunchManager(tests.DBTestCase):
             self.provider, False)
         self.pmanager.resetClient()
 
+    def _createHandler(self, retries=1):
+        # Mock NodeRequest handler object
+        class FakePoolWorker:
+            launcher_id = 'Test'
+
+        class FakeRequest:
+            requestor = 'zuul'
+
+        class FakeProvider:
+            launch_retries = retries
+
+        handler = OpenStackNodeRequestHandler(FakePoolWorker(), FakeRequest())
+        handler.zk = self.zk
+        handler.pool = self.provider_pool
+        handler.manager = self.pmanager
+        handler.provider = FakeProvider()
+        return handler
+
+    def _launch(self, handler, node):
+        # Mock NodeRequest runHandler method
+        thread = handler.launch(node)
+        thread.start()
+        handler._threads.append(thread)
+        handler.nodeset.append(node)
+
     def test_successful_launch(self):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
+        handler = self._createHandler(1)
 
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
-                                         self.pmanager, 'zuul', 1)
-        mgr.launch(n1)
-        while not mgr.poll():
+        self._launch(handler, n1)
+        while not handler.pollLauncher():
             time.sleep(0)
-        self.assertEqual(len(mgr.ready_nodes), 1)
-        self.assertEqual(len(mgr.failed_nodes), 0)
-        nodes = mgr._provider_manager.listNodes()
+        self.assertEqual(len(handler.ready_nodes), 1)
+        self.assertEqual(len(handler.failed_nodes), 0)
+        nodes = handler.manager.listNodes()
         self.assertEqual(nodes[0]['metadata']['groups'],
                          'fake-provider,fake-image,fake-label')
 
@@ -69,23 +93,23 @@ class TestNodeLaunchManager(tests.DBTestCase):
     def test_failed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
+        handler = self._createHandler(1)
 
         mock_launch.side_effect = Exception()
         n1 = zk.Node()
         n1.state = zk.BUILDING
         n1.type = 'fake-label'
-        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
-                                         self.pmanager, 'zuul', 1)
-        mgr.launch(n1)
-        while not mgr.poll():
+        self._launch(handler, n1)
+        while not handler.pollLauncher():
             time.sleep(0)
-        self.assertEqual(len(mgr.failed_nodes), 1)
-        self.assertEqual(len(mgr.ready_nodes), 0)
+        self.assertEqual(len(handler.failed_nodes), 1)
+        self.assertEqual(len(handler.ready_nodes), 0)
 
     @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
     def test_mixed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
+        handler = self._createHandler(1)
 
         mock_launch.side_effect = [None, Exception()]
         n1 = zk.Node()
@@ -94,11 +118,9 @@ class TestNodeLaunchManager(tests.DBTestCase):
         n2 = zk.Node()
         n2.state = zk.BUILDING
         n2.type = 'fake-label'
-        mgr = OpenStackNodeLaunchManager(self.zk, self.provider_pool,
-                                         self.pmanager, 'zuul', 1)
-        mgr.launch(n1)
-        mgr.launch(n2)
-        while not mgr.poll():
+        self._launch(handler, n1)
+        self._launch(handler, n2)
+        while not handler.pollLauncher():
             time.sleep(0)
-        self.assertEqual(len(mgr.failed_nodes), 1)
-        self.assertEqual(len(mgr.ready_nodes), 1)
+        self.assertEqual(len(handler._failed_nodes), 1)
+        self.assertEqual(len(handler._ready_nodes), 1)

@@ -16,12 +16,12 @@
 
 import voluptuous as v
 
-from nodepool.driver import ConfigValue
+from nodepool.driver import ConfigPool
 from nodepool.driver import ProviderConfig
 from nodepool.config import as_list
 
 
-class StaticPool(ConfigValue):
+class StaticPool(ConfigPool):
     def __eq__(self, other):
         if (other.labels != self.labels or
             other.nodes != self.nodes):

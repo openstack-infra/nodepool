@@ -21,14 +21,7 @@ from nodepool.driver import NodeRequestHandler
 class TestHandler(NodeRequestHandler):
     log = logging.getLogger("nodepool.driver.test.TestHandler")
 
-    def run_handler(self):
-        self._setFromPoolWorker()
-        node = zk.Node()
+    def launch(self, node):
         node.state = zk.READY
         node.external_id = "test-%s" % self.request.id
-        node.provider = self.provider.name
-        node.launcher = self.launcher_id
-        node.allocated_to = self.request.id
-        node.type = self.request.node_types[0]
-        self.nodeset.append(node)
         self.zk.storeNode(node)

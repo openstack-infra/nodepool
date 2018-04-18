@@ -1188,7 +1188,7 @@ class TestLauncher(tests.DBTestCase):
         provider2_second.state = zk.DELETING
         self.zk.storeNode(provider2_second)
 
-        # Set provider1 run_handler to throw exception to simulate a
+        # Set provider1 runHandler to throw exception to simulate a
         # broken cloud. Note the pool worker instantiates request handlers on
         # demand which is why we have a somewhat convoluted monkey patch here.
         # We must patch deep enough in the request handler that
@@ -1199,7 +1199,7 @@ class TestLauncher(tests.DBTestCase):
         def raise_KeyError(node):
             raise KeyError('fake-provider')
 
-        request_handler.launch_manager.launch = raise_KeyError
+        request_handler.launch = raise_KeyError
 
         # Delete instance in fake-provider. This should cause provider2
         # to service the request that was held pending by fake-provider.
