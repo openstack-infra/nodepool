@@ -377,6 +377,7 @@ class CleanupWorker(BaseCleanupWorker):
             (self._cleanupLeakedInstances, 'leaked instance cleanup'),
             (self._cleanupLostRequests, 'lost request cleanup'),
             (self._cleanupMaxReadyAge, 'max ready age cleanup'),
+            (self._cleanupMaxHoldAge, 'max hold age cleanup'),
         ]
 
     def _resetLostRequest(self, zk_conn, req):
@@ -625,12 +626,6 @@ class CleanupWorker(BaseCleanupWorker):
             except Exception:
                 self.log.exception(
                     "Exception in %s (%s)", self.name, description)
-
-        try:
-            self._cleanupMaxHoldAge()
-        except Exception:
-            self.log.exception(
-                "Exception in CleanupWorker (max hold age cleanup):")
 
 
 class DeletedNodeWorker(BaseCleanupWorker):
