@@ -735,7 +735,7 @@ class TestLauncher(tests.DBTestCase):
     def test_hold_expiration_no_default(self):
         """Test a held node is deleted when past its operator-specified TTL,
         no max-hold-age set"""
-        configfile = self.setup_config('node_max_ready_age.yaml')
+        configfile = self.setup_config('node_max_hold_age_no_default.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         self.useBuilder(configfile)
         pool.start()
@@ -748,7 +748,7 @@ class TestLauncher(tests.DBTestCase):
         # hold the node
         node.state = zk.HOLD
         node.comment = 'testing'
-        node.hold_expiration = 5
+        node.hold_expiration = 1
         self.zk.lockNode(node, blocking=False)
         self.zk.storeNode(node)
         self.zk.unlockNode(node)
