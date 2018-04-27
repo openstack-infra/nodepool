@@ -1,10 +1,10 @@
 Nodepool
 ========
 
-Nodepool is a system for launching single-use test nodes on demand
-based on images built with cached data.  It is designed to work with
-any OpenStack based cloud, and is part of a suite of tools that form a
-comprehensive test system, including Zuul.
+Nodepool is a system for managing test node resources. It supports
+launching single-use test nodes from cloud providers as well as managing
+access to pre-defined pre-existing nodes. Nodepool is part of a suite of
+tools that form a comprehensive test system, including Zuul.
 
 Contents:
 
