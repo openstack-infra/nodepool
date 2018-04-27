@@ -1292,7 +1292,8 @@ class TestLauncher(tests.DBTestCase):
             time.sleep(1)
             launchers = self.zk.getRegisteredLaunchers()
 
-    @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
+    @mock.patch('nodepool.driver.openstack.handler.'
+                'OpenStackNodeLauncher._launchNode')
     def test_launchNode_session_expired(self, mock_launch):
         '''
         Test ZK session lost during _launchNode().

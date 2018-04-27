@@ -51,35 +51,30 @@ class StatsReporter(object):
         super(StatsReporter, self).__init__()
         self._statsd = get_client()
 
-    def recordLaunchStats(self, subkey, dt, image_name,
-                          provider_name, node_az, requestor):
+    def recordLaunchStats(self, subkey, dt):
         '''
         Record node launch statistics.
 
         :param str subkey: statsd key
         :param int dt: Time delta in milliseconds
-        :param str image_name: Name of the image used
-        :param str provider_name: Name of the provider
-        :param str node_az: AZ of the launched node
-        :param str requestor: Identifier for the request originator
         '''
         if not self._statsd:
             return
 
         keys = [
-            'nodepool.launch.provider.%s.%s' % (provider_name, subkey),
-            'nodepool.launch.image.%s.%s' % (image_name, subkey),
+            'nodepool.launch.provider.%s.%s' % (
+                self.provider_config.name, subkey),
             'nodepool.launch.%s' % (subkey,),
         ]
 
-        if node_az:
+        if self.node.az:
             keys.append('nodepool.launch.provider.%s.%s.%s' %
-                        (provider_name, node_az, subkey))
+                        (self.provider_config.name, self.node.az, subkey))
 
-        if requestor:
+        if self.handler.request.requestor:
             # Replace '.' which is a graphite hierarchy, and ':' which is
             # a statsd delimeter.
-            requestor = requestor.replace('.', '_')
+            requestor = self.handler.request.requestor.replace('.', '_')
             requestor = requestor.replace(':', '_')
             keys.append('nodepool.launch.requestor.%s.%s' %
                         (requestor, subkey))

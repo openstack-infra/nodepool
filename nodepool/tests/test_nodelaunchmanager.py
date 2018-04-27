@@ -89,7 +89,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.assertEqual(nodes[0]['metadata']['groups'],
                          'fake-provider,fake-image,fake-label')
 
-    @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
+    @mock.patch('nodepool.driver.openstack.handler.'
+                'OpenStackNodeLauncher._launchNode')
     def test_failed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
@@ -105,7 +106,8 @@ class TestNodeLaunchManager(tests.DBTestCase):
         self.assertEqual(len(handler.failed_nodes), 1)
         self.assertEqual(len(handler.ready_nodes), 0)
 
-    @mock.patch('nodepool.driver.openstack.handler.NodeLauncher._launchNode')
+    @mock.patch('nodepool.driver.openstack.handler.'
+                'OpenStackNodeLauncher._launchNode')
     def test_mixed_launch(self, mock_launch):
         configfile = self.setup_config('node.yaml')
         self._setup(configfile)
