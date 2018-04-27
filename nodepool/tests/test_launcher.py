@@ -1064,6 +1064,10 @@ class TestLauncher(tests.DBTestCase):
         pool.start()
         self.wait_for_config(pool)
 
+        fake_image = pool.config.diskimages['fake-image']
+        self.assertIn('REG_PASSWORD', fake_image.env_vars)
+        self.assertEqual('secret', fake_image.env_vars['REG_PASSWORD'])
+
         zk_servers = pool.config.zookeeper_servers
         self.assertEqual(1, len(zk_servers))
         key = list(zk_servers.keys())[0]

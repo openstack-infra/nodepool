@@ -102,6 +102,14 @@ class Config(ConfigValue):
             d.username = diskimage.get('username', 'zuul')
             self.diskimages[d.name] = d
 
+    def setSecureDiskimageEnv(self, diskimages, secure_config_path):
+        for diskimage in diskimages:
+            if diskimage['name'] not in self.diskimages:
+                raise Exception('%s: unknown diskimage %s' %
+                                (secure_config_path, diskimage['name']))
+            self.diskimages[diskimage['name']].env_vars.update(
+                diskimage['env-vars'])
+
     def setLabels(self, labels_cfg):
         if not labels_cfg:
             return
@@ -222,3 +230,5 @@ def loadSecureConfig(config, secure_config_path):
 
     # TODO(Shrews): Support ZooKeeper auth
     config.setZooKeeperServers(secure.get('zookeeper-servers'))
+    config.setSecureDiskimageEnv(
+        secure.get('diskimages', []), secure_config_path)
