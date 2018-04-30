@@ -27,11 +27,11 @@ class StaticNodeRequestHandler(NodeRequestHandler):
     def _checkConcurrency(self, static_node):
         access_count = 0
 
-        unavailable_states = ['in-use']
+        unavailable_states = [zk.IN_USE]
         if not self.request.reuse:
             # When re-use is disabled (e.g. for Min-Ready request), we need
             # to consider 'ready' node as in-use.
-            unavailable_states.append('ready')
+            unavailable_states.append(zk.READY)
 
         for node in self.zk.nodeIterator():
             if node.hostname != static_node["name"]:
