@@ -32,7 +32,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         self.useFixture(config_dir)
         self.clouds_path = os.path.join(config_dir.path, 'clouds.yaml')
         self.useFixture(fixtures.MonkeyPatch(
-            'os_client_config.config.CONFIG_FILES',
+            'openstack.config.loader.CONFIG_FILES',
             [self.clouds_path]))
 
         with open(self.clouds_path, 'w') as h:

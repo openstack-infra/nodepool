@@ -192,7 +192,7 @@ class BaseTestCase(testtools.TestCase):
         clouds_path = os.path.join(os.path.dirname(__file__),
                                    'fixtures', 'clouds.yaml')
         self.useFixture(fixtures.MonkeyPatch(
-            'os_client_config.config.CONFIG_FILES', [clouds_path]))
+            'openstack.config.loader.CONFIG_FILES', [clouds_path]))
 
     def wait_for_threads(self):
         # Wait until all transient threads (node launches, deletions,
