@@ -17,7 +17,6 @@ from copy import copy
 import abc
 import json
 import logging
-import six
 import time
 from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
@@ -204,7 +203,7 @@ class BaseModel(Serializable):
 
     @id.setter
     def id(self, value):
-        if not isinstance(value, six.string_types):
+        if not isinstance(value, str):
             raise TypeError("'id' attribute must be a string type")
         self._id = value
 

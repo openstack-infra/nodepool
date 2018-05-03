@@ -18,9 +18,8 @@
 
 import sys
 import threading
-import six
-from six.moves import queue as Queue
 import logging
+import queue
 import time
 import requests.exceptions
 
@@ -51,7 +50,7 @@ class Task(object):
     def wait(self):
         self._wait_event.wait()
         if self._exception:
-            six.reraise(self._exception, None, self._traceback)
+            raise self._exception.with_traceback(self._traceback)
         return self._result
 
     def run(self, client):
@@ -69,7 +68,7 @@ class TaskManager(threading.Thread):
     def __init__(self, client, name, rate):
         super(TaskManager, self).__init__(name=name)
         self.daemon = True
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
         self._running = True
         self.name = name
         self.rate = float(rate)
