@@ -66,12 +66,13 @@
     run: playbooks/nodepool-functional-py35-src/run.yaml
     vars:
       devstack_localrc:
-        LIBS_FROM_GIT: shade,glean,diskimage-builder
+        LIBS_FROM_GIT: shade,glean,diskimage-builder,openstacksdk
     required-projects:
       - openstack-infra/glean
       - openstack-infra/nodepool
       - openstack-infra/shade
       - openstack/diskimage-builder
+      - openstack/openstacksdk
 
 - job:
     name: nodepool-functional-py35-src
