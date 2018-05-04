@@ -207,7 +207,6 @@ EOF
     fi
 
     NODEPOOL_CENTOS_7_MIN_READY=1
-    NODEPOOL_DEBIAN_JESSIE_MIN_READY=1
     NODEPOOL_DEBIAN_STRETCH_MIN_READY=1
     NODEPOOL_FEDORA_27_MIN_READY=1
     NODEPOOL_UBUNTU_BIONIC_MIN_READY=1
@@ -219,9 +218,6 @@ EOF
 
     if $NODEPOOL_PAUSE_CENTOS_7_DIB ; then
        NODEPOOL_CENTOS_7_MIN_READY=0
-    fi
-    if $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB ; then
-       NODEPOOL_DEBIAN_JESSIE_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB ; then
        NODEPOOL_DEBIAN_STRETCH_MIN_READY=0
@@ -262,8 +258,6 @@ zookeeper-servers:
 labels:
   - name: centos-7
     min-ready: $NODEPOOL_CENTOS_7_MIN_READY
-  - name: debian-jessie
-    min-ready: $NODEPOOL_DEBIAN_JESSIE_MIN_READY
   - name: debian-stretch
     min-ready: $NODEPOOL_DEBIAN_STRETCH_MIN_READY
   - name: fedora-27
@@ -292,8 +286,6 @@ providers:
     diskimages:
       - name: centos-7
         config-drive: true
-      - name: debian-jessie
-        config-drive: true
       - name: debian-stretch
         config-drive: true
       - name: fedora-27
@@ -317,12 +309,6 @@ providers:
           - name: centos-7
             diskimage: centos-7
             min-ram: 1024
-            flavor-name: 'nodepool'
-            console-log: True
-            key-name: $NODEPOOL_KEY_NAME
-          - name: debian-jessie
-            diskimage: debian-jessie
-            min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
             key-name: $NODEPOOL_KEY_NAME
@@ -394,33 +380,6 @@ diskimages:
       DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
       DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
       $DIB_DISTRIBUTION_MIRROR_CENTOS
-      $DIB_GET_PIP
-      $DIB_GLEAN_INSTALLTYPE
-      $DIB_GLEAN_REPOLOCATION
-      $DIB_GLEAN_REPOREF
-  - name: debian-jessie
-    pause: $NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB
-    rebuild-age: 86400
-    elements:
-      - debian-minimal
-      - vm
-      - simple-init
-      - growroot
-      - devuser
-      - openssh-server
-      - nodepool-setup
-    release: jessie
-    env-vars:
-      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
-      DIB_CHECKSUM: '1'
-      DIB_SHOW_IMAGE_USAGE: '1'
-      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
-      DIB_APT_LOCAL_CACHE: '0'
-      DIB_DISABLE_APT_CLEANUP: '1'
-      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
-      DIB_DEBIAN_COMPONENTS: 'main'
-      $DIB_DISTRIBUTION_MIRROR_DEBIAN
-      $DIB_DEBOOTSTRAP_EXTRA_ARGS
       $DIB_GET_PIP
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION

@@ -119,7 +119,6 @@
     parent: nodepool-functional-py35-src-base
     vars:
       devstack_localrc:
-        NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB: false
         NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB: false
 
 - project:
