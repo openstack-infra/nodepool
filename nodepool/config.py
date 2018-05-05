@@ -95,6 +95,9 @@ class Config(ConfigValue):
             if not isinstance(d.env_vars, dict):
                 d.env_vars = {}
             d.image_types = set(diskimage.get('formats', []))
+            # Ensure at least qcow2 is set to be passed to qemu-img
+            if not d.image_types:
+                d.image_types.add('qcow2')
             d.pause = bool(diskimage.get('pause', False))
             d.username = diskimage.get('username', 'zuul')
             self.diskimages[d.name] = d
