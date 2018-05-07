@@ -1,6 +1,7 @@
 *.egg
 *.egg-info
 *.pyc
+.stestr
 .test
 .testrepository
 .tox
