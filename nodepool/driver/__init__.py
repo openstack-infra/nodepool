@@ -25,8 +25,6 @@ import os
 import time
 import threading
 
-import six
-
 from kazoo import exceptions as kze
 
 from nodepool import zk
@@ -107,8 +105,7 @@ class Drivers:
             raise RuntimeError("%s: unknown driver" % name)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class Provider(object):
+class Provider(object, metaclass=abc.ABCMeta):
     """The Provider interface
 
     The class or instance attribute **name** must be provided as a string.
@@ -147,8 +144,7 @@ class Provider(object):
         pass
 
 
-@six.add_metaclass(abc.ABCMeta)
-class NodeRequestHandler(object):
+class NodeRequestHandler(object, metaclass=abc.ABCMeta):
     '''
     Class to process a single nodeset request.
 
@@ -707,8 +703,7 @@ class Driver(ConfigValue):
     pass
 
 
-@six.add_metaclass(abc.ABCMeta)
-class ProviderConfig(ConfigValue):
+class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
     """The Provider config interface
 
     The class or instance attribute **name** must be provided as a string.

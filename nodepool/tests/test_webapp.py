@@ -16,7 +16,7 @@
 import json
 import logging
 import yaml
-from six.moves.urllib import request
+from urllib import request
 
 from nodepool import tests
 from nodepool import zk
