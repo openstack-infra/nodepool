@@ -33,6 +33,10 @@ class StaticPool(ConfigPool):
 
 
 class StaticProviderConfig(ProviderConfig):
+    def __init__(self, *args, **kwargs):
+        self.__pools = {}
+        super().__init__(*args, **kwargs)
+
     def __eq__(self, other):
         if other.pools != self.pools:
             return False
@@ -42,8 +46,11 @@ class StaticProviderConfig(ProviderConfig):
     def reset():
         pass
 
+    @property
+    def pools(self):
+        return self.__pools
+
     def load(self, config):
-        self.pools = {}
         for pool in self.provider.get('pools', []):
             pp = StaticPool()
             pp.name = pool['name']

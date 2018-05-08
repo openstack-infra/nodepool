@@ -725,6 +725,14 @@ class ProviderConfig(ConfigValue):
     def __repr__(self):
         return "<Provider %s>" % self.name
 
+    @property
+    @abc.abstractmethod
+    def pools(self):
+        '''
+        Return a dict of ConfigPool-based objects, indexed by pool name.
+        '''
+        pass
+
     @abc.abstractmethod
     def __eq__(self, other):
         pass

@@ -79,6 +79,10 @@ class ProviderPool(ConfigPool):
 class OpenStackProviderConfig(ProviderConfig):
     os_client_config = None
 
+    def __init__(self, *args, **kwargs):
+        self.__pools = {}
+        super().__init__(*args, **kwargs)
+
     def __eq__(self, other):
         if (other.cloud_config != self.cloud_config or
             other.pools != self.pools or
@@ -98,6 +102,10 @@ class OpenStackProviderConfig(ProviderConfig):
             if arg in self.provider:
                 cloud_kwargs[arg] = self.provider[arg]
         return cloud_kwargs
+
+    @property
+    def pools(self):
+        return self.__pools
 
     @staticmethod
     def reset():
@@ -174,7 +182,6 @@ class OpenStackProviderConfig(ProviderConfig):
                 default_port_mapping.get(i.connection_type, 22))
             self.cloud_images[i.name] = i
 
-        self.pools = {}
         for pool in self.provider.get('pools', []):
             pp = ProviderPool()
             pp.name = pool['name']
