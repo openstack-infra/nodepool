@@ -173,7 +173,7 @@ formatter=simple
 args=(sys.stdout,)
 
 [formatter_simple]
-format=%(asctime)s %(levelname)s %(name)s: %(message)s
+format=%(message)s
 datefmt=
 EOF
 
