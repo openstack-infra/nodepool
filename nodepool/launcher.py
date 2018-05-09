@@ -882,7 +882,7 @@ class NodePool(threading.Thread):
             ready in at least one provider. False otherwise.
         '''
         for pool in label.pools:
-            if not pool.provider.driver.manage_images:
+            if not pool.provider.manage_images:
                 # Provider doesn't manage images, assuming label is ready
                 return True
             for pool_label in pool.labels.values():

@@ -107,6 +107,10 @@ class OpenStackProviderConfig(ProviderConfig):
     def pools(self):
         return self.__pools
 
+    @property
+    def manage_images(self):
+        return True
+
     @staticmethod
     def reset():
         OpenStackProviderConfig.os_client_config = None
@@ -119,7 +123,6 @@ class OpenStackProviderConfig(ProviderConfig):
         self.cloud_config = self.os_client_config.get_one_cloud(**cloud_kwargs)
 
         self.image_type = self.cloud_config.config['image_format']
-        self.driver.manage_images = True
         self.region_name = self.provider.get('region-name')
         self.rate = float(self.provider.get('rate', 1.0))
         self.boot_timeout = self.provider.get('boot-timeout', 60)
