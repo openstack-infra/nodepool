@@ -20,7 +20,6 @@ else
     source /opt/stack/devstack/stackrc
 fi
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-True}
-NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB=${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB:-True}
 NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB=${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB:-True}
 NODEPOOL_PAUSE_FEDORA_27_DIB=${NODEPOOL_PAUSE_FEDORA_27_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB=${NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB:-True}
@@ -88,15 +87,6 @@ if [ ${NODEPOOL_PAUSE_CENTOS_7_DIB,,} = 'false' ]; then
     waitfornode centos-7
     # check ssh for root user
     sshintonode centos-7
-fi
-
-if [ ${NODEPOOL_PAUSE_DEBIAN_JESSIE_DIB,,} = 'false' ]; then
-    # check that image built
-    waitforimage debian-jessie
-    # check image was bootable
-    waitfornode debian-jessie
-    # check ssh for root user
-    sshintonode debian-jessie
 fi
 
 if [ ${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB,,} = 'false' ]; then
