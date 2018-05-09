@@ -207,7 +207,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
 
         :returns: True if it is available, False otherwise.
         '''
-        if self.provider.driver.manage_images:
+        if self.provider.manage_images:
             for label in self.request.node_types:
                 if self.pool.labels[label].cloud_image:
                     if not self.manager.labelReady(self.pool.labels[label]):
@@ -715,7 +715,6 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
         self.driver = Driver()
         self.driver.name = provider.get('driver', 'openstack')
         self.max_concurrency = provider.get('max-concurrency', -1)
-        self.driver.manage_images = False
 
     def __repr__(self):
         return "<Provider %s>" % self.name
@@ -725,6 +724,14 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
     def pools(self):
         '''
         Return a dict of ConfigPool-based objects, indexed by pool name.
+        '''
+        pass
+
+    @property
+    @abc.abstractmethod
+    def manage_images(self):
+        '''
+        Return True if provider manages external images, False otherwise.
         '''
         pass
 

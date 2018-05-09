@@ -39,6 +39,10 @@ class TestConfig(ProviderConfig):
     def pools(self):
         return self.__pools
 
+    @property
+    def manage_images(self):
+        return False
+
     def load(self, newconfig):
         self.labels = set()
         for pool in self.provider.get('pools', []):
