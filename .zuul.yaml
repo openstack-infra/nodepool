@@ -64,9 +64,6 @@
     name: nodepool-functional-py35-src-base
     parent: nodepool-functional-base
     run: playbooks/nodepool-functional-py35-src/run.yaml
-    vars:
-      devstack_localrc:
-        LIBS_FROM_GIT: shade,glean,diskimage-builder,openstacksdk
     required-projects:
       - openstack-infra/glean
       - openstack-infra/nodepool
