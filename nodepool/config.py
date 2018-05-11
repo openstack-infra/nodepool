@@ -38,6 +38,27 @@ class Config(ConfigValue):
         self.providers = {}
         self.provider_managers = {}
         self.zookeeper_servers = {}
+        self.elementsdir = None
+        self.imagesdir = None
+        self.build_log_dir = None
+        self.build_log_retention = None
+        self.max_hold_age = None
+        self.webapp = None
+
+    def __eq__(self, other):
+        if isinstance(other, Config):
+            return (self.diskimages == other.diskimages and
+                    self.labels == other.labels and
+                    self.providers == other.providers and
+                    self.provider_managers == other.provider_managers and
+                    self.zookeeper_servers == other.zookeeper_servers and
+                    self.elementsdir == other.elementsdir and
+                    self.imagesdir == other.imagesdir and
+                    self.build_log_dir == other.build_log_dir and
+                    self.build_log_retention == other.build_log_retention and
+                    self.max_hold_age == other.max_hold_age and
+                    self.webapp == other.webapp)
+        return False
 
     def setElementsDir(self, value):
         self.elementsdir = value
@@ -122,25 +143,46 @@ class Config(ConfigValue):
 
 
 class Label(ConfigValue):
+    def __init__(self):
+        self.name = None
+        self.max_ready_age = None
+        self.min_ready = None
+        self.pools = None
+
+    def __eq__(self, other):
+        if isinstance(other, Label):
+            return (self.name == other.name and
+                    self.max_ready_age == other.max_ready_age and
+                    self.min_ready == other.min_ready and
+                    self.pools == other.pools)
+        return False
+
     def __repr__(self):
         return "<Label %s>" % self.name
 
 
 class DiskImage(ConfigValue):
-    def __eq__(self, other):
-        if (other.name != self.name or
-            other.elements != self.elements or
-            other.release != self.release or
-            other.rebuild_age != self.rebuild_age or
-            other.env_vars != self.env_vars or
-            other.image_types != self.image_types or
-            other.pause != self.pause or
-            other.username != self.username):
-            return False
-        return True
+    def __init__(self):
+        self.name = None
+        self.elements = None
+        self.release = None
+        self.rebuild_age = None
+        self.env_vars = None
+        self.image_types = None
+        self.pause = False
+        self.username = None
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
+    def __eq__(self, other):
+        if isinstance(other, DiskImage):
+            return (other.name == self.name and
+                    other.elements == self.elements and
+                    other.release == self.release and
+                    other.rebuild_age == self.rebuild_age and
+                    other.env_vars == self.env_vars and
+                    other.image_types == self.image_types and
+                    other.pause == self.pause and
+                    other.username == self.username)
+        return False
 
     def __repr__(self):
         return "<DiskImage %s>" % self.name

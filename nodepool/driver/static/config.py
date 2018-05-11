@@ -22,11 +22,21 @@ from nodepool.config import as_list
 
 
 class StaticPool(ConfigPool):
+    def __init__(self):
+        self.name = None
+        self.nodes = []
+        # The StaticProviderConfig that owns this pool.
+        self.provider = None
+
+        # Initialize base class attributes
+        super().__init__()
+
     def __eq__(self, other):
-        if (other.labels != self.labels or
-            other.nodes != self.nodes):
-            return False
-        return True
+        if isinstance(other, StaticPool):
+            return (super().__eq__(other) and
+                    other.name == self.name and
+                    other.nodes == self.nodes)
+        return False
 
     def __repr__(self):
         return "<StaticPool %s>" % self.name
@@ -38,9 +48,11 @@ class StaticProviderConfig(ProviderConfig):
         super().__init__(*args, **kwargs)
 
     def __eq__(self, other):
-        if other.pools != self.pools:
-            return False
-        return True
+        if isinstance(other, StaticProviderConfig):
+            return (super().__eq__(other) and
+                    other.manage_images == self.manage_images and
+                    other.pools == self.pools)
+        return False
 
     @staticmethod
     def reset():
@@ -60,8 +72,8 @@ class StaticProviderConfig(ProviderConfig):
             pp.name = pool['name']
             pp.provider = self
             self.pools[pp.name] = pp
+            # WARNING: This intentionally changes the type!
             pp.labels = set()
-            pp.nodes = []
             for node in pool.get('nodes', []):
                 pp.nodes.append({
                     'name': node['name'],
