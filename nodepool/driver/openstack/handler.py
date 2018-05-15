@@ -245,6 +245,27 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         super().__init__(pw, request)
         self.chosen_az = None
 
+    def imagesAvailable(self):
+        '''
+        Determines if the requested images are available for this provider.
+
+        ZooKeeper is queried for an image uploaded to the provider that is
+        in the READY state.
+
+        :returns: True if it is available, False otherwise.
+        '''
+        if self.provider.manage_images:
+            for label in self.request.node_types:
+                if self.pool.labels[label].cloud_image:
+                    if not self.manager.labelReady(self.pool.labels[label]):
+                        return False
+                else:
+                    if not self.zk.getMostRecentImageUpload(
+                            self.pool.labels[label].diskimage.name,
+                            self.provider.name):
+                        return False
+        return True
+
     def hasRemainingQuota(self, ntype):
         needed_quota = self.manager.quotaNeededByNodeType(ntype, self.pool)
 
