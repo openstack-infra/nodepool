@@ -222,7 +222,7 @@ class OpenStackProvider(Provider):
                     # calculate its cost without pool info.
                     continue
                 node_resources = self.quotaNeededByNodeType(
-                    node.type, provider_pool)
+                    node.type[0], provider_pool)
                 used_quota.add(node_resources)
         return used_quota
 

@@ -53,6 +53,16 @@ HOLD = 'hold'
 INIT = 'init'
 
 
+# NOTE(Shrews): Importing this from nodepool.config causes an import error
+# since that file imports this file.
+def as_list(item):
+    if not item:
+        return []
+    if isinstance(item, list):
+        return item
+    return [item]
+
+
 class ZooKeeperConnectionConfig(object):
     '''
     Represents the connection parameters for a ZooKeeper server.
@@ -481,7 +491,7 @@ class Node(BaseModel):
         self.cloud = None
         self.provider = None
         self.pool = None
-        self.type = None
+        self.__type = []
         self.allocated_to = None
         self.az = None
         self.region = None
@@ -538,6 +548,16 @@ class Node(BaseModel):
                     self.hold_expiration == other.hold_expiration)
         else:
             return False
+
+    @property
+    def type(self):
+        return self.__type
+
+    @type.setter
+    def type(self, value):
+        # Using as_list() here helps us to transition from existing Nodes
+        # in the ZooKeeper database that still use string.
+        self.__type = as_list(value)
 
     def toDict(self):
         '''
@@ -1711,15 +1731,19 @@ class ZooKeeper(object):
         :param list labels: The node types we want.
 
         :returns: A dictionary, keyed by node type, with lists of Node objects
-            that are ready, or an empty dict if none are found.
+            that are ready, or an empty dict if none are found. A node may
+            appear more than once under different labels if it is tagged with
+            those labels.
         '''
         ret = {}
         for node in self.nodeIterator():
-            if (node.state == READY and
-                    not node.allocated_to and node.type in labels):
-                if node.type not in ret:
-                    ret[node.type] = []
-                ret[node.type].append(node)
+            if node.state != READY or node.allocated_to:
+                continue
+            for label in labels:
+                if label in node.type:
+                    if label not in ret:
+                        ret[label] = []
+                    ret[label].append(node)
         return ret
 
     def deleteOldestUnusedNode(self, provider_name, pool_name):

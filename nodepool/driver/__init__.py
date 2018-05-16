@@ -139,6 +139,36 @@ class Provider(object, metaclass=abc.ABCMeta):
         pass
 
 
+class LabelRecorder(object):
+    def __init__(self):
+        self.data = []
+
+    def add(self, label, node_id):
+        self.data.append({'label': label, 'node_id': node_id})
+
+    def labels(self):
+        '''
+        Return labels in the order they were added.
+        '''
+        labels = []
+        for d in self.data:
+            labels.append(d['label'])
+        return labels
+
+    def pop(self, label):
+        '''
+        Return the node ID for the (first found) requested label and remove it.
+        '''
+        for d in self.data:
+            if d['label'] == label:
+                node_id = d['node_id']
+                break
+        if not node_id:
+            return None
+        self.data.remove({'label': label, 'node_id': node_id})
+        return node_id
+
+
 class NodeRequestHandler(object, metaclass=abc.ABCMeta):
     '''
     Class to process a single nodeset request.
@@ -161,6 +191,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         self.paused = False
         self.launcher_id = self.pw.launcher_id
 
+        self._satisfied_types = LabelRecorder()
         self._failed_nodes = []
         self._ready_nodes = []
 
@@ -218,7 +249,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         # we need to calculate the difference between our current node set
         # and what was requested. We cannot use set operations here since a
         # node type can appear more than once in the requested types.
-        saved_types = collections.Counter([n.type for n in self.nodeset])
+        saved_types = collections.Counter(self._satisfied_types.labels())
         requested_types = collections.Counter(self.request.node_types)
         diff = requested_types - saved_types
         needed_types = list(diff.elements())
@@ -255,6 +286,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
                         node.allocated_to = self.request.id
                         self.zk.storeNode(node)
                         self.nodeset.append(node)
+                        self._satisfied_types.add(ntype, node.id)
                         # Notify driver handler about node re-use
                         self.nodeReused(node)
                         break
@@ -301,6 +333,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
                 self.zk.storeNode(node)
 
                 self.nodeset.append(node)
+                self._satisfied_types.add(ntype, node.id)
                 self.launch(node)
 
     def _runHandler(self):
@@ -485,15 +518,9 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         else:
             # The assigned nodes must be added to the request in the order
             # in which they were requested.
-            assigned = []
             for requested_type in self.request.node_types:
-                for node in self.nodeset:
-                    if node.id in assigned:
-                        continue
-                    if node.type == requested_type:
-                        # Record node ID in the request
-                        self.request.nodes.append(node.id)
-                        assigned.append(node.id)
+                node_id = self._satisfied_types.pop(requested_type)
+                self.request.nodes.append(node_id)
 
             self.log.debug("Fulfilled node request %s",
                            self.request.id)

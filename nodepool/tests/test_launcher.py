@@ -110,10 +110,10 @@ class TestLauncher(tests.DBTestCase):
         nodes = []
         for node_id in req.nodes:
             nodes.append(self.zk.getNode(node_id))
-        self.assertEqual(nodes[0].type, 'fake-label3')
-        self.assertEqual(nodes[1].type, 'fake-label1')
-        self.assertEqual(nodes[2].type, 'fake-label4')
-        self.assertEqual(nodes[3].type, 'fake-label2')
+        self.assertEqual(nodes[0].type, ['fake-label3'])
+        self.assertEqual(nodes[1].type, ['fake-label1'])
+        self.assertEqual(nodes[2].type, ['fake-label4'])
+        self.assertEqual(nodes[3].type, ['fake-label2'])
 
     def _test_node_assignment_at_quota(self,
                                        config,
@@ -407,7 +407,7 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
 
@@ -423,7 +423,7 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         # We have no host_keys because host-key-checking is False.
         self.assertEqual(nodes[0].host_keys, [])
@@ -451,7 +451,7 @@ class TestLauncher(tests.DBTestCase):
         # that one was launched.
         nodes = self.waitForNodes('fake-label', 1)
         self.assertEqual(len(nodes), 1)
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
 
@@ -466,7 +466,7 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
 
     def test_disabled_label(self):
         """Test that a node is not created with min-ready=0"""
@@ -488,7 +488,7 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
 
     def test_node_flavor_name(self):
@@ -501,7 +501,7 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
 
     def test_node_vhd_image(self):
         """Test that a image and node are created vhd image"""
@@ -513,7 +513,7 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
 
     def test_node_vhd_and_qcow2(self):
         """Test label provided by vhd and qcow2 images builds"""
@@ -540,10 +540,10 @@ class TestLauncher(tests.DBTestCase):
         total_nodes = sum(1 for _ in self.zk.nodeIterator())
         self.assertEqual(total_nodes, 2)
         self.assertEqual(nodes[0].provider, 'fake-provider2')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertEqual(nodes[1].provider, 'fake-provider2')
-        self.assertEqual(nodes[1].type, 'fake-label')
+        self.assertEqual(nodes[1].type, ['fake-label'])
         self.assertEqual(nodes[1].username, 'zuul')
 
     def test_node_az(self):
@@ -924,13 +924,13 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertEqual(len(lab1), 1)
         self.assertEqual(lab1[0].provider, 'fake-provider')
-        self.assertEqual(lab1[0].type, 'fake-label1')
+        self.assertEqual(lab1[0].type, ['fake-label1'])
         self.assertEqual(lab1[0].az, 'az1')
         self.assertEqual(lab1[0].pool, 'pool1')
 
         self.assertEqual(len(lab2), 1)
         self.assertEqual(lab2[0].provider, 'fake-provider')
-        self.assertEqual(lab2[0].type, 'fake-label2')
+        self.assertEqual(lab2[0].type, ['fake-label2'])
         self.assertEqual(lab2[0].az, 'az2')
         self.assertEqual(lab2[0].pool, 'pool2')
 
@@ -1077,7 +1077,7 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
-        self.assertEqual(nodes[0].type, 'fake-label')
+        self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
 

@@ -124,7 +124,7 @@ class OpenStackNodeLauncher(NodeLauncher):
             az=self.node.az,
             config_drive=config_drive,
             nodepool_node_id=self.node.id,
-            nodepool_node_label=self.node.type,
+            nodepool_node_label=self.node.type[0],
             nodepool_image_name=image_name,
             networks=self.pool.networks,
             boot_from_volume=self.label.boot_from_volume,
@@ -391,7 +391,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         return True
 
     def launch(self, node):
-        label = self.pool.labels[node.type]
+        label = self.pool.labels[node.type[0]]
         thd = OpenStackNodeLauncher(self, node, self.provider, label)
         thd.start()
         self._threads.append(thd)
