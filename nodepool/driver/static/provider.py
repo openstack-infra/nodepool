@@ -43,7 +43,8 @@ class StaticNodeProvider(Provider):
                             timeout=node["timeout"])
         except exceptions.ConnectionTimeoutException:
             raise StaticNodeError(
-                "%s: ConnectionTimeoutException" % node["name"])
+                "%s:%s: ConnectionTimeoutException" % (
+                    node["name"], node["connection-port"]))
 
         # Check node host-key
         if set(node["host-key"]).issubset(set(keys)):
