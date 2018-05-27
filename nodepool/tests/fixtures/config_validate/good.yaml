@@ -21,6 +21,8 @@ labels:
   - name: trusty-static
   - name: kubernetes-namespace
   - name: pod-fedora
+  - name: openshift-project
+  - name: openshift-pod
 
 providers:
   - name: cloud1
@@ -115,6 +117,20 @@ providers:
           - name: pod-fedora
             type: pod
             image: docker.io/fedora:28
+
+  - name: openshift
+    driver: openshift
+    context: "/hostname:8443/self-provisioner-service-account"
+    pools:
+      - name: main
+        labels:
+          - name: openshift-project
+            type: project
+          - name: openshift-pod
+            type: pod
+            image: docker.io/fedora:28
+            memory: 512
+            cpu: 2
 
 diskimages:
   - name: trusty

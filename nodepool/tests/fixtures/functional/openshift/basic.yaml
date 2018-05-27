@@ -1,0 +1,23 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: openshift-project
+    min-ready: 1
+  - name: openshift-pod
+    min-ready: 1
+
+providers:
+  - name: openshift
+    driver: openshift
+    context: {context_name}
+    pools:
+      - name: main
+        labels:
+          - name: openshift-project
+            type: project
+          - name: openshift-pod
+            type: pod
+            image: docker.io/fedora:28

@@ -352,6 +352,13 @@ Options
          kubernetes driver, see the separate section
          :attr:`providers.[kubernetes]`
 
+      .. value:: openshift
+
+         For details on the extra options required and provided by the
+         openshift driver, see the separate section
+         :attr:`providers.[openshift]`
+
+
 OpenStack Driver
 ----------------
 
@@ -1134,3 +1141,132 @@ Selecting the kubernetes driver adds the following options to the
          Only used by the
          :value:`providers.[kubernetes].labels.type.pod` label type;
          specifies the image name used by the pod.
+
+
+Openshift Driver
+----------------
+
+Selecting the openshift driver adds the following options to the
+:attr:`providers` section of the configuration.
+
+.. attr-overview::
+   :prefix: providers.[openshift]
+   :maxdepth: 3
+
+.. attr:: providers.[openshift]
+   :type: list
+
+   An Openshift provider's resources are partitioned into groups called `pool`
+   (see :attr:`providers.[openshift].pools` for details), and within a pool,
+   the node types which are to be made available are listed
+   (see :attr:`providers.[openshift].labels` for details).
+
+   .. note:: For documentation purposes the option names are prefixed
+             ``providers.[openshift]`` to disambiguate from other
+             drivers, but ``[openshift]`` is not required in the
+             configuration (e.g. below
+             ``providers.[openshift].pools`` refers to the ``pools``
+             key in the ``providers`` section when the ``openshift``
+             driver is selected).
+
+   Example:
+
+   .. code-block:: yaml
+
+     providers:
+       - name: cluster
+         driver: openshift
+         context: context-name
+         pools:
+           - name: main
+             labels:
+               - name: openshift-project
+                 type: project
+               - name: openshift-pod
+                 type: pod
+                 image: docker.io/fedora:28
+
+   .. attr:: context
+      :required:
+
+      Name of the context configured in ``kube/config``.
+
+      Before using the driver, Nodepool services need a ``kube/config`` file
+      manually installed with self-provisioner (the service account needs to
+      be able to create project) context.
+      Make sure the context is present in ``oc config get-contexts`` command
+      output.
+
+   .. attr:: launch-retries
+      :default: 3
+
+      The number of times to retry launching a node before considering
+      the job failed.
+
+   .. attr:: max-projects
+      :default: infinite
+      :type: int
+
+      Maximum number of projects that can be used.
+
+   .. attr:: pools
+      :type: list
+
+      A pool defines a group of resources from an Openshift provider.
+
+      .. attr:: name
+         :required:
+
+         Project's name are prefixed with the pool's name.
+
+   .. attr:: labels
+      :type: list
+
+      Each entry in a pool`s `labels` section indicates that the
+      corresponding label is available for use in this pool.
+
+      Each entry is a dictionary with the following keys
+
+      .. attr:: name
+         :required:
+
+         Identifier for this label; references an entry in the
+         :attr:`labels` section.
+
+      .. attr:: type
+
+         The Openshift provider supports two types of labels:
+
+         .. value:: project
+
+            Project labels provide an empty project configured
+            with a service account that can creates pods, services,
+            configmaps, etc.
+
+         .. value:: pod
+
+            Pod labels provide a dedicated project with a single pod
+            created using the
+            :attr:`providers.[openshift].labels.image` parameter and it
+            is configured with a service account that can exec and get
+            the logs of the pod.
+
+      .. attr:: image
+
+         Only used by the
+         :value:`providers.[openshift].labels.type.pod` label type;
+         specifies the image name used by the pod.
+
+      .. attr:: cpu
+         :type: int
+
+         Only used by the
+         :value:`providers.[openshift].labels.type.pod` label type;
+         specifies the amount of cpu to request for the pod.
+
+      .. attr:: memory
+         :type: int
+
+         Only used by the
+         :value:`providers.[openshift].labels.type.pod` label type;
+         specifies the amount of memory in MB to request for the pod.

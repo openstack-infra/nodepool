@@ -1,0 +1,26 @@
+- hosts: cluster
+  roles:
+    - deploy-openshift
+
+- hosts: launcher
+  pre_tasks:
+    - name: Login to the openshift cluster as developer
+      command: >
+          oc login -u developer -p developer --insecure-skip-tls-verify=true
+          https://{{ hostvars['cluster']['ansible_hostname'] }}:8443
+
+    # Zookeeper service doesn't start by default on fedora
+    - name: Setup zoo.cfg
+      command: cp /etc/zookeeper/zoo_sample.cfg /etc/zookeeper/zoo.cfg
+      become: yes
+      ignore_errors: yes
+
+    - name: Start zookeeper
+      service:
+        name: zookeeper
+        state: started
+      become: yes
+      ignore_errors: yes
+  roles:
+    - role: tox
+      tox_envlist: functional_openshift
