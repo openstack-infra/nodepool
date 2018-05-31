@@ -75,7 +75,6 @@ class Drivers:
                 driver_obj = {}
                 for name, parent_class in (
                         ("config", ProviderConfig),
-                        ("handler", NodeRequestHandler),
                         ("provider", Provider),
                 ):
                     driver_obj[name] = Drivers._load_class(
@@ -199,6 +198,12 @@ class Provider(object, metaclass=abc.ABCMeta):
 
         This is called periodically to give the provider a chance to
         clean up any resources which make have leaked.
+        """
+        pass
+
+    @abc.abstractmethod
+    def getRequestHandler(self, poolworker, request):
+        """Return a NodeRequestHandler for the supplied request
         """
         pass
 

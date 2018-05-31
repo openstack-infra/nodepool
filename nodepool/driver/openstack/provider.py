@@ -29,6 +29,9 @@ from nodepool.task_manager import ManagerStoppedException
 from nodepool.task_manager import TaskManager
 from nodepool import version
 
+# Import entire module to avoid partial-loading, circular import
+from nodepool.driver.openstack import handler
+
 
 IPS_LIST_AGE = 5      # How long to keep a cached copy of the ip list
 MAX_QUOTA_AGE = 5 * 60  # How long to keep the quota information cached
@@ -129,6 +132,9 @@ class OpenStackProvider(Provider):
     def join(self):
         if self._taskmanager:
             self._taskmanager.join()
+
+    def getRequestHandler(self, poolworker, request):
+        return handler.OpenStackNodeRequestHandler(poolworker, request)
 
     @property
     def _flavors(self):

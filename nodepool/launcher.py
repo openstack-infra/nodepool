@@ -31,7 +31,6 @@ from nodepool import provider_manager
 from nodepool import stats
 from nodepool import config as nodepool_config
 from nodepool import zk
-from nodepool.driver import Drivers
 
 
 MINS = 60
@@ -148,10 +147,6 @@ class PoolWorker(threading.Thread):
     # Private methods
     # ---------------------------------------------------------------
 
-    def _get_node_request_handler(self, provider, request):
-        driver = Drivers.get(provider.driver.name)
-        return driver['handler'](self, request)
-
     def _assignHandlers(self):
         '''
         For each request we can grab, create a NodeRequestHandler for it.
@@ -211,7 +206,9 @@ class PoolWorker(threading.Thread):
 
             # Got a lock, so assign it
             self.log.info("Assigning node request %s" % req)
-            rh = self._get_node_request_handler(provider, req)
+
+            pm = self.getProviderManager()
+            rh = pm.getRequestHandler(self, req)
             rh.run()
             if rh.paused:
                 self.paused_handler = rh
