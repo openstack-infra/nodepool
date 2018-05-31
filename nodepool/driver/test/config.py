@@ -31,10 +31,6 @@ class TestConfig(ProviderConfig):
     def __eq__(self, other):
         return self.name == other.name
 
-    @staticmethod
-    def reset():
-        pass
-
     @property
     def pools(self):
         return self.__pools

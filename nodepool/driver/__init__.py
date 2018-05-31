@@ -32,6 +32,7 @@ class Drivers:
 
     log = logging.getLogger("nodepool.driver.Drivers")
     drivers = {}
+    _drivers = {}  # TODO: replace drivers
     drivers_paths = None
 
     @staticmethod
@@ -50,7 +51,7 @@ class Drivers:
         if not obj:
             error = "no %s implementation found" % parent_class
         if error:
-            Drivers.log.error("%s: %s" % (path, error))
+            Drivers.log.error("%s: %s", path, error)
             return False
         return obj[0][1]
 
@@ -66,15 +67,14 @@ class Drivers:
             for driver in drivers:
                 driver_path = os.path.join(drivers_path, driver)
                 if driver in Drivers.drivers:
-                    Drivers.log.warning("%s: duplicate driver" % driver_path)
+                    Drivers.log.warning("%s: duplicate driver", driver_path)
                     continue
                 if not os.path.isdir(driver_path) or \
                    "__init__.py" not in os.listdir(driver_path):
                     continue
-                Drivers.log.debug("%s: loading driver" % driver_path)
+                Drivers.log.debug("%s: loading driver", driver_path)
                 driver_obj = {}
                 for name, parent_class in (
-                        ("config", ProviderConfig),
                         ("provider", Provider),
                 ):
                     driver_obj[name] = Drivers._load_class(
@@ -83,10 +83,21 @@ class Drivers:
                     if not driver_obj[name]:
                         break
                 if not driver_obj[name]:
-                    Drivers.log.error("%s: skipping incorrect driver" %
-                                      driver_path)
+                    Drivers.log.error(
+                        "%s: skipping incorrect driver from %s.py",
+                        driver_path, name)
                     continue
                 Drivers.drivers[driver] = driver_obj
+                driver_obj = Drivers._load_class(
+                    driver, os.path.join(driver_path, "__init__.py"),
+                    Driver)
+                if not driver_obj:
+                    Drivers.log.error(
+                        "%s: skipping incorrect driver from __init__.py",
+                        driver_path)
+                    continue
+                Drivers._drivers[driver] = driver_obj()
+
         Drivers.drivers_paths = drivers_paths
 
     @staticmethod
@@ -97,6 +108,42 @@ class Drivers:
             return Drivers.drivers[name]
         except KeyError:
             raise RuntimeError("%s: unknown driver" % name)
+
+    # TODO: replace get
+    @staticmethod
+    def _get(name):
+        if not Drivers._drivers:
+            Drivers.load()
+        try:
+            return Drivers._drivers[name]
+        except KeyError:
+            raise RuntimeError("%s: unknown driver" % name)
+
+
+class Driver(object, metaclass=abc.ABCMeta):
+    """The Driver interface
+
+    This is the main entrypoint for a Driver.  A single instance of
+    this will be created for each driver in the system and will
+    persist for the lifetime of the process.
+
+    The class or instance attribute **name** must be provided as a string.
+
+    """
+
+    def reset(self):
+        '''
+        Called before loading configuration to reset any global state
+        '''
+        pass
+
+    @abc.abstractmethod
+    def getProviderConfig(self, provider):
+        """Return a ProviderConfig instance
+
+        :arg dict provider: The parsed provider configuration
+        """
+        pass
 
 
 class Provider(object, metaclass=abc.ABCMeta):
@@ -723,12 +770,12 @@ class ConfigPool(ConfigValue):
         return False
 
 
-class Driver(ConfigValue):
+class DriverConfig(ConfigValue):
     def __init__(self):
         self.name = None
 
     def __eq__(self, other):
-        if isinstance(other, Driver):
+        if isinstance(other, DriverConfig):
             return self.name == other.name
         return False
 
@@ -742,7 +789,7 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
     def __init__(self, provider):
         self.name = provider['name']
         self.provider = provider
-        self.driver = Driver()
+        self.driver = DriverConfig()
         self.driver.name = provider.get('driver', 'openstack')
         self.max_concurrency = provider.get('max-concurrency', -1)
 
@@ -770,14 +817,6 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
     def manage_images(self):
         '''
         Return True if provider manages external images, False otherwise.
-        '''
-        pass
-
-    # TODO: can we remove this?
-    @abc.abstractmethod
-    def reset():
-        '''
-        Called before loading configuration to reset any global state
         '''
         pass
 

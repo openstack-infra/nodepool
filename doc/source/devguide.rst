@@ -54,6 +54,8 @@ its most important pieces::
 Drivers
 -------
 
+.. autoclass:: nodepool.driver.Driver
+   :members:
 .. autoclass:: nodepool.driver.Provider
    :members:
 .. autoclass:: nodepool.driver.NodeRequestHandler

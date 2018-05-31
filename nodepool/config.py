@@ -204,8 +204,8 @@ def get_provider_config(provider):
     # Ensure legacy configuration still works when using fake cloud
     if provider.get('name', '').startswith('fake'):
         provider['driver'] = 'fake'
-    driver = Drivers.get(provider['driver'])
-    return driver['config'](provider)
+    driver = Drivers._get(provider['driver'])
+    return driver.getProviderConfig(provider)
 
 
 def openConfig(path):
@@ -234,8 +234,8 @@ def loadConfig(config_path):
     config = openConfig(config_path)
 
     # Call driver config reset now to clean global hooks like os_client_config
-    for driver in Drivers.drivers.values():
-        driver["config"].reset()
+    for driver in Drivers._drivers.values():
+        driver.reset()
 
     newconfig = Config()
 

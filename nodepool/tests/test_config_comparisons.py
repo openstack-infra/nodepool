@@ -18,7 +18,7 @@ from nodepool.config import Config
 from nodepool.config import DiskImage
 from nodepool.config import Label
 from nodepool.driver import ConfigPool
-from nodepool.driver import Driver
+from nodepool.driver import DriverConfig
 from nodepool.driver.openstack.config import OpenStackProviderConfig
 from nodepool.driver.openstack.config import ProviderDiskImage
 from nodepool.driver.openstack.config import ProviderCloudImage
@@ -37,9 +37,9 @@ class TestConfigComparisons(tests.BaseTestCase):
         a.max_servers = 5
         self.assertNotEqual(a, b)
 
-    def test_Driver(self):
-        a = Driver()
-        b = Driver()
+    def test_DriverConfig(self):
+        a = DriverConfig()
+        b = DriverConfig()
         self.assertEqual(a, b)
         a.name = "foo"
         self.assertNotEqual(a, b)
@@ -100,8 +100,8 @@ class TestConfigComparisons(tests.BaseTestCase):
 
     def test_OpenStackProviderConfig(self):
         provider = {'name': 'foo'}
-        a = OpenStackProviderConfig(provider)
-        b = OpenStackProviderConfig(provider)
+        a = OpenStackProviderConfig(None, provider)
+        b = OpenStackProviderConfig(None, provider)
         self.assertEqual(a, b)
         # intentionally change an attribute of the base class
         a.name = 'bar'

@@ -54,10 +54,6 @@ class StaticProviderConfig(ProviderConfig):
                     other.pools == self.pools)
         return False
 
-    @staticmethod
-    def reset():
-        pass
-
     @property
     def pools(self):
         return self.__pools

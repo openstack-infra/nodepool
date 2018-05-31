@@ -14,7 +14,6 @@
 
 import os
 
-from nodepool import config as nodepool_config
 from nodepool import tests
 from nodepool.driver import Drivers
 
@@ -25,11 +24,6 @@ class TestDrivers(tests.DBTestCase):
         drivers_dir = os.path.join(os.path.dirname(test_dir), 'driver')
         Drivers.load([drivers_dir])
         return super().setup_config(filename)
-
-    def test_external_driver_config(self):
-        configfile = self.setup_config('external_driver.yaml')
-        nodepool_config.loadConfig(configfile)
-        self.assertIn("config", Drivers.get("test"))
 
     def test_external_driver_handler(self):
         configfile = self.setup_config('external_driver.yaml')
