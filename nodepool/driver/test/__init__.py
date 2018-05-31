@@ -13,9 +13,13 @@
 # limitations under the License.
 
 from nodepool.driver import Driver
-from nodepool.driver.test.config import TestConfig
+from nodepool.driver.test import config
+from nodepool.driver.test import provider
 
 
 class TestDriver(Driver):
     def getProviderConfig(self, provider):
-        return TestConfig(provider)
+        return config.TestConfig(provider)
+
+    def getProvider(self, provider_config, use_taskmanager):
+        return provider.TestProvider(provider_config)

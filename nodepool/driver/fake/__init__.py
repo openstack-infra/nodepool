@@ -16,6 +16,7 @@ import os_client_config
 
 from nodepool.driver import Driver
 from nodepool.driver.fake.config import FakeProviderConfig
+from nodepool.driver.fake.provider import FakeProvider
 
 
 class FakeDriver(Driver):
@@ -28,3 +29,6 @@ class FakeDriver(Driver):
 
     def getProviderConfig(self, provider):
         return FakeProviderConfig(self, provider)
+
+    def getProvider(self, provider_config, use_taskmanager):
+        return FakeProvider(provider_config, use_taskmanager)

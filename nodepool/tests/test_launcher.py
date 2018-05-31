@@ -21,7 +21,7 @@ import mock
 
 from nodepool import tests
 from nodepool import zk
-from nodepool.driver import Drivers
+from nodepool.driver.fake import provider as fakeprovider
 import nodepool.launcher
 
 from kazoo import exceptions as kze
@@ -130,7 +130,7 @@ class TestLauncher(tests.DBTestCase):
         def fake_get_quota():
             return (max_cores, max_instances, max_ram)
         self.useFixture(fixtures.MockPatchObject(
-            Drivers.get('fake')['provider'].fake_cloud, '_get_quota',
+            fakeprovider.FakeProvider.fake_cloud, '_get_quota',
             fake_get_quota
         ))
 
@@ -265,7 +265,7 @@ class TestLauncher(tests.DBTestCase):
         def fake_get_quota():
             return (max_cores, max_instances, max_ram)
         self.useFixture(fixtures.MockPatchObject(
-            Drivers.get('fake')['provider'].fake_cloud, '_get_quota',
+            fakeprovider.FakeProvider.fake_cloud, '_get_quota',
             fake_get_quota
         ))
 
@@ -653,7 +653,7 @@ class TestLauncher(tests.DBTestCase):
             raise RuntimeError('Fake Error')
 
         self.useFixture(fixtures.MockPatchObject(
-            Drivers.get('fake')['provider'], 'deleteServer', fail_delete))
+            fakeprovider.FakeProvider, 'deleteServer', fail_delete))
 
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

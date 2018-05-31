@@ -16,6 +16,7 @@ import os_client_config
 
 from nodepool.driver import Driver
 from nodepool.driver.openstack.config import OpenStackProviderConfig
+from nodepool.driver.openstack.provider import OpenStackProvider
 
 
 class OpenStackDriver(Driver):
@@ -28,3 +29,6 @@ class OpenStackDriver(Driver):
 
     def getProviderConfig(self, provider):
         return OpenStackProviderConfig(self, provider)
+
+    def getProvider(self, provider_config, use_taskmanager):
+        return OpenStackProvider(provider_config, use_taskmanager)

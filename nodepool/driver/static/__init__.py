@@ -13,9 +13,13 @@
 # limitations under the License.
 
 from nodepool.driver import Driver
-from nodepool.driver.static.config import StaticProviderConfig
+from nodepool.driver.static import config
+from nodepool.driver.static import provider
 
 
 class StaticDriver(Driver):
     def getProviderConfig(self, provider):
-        return StaticProviderConfig(provider)
+        return config.StaticProviderConfig(provider)
+
+    def getProvider(self, provider_config, use_taskmanager):
+        return provider.StaticNodeProvider(provider_config, use_taskmanager)

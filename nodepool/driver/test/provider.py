@@ -19,7 +19,7 @@ from nodepool.driver.test import handler
 
 
 class TestProvider(Provider):
-    def __init__(self, provider, *args):
+    def __init__(self, provider):
         self.provider = provider
 
     def start(self):

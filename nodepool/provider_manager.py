@@ -23,7 +23,7 @@ from nodepool.driver import Drivers
 
 def get_provider(provider, use_taskmanager):
     driver = Drivers.get(provider.driver.name)
-    return driver['provider'](provider, use_taskmanager)
+    return driver.getProvider(provider, use_taskmanager)
 
 
 class ProviderManager(object):
