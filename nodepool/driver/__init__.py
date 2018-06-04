@@ -103,39 +103,112 @@ class Drivers:
 class Provider(object, metaclass=abc.ABCMeta):
     """The Provider interface
 
+    Drivers implement this interface to supply Providers.  Each
+    "provider" in the nodepool configuration corresponds to an
+    instance of a class which implements this interface.
+
+    If the configuration is changed, old provider instances will be
+    stopped and new ones created as necessary.
+
     The class or instance attribute **name** must be provided as a string.
 
     """
     @abc.abstractmethod
     def start(self):
+        """Start this provider
+
+        This is called after each configuration change to allow the driver
+        to perform initialization tasks and start background threads.
+
+        """
         pass
 
     @abc.abstractmethod
     def stop(self):
+        """Stop this provider
+
+        Before shutdown or reconfiguration, this is called to signal
+        to the driver that it will no longer be used.  It should not
+        begin any new tasks, but may allow currently running tasks to
+        continue.
+
+        """
         pass
 
     @abc.abstractmethod
     def join(self):
+        """Wait for provider to finish
+
+        On shutdown, this is called after
+        :py:meth:`~nodepool.driver.Provider.stop` and should return
+        when the provider has completed all tasks.  This may not be
+        called on reconfiguration (so drivers should not rely on this
+        always being called after stop).
+
+        """
         pass
 
     @abc.abstractmethod
     def labelReady(self, name):
+        """Determine if a label is ready in this provider
+
+        If the pre-requisites for this label are ready, return true.
+        For example, if the label requires an image that is not
+        present, this should return False.  This method should not
+        examine inventory or quota.  In other words, it should return
+        True if a request for the label would be expected to succeed
+        with no resource contention, but False if is not possible to
+        satisfy a request for the label.
+
+        :param str name: The name of the label
+
+        :returns: True if the label is ready in this provider, False
+           otherwise.
+        """
         pass
 
     @abc.abstractmethod
     def cleanupNode(self, node_id):
+        """Cleanup a node after use
+
+        The driver may delete the node or return it to the pool.  This
+        may be called after the node was used, or as part of cleanup
+        from an aborted launch attempt.
+
+        :param str node_id: The id of the node
+        """
         pass
 
     @abc.abstractmethod
     def waitForNodeCleanup(self, node_id):
+        """Wait for a node to be cleaned up
+
+        When called, this will be called after
+        :py:meth:`~nodepool.driver.Provider.cleanupNode`.
+
+        This method should return after the node has been deleted or
+        returned to the pool.
+
+        :param str node_id: The id of the node
+        """
         pass
 
     @abc.abstractmethod
     def cleanupLeakedResources(self):
+        """Clean up any leaked resources
+
+        This is called periodically to give the provider a chance to
+        clean up any resources which make have leaked.
+        """
         pass
 
     @abc.abstractmethod
     def listNodes(self):
+        # TODO: This is used by the launcher to find leaked instances
+        # to delete (see _cleanupLeakedInstances).  It assumes server
+        # metadata.  Instead, this should be folded into
+        # cleanupLeakedResources so that drivers can figure out how to
+        # determine their own leaked instances.
         pass
 
 
@@ -695,16 +768,26 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
         '''
         pass
 
+    # TODO: can we remove this?
     @abc.abstractmethod
     def reset():
+        '''
+        Called before loading configuration to reset any global state
+        '''
         pass
 
     @abc.abstractmethod
     def load(self, newconfig):
+        '''
+        Update this config object from the supplied parsed config
+        '''
         pass
 
     @abc.abstractmethod
     def getSchema(self):
+        '''
+        Return a voluptuous schema for config validation
+        '''
         pass
 
     @abc.abstractmethod
