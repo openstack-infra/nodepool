@@ -1323,7 +1323,8 @@ class TestLauncher(tests.DBTestCase):
         while self.zk.countPoolNodes('fake-provider', 'main'):
             time.sleep(0)
 
-    @mock.patch('nodepool.driver.NodeRequestHandler.poll')
+    @mock.patch(
+        'nodepool.driver.openstack.handler.OpenStackNodeRequestHandler.poll')
     def test_handler_poll_session_expired(self, mock_poll):
         '''
         Test ZK session lost during handler poll().

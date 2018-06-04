@@ -24,6 +24,11 @@ class StaticNodeRequestHandler(NodeRequestHandler):
     log = logging.getLogger("nodepool.driver.static."
                             "StaticNodeRequestHandler")
 
+    @property
+    def alive_thread_count(self):
+        # We don't spawn threads to launch nodes, so always return 1.
+        return 1
+
     def _checkConcurrency(self, static_node):
         access_count = 0
 
@@ -76,7 +81,12 @@ class StaticNodeRequestHandler(NodeRequestHandler):
             node.host_keys = self.manager.nodes_keys[static_node["name"]]
             self.zk.storeNode(node)
 
-    def pollLauncher(self):
+    def launchesComplete(self):
+        '''
+        Our nodeset could have nodes in BUILDING state because we may be
+        waiting for one of our static nodes to free up. Keep calling launch()
+        to try to grab one.
+        '''
         waiting_node = False
         for node in self.nodeset:
             if node.state == zk.READY:

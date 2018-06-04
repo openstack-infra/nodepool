@@ -22,28 +22,32 @@ from kazoo import exceptions as kze
 from nodepool import exceptions
 from nodepool import nodeutils as utils
 from nodepool import zk
-from nodepool.driver import NodeLauncher
+from nodepool.driver.utils import NodeLauncher
 from nodepool.driver import NodeRequestHandler
 from nodepool.driver.openstack.provider import QuotaInformation
 
 
 class OpenStackNodeLauncher(NodeLauncher):
-    def __init__(self, handler, node, retries):
+    def __init__(self, handler, node, provider_config, provider_label):
         '''
         Initialize the launcher.
 
-        :param NodeRequestHandler handler: The handler object.
-        :param Node node: The node object.
-        :param int retries: Number of times to retry failed launches.
+        :param OpenStackNodeRequestHandler handler: The handler object.
+        :param Node node: A Node object describing the node to launch.
+        :param ProviderConfig provider_config: A ProviderConfig object
+            describing the provider launching this node.
+        :param ProviderLabel provider_label: A ProviderLabel object
+            describing the label to use for the node.
         '''
-        super().__init__(handler, node)
-        self._retries = retries
+        super().__init__(handler.zk, node, provider_config)
 
-        if self.label.diskimage:
-            self._diskimage = self.provider_config.diskimages[
-                self.label.diskimage.name]
-        else:
-            self._diskimage = None
+        # Number of times to retry failed launches.
+        self._retries = provider_config.launch_retries
+
+        self.label = provider_label
+        self.pool = provider_label.pool
+        self.handler = handler
+        self.zk = handler.zk
 
     def _logConsole(self, server_id, hostname):
         if not self.label.console_log:
@@ -56,17 +60,23 @@ class OpenStackNodeLauncher(NodeLauncher):
 
     def _launchNode(self):
         if self.label.diskimage:
+            diskimage = self.provider_config.diskimages[
+                self.label.diskimage.name]
+        else:
+            diskimage = None
+
+        if diskimage:
             # launch using diskimage
             cloud_image = self.handler.zk.getMostRecentImageUpload(
-                self._diskimage.name, self.provider_config.name)
+                diskimage.name, self.provider_config.name)
 
             if not cloud_image:
                 raise exceptions.LaunchNodepoolException(
                     "Unable to find current cloud image %s in %s" %
-                    (self._diskimage.name, self.provider_config.name)
+                    (diskimage.name, self.provider_config.name)
                 )
 
-            config_drive = self._diskimage.config_drive
+            config_drive = diskimage.config_drive
             image_external = dict(id=cloud_image.external_id)
             image_id = "{path}/{upload_id}".format(
                 path=self.handler.zk._imageUploadPath(
@@ -74,10 +84,10 @@ class OpenStackNodeLauncher(NodeLauncher):
                     cloud_image.build_id,
                     cloud_image.provider_name),
                 upload_id=cloud_image.id)
-            image_name = self._diskimage.name
+            image_name = diskimage.name
             username = cloud_image.username
-            connection_type = self._diskimage.connection_type
-            connection_port = self._diskimage.connection_port
+            connection_type = diskimage.connection_type
+            connection_port = diskimage.connection_port
 
         else:
             # launch using unmanaged cloud image
@@ -129,7 +139,7 @@ class OpenStackNodeLauncher(NodeLauncher):
         self.node.connection_port = connection_port
 
         # Checkpoint save the updated node info
-        self.storeNode()
+        self.zk.storeNode(self.node)
 
         self.log.debug("Waiting for server %s for node id: %s" %
                        (server.id, self.node.id))
@@ -168,7 +178,7 @@ class OpenStackNodeLauncher(NodeLauncher):
             self.node.private_ipv4 = server.public_v4
 
         # Checkpoint save the updated node info
-        self.storeNode()
+        self.zk.storeNode(self.node)
 
         self.log.debug(
             "Node %s is running [region: %s, az: %s, ip: %s ipv4: %s, "
@@ -199,7 +209,7 @@ class OpenStackNodeLauncher(NodeLauncher):
                 raise
 
         self.node.host_keys = host_keys
-        self.storeNode()
+        self.zk.storeNode(self.node)
 
     def launch(self):
         attempts = 1
@@ -225,7 +235,7 @@ class OpenStackNodeLauncher(NodeLauncher):
                     self.node.public_ipv4 = None
                     self.node.public_ipv6 = None
                     self.node.interface_ip = None
-                    self.storeNode()
+                    self.zk.storeNode(self.node)
                 if attempts == self._retries:
                     raise
                 # Invalidate the quota cache if we encountered a quota error.
@@ -235,7 +245,7 @@ class OpenStackNodeLauncher(NodeLauncher):
                 attempts += 1
 
         self.node.state = zk.READY
-        self.storeNode()
+        self.zk.storeNode(self.node)
         self.log.info("Node id %s is ready", self.node.id)
 
 
@@ -244,6 +254,15 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
     def __init__(self, pw, request):
         super().__init__(pw, request)
         self.chosen_az = None
+        self._threads = []
+
+    @property
+    def alive_thread_count(self):
+        count = 0
+        for t in self._threads:
+            if t.isAlive():
+                count += 1
+        return count
 
     def imagesAvailable(self):
         '''
@@ -348,5 +367,31 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         node.cloud = self.provider.cloud_config.name
         node.region = self.provider.region_name
 
+    def launchesComplete(self):
+        '''
+        Check if all launch requests have completed.
+
+        When all of the Node objects have reached a final state (READY or
+        FAILED), we'll know all threads have finished the launch process.
+        '''
+        if not self._threads:
+            return True
+
+        # Give the NodeLaunch threads time to finish.
+        if self.alive_thread_count:
+            return False
+
+        node_states = [node.state for node in self.nodeset]
+
+        # NOTE: It very important that NodeLauncher always sets one of
+        # these states, no matter what.
+        if not all(s in (zk.READY, zk.FAILED) for s in node_states):
+            return False
+
+        return True
+
     def launch(self, node):
-        return OpenStackNodeLauncher(self, node, self.provider.launch_retries)
+        label = self.pool.labels[node.type]
+        thd = OpenStackNodeLauncher(self, node, self.provider, label)
+        thd.start()
+        self._threads.append(thd)
