@@ -572,6 +572,7 @@ class TestZooKeeper(tests.DBTestCase):
     def test_getReadyNodesOfTypes(self):
         n1 = self._create_node()
         n1.type = 'label1'
+        n1.state = zk.READY
         self.zk.storeNode(n1)
         n2 = self._create_node()
         n2.state = zk.READY
@@ -584,8 +585,32 @@ class TestZooKeeper(tests.DBTestCase):
 
         r = self.zk.getReadyNodesOfTypes(['label1'])
         self.assertIn('label1', r)
-        self.assertEqual(1, len(r['label1']))
-        self.assertEqual(n2, r['label1'][0])
+        self.assertEqual(2, len(r['label1']))
+        self.assertIn(n1, r['label1'])
+        self.assertIn(n2, r['label1'])
+
+    def test_getReadyNodesOfTypes_multilabel(self):
+        n1 = self._create_node()
+        n1.type = 'label1'
+        n1.state = zk.READY
+        self.zk.storeNode(n1)
+        n2 = self._create_node()
+        n2.state = zk.READY
+        n2.type = ['label1', 'label3']
+        self.zk.storeNode(n2)
+        n3 = self._create_node()
+        n3.state = zk.READY
+        n3.type = 'label2'
+        self.zk.storeNode(n3)
+
+        r = self.zk.getReadyNodesOfTypes(['label1', 'label3'])
+        self.assertIn('label1', r)
+        self.assertIn('label3', r)
+        self.assertEqual(2, len(r['label1']))
+        self.assertEqual(1, len(r['label3']))
+        self.assertIn(n1, r['label1'])
+        self.assertIn(n2, r['label1'])
+        self.assertIn(n2, r['label3'])
 
     def test_nodeIterator(self):
         n1 = self._create_node()
@@ -832,7 +857,7 @@ class TestZKModel(tests.BaseTestCase):
             'state_time': now,
             'created_time': now - 2,
             'provider': 'rax',
-            'type': 'trusty',
+            'type': ['trusty'],
             'allocated_to': '456-789',
             'az': 'RegionOne',
             'region': 'fake-region',

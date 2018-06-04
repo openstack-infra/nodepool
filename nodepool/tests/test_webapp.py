@@ -143,7 +143,7 @@ class TestWebApp(tests.DBTestCase):
         objs = json.loads(data.decode('utf8'))
         self.assertDictContainsSubset({'id': '0000000000',
                                        'ipv6': '',
-                                       'label': 'fake-label',
+                                       'label': ['fake-label'],
                                        'locked': 'unlocked',
                                        'provider': 'fake-provider',
                                        'public_ipv4': 'fake',
@@ -160,7 +160,7 @@ class TestWebApp(tests.DBTestCase):
         objs = json.loads(data.decode('utf8'))
         self.assertDictContainsSubset({'id': '0000000000',
                                        'ipv6': '',
-                                       'label': 'fake-label',
+                                       'label': ['fake-label'],
                                        'locked': 'unlocked',
                                        'provider': 'fake-provider',
                                        'public_ipv4': 'fake',

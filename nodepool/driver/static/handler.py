@@ -62,7 +62,7 @@ class StaticNodeRequestHandler(NodeRequestHandler):
         # Randomize static nodes order
         random.shuffle(available_nodes)
         for available_node in available_nodes:
-            if node.type in available_node["labels"]:
+            if node.type[0] in available_node["labels"]:
                 if self._checkConcurrency(available_node):
                     static_node = available_node
                     break
