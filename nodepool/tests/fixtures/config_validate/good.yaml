@@ -70,6 +70,8 @@ providers:
         max-servers: 184
         auto-floating-ip: False
         host-key-checking: False
+        security-groups:
+          - zuul_sg
         labels:
           - name: trusty
             diskimage: trusty

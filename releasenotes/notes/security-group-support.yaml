@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    Added support for specifying security-groups for the nodes in openstack
+    driver. Pool.security-groups takes list of SGs to attach to the server.

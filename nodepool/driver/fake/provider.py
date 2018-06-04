@@ -121,6 +121,7 @@ class FakeOpenStackCloud(object):
                 done_status='ACTIVE', max_quota=-1, **kw):
         should_fail = kw.get('SHOULD_FAIL', '').lower() == 'true'
         nics = kw.get('nics', [])
+        security_groups = kw.get('security_groups', [])
         addresses = None
         # if keyword 'ipv6-uuid' is found in provider config,
         # ipv6 address will be available in public addr dict.
@@ -162,6 +163,7 @@ class FakeOpenStackCloud(object):
                   public_v6=public_v6,
                   private_v4=private_v4,
                   interface_ip=interface_ip,
+                  security_groups=security_groups,
                   location=Dummy(Dummy.LOCATION, zone=kw.get('az')),
                   metadata=kw.get('meta', {}),
                   manager=self,

@@ -124,6 +124,7 @@ class ProviderPool(ConfigPool):
         self.max_ram = None
         self.azs = None
         self.networks = None
+        self.security_groups = None
         self.auto_floating_ip = True
         self.host_key_checking = True
         self.labels = None
@@ -143,6 +144,7 @@ class ProviderPool(ConfigPool):
                     other.max_ram == self.max_ram and
                     other.azs == self.azs and
                     other.networks == self.networks and
+                    other.security_groups == self.security_groups and
                     other.auto_floating_ip == self.auto_floating_ip and
                     other.host_key_checking == self.host_key_checking and
                     other.labels == self.labels)
@@ -280,6 +282,7 @@ class OpenStackProviderConfig(ProviderConfig):
             pp.max_ram = pool.get('max-ram', math.inf)
             pp.azs = pool.get('availability-zones')
             pp.networks = pool.get('networks', [])
+            pp.security_groups = pool.get('security-groups', [])
             pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
             pp.host_key_checking = bool(pool.get('host-key-checking', True))
 
@@ -371,6 +374,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'max-ram': int,
             'labels': [pool_label],
             'availability-zones': [str],
+            'security-groups': [str]
         }
 
         return v.Schema({

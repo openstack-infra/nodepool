@@ -320,7 +320,8 @@ class OpenStackProvider(Provider):
                      az=None, key_name=None, config_drive=True,
                      nodepool_node_id=None, nodepool_node_label=None,
                      nodepool_image_name=None,
-                     networks=None, boot_from_volume=False, volume_size=50):
+                     networks=None, security_groups=None,
+                     boot_from_volume=False, volume_size=50):
         if not networks:
             networks = []
         if not isinstance(image, dict):
@@ -341,6 +342,8 @@ class OpenStackProvider(Provider):
             create_args['key_name'] = key_name
         if az:
             create_args['availability_zone'] = az
+        if security_groups:
+            create_args['security_groups'] = security_groups
         nics = []
         for network in networks:
             net_id = self.findNetwork(network)['id']

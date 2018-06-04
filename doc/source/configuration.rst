@@ -328,6 +328,8 @@ Example::
             - az1
           networks:
             - some-network-name
+          security-groups:
+            - zuul-security-group
           labels:
             - name: trusty
               min-ram: 8192
@@ -371,9 +373,10 @@ Example::
   Name of a cloud configured in ``clouds.yaml``.
 
   The instances spawned by nodepool will inherit the default security group
-  of the project specified in the cloud definition in `clouds.yaml`. This means
-  that when working with Zuul, for example, SSH traffic (TCP/22) must be allowed
-  in the project's default security group for Zuul to be able to reach instances.
+  of the project specified in the cloud definition in `clouds.yaml` (if other
+  values not specified). This means that when working with Zuul, for example,
+  SSH traffic (TCP/22) must be allowed in the project's default security group
+  for Zuul to be able to reach instances.
 
   More information about the contents of `clouds.yaml` can be found in
   `the os-client-config documentation <http://docs.openstack.org/developer/os-client-config/>`_.
@@ -447,6 +450,8 @@ Example::
         - az1
       networks:
         - some-network-name
+      security-groups:
+        - zuul-security-group
       auto-floating-ip: False
       host-key-checking: True
       labels:
@@ -498,6 +503,10 @@ Example::
   ``networks`` (list)
     Specify custom Neutron networks that get attached to each
     node. Specify the name or id of the network as a string.
+
+  ``security-groups`` (list)
+    Specify custom Neutron security groups that get attached to each
+    node. Specify the name or id of the security_group as a string.
 
   ``auto-floating-ip`` (bool)
     Specify custom behavior of allocating floating ip for each node.

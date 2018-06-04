@@ -129,6 +129,7 @@ class OpenStackNodeLauncher(NodeLauncher):
             nodepool_node_label=self.node.type[0],
             nodepool_image_name=image_name,
             networks=self.pool.networks,
+            security_groups=self.pool.security_groups,
             boot_from_volume=self.label.boot_from_volume,
             volume_size=self.label.volume_size)
 
