@@ -206,8 +206,9 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
             list if all are valid.
         '''
         invalid = []
+        valid = self.provider.getSupportedLabels()
         for ntype in self.request.node_types:
-            if ntype not in self.pool.labels:
+            if ntype not in valid:
                 invalid.append(ntype)
         return invalid
 
