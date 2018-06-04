@@ -21,6 +21,9 @@ from nodepool.driver import NodeRequestHandler
 class TestHandler(NodeRequestHandler):
     log = logging.getLogger("nodepool.driver.test.TestHandler")
 
+    def imagesAvailable(self):
+        return True
+
     def launch(self, node):
         node.state = zk.READY
         node.external_id = "test-%s" % self.request.id

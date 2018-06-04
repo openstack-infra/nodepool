@@ -45,6 +45,12 @@ class StaticNodeRequestHandler(NodeRequestHandler):
             return False
         return True
 
+    def imagesAvailable(self):
+        '''
+        This driver doesn't manage images, so always return True.
+        '''
+        return True
+
     def launch(self, node):
         static_node = None
         available_nodes = self.manager.listNodes()

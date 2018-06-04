@@ -198,27 +198,6 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
     def ready_nodes(self):
         return self._ready_nodes
 
-    def _imagesAvailable(self):
-        '''
-        Determines if the requested images are available for this provider.
-
-        ZooKeeper is queried for an image uploaded to the provider that is
-        in the READY state.
-
-        :returns: True if it is available, False otherwise.
-        '''
-        if self.provider.manage_images:
-            for label in self.request.node_types:
-                if self.pool.labels[label].cloud_image:
-                    if not self.manager.labelReady(self.pool.labels[label]):
-                        return False
-                else:
-                    if not self.zk.getMostRecentImageUpload(
-                            self.pool.labels[label].diskimage.name,
-                            self.provider.name):
-                        return False
-        return True
-
     def _invalidNodeTypes(self):
         '''
         Return any node types that are invalid for this provider.
@@ -360,7 +339,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         if invalid_types:
             declined_reasons.append('node type(s) [%s] not available' %
                                     ','.join(invalid_types))
-        elif not self._imagesAvailable():
+        elif not self.imagesAvailable():
             declined_reasons.append('images are not available')
         elif (self.pool.max_servers <= 0 or
               not self.hasProviderQuota(self.request.node_types)):
@@ -612,6 +591,16 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         '''
         Handler may implement this to store metadata before building the node.
         The OpenStack handler uses this to set az, cloud and region.
+        '''
+        pass
+
+    @abc.abstractmethod
+    def imagesAvailable(self):
+        '''
+        Handler needs to implement this to determines if the requested images
+        in self.request.node_types are available for this provider.
+
+        :returns: True if it is available, False otherwise.
         '''
         pass
 
