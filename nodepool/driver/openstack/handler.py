@@ -24,7 +24,9 @@ from nodepool import nodeutils as utils
 from nodepool import zk
 from nodepool.driver.utils import NodeLauncher
 from nodepool.driver import NodeRequestHandler
-from nodepool.driver.openstack.provider import QuotaInformation
+
+# Import entire module to avoid partial-loading, circular import
+from nodepool.driver.openstack import provider
 
 
 class OpenStackNodeLauncher(NodeLauncher):
@@ -300,10 +302,10 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
 
         # Now calculate pool specific quota. Values indicating no quota default
         # to math.inf representing infinity that can be calculated with.
-        pool_quota = QuotaInformation(cores=self.pool.max_cores,
-                                      instances=self.pool.max_servers,
-                                      ram=self.pool.max_ram,
-                                      default=math.inf)
+        pool_quota = provider.QuotaInformation(cores=self.pool.max_cores,
+                                               instances=self.pool.max_servers,
+                                               ram=self.pool.max_ram,
+                                               default=math.inf)
         pool_quota.subtract(
             self.manager.estimatedNodepoolQuotaUsed(self.zk, self.pool))
         pool_quota.subtract(needed_quota)
@@ -312,7 +314,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
         return pool_quota.non_negative()
 
     def hasProviderQuota(self, node_types):
-        needed_quota = QuotaInformation()
+        needed_quota = provider.QuotaInformation()
 
         for ntype in node_types:
             needed_quota.add(
@@ -326,10 +328,10 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
 
         # Now calculate pool specific quota. Values indicating no quota default
         # to math.inf representing infinity that can be calculated with.
-        pool_quota = QuotaInformation(cores=self.pool.max_cores,
-                                      instances=self.pool.max_servers,
-                                      ram=self.pool.max_ram,
-                                      default=math.inf)
+        pool_quota = provider.QuotaInformation(cores=self.pool.max_cores,
+                                               instances=self.pool.max_servers,
+                                               ram=self.pool.max_ram,
+                                               default=math.inf)
         pool_quota.subtract(needed_quota)
         return pool_quota.non_negative()
 

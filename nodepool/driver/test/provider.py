@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from nodepool.driver import Provider
+from nodepool.driver.test import handler
 
 
 class TestProvider(Provider):
@@ -44,3 +45,6 @@ class TestProvider(Provider):
 
     def listNodes(self):
         return []
+
+    def getRequestHandler(self, poolworker, request):
+        return handler.TestHandler(poolworker, request)

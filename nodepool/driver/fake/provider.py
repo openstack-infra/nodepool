@@ -23,6 +23,7 @@ import shade
 
 from nodepool import exceptions
 from nodepool.driver.openstack.provider import OpenStackProvider
+from nodepool.driver.fake.handler import FakeNodeRequestHandler
 
 
 class Dummy(object):
@@ -303,3 +304,6 @@ class FakeProvider(OpenStackProvider):
             self.createServer_fails -= 1
             raise Exception("Expected createServer exception")
         return super(FakeProvider, self).createServer(*args, **kwargs)
+
+    def getRequestHandler(self, poolworker, request):
+        return FakeNodeRequestHandler(poolworker, request)

@@ -17,6 +17,7 @@ import logging
 from nodepool import exceptions
 from nodepool.driver import Provider
 from nodepool.nodeutils import nodescan
+from nodepool.driver.static.handler import StaticNodeRequestHandler
 
 
 class StaticNodeError(Exception):
@@ -91,3 +92,6 @@ class StaticNodeProvider(Provider):
 
     def cleanupLeakedResources(self):
         pass
+
+    def getRequestHandler(self, poolworker, request):
+        return StaticNodeRequestHandler(poolworker, request)
