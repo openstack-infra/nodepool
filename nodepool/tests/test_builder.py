@@ -312,4 +312,19 @@ class TestNodePoolBuilder(tests.DBTestCase):
     def test_diskimage_build_only(self):
         configfile = self.setup_config('node_diskimage_only.yaml')
         self.useBuilder(configfile)
-        self.waitForBuild('fake-image', '0000000001')
+        build_tar = self.waitForBuild('fake-image', '0000000001')
+        build_default = self.waitForBuild('fake-image-default-format',
+                                          '0000000001')
+
+        self.assertEqual(build_tar._formats, ['tar'])
+        self.assertEqual(build_default._formats, ['qcow2'])
+
+    def test_diskimage_build_formats(self):
+        configfile = self.setup_config('node_diskimage_formats.yaml')
+        self.useBuilder(configfile)
+        build_default = self.waitForBuild('fake-image-default-format',
+                                          '0000000001')
+        build_vhd = self.waitForBuild('fake-image-vhd', '0000000001')
+
+        self.assertEqual(build_default._formats, ['qcow2'])
+        self.assertEqual(build_vhd._formats, ['vhd'])

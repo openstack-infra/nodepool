@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Nodepool now defaults to building qcow2 diskimages instead of failing if
+    the diskimage doesn't specify an image format and the diskimage isn't used
+    by any provider. This makes it more convenient to build images without
+    uploading them to a cloud provider.
