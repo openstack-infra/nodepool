@@ -116,9 +116,6 @@ class Config(ConfigValue):
             if not isinstance(d.env_vars, dict):
                 d.env_vars = {}
             d.image_types = set(diskimage.get('formats', []))
-            # Ensure at least qcow2 is set to be passed to qemu-img
-            if not d.image_types:
-                d.image_types.add('qcow2')
             d.pause = bool(diskimage.get('pause', False))
             d.username = diskimage.get('username', 'zuul')
             self.diskimages[d.name] = d
@@ -249,6 +246,13 @@ def loadConfig(config_path):
     newconfig.setDiskImages(config.get('diskimages'))
     newconfig.setLabels(config.get('labels'))
     newconfig.setProviders(config.get('providers'))
+
+    # Ensure at least qcow2 is set to be passed to qemu-img.
+    # Note that this needs to be after setting the providers as they
+    # add their supported image types to the diskimages.
+    for diskimage in newconfig.diskimages.values():
+        if not diskimage.image_types:
+            diskimage.image_types.add('qcow2')
 
     return newconfig
 

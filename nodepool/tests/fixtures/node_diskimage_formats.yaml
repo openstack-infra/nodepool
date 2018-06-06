@@ -1,0 +1,66 @@
+elements-dir: .
+images-dir: '{images_dir}'
+build-log-dir: '{build_log_dir}'
+
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: fake-label-default-format
+    min-ready: 1
+  - name: fake-label-vhd
+    min-ready: 1
+
+providers:
+  - name: fake-provider-default-format
+    cloud: fake
+    driver: fake
+    region-name: fake-region
+    rate: 0.0001
+    diskimages:
+      - name: fake-image-default-format
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+          - name: fake-label-default-format
+            diskimage: fake-image-default-format
+            min-ram: 8192
+  - name: fake-provider-vhd
+    cloud: fake-vhd
+    driver: fake
+    region-name: fake-region
+    rate: 0.0001
+    diskimages:
+      - name: fake-image-vhd
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+          - name: fake-label-vhd
+            diskimage: fake-image-vhd
+            min-ram: 8192
+
+diskimages:
+  - name: fake-image-default-format
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
+  - name: fake-image-vhd
+    elements:
+      - fedora
+      - vm
+    release: 21
+    env-vars:
+      TMPDIR: /opt/dib_tmp
+      DIB_IMAGE_CACHE: /opt/dib_cache
+      DIB_CLOUD_IMAGES: http://download.fedoraproject.org/pub/fedora/linux/releases/test/21-Beta/Cloud/Images/x86_64/
+      BASE_IMAGE_FILE: Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2
