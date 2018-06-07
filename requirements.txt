@@ -13,4 +13,4 @@ diskimage-builder>=2.0.0
 voluptuous
 kazoo
 Paste
-WebOb>=1.2.3
+WebOb>=1.8.1

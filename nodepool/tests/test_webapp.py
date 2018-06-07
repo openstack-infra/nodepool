@@ -25,6 +25,10 @@ from nodepool import zk
 class TestWebApp(tests.DBTestCase):
     log = logging.getLogger("nodepool.TestWebApp")
 
+    # A standard browser accept header
+    browser_accept = (
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+
     def test_image_list(self):
         configfile = self.setup_config('node.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
@@ -41,7 +45,18 @@ class TestWebApp(tests.DBTestCase):
             "http://localhost:%s/image-list" % port)
         # NOTE(ianw): we want pretty printed text/plain back, but
         # simulating a normal web-browser request.
-        req.add_header('Accept', 'text/html')
+        req.add_header('Accept', self.browser_accept)
+        f = request.urlopen(req)
+        self.assertEqual(f.info().get('Content-Type'),
+                         'text/plain; charset=UTF-8')
+        data = f.read()
+        self.assertTrue('fake-image' in data.decode('utf8'))
+
+        # also ensure that text/plain works (might be hand-set by a
+        # command-line curl script, etc)
+        req = request.Request(
+            "http://localhost:%s/image-list" % port)
+        req.add_header('Accept', 'text/plain')
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'text/plain; charset=UTF-8')
@@ -62,7 +77,7 @@ class TestWebApp(tests.DBTestCase):
 
         req = request.Request(
             "http://localhost:%s/image-list?fields=id,image,state" % port)
-        req.add_header('Accept', 'text/html')
+        req.add_header('Accept', self.browser_accept)
         f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'text/plain; charset=UTF-8')
@@ -152,8 +167,8 @@ class TestWebApp(tests.DBTestCase):
         req = request.Request(
             "http://localhost:%s/node-list?node_id=%s" % (port,
                                                           '0000000000'))
-        f = request.urlopen(req)
         req.add_header('Accept', 'application/json')
+        f = request.urlopen(req)
         self.assertEqual(f.info().get('Content-Type'),
                          'application/json')
         data = f.read()
