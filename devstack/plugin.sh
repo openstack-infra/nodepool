@@ -213,6 +213,7 @@ EOF
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
     NODEPOOL_OPENSUSE_423_MIN_READY=1
+    NODEPOOL_OPENSUSE_150_MIN_READY=1
     NODEPOOL_OPENSUSE_TUMBLEWEED_MIN_READY=1
     NODEPOOL_GENTOO_17_0_SYSTEMD_MIN_READY=1
 
@@ -236,6 +237,9 @@ EOF
     fi
     if $NODEPOOL_PAUSE_OPENSUSE_423_DIB ; then
         NODEPOOL_OPENSUSE_423_MIN_READY=0
+    fi
+    if $NODEPOOL_PAUSE_OPENSUSE_150_DIB ; then
+        NODEPOOL_OPENSUSE_150_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB ; then
         NODEPOOL_OPENSUSE_TUMBLEWEED_MIN_READY=0
@@ -270,6 +274,8 @@ labels:
     min-ready: $NODEPOOL_UBUNTU_XENIAL_MIN_READY
   - name: opensuse-423
     min-ready: $NODEPOOL_OPENSUSE_423_MIN_READY
+  - name: opensuse-150
+    min-ready: $NODEPOOL_OPENSUSE_150_MIN_READY
   - name: opensuse-tumbleweed
     min-ready: $NODEPOOL_OPENSUSE_TUMBLEWEED_MIN_READY
   - name: gentoo-17-0-systemd
@@ -297,6 +303,8 @@ providers:
       - name: ubuntu-xenial
         config-drive: true
       - name: opensuse-423
+        config-drive: true
+      - name: opensuse-150
         config-drive: true
       - name: opensuse-tumbleweed
         config-drive: true
@@ -344,6 +352,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
           - name: opensuse-423
             diskimage: opensuse-423
+            min-ram: 512
+            flavor-name: 'nodepool'
+            console-log: True
+            key-name: $NODEPOOL_KEY_NAME
+          - name: opensuse-150
+            diskimage: opensuse-150
             min-ram: 512
             flavor-name: 'nodepool'
             console-log: True
@@ -526,6 +540,28 @@ diskimages:
       - openssh-server
       - nodepool-setup
     release: '42.3'
+    env-vars:
+      TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
+      DIB_CHECKSUM: '1'
+      DIB_SHOW_IMAGE_USAGE: '1'
+      DIB_IMAGE_CACHE: $NODEPOOL_DIB_BASE_PATH/cache
+      DIB_DEV_USER_AUTHORIZED_KEYS: $NODEPOOL_PUBKEY
+      $DIB_GET_PIP
+      $DIB_GLEAN_INSTALLTYPE
+      $DIB_GLEAN_REPOLOCATION
+      $DIB_GLEAN_REPOREF
+  - name: opensuse-150
+    pause: $NODEPOOL_PAUSE_OPENSUSE_150_DIB
+    rebuild-age: 86400
+    elements:
+      - opensuse-minimal
+      - vm
+      - simple-init
+      - growroot
+      - devuser
+      - openssh-server
+      - nodepool-setup
+    release: '15.0'
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'

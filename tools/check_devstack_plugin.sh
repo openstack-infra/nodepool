@@ -26,6 +26,7 @@ NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB=${NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-True}
 NODEPOOL_PAUSE_OPENSUSE_423_DIB=${NODEPOOL_PAUSE_OPENSUSE_423_DIB:-True}
+NODEPOOL_PAUSE_OPENSUSE_150_DIB=${NODEPOOL_PAUSE_OPENSUSE_150_DIB:-True}
 NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB=${NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB:-True}
 NODEPOOL_PAUSE_GENTOO_17_0_SYSTEMD_DIB=${NODEPOOL_PAUSE_GENTOO_17_0_SYSTEMD_DIB:-True}
 
@@ -141,6 +142,14 @@ if [ ${NODEPOOL_PAUSE_OPENSUSE_423_DIB,,} = 'false' ]; then
     waitfornode opensuse-423
     # check ssh for root user
     sshintonode opensuse-423
+fi
+if [ ${NODEPOOL_PAUSE_OPENSUSE_150_DIB,,} = 'false' ]; then
+    # check that image built
+    waitforimage opensuse-150
+    # check image was bootable
+    waitfornode opensuse-150
+    # check ssh for root user
+    sshintonode opensuse-150
 fi
 if [ ${NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB,,} = 'false' ]; then
     # check that image built

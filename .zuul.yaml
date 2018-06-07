@@ -94,6 +94,7 @@
     vars:
       devstack_localrc:
         NODEPOOL_PAUSE_OPENSUSE_423_DIB: false
+        NODEPOOL_PAUSE_OPENSUSE_150_DIB: false
         NODEPOOL_PAUSE_OPENSUSE_TUMBLEWEED_DIB: false
 
 - job:
