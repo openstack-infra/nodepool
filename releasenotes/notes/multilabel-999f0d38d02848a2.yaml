@@ -1,0 +1,9 @@
+---
+upgrade:
+  - |
+    Nodepool can now support multiple node labels, although the OpenStack and
+    static node drivers do not yet support specifying multiple labels, so this
+    is not yet a user-visible change. This does, however, require shutting down
+    all launcher processes before restarting them. Running multiple launchers
+    with mixed support of multi-label will cause errors, so a full shutdown is
+    required.
