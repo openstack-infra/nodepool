@@ -463,14 +463,17 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
 
         declined_reasons = []
         invalid_types = self._invalidNodeTypes()
-        if invalid_types:
+
+        if self.pool.max_servers <= 0:
+            declined_reasons.append('pool is disabled by max_servers')
+        elif invalid_types:
             declined_reasons.append('node type(s) [%s] not available' %
                                     ','.join(invalid_types))
         elif not self.imagesAvailable():
             declined_reasons.append('images are not available')
-        elif (self.pool.max_servers <= 0 or
-              not self.hasProviderQuota(self.request.node_types)):
+        elif not self.hasProviderQuota(self.request.node_types):
             declined_reasons.append('it would exceed quota')
+
         # TODO(tobiash): Maybe also calculate the quota prediction here and
         # backoff for some seconds if the used quota would be exceeded?
         # This way we could give another (free) provider the chance to take
