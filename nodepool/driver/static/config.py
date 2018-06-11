@@ -78,7 +78,7 @@ class StaticProviderConfig(ProviderConfig):
                     'timeout': int(node.get('timeout', 5)),
                     # Read ssh-port values for backward compat, but prefer port
                     'connection-port': int(
-                        node.get('port', node.get('ssh-port', 22))),
+                        node.get('connection-port', node.get('ssh-port', 22))),
                     'connection-type': node.get('connection-type', 'ssh'),
                     'username': node.get('username', 'zuul'),
                     'max-parallel-jobs': int(node.get('max-parallel-jobs', 1)),
