@@ -299,7 +299,7 @@ class PoolWorker(threading.Thread):
                     self._assignHandlers()
                 else:
                     # If we are paused, one request handler could not
-                    # satisify its assigned request, so give it
+                    # satisfy its assigned request, so give it
                     # another shot. Unpause ourselves if it completed.
                     self.paused_handler.run()
                     if not self.paused_handler.paused:

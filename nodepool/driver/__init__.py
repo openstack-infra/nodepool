@@ -490,7 +490,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
             # us with more than max-servers.
             # TODO: handle this with the quota code
             if current_count >= self.pool.max_servers:
-                declined_reasons.append("provider cannot satisify min-ready")
+                declined_reasons.append("provider cannot satisfy min-ready")
 
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
