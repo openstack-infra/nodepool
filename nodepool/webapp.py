@@ -117,9 +117,9 @@ class WebApp(threading.Thread):
         :param request: The incoming request
         :return str: Best guess of either 'pretty' or 'json'
         '''
-        best = request.accept.best_match(
-            ['application/json', 'text/plain'])
-        if best == 'application/json':
+        acceptable = request.accept.acceptable_offers(
+            ['text/html', 'text/plain', 'application/json'])
+        if acceptable[0][0] == 'application/json':
             return 'json'
         else:
             return 'pretty'
