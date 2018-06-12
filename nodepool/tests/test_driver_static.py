@@ -38,15 +38,113 @@ class TestDriverStatic(tests.DBTestCase):
         config = nodepool_config.loadConfig(configfile)
         self.assertIn('static-provider', config.providers)
 
+    def test_static_basic(self):
+        '''
+        Test that basic node registration works.
+        '''
+        configfile = self.setup_config('static-basic.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for node pre-registration")
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        self.assertEqual(nodes[0].state, zk.READY)
+        self.assertEqual(nodes[0].provider, "static-provider")
+        self.assertEqual(nodes[0].pool, "main")
+        self.assertEqual(nodes[0].launcher, "static driver")
+        self.assertEqual(nodes[0].type, ['fake-label'])
+        self.assertEqual(nodes[0].hostname, 'fake-host-1')
+        self.assertEqual(nodes[0].interface_ip, 'fake-host-1')
+        self.assertEqual(nodes[0].username, 'zuul')
+        self.assertEqual(nodes[0].connection_port, 22022)
+        self.assertEqual(nodes[0].connection_type, 'ssh')
+        self.assertEqual(nodes[0].host_keys, ['ssh-rsa FAKEKEY'])
+
+    def test_static_node_increase(self):
+        '''
+        Test that adding new nodes to the config creates additional nodes.
+        '''
+        configfile = self.setup_config('static-basic.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for initial node")
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        self.log.debug("Waiting for additional node")
+        self.replace_config(configfile, 'static-2-nodes.yaml')
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+
+    def test_static_node_decrease(self):
+        '''
+        Test that removing nodes from the config removes nodes.
+        '''
+        configfile = self.setup_config('static-2-nodes.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for initial nodes")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+
+        self.log.debug("Waiting for node decrease")
+        self.replace_config(configfile, 'static-basic.yaml')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0].hostname, 'fake-host-1')
+
+    def test_static_parallel_increase(self):
+        '''
+        Test that increasing max-parallel-jobs creates additional nodes.
+        '''
+        configfile = self.setup_config('static-basic.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for initial node")
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        self.log.debug("Waiting for additional node")
+        self.replace_config(configfile, 'static-parallel-increase.yaml')
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+
+    def test_static_parallel_decrease(self):
+        '''
+        Test that decreasing max-parallel-jobs deletes nodes.
+        '''
+        configfile = self.setup_config('static-parallel-increase.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for initial nodes")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+
+        self.log.debug("Waiting for node decrease")
+        self.replace_config(configfile, 'static-basic.yaml')
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+    def test_static_multilabel(self):
+        configfile = self.setup_config('static-multilabel.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        nodes = self.waitForNodes('fake-label')
+        self.assertIn('fake-label', nodes[0].type)
+        self.assertIn('fake-label2', nodes[0].type)
+
     def test_static_handler(self):
         configfile = self.setup_config('static.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)
         pool.start()
-        self.log.debug("Waiting for min-ready nodes")
         node = self.waitForNodes('fake-label')
-        self.assertEqual(len(node), 1)
-        nodes = self.waitForNodes('fake-concurrent-label', 2)
-        self.assertEqual(len(nodes), 2)
+        self.waitForNodes('fake-concurrent-label', 2)
 
         node = node[0]
         self.log.debug("Marking first node as used %s", node.id)

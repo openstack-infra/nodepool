@@ -13,10 +13,7 @@
 # under the License.
 
 import logging
-import random
 
-from nodepool import nodeutils
-from nodepool import zk
 from nodepool.driver import NodeRequestHandler
 
 
@@ -29,69 +26,21 @@ class StaticNodeRequestHandler(NodeRequestHandler):
         # We don't spawn threads to launch nodes, so always return 1.
         return 1
 
-    def _checkConcurrency(self, static_node):
-        access_count = 0
-
-        unavailable_states = [zk.IN_USE]
-        if not self.request.reuse:
-            # When re-use is disabled (e.g. for Min-Ready request), we need
-            # to consider 'ready' node as in-use.
-            unavailable_states.append(zk.READY)
-
-        for node in self.zk.nodeIterator():
-            if node.hostname != static_node["name"]:
-                continue
-            if node.state in unavailable_states:
-                access_count += 1
-
-        if access_count >= static_node["max-parallel-jobs"]:
-            self.log.info("%s: max concurrency reached (%d)" % (
-                static_node["name"], access_count))
-            return False
-        return True
-
     def imagesAvailable(self):
         '''
         This driver doesn't manage images, so always return True.
         '''
         return True
 
-    def launch(self, node):
-        static_node = None
-        available_nodes = self.manager.listNodes()
-        # Randomize static nodes order
-        random.shuffle(available_nodes)
-        for available_node in available_nodes:
-            if node.type[0] in available_node["labels"]:
-                if self._checkConcurrency(available_node):
-                    static_node = available_node
-                    break
+    def hasRemainingQuota(self, ntype):
+        # We are always at quota since we cannot launch new nodes.
+        return False
 
-        if static_node:
-            self.log.debug("%s: Assigning static_node %s" % (
-                self.request.id, static_node))
-            node.state = zk.READY
-            node.external_id = "static-%s" % self.request.id
-            node.hostname = static_node["name"]
-            node.username = static_node["username"]
-            node.interface_ip = static_node["name"]
-            node.connection_port = static_node["connection-port"]
-            node.connection_type = static_node["connection-type"]
-            nodeutils.set_node_ip(node)
-            node.host_keys = self.manager.nodes_keys[static_node["name"]]
-            self.zk.storeNode(node)
+    def launch(self, node):
+        # NOTE: We do not expect this to be called since hasRemainingQuota()
+        # returning False should prevent the call.
+        raise Exception("Node launching not supported by static driver")
 
     def launchesComplete(self):
-        '''
-        Our nodeset could have nodes in BUILDING state because we may be
-        waiting for one of our static nodes to free up. Keep calling launch()
-        to try to grab one.
-        '''
-        waiting_node = False
-        for node in self.nodeset:
-            if node.state == zk.READY:
-                continue
-            self.launch(node)
-            if node.state != zk.READY:
-                waiting_node = True
-        return not waiting_node
+        # We don't wait on a launch since we never actually launch.
+        return True
