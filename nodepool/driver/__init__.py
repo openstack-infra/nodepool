@@ -131,7 +131,25 @@ class Driver(object, metaclass=abc.ABCMeta):
         pass
 
 
-class Provider(object, metaclass=abc.ABCMeta):
+class ProviderNotifications(object):
+    """
+    Notification interface for :class:`.Provider` objects.
+
+    This groups all notification messages bound for the Provider. The
+    Provider class inherits from this by default. A Provider overrides the
+    methods here if they want to handle the notification.
+    """
+
+    def nodeDeletedNotification(self, node):
+        """
+        Called after the ZooKeeper object for a node is deleted.
+
+        :param Node node: Object describing the node just deleted.
+        """
+        pass
+
+
+class Provider(ProviderNotifications, metaclass=abc.ABCMeta):
     """The Provider interface
 
     Drivers implement this interface to supply Providers.  Each
@@ -283,7 +301,25 @@ class LabelRecorder(object):
         return node_id
 
 
-class NodeRequestHandler(object, metaclass=abc.ABCMeta):
+class NodeRequestHandlerNotifications(object):
+    """
+    Notification interface for :class:`.NodeRequestHandler` objects.
+
+    This groups all notification messages bound for the NodeRequestHandler.
+    The NodeRequestHandler class inherits from this by default. A request
+    handler overrides the methods here if they want to handle the notification.
+    """
+
+    def nodeReusedNotification(self, node):
+        '''
+        Handler may implement this to be notified when a node is re-used.
+        The OpenStack handler uses this to set the choozen_az.
+        '''
+        pass
+
+
+class NodeRequestHandler(NodeRequestHandlerNotifications,
+                         metaclass=abc.ABCMeta):
     '''
     Class to process a single nodeset request.
 
@@ -402,7 +438,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
                         self.nodeset.append(node)
                         self._satisfied_types.add(ntype, node.id)
                         # Notify driver handler about node re-use
-                        self.nodeReused(node)
+                        self.nodeReusedNotification(node)
                         break
 
             # Could not grab an existing node, so launch a new one.
@@ -671,13 +707,6 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
         :return: True if there is enough quota, False otherwise
         '''
         return True
-
-    def nodeReused(self, node):
-        '''
-        Handler may implement this to be notified when a node is re-used.
-        The OpenStack handler uses this to set the choozen_az.
-        '''
-        pass
 
     def checkReusableNode(self, node):
         '''
