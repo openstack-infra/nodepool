@@ -57,7 +57,7 @@ class StaticNodeProvider(Provider):
         raise StaticNodeError("%s: host key mismatches (%s)" %
                               (node["name"], keys))
 
-    def start(self):
+    def start(self, zk_conn):
         for pool in self.provider.pools.values():
             self.pools[pool.name] = {}
             for node in pool.nodes:

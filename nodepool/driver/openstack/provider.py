@@ -118,7 +118,7 @@ class OpenStackProvider(Provider):
         self._taskmanager = None
         self._current_nodepool_quota = None
 
-    def start(self):
+    def start(self, zk_conn):
         if self._use_taskmanager:
             self._taskmanager = TaskManager(None, self.provider.name,
                                             self.provider.rate)

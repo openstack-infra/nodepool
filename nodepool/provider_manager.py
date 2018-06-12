@@ -30,7 +30,18 @@ class ProviderManager(object):
     log = logging.getLogger("nodepool.ProviderManager")
 
     @staticmethod
-    def reconfigure(old_config, new_config, use_taskmanager=True):
+    def reconfigure(old_config, new_config, zk_conn, use_taskmanager=True):
+        '''
+        Reconfigure the provider managers on any configuration changes.
+
+        If a provider configuration changes, stop the current provider
+        manager we have cached and replace it with a new one.
+
+        :param Config old_config: The previously read configuration.
+        :param Config new_config: The newly read configuration.
+        :param ZooKeeper zk_conn: A ZooKeeper connection object.
+        :param bool use_taskmanager: If True, use a task manager.
+        '''
         stop_managers = []
         for p in new_config.providers.values():
             oldmanager = None
@@ -46,7 +57,7 @@ class ProviderManager(object):
                                           " for %s" % p.name)
                 new_config.provider_managers[p.name] = \
                     get_provider(p, use_taskmanager)
-                new_config.provider_managers[p.name].start()
+                new_config.provider_managers[p.name].start(zk_conn)
 
         for stop_manager in stop_managers:
             stop_manager.stop()

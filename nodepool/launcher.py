@@ -819,8 +819,9 @@ class NodePool(threading.Thread):
 
     def updateConfig(self):
         config = self.loadConfig()
-        provider_manager.ProviderManager.reconfigure(self.config, config)
         self.reconfigureZooKeeper(config)
+        provider_manager.ProviderManager.reconfigure(self.config, config,
+                                                     self.getZK())
         self.setConfig(config)
 
     def removeCompletedRequests(self):
