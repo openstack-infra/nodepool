@@ -711,6 +711,11 @@ Static driver
 The static provider driver is used to define static nodes. Nodes are also
 partitioned into groups called "pools" (see :ref:`static_nodes` for details).
 
+.. NOTE::
+
+   Although you may define more than one pool, it is essentially useless to do
+   so since a node's ``name`` must be unique across all pools.
+
 Example::
 
   providers:
@@ -732,13 +737,14 @@ Example::
 static nodes
 ~~~~~~~~~~~~
 
-Each entry in a pool`s nodes section indicates a static node and it's
+Each entry in a pool's nodes section indicates a static node and it's
 corresponding label.
 
 **required**
 
   ``name``
-  The hostname or ip address of the static node.
+  The hostname or ip address of the static node. This must be unique
+  across all nodes defined within the configuration file.
 
   ``labels`` (list)
   The list of labels associated with the node.
