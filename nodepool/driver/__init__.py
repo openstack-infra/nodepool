@@ -496,16 +496,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))
             self.decline_request()
-            self.unlockNodeSet(clear_allocation=True)
-
-            # If conditions have changed for a paused request to now cause us
-            # to decline it, we need to unpause so we don't keep trying it
-            if self.paused:
-                self.paused = False
-
-            self.zk.storeNodeRequest(self.request)
-            self.zk.unlockNodeRequest(self.request)
-            self.done = True
+            self._declinedHandlerCleanup()
             return
 
         if self.paused:
@@ -516,6 +507,27 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
             self.zk.storeNodeRequest(self.request)
 
         self._waitForNodeSet()
+
+    def _declinedHandlerCleanup(self):
+        """
+        After declining a request, do necessary cleanup actions.
+        """
+        self.unlockNodeSet(clear_allocation=True)
+
+        # If conditions have changed for a paused request to now cause us
+        # to decline it, we need to unpause so we don't keep trying it
+        if self.paused:
+            self.paused = False
+
+        try:
+            self.zk.storeNodeRequest(self.request)
+            self.zk.unlockNodeRequest(self.request)
+        except Exception:
+            # If the request is gone for some reason, we need to make
+            # sure that self.done still gets set.
+            self.log.exception("Unable to modify missing request %s",
+                               self.request.id)
+        self.done = True
 
     # ---------------------------------------------------------------
     # Public methods
@@ -576,16 +588,7 @@ class NodeRequestHandler(object, metaclass=abc.ABCMeta):
                 "Declining node request %s due to exception in "
                 "NodeRequestHandler:", self.request.id)
             self.decline_request()
-            self.unlockNodeSet(clear_allocation=True)
-            try:
-                self.zk.storeNodeRequest(self.request)
-                self.zk.unlockNodeRequest(self.request)
-            except Exception:
-                # If the request is gone for some reason, we need to make
-                # sure that self.done still gets set.
-                self.log.exception("Unable to decline missing request %s",
-                                   self.request.id)
-            self.done = True
+            self._declinedHandlerCleanup()
 
     def poll(self):
         if self.paused:

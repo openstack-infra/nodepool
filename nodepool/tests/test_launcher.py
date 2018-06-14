@@ -1370,3 +1370,54 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(1, mock_poll.call_count)
         self.assertEqual(0, len(
             pool._pool_threads["fake-provider-main"].request_handlers))
+
+    def test_exception_causing_decline_of_paused_request(self):
+        """
+        Test that a paused request, that later gets declined because of
+        an exception (say, thrown from a provider operation), unpauses
+        and removes the request handler.
+        """
+
+        # First config has max-servers set to 2
+        configfile = self.setup_config('pause_declined_1.yaml')
+        self.useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        # Create a request that uses all capacity (2 servers)
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(len(req.nodes), 2)
+
+        # Now that we have 2 nodes in use, create another request that
+        # requests two nodes, which should cause the request to pause.
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        req2.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req2)
+        req2 = self.waitForNodeRequest(req2, (zk.PENDING,))
+
+        # Force an exception within the run handler.
+        pool_worker = pool.getPoolWorkers('fake-provider')
+        while not pool_worker[0].paused_handler:
+            time.sleep(0.1)
+        pool_worker[0].paused_handler.hasProviderQuota = mock.Mock(
+            side_effect=Exception('mock exception')
+        )
+
+        # The above exception should cause us to fail the paused request.
+        req2 = self.waitForNodeRequest(req2, (zk.FAILED,))
+        self.assertNotEqual(req2.declined_by, [])
+
+        # The exception handling should make sure that we unpause AND remove
+        # the request handler.
+        while pool_worker[0].paused_handler:
+            time.sleep(0.1)
+        self.assertEqual(0, len(pool_worker[0].request_handlers))
