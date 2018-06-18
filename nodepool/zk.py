@@ -20,6 +20,7 @@ import logging
 import time
 from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
+from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.recipe.lock import Lock
 
 from nodepool import exceptions as npe
@@ -655,12 +656,16 @@ class ZooKeeper(object):
     REQUEST_ROOT = "/nodepool/requests"
     REQUEST_LOCK_ROOT = "/nodepool/requests-lock"
 
+    # Log zookeeper retry every 10 seconds
+    retry_log_rate = 10
+
     def __init__(self):
         '''
         Initialize the ZooKeeper object.
         '''
         self.client = None
         self._became_lost = False
+        self._last_retry_log = 0
 
     # =======================================================================
     # Private Methods
@@ -788,6 +793,15 @@ class ZooKeeper(object):
         else:
             self.log.debug("ZooKeeper connection: CONNECTED")
 
+    def logConnectionRetryEvent(self):
+        '''
+        Kazoo retry callback
+        '''
+        now = time.monotonic()
+        if now - self._last_retry_log >= self.retry_log_rate:
+            self.log.warning("Retrying zookeeper connection")
+            self._last_retry_log = now
+
     # =======================================================================
     # Public Methods and Properties
     # =======================================================================
@@ -834,7 +848,13 @@ class ZooKeeper(object):
             hosts = buildZooKeeperHosts(host_list)
             self.client = KazooClient(hosts=hosts, read_only=read_only)
             self.client.add_listener(self._connection_listener)
-            self.client.start()
+            # Manually retry initial connection attempt
+            while True:
+                try:
+                    self.client.start(1)
+                    break
+                except KazooTimeoutError:
+                    self.logConnectionRetryEvent()
 
     def disconnect(self):
         '''
