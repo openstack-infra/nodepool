@@ -677,6 +677,47 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].provider, 'fake-provider')
 
+    def test_node_delete_error(self):
+        def error_delete(self, name):
+            # Set ERROR status instead of deleting the node
+            self._getClient()._server_list[0].status = 'ERROR'
+
+        self.useFixture(fixtures.MockPatchObject(
+            fakeprovider.FakeProvider, 'deleteServer', error_delete))
+
+        configfile = self.setup_config('node_delete_error.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+
+        # request a node
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+        self.log.debug("Wait for request")
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
+        self.assertEqual(len(req.nodes), 1)
+
+        # remove the node from db
+        self.log.debug("deleting node %s", req.nodes[0])
+        node = self.zk.getNode(req.nodes[0])
+        self.zk.deleteNode(node)
+
+        # wait the cleanup thread to kick in
+        time.sleep(5)
+        zk_nodes = self.zk.getNodes()
+        self.assertEqual(len(zk_nodes), 1)
+        node = self.zk.getNode(zk_nodes[0])
+        self.assertEqual(node.state, zk.DELETING)
+
+        # remove error nodes
+        pool.getProviderManager(
+            'fake-provider')._getClient()._server_list.clear()
+
     def test_leaked_node(self):
         """Test that a leaked node is deleted"""
         configfile = self.setup_config('leaked_node.yaml')
