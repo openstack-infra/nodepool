@@ -16,6 +16,7 @@
 
 import abc
 import logging
+import math
 import threading
 import time
 
@@ -84,3 +85,71 @@ class NodeLauncher(threading.Thread,
             self.updateNodeStats(self.zk, self.provider_config)
         except Exception:
             self.log.exception("Exception while reporting stats:")
+
+
+class QuotaInformation:
+
+    def __init__(self, cores=None, instances=None, ram=None, default=0):
+        '''
+        Initializes the quota information with some values. None values will
+        be initialized with default which will be typically 0 or math.inf
+        indicating an infinite limit.
+
+        :param cores:
+        :param instances:
+        :param ram:
+        :param default:
+        '''
+        self.quota = {
+            'compute': {
+                'cores': self._get_default(cores, default),
+                'instances': self._get_default(instances, default),
+                'ram': self._get_default(ram, default),
+            }
+        }
+
+    @staticmethod
+    def construct_from_flavor(flavor):
+        return QuotaInformation(instances=1,
+                                cores=flavor.vcpus,
+                                ram=flavor.ram)
+
+    @staticmethod
+    def construct_from_limits(limits):
+        def bound_value(value):
+            if value == -1:
+                return math.inf
+            return value
+
+        return QuotaInformation(
+            instances=bound_value(limits.max_total_instances),
+            cores=bound_value(limits.max_total_cores),
+            ram=bound_value(limits.max_total_ram_size))
+
+    def _get_default(self, value, default):
+        return value if value is not None else default
+
+    def _add_subtract(self, other, add=True):
+        for category in self.quota.keys():
+            for resource in self.quota[category].keys():
+                second_value = other.quota.get(category, {}).get(resource, 0)
+                if add:
+                    self.quota[category][resource] += second_value
+                else:
+                    self.quota[category][resource] -= second_value
+
+    def subtract(self, other):
+        self._add_subtract(other, add=False)
+
+    def add(self, other):
+        self._add_subtract(other, True)
+
+    def non_negative(self):
+        for key_i, category in self.quota.items():
+            for resource, value in category.items():
+                if value < 0:
+                    return False
+        return True
+
+    def __str__(self):
+        return str(self.quota)
