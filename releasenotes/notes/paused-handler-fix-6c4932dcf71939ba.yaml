@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixed a bug where if a request handler is paused and an exception is thrown
+    within the handler, the handler was not properly unpaused and the request
+    remained in the list of active handlers.
