@@ -338,7 +338,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
             return False
         return True
 
-    def nodeReused(self, node):
+    def nodeReusedNotification(self, node):
         """
         We attempt to group the node set within the same provider availability
         zone.

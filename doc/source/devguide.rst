@@ -58,7 +58,11 @@ Drivers
    :members:
 .. autoclass:: nodepool.driver.Provider
    :members:
+.. autoclass:: nodepool.driver.ProviderNotifications
+   :members:
 .. autoclass:: nodepool.driver.NodeRequestHandler
+   :members:
+.. autoclass:: nodepool.driver.NodeRequestHandlerNotifications
    :members:
 .. autoclass:: nodepool.driver.ProviderConfig
    :members:
