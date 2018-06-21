@@ -83,9 +83,14 @@ class StaticProviderConfig(ProviderConfig):
                     'username': node.get('username', 'zuul'),
                     'max-parallel-jobs': int(node.get('max-parallel-jobs', 1)),
                 })
-                for label in node['labels'].split():
-                    pp.labels.add(label)
-                    config.labels[label].pools.append(pp)
+                if isinstance(node['labels'], str):
+                    for label in node['labels'].split():
+                        pp.labels.add(label)
+                        config.labels[label].pools.append(pp)
+                elif isinstance(node['labels'], list):
+                    for label in node['labels']:
+                        pp.labels.add(label)
+                        config.labels[label].pools.append(pp)
 
     def getSchema(self):
         pool_node = {

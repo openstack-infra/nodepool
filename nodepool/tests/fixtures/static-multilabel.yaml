@@ -6,8 +6,6 @@ zookeeper-servers:
 labels:
   - name: fake-label
   - name: fake-label2
-  - name: fake-concurrent-label
-  - name: fake-windows-label
 
 providers:
   - name: static-provider
@@ -16,17 +14,10 @@ providers:
       - name: main
         nodes:
           - name: fake-host-1
-            labels: fake-label
+            labels:
+              - fake-label
+              - fake-label2
             host-key: ssh-rsa FAKEKEY
             timeout: 13
             connection-port: 22022
             username: zuul
-            max-parallel-jobs: 1
-          - name: fake-host-2
-            labels: fake-concurrent-label
-            host-key: ssh-rsa FAKEKEY
-            max-parallel-jobs: 2
-          - name: fake-host-3
-            labels: fake-windows-label
-            max-parallel-jobs: 1
-            connection-type: winrm
