@@ -22,7 +22,7 @@ class TestProvider(Provider):
     def __init__(self, provider):
         self.provider = provider
 
-    def start(self):
+    def start(self, zk_conn):
         pass
 
     def stop(self):

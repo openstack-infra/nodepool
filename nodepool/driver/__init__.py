@@ -145,11 +145,15 @@ class Provider(object, metaclass=abc.ABCMeta):
 
     """
     @abc.abstractmethod
-    def start(self):
+    def start(self, zk_conn):
         """Start this provider
 
+        :param ZooKeeper zk_conn: A ZooKeeper connection object.
+
         This is called after each configuration change to allow the driver
-        to perform initialization tasks and start background threads.
+        to perform initialization tasks and start background threads. The
+        ZooKeeper connection object is provided if the Provider needs to
+        interact with it.
 
         """
         pass

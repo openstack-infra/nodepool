@@ -61,7 +61,7 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         self.assertIn('real-provider', config.providers)
         pm = provider_manager.get_provider(
             config.providers['real-provider'], use_taskmanager=False)
-        pm.start()
+        pm.start(None)
         self.assertEqual(pm._client.auth, auth_data)
 
     def test_nodepool_occ_config_reload(self):
