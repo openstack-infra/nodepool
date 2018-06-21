@@ -164,9 +164,6 @@ class StaticNodeProvider(Provider):
                 self.zk.unlockNode(node)
 
     def _start(self, zk_conn):
-        # TODO(Shrews): Deregister nodes when they are removed from the config
-        # or when max-parallel-jobs is decreased.
-
         self.zk = zk_conn
         self.registered = self.getRegisteredNodeHostnames()
 
