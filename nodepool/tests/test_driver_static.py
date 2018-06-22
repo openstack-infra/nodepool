@@ -200,3 +200,33 @@ class TestDriverStatic(tests.DBTestCase):
         req = self.waitForNodeRequest(req)
         self.assertEqual(req.state, zk.FULFILLED)
         self.assertEqual(len(req.nodes), 1)
+
+    def test_static_request_handled(self):
+        '''
+        Test that a node is reregistered after handling a request.
+        '''
+        configfile = self.setup_config('static-basic.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        self.log.debug("Waiting for request %s", req.id)
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(len(req.nodes), 1)
+        self.assertEqual(req.nodes[0], nodes[0].id)
+
+        # Mark node as used
+        nodes[0].state = zk.USED
+        self.zk.storeNode(nodes[0])
+
+        # Our single node should have been used, deleted, then reregistered
+        new_nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(nodes[0].hostname, new_nodes[0].hostname)

@@ -165,11 +165,11 @@ class StaticNodeProvider(Provider):
 
     def _start(self, zk_conn):
         self.zk = zk_conn
-        self.registered = self.getRegisteredNodeHostnames()
+        registered = self.getRegisteredNodeHostnames()
 
         for pool in self.provider.pools.values():
             for node in pool.nodes:
-                current_count = self.registered[node["name"]]
+                current_count = registered[node["name"]]
 
                 # Register nodes to synchronize with our configuration.
                 if current_count < node["max-parallel-jobs"]:
@@ -197,10 +197,10 @@ class StaticNodeProvider(Provider):
         # De-register nodes to synchronize with our configuration.
         # This case covers any registered nodes that no longer appear in
         # the config.
-        for hostname in list(self.registered):
+        for hostname in list(registered):
             if hostname not in self.static_nodes:
                 try:
-                    self.deregisterNode(self.registered[hostname], hostname)
+                    self.deregisterNode(registered[hostname], hostname)
                 except Exception:
                     self.log.exception("Couldn't deregister static node:")
                     continue
@@ -248,7 +248,13 @@ class StaticNodeProvider(Provider):
             return
 
         static_node = self.static_nodes[node.hostname]
-        current_count = self.registered[node.hostname]
+        try:
+            registered = self.getRegisteredNodeHostnames()
+        except Exception:
+            self.log.exception(
+                "Cannot get registered hostnames for node re-registration:")
+            return
+        current_count = registered[node.hostname]
 
         # It's possible we were not able to de-register nodes due to a config
         # change (because they were in use). In that case, don't bother to
