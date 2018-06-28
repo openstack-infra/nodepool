@@ -109,8 +109,9 @@ class StaticProviderConfig(ProviderConfig):
         }
         return v.Schema({'pools': [pool]})
 
-    def getSupportedLabels(self):
+    def getSupportedLabels(self, pool_name=None):
         labels = set()
         for pool in self.pools.values():
-            labels.update(pool.labels)
+            if not pool_name or (pool.name == pool_name):
+                labels.update(pool.labels)
         return labels

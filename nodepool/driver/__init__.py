@@ -373,7 +373,7 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
             list if all are valid.
         '''
         invalid = []
-        valid = self.provider.getSupportedLabels()
+        valid = self.provider.getSupportedLabels(self.pool.name)
         for ntype in self.request.node_types:
             if ntype not in valid:
                 invalid.append(ntype)
@@ -859,8 +859,10 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def getSupportedLabels(self):
+    def getSupportedLabels(self, pool_name=None):
         '''
         Return a set of label names supported by this provider.
+
+        :param str pool_name: If provided, get labels for the given pool only.
         '''
         pass

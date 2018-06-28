@@ -57,5 +57,5 @@ class TestConfig(ProviderConfig):
                 'labels': [str]}
         return v.Schema({'pools': [pool]})
 
-    def getSupportedLabels(self):
+    def getSupportedLabels(self, pool_name=None):
         return self.labels
