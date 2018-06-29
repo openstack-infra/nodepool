@@ -160,7 +160,7 @@ class NodePoolCmd(NodepoolApp):
         fields = ['id', 'provider', 'label', 'server_id',
                   'public_ipv4', 'ipv6', 'state', 'age', 'locked']
         if detail:
-            fields.extend(['hostname', 'private_ipv4', 'AZ',
+            fields.extend(['pool', 'hostname', 'private_ipv4', 'AZ',
                            'connection_port', 'launcher',
                            'allocated_to', 'hold_job',
                            'comment'])
