@@ -159,6 +159,13 @@ class OpenStackProvider(Provider):
                     # but move on and don't account it as we can't properly
                     # calculate its cost without pool info.
                     continue
+                if node.type[0] not in provider_pool.labels:
+                    self.log.warning(
+                        "Node type is not in provider pool for node %s" % node)
+                    # This node is also in a funny state; the config
+                    # may have changed under it.  It should settle out
+                    # eventually when it's deleted.
+                    continue
                 node_resources = self.quotaNeededByNodeType(
                     node.type[0], provider_pool)
                 used_quota.add(node_resources)
