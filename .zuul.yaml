@@ -149,3 +149,7 @@
     experimental:
       jobs:
         - nodepool-functional-py35-debian-src
+    release:
+      jobs:
+        - publish-zuul-docs
+        - publish-openstack-sphinx-docs-infra-python3
