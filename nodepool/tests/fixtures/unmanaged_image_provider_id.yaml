@@ -1,0 +1,29 @@
+elements-dir: .
+images-dir: '{images_dir}'
+build-log-dir: '{build_log_dir}'
+
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: fake-label
+    min-ready: 1
+
+providers:
+  - name: fake-provider
+    cloud: fake
+    driver: fake
+    region-name: fake-region
+    rate: 0.0001
+    cloud-images:
+      - name: fake-image
+        image-id: 'fake-image-id'
+    pools:
+      - name: main
+        max-servers: 96
+        labels:
+          - name: fake-label
+            cloud-image: fake-image
+            min-ram: 8192

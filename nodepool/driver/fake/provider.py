@@ -107,7 +107,10 @@ class FakeOpenStackCloud(object):
     def _get(self, name_or_id, instance_list):
         self.log.debug("Get %s in %s" % (name_or_id, repr(instance_list)))
         for instance in instance_list:
-            if instance.name == name_or_id or instance.id == name_or_id:
+            if isinstance(name_or_id, dict):
+                if instance.id == name_or_id['id']:
+                    return instance
+            elif instance.name == name_or_id or instance.id == name_or_id:
                 return instance
         return None
 

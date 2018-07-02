@@ -1000,6 +1000,18 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(nodes), 1)
 
+    def test_unmanaged_image_provider_id(self):
+        """
+        Test node launching using an unmanaged image referencing the
+        image ID as known by the provider.
+        """
+        configfile = self.setup_config('unmanaged_image_provider_id.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.log.debug("Waiting for node")
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
     def test_paused_gets_declined(self):
         """Test that a paused request, that later gets declined, unpauses."""
 
