@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    For pre-existing cloud images (not managed by nodepool), referencing
+    them by ID was failing since they could not be found with this data,
+    only by name.

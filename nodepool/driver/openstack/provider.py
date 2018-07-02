@@ -388,7 +388,14 @@ class OpenStackProvider(Provider):
     def labelReady(self, label):
         if not label.cloud_image:
             return False
-        image = self.getImage(label.cloud_image.external)
+
+        # If an image ID was supplied, we'll assume it is ready since
+        # we don't currently have a way of validating that (except during
+        # server creation).
+        if label.cloud_image.image_id:
+            return True
+
+        image = self.getImage(label.cloud_image.external_name)
         if not image:
             self.log.warning(
                 "Provider %s is configured to use %s as the"
