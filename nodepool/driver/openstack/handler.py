@@ -306,6 +306,7 @@ class OpenStackNodeRequestHandler(NodeRequestHandler):
                                       default=math.inf)
         pool_quota.subtract(
             self.manager.estimatedNodepoolQuotaUsed(self.zk, self.pool))
+        self.log.debug("Current pool quota: %s" % pool_quota)
         pool_quota.subtract(needed_quota)
         self.log.debug("Predicted remaining pool quota: %s", pool_quota)
 
