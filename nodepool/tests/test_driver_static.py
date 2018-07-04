@@ -62,6 +62,30 @@ class TestDriverStatic(tests.DBTestCase):
         self.assertEqual(nodes[0].connection_type, 'ssh')
         self.assertEqual(nodes[0].host_keys, ['ssh-rsa FAKEKEY'])
 
+    def test_static_unresolvable(self):
+        '''
+        Test that basic node registration works.
+        '''
+        configfile = self.setup_config('static-unresolvable.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for node pre-registration")
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        self.assertEqual(nodes[0].state, zk.READY)
+        self.assertEqual(nodes[0].provider, "static-provider")
+        self.assertEqual(nodes[0].pool, "main")
+        self.assertEqual(nodes[0].launcher, "static driver")
+        self.assertEqual(nodes[0].type, ['fake-label'])
+        self.assertEqual(nodes[0].hostname, 'fake-host-1')
+        self.assertEqual(nodes[0].interface_ip, 'fake-host-1')
+        self.assertEqual(nodes[0].username, 'zuul')
+        self.assertEqual(nodes[0].connection_port, 22022)
+        self.assertEqual(nodes[0].connection_type, 'ssh')
+        self.assertEqual(nodes[0].host_keys, ['ssh-rsa FAKEKEY'])
+
     def test_static_node_increase(self):
         '''
         Test that adding new nodes to the config creates additional nodes.

@@ -1,0 +1,26 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: fake-label
+  - name: fake-label-unresolvable
+
+providers:
+  - name: static-provider
+    driver: static
+    pools:
+      - name: main
+        nodes:
+          - name: unresolvable.unresolvable.unresolvable
+            labels: fake-label-unresolvable
+            timeout: 13
+            connection-port: 22022
+            username: zuul
+          - name: fake-host-1
+            labels: fake-label
+            host-key: ssh-rsa FAKEKEY
+            timeout: 13
+            connection-port: 22022
+            username: zuul
