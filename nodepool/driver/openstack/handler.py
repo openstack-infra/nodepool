@@ -76,6 +76,8 @@ class OpenStackNodeLauncher(NodeLauncher):
                 )
 
             config_drive = diskimage.config_drive
+            # Using a dict with the ID bypasses an image search during
+            # server creation.
             image_external = dict(id=cloud_image.external_id)
             image_id = "{path}/{upload_id}".format(
                 path=self.handler.zk._imageUploadPath(
@@ -92,7 +94,13 @@ class OpenStackNodeLauncher(NodeLauncher):
             # launch using unmanaged cloud image
             config_drive = self.label.cloud_image.config_drive
 
-            image_external = self.label.cloud_image.external
+            if self.label.cloud_image.image_id:
+                # Using a dict with the ID bypasses an image search during
+                # server creation.
+                image_external = dict(id=self.label.cloud_image.image_id)
+            else:
+                image_external = self.label.cloud_image.external_name
+
             image_id = self.label.cloud_image.name
             image_name = self.label.cloud_image.name
             username = self.label.cloud_image.username
