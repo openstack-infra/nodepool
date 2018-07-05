@@ -16,50 +16,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import threading
 import logging
 import queue
 import time
-import requests.exceptions
 
 from nodepool import stats
 
 
 class ManagerStoppedException(Exception):
     pass
-
-
-class Task(object):
-    def __init__(self, **kw):
-        self._wait_event = threading.Event()
-        self._exception = None
-        self._traceback = None
-        self._result = None
-        self.args = kw
-
-    def done(self, result):
-        self._result = result
-        self._wait_event.set()
-
-    def exception(self, e, tb):
-        self._exception = e
-        self._traceback = tb
-        self._wait_event.set()
-
-    def wait(self):
-        self._wait_event.wait()
-        if self._exception:
-            raise self._exception.with_traceback(self._traceback)
-        return self._result
-
-    def run(self, client):
-        try:
-            self.done(self.main(client))
-        except requests.exceptions.ProxyError as e:
-            raise e
-        except Exception as e:
-            self.exception(e, sys.exc_info()[2])
 
 
 class TaskManager(object):
