@@ -62,11 +62,11 @@ class Task(object):
             self.exception(e, sys.exc_info()[2])
 
 
-class TaskManager(threading.Thread):
+class TaskManager(object):
     log = logging.getLogger("nodepool.TaskManager")
 
     def __init__(self, client, name, rate):
-        super(TaskManager, self).__init__(name=name)
+        super(TaskManager, self).__init__()
         self.daemon = True
         self.queue = queue.Queue()
         self._running = True
@@ -74,13 +74,21 @@ class TaskManager(threading.Thread):
         self.rate = float(rate)
         self._client = None
         self.statsd = stats.get_client()
+        self._thread = threading.Thread(name=name, target=self.run)
+        self._thread.daemon = True
 
     def setClient(self, client):
         self._client = client
 
+    def start(self):
+        self._thread.start()
+
     def stop(self):
         self._running = False
         self.queue.put(None)
+
+    def join(self):
+        self._thread.join()
 
     def run(self):
         last_ts = 0
