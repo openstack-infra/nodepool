@@ -25,7 +25,6 @@ from nodepool import exceptions
 from nodepool.driver import Provider
 from nodepool.driver.utils import QuotaInformation
 from nodepool.nodeutils import iterate_timeout
-from nodepool.task_manager import ManagerStoppedException
 from nodepool.task_manager import TaskManager
 from nodepool import version
 
@@ -347,43 +346,6 @@ class OpenStackProvider(Provider):
                 "server %s deletion" % server_id):
             if not self.getServer(server_id):
                 return
-
-    def waitForImage(self, image_id, timeout=3600):
-        last_status = None
-        for count in iterate_timeout(
-                timeout, exceptions.ImageCreateException, "image creation"):
-            try:
-                image = self.getImage(image_id)
-            except exceptions.NotFound:
-                continue
-            except ManagerStoppedException:
-                raise
-            except Exception:
-                self.log.exception('Unable to list images while waiting for '
-                                   '%s will retry' % (image_id))
-                continue
-
-            # shade returns None when not found
-            if not image:
-                continue
-
-            status = image['status']
-            if (last_status != status):
-                self.log.debug(
-                    'Status of image in {provider} {id}: {status}'.format(
-                        provider=self.provider.name,
-                        id=image_id,
-                        status=status))
-                if status == 'ERROR' and 'fault' in image:
-                    self.log.debug(
-                        'ERROR in {provider} on {id}: {resason}'.format(
-                            provider=self.provider.name,
-                            id=image_id,
-                            resason=image['fault']['message']))
-            last_status = status
-            # Glance client returns lower case statuses - but let's be sure
-            if status.lower() in ['active', 'error']:
-                return image
 
     def createImage(self, server, image_name, meta):
         return self._client.create_image_snapshot(
