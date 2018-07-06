@@ -297,32 +297,35 @@ class TestLauncher(tests.DBTestCase):
         # (according to nodepool's quota estimate) fails.
         client.max_instances = 1
 
-        # Request a second node; this request should fail.
+        # Request a second node; this request should pause the handler.
         req2 = zk.NodeRequest()
         req2.state = zk.REQUESTED
         req2.node_types.append('fake-label')
         self.log.debug("Adding second request")
         self.zk.storeNodeRequest(req2)
-        req2 = self.waitForNodeRequest(req2)
-        self.assertEqual(req2.state, zk.FAILED)
 
-        # After the second request failed, the internal quota estimate
-        # should be reset, so the next request should pause to wait
-        # for more quota to become available.
-        req3 = zk.NodeRequest()
-        req3.state = zk.REQUESTED
-        req3.node_types.append('fake-label')
-        self.log.debug("Adding third request")
-        self.zk.storeNodeRequest(req3)
-        req3 = self.waitForNodeRequest(req3, (zk.PENDING,))
-        self.assertEqual(req3.state, zk.PENDING)
-
-        # Wait until there is a paused request handler and verify that
-        # there is still only one server built (from the first
-        # request).
         pool_worker = pool.getPoolWorkers('fake-provider')
         while not pool_worker[0].paused_handler:
+            # self.log.debug("tick")
             time.sleep(0.1)
+        self.log.debug("finished waiting")
+
+        # The handler is paused now and the request should be in state PENDING
+        req2 = self.waitForNodeRequest(req2, zk.PENDING)
+        self.assertEqual(req2.state, zk.PENDING)
+
+        # Now free up the first node
+        self.log.debug("Marking first node as used %s", req1.id)
+        req1_node.state = zk.USED
+        self.zk.storeNode(req1_node)
+        self.zk.unlockNode(req1_node)
+        self.waitForNodeDeletion(req1_node)
+
+        # After the first node is cleaned up the second request should be
+        # able to fulfill now.
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FULFILLED)
+
         self.assertEqual(len(client._server_list), 1)
 
     def test_fail_request_on_launch_failure(self):
