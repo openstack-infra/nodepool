@@ -1270,9 +1270,10 @@ class NodePoolBuilder(object):
         for worker in (workers):
             worker.join()
 
+        self.log.debug('Stopping providers')
+        provider_manager.ProviderManager.stopProviders(self._config)
+
         self.log.debug('Terminating ZooKeeper connection')
         self.zk.disconnect()
 
-        self.log.debug('Stopping providers')
-        provider_manager.ProviderManager.stopProviders(self._config)
         self.log.debug('Finished stopping')
