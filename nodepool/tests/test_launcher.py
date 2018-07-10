@@ -1436,3 +1436,135 @@ class TestLauncher(tests.DBTestCase):
         while pool_worker[0].paused_handler:
             time.sleep(0.1)
         self.assertEqual(0, len(pool_worker[0].request_handlers))
+
+    def test_ignore_provider_quota_false(self):
+        '''
+        Test that a node request get fulfilled with ignore-provider-quota set
+        to false.
+        '''
+
+        # Set max-cores quota value to 0 to force "out of quota". Note that
+        # the fake provider checks the number of instances during server
+        # creation to decide if it should throw an over quota exception,
+        # but it doesn't check cores.
+        def fake_get_quota():
+            return (0, 20, 1000000)
+        self.useFixture(fixtures.MockPatchObject(
+            fakeprovider.FakeProvider.fake_cloud, '_get_quota',
+            fake_get_quota
+        ))
+
+        configfile = self.setup_config('ignore_provider_quota_false.yaml')
+        self.useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        # Create a request with ignore-provider-quota set to false that should
+        # fail because it will decline the request because "it would exceed
+        # quota".
+        self.log.debug("Submitting request with ignore-provider-quota False")
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FAILED)
+
+    def test_ignore_provider_quota_true(self):
+        '''
+        Test that a node request get fulfilled with ignore-provider-quota set
+        to true.
+        '''
+
+        # Set max-cores quota value to 0 to force "out of quota". Note that
+        # the fake provider checks the number of instances during server
+        # creation to decide if it should throw an over quota exception,
+        # but it doesn't check cores.
+        def fake_get_quota():
+            return (0, 20, 1000000)
+        self.useFixture(fixtures.MockPatchObject(
+            fakeprovider.FakeProvider.fake_cloud, '_get_quota',
+            fake_get_quota
+        ))
+
+        configfile = self.setup_config('ignore_provider_quota_true.yaml')
+        self.useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        # Create a request with ignore-provider-quota set to true that should
+        # pass regardless of the lack of cloud/provider quota.
+        self.replace_config(configfile, 'ignore_provider_quota_true.yaml')
+
+        self.log.debug(
+            "Submitting an initial request with ignore-provider-quota True")
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req1)
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+
+        # Lock this node so it appears as used and not deleted
+        req1_node = self.zk.getNode(req1.nodes[0])
+        self.zk.lockNode(req1_node, blocking=False)
+
+        # Request a second node; this request should pause the handler
+        # due to the pool set with max-servers: 1
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        self.log.debug(
+            "Submitting a second request with ignore-provider-quota True"
+            "but with a full max-servers quota.")
+        self.zk.storeNodeRequest(req2)
+
+        pool_worker = pool.getPoolWorkers('fake-provider')
+        while not pool_worker[0].paused_handler:
+            time.sleep(0.1)
+
+        # The handler is paused now and the request should be in state PENDING
+        req2 = self.waitForNodeRequest(req2, zk.PENDING)
+        self.assertEqual(req2.state, zk.PENDING)
+
+        # Now free up the first node
+        self.log.debug("Marking first node as used %s", req1.id)
+        req1_node.state = zk.USED
+        self.zk.storeNode(req1_node)
+        self.zk.unlockNode(req1_node)
+        self.waitForNodeDeletion(req1_node)
+
+        # After the first node is cleaned up the second request should be
+        # able to fulfill now.
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FULFILLED)
+
+        # Lock this node so it appears as used and not deleted
+        req2_node = self.zk.getNode(req2.nodes[0])
+        self.zk.lockNode(req2_node, blocking=False)
+
+        # Now free up the second node
+        self.log.debug("Marking second node as used %s", req2.id)
+        req2_node.state = zk.USED
+        self.zk.storeNode(req2_node)
+        self.zk.unlockNode(req2_node)
+        self.waitForNodeDeletion(req2_node)
+
+        # Request a 2 node set; this request should fail
+        # due to the provider only being able to fulfill
+        # a single node at a time.
+        req3 = zk.NodeRequest()
+        req3.state = zk.REQUESTED
+        req3.node_types.append('fake-label')
+        req3.node_types.append('fake-label')
+        self.log.debug(
+            "Submitting a third request with ignore-provider-quota True"
+            "for a 2-node set which the provider cannot fulfill.")
+        self.zk.storeNodeRequest(req3)
+
+        req3 = self.waitForNodeRequest(req3)
+        self.assertEqual(req3.state, zk.FAILED)

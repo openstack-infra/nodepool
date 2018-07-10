@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    A new boolean pool variable ``ignore-provider-quota`` has been added to
+    allow the provider quota to be ignored for a pool. Instead, nodepool only
+    checks against the configured max values for the pool and the current usage
+    based on stored data. This may be useful in circumstances where the
+    provider is incorrectly calculating quota.
