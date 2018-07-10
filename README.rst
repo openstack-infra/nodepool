@@ -1,71 +1,58 @@
 Nodepool
 ========
 
-Nodepool is a service used by the OpenStack CI team to deploy and manage a pool
-of devstack images on a cloud server for use in OpenStack project testing.
+Nodepool is a system for managing test node resources. It supports launching
+single-use test nodes from cloud providers as well as managing access to
+pre-defined pre-existing nodes. Nodepool is part of a suite of tools that form
+a comprehensive test system, including Zuul.
 
-Developer setup
-===============
+The latest documentation for Nodepool is published at:
+https://zuul-ci.org/docs/nodepool/
 
-Make sure you have pip installed:
+The latest documentation for Zuul is published at:
+https://zuul-ci.org/docs/zuul/
 
-.. code-block:: bash
+Getting Help
+------------
 
-    wget https://bootstrap.pypa.io/get-pip.py
-    sudo python get-pip.py
+There are two Zuul-related mailing lists:
 
-Install dependencies:
+`zuul-announce <http://lists.zuul-ci.org/cgi-bin/mailman/listinfo/zuul-announce>`_
+  A low-traffic announcement-only list to which every Zuul operator or
+  power-user should subscribe.
 
-.. code-block:: bash
+`zuul-discuss <http://lists.zuul-ci.org/cgi-bin/mailman/listinfo/zuul-discuss>`_
+  General discussion about Zuul, including questions about how to use
+  it, and future development.
 
-    sudo pip install bindep
-    sudo apt-get install $(bindep -b nodepool)
+You will also find Zuul developers in the `#zuul` channel on Freenode
+IRC.
 
-    mkdir src
-    cd ~/src
-    git clone git://git.openstack.org/openstack-infra/system-config
-    git clone git://git.openstack.org/openstack-infra/nodepool
-    cd nodepool
-    sudo pip install -U -r requirements.txt
-    sudo pip install -e .
+Contributing
+------------
 
-If you're testing a specific patch that is already in gerrit, you will also
-want to install git-review and apply that patch while in the nodepool
-directory, ie:
+To browse the latest code, see: https://git.zuul-ci.org/cgit/nodepool/tree/
+To clone the latest code, use `git clone https://git.zuul-ci.org/nodepool`
 
-.. code-block:: bash
+Bugs are handled at: https://storyboard.openstack.org/#!/project/679
 
-    git review -x XXXXX
+Code reviews are handled by gerrit at https://review.openstack.org
 
+After creating a Gerrit account, use `git review` to submit patches.
+Example::
 
-Create or adapt a nodepool yaml file. You can adapt an infra/system-config one, or
-fake.yaml as desired. Note that fake.yaml's settings won't Just Work - consult
-./modules/openstack_project/templates/nodepool/nodepool.yaml.erb in the
-infra/system-config tree to see a production config.
+    # Do your commits
+    $ git review
+    # Enter your username if prompted
 
-If the cloud being used has no default_floating_pool defined in nova.conf,
-you will need to define a pool name using the nodepool yaml file to use
-floating ips.
+Join `#zuul` on Freenode to discuss development or usage.
 
-Export variable for your ssh key so you can log into the created instances:
+License
+-------
 
-.. code-block:: bash
+Nodepool is free software, licensed under the Apache License, version 2.0.
 
-    export NODEPOOL_SSH_KEY=`cat ~/.ssh/id_rsa.pub | awk '{print $2}'`
+Python Version Support
+----------------------
 
-Start nodepool with a demo config file (copy or edit fake.yaml
-to contain your data):
-
-.. code-block:: bash
-
-    export STATSD_HOST=127.0.0.1
-    export STATSD_PORT=8125
-    nodepool-launcher -d -c tools/fake.yaml
-
-All logging ends up in stdout.
-
-Use the following tool to check on progress:
-
-.. code-block:: bash
-
-    nodepool image-list
+Nodepool requires Python 3. It does not support Python 2.
