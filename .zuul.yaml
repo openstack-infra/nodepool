@@ -145,11 +145,9 @@
     post:
       jobs:
         - publish-zuul-docs
-        - publish-openstack-sphinx-docs-infra-python3
     experimental:
       jobs:
         - nodepool-functional-py35-debian-src
     release:
       jobs:
         - publish-zuul-docs
-        - publish-openstack-sphinx-docs-infra-python3
