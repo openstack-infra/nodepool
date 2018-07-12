@@ -655,7 +655,7 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
 
         # Launches are complete, so populate ready_nodes and failed_nodes.
         aborted_nodes = []
-        for node in self.nodeset[:]:
+        for node in self.nodeset.copy():
             if node.state == zk.READY:
                 self.ready_nodes.append(node)
             elif node.state == zk.ABORTED:

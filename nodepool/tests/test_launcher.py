@@ -306,9 +306,7 @@ class TestLauncher(tests.DBTestCase):
 
         pool_worker = pool.getPoolWorkers('fake-provider')
         while not pool_worker[0].paused_handler:
-            # self.log.debug("tick")
             time.sleep(0.1)
-        self.log.debug("finished waiting")
 
         # The handler is paused now and the request should be in state PENDING
         req2 = self.waitForNodeRequest(req2, zk.PENDING)
