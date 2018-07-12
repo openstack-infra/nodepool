@@ -488,6 +488,12 @@ Example::
     ram allocated by nodepool. If not defined nodepool can use as much ram as
     the tenant allows.
 
+  ``ignore-provider-quota``
+    Ignore the provider quota for this pool. Instead, only check against the
+    configured max values for this pool and the current usage based on stored
+    data. This may be useful in circumstances where the provider is incorrectly
+    calculating quota.
+
   ``availability-zones`` (list)
     A list of availability zones to use.
 
