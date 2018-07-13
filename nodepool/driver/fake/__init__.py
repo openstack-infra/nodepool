@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os_client_config
+from openstack.config import loader
 
 from nodepool.driver import Driver
 from nodepool.driver.fake.config import FakeProviderConfig
@@ -25,7 +25,7 @@ class FakeDriver(Driver):
         self.reset()
 
     def reset(self):
-        self.os_client_config = os_client_config.OpenStackConfig()
+        self.openstack_config = loader.OpenStackConfig()
 
     def getProviderConfig(self, provider):
         return FakeProviderConfig(self, provider)

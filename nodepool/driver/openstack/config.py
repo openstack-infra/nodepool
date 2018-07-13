@@ -195,8 +195,8 @@ class OpenStackProviderConfig(ProviderConfig):
 
     def load(self, config):
         cloud_kwargs = self._cloudKwargs()
-        occ = self.driver_object.os_client_config
-        self.cloud_config = occ.get_one_cloud(**cloud_kwargs)
+        openstack_config = self.driver_object.openstack_config
+        self.cloud_config = openstack_config.get_one(**cloud_kwargs)
 
         self.image_type = self.cloud_config.config['image_format']
         self.region_name = self.provider.get('region-name')

@@ -21,6 +21,8 @@ import logging
 import queue
 import time
 
+from openstack import task_manager as openstack_task_manager
+
 from nodepool import stats
 
 
@@ -28,23 +30,18 @@ class ManagerStoppedException(Exception):
     pass
 
 
-class TaskManager(object):
+class TaskManager(openstack_task_manager.TaskManager):
     log = logging.getLogger("nodepool.TaskManager")
 
-    def __init__(self, client, name, rate):
-        super(TaskManager, self).__init__()
+    def __init__(self, name, rate, workers=5):
+        super(TaskManager, self).__init__(name=name, workers=workers)
         self.daemon = True
         self.queue = queue.Queue()
         self._running = True
-        self.name = name
         self.rate = float(rate)
-        self._client = None
         self.statsd = stats.get_client()
         self._thread = threading.Thread(name=name, target=self.run)
         self._thread.daemon = True
-
-    def setClient(self, client):
-        self._client = client
 
     def start(self):
         self._thread.start()
@@ -70,33 +67,25 @@ class TaskManager(object):
                     if delta >= self.rate:
                         break
                     time.sleep(self.rate - delta)
-                self.log.debug("Manager %s running task %s (queue: %s)" %
-                               (self.name, type(task).__name__,
-                                self.queue.qsize()))
-                start = time.time()
-                self.runTask(task)
-                last_ts = time.time()
-                dt = last_ts - start
-                self.log.debug("Manager %s ran task %s in %ss" %
-                               (self.name, type(task).__name__, dt))
-                if self.statsd:
-                    # nodepool.task.PROVIDER.subkey
-                    subkey = type(task).__name__
-                    key = 'nodepool.task.%s.%s' % (self.name, subkey)
-                    self.statsd.timing(key, int(dt * 1000))
-                    self.statsd.incr(key)
-
+                self.log.debug("Manager %s running task %s (queue %s)" %
+                               (self.name, task.name, self.queue.qsize()))
+                self.run_task(task)
                 self.queue.task_done()
         except Exception:
             self.log.exception("Task manager died.")
             raise
 
-    def submitTask(self, task):
+    def post_run_task(self, elapsed_time, task):
+        super(TaskManager, self).post_run_task(elapsed_time, task)
+        if self.statsd:
+            # nodepool.task.PROVIDER.TASK_NAME
+            key = 'nodepool.task.%s.%s' % (self.name, task.name)
+            self.statsd.timing(key, int(elapsed_time * 1000))
+            self.statsd.incr(key)
+
+    def submit_task(self, task, raw=False):
         if not self._running:
             raise ManagerStoppedException(
                 "Manager %s is no longer running" % self.name)
         self.queue.put(task)
         return task.wait()
-
-    def runTask(self, task):
-        task.run(self._client)

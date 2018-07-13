@@ -46,7 +46,7 @@ _DEFAULT_SERVER_LOGGING_CONFIG = {
             'handlers': ['console'],
             'level': 'WARN',
         },
-        'shade': {
+        'openstack': {
             'handlers': ['console'],
             'level': 'WARN',
         },
