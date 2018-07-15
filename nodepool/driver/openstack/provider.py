@@ -324,13 +324,15 @@ class OpenStackProvider(Provider):
         except openstack.exceptions.BadRequestException:
             # We've gotten a 400 error from nova - which means the request
             # was malformed. The most likely cause of that, unless something
-            # became functionally and systemically broken, is stale image
+            # became functionally and systemically broken, is stale az, image
             # or flavor cache. Log a message, invalidate the caches so that
             # next time we get new caches.
             self._images = {}
+            self.__azs = None
             self.__flavors = {}  # TODO(gtema): caching
             self.log.info(
-                "Clearing flavor and image caches due to 400 error from nova")
+                "Clearing az, flavor and image caches due to 400 error "
+                "from nova")
             raise
 
     def getServer(self, server_id):
