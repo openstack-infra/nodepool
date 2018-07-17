@@ -20,24 +20,6 @@ NODEPOOL_PUBKEY=$HOME/.ssh/id_nodepool.pub
 NODEPOOL_INSTALL=$HOME/nodepool-venv
 NODEPOOL_CACHE_GET_PIP=/opt/stack/cache/files/get-pip.py
 
-# Install shade from git if requested. If not requested
-# nodepool install will pull it in.
-function install_shade {
-    if use_library_from_git "shade"; then
-        GITREPO["shade"]=$SHADE_REPO_URL
-        GITDIR["shade"]=$DEST/shade
-        GITBRANCH["shade"]=$SHADE_REPO_REF
-        git_clone_by_name "shade"
-        # Install shade globally, because the job config has LIBS_FROM_GIT
-        # and if we don't install it globally, all hell breaks loose
-        setup_dev_lib "shade"
-        # BUT - install shade into a virtualenv so that we don't have issues
-        # with OpenStack constraints affecting the shade dependency install.
-        # This particularly shows up with os-client-config
-        $NODEPOOL_INSTALL/bin/pip install $DEST/shade
-    fi
-}
-
 function install_diskimage_builder {
     if use_library_from_git "diskimage-builder"; then
         GITREPO["diskimage-builder"]=$DISKIMAGE_BUILDER_REPO_URL
@@ -65,7 +47,6 @@ function install_glean {
 function install_nodepool {
     VENV="virtualenv -p python3"
     $VENV $NODEPOOL_INSTALL
-    install_shade
     install_diskimage_builder
     install_glean
 
@@ -127,7 +108,7 @@ function nodepool_write_config {
 keys=simple
 
 [loggers]
-keys=root,nodepool,shade,kazoo,keystoneauth,novaclient
+keys=root,nodepool,openstack,kazoo,keystoneauth,novaclient
 
 [handlers]
 keys=console
@@ -142,10 +123,10 @@ handlers=console
 qualname=nodepool
 propagate=0
 
-[logger_shade]
+[logger_openstack]
 level=DEBUG
 handlers=console
-qualname=shade
+qualname=openstack
 propagate=0
 
 [logger_keystoneauth]

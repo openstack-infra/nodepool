@@ -394,7 +394,7 @@ class OpenStackProvider(Provider):
         #  - v2 w/task waiting is very strange and complex - but we have to
         #              block for our v1 clouds anyway, so we might as well
         #              have the interface be the same and treat faking-out
-        #              a shade-level fake-async interface later
+        #              a openstacksdk-level fake-async interface later
         if not meta:
             meta = {}
         if image_type:

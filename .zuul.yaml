@@ -67,7 +67,6 @@
     required-projects:
       - openstack-infra/glean
       - openstack-infra/nodepool
-      - openstack-infra/shade
       - openstack/diskimage-builder
       - openstack/openstacksdk
 
