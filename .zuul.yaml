@@ -134,6 +134,9 @@
         - build-sphinx-docs:
             vars:
               sphinx_python: python3
+        - pbrx-build-container-images:
+            vars:
+              pbrx_prefix: zuul
     gate:
       jobs:
         - tox-pep8
@@ -141,6 +144,9 @@
         - build-sphinx-docs:
             vars:
               sphinx_python: python3
+        - pbrx-build-container-images:
+            vars:
+              pbrx_prefix: zuul
     post:
       jobs:
         - publish-zuul-docs
