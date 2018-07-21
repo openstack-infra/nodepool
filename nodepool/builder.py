@@ -537,7 +537,8 @@ class CleanupWorker(BaseWorker):
         self._checkForZooKeeperChanges(new_config)
         provider_manager.ProviderManager.reconfigure(self._config, new_config,
                                                      self._zk,
-                                                     use_taskmanager=False)
+                                                     use_taskmanager=False,
+                                                     only_image_manager=True)
         self._config = new_config
 
         self._cleanup()
@@ -880,7 +881,8 @@ class UploadWorker(BaseWorker):
         self._checkForZooKeeperChanges(new_config)
         provider_manager.ProviderManager.reconfigure(self._config, new_config,
                                                      self._zk,
-                                                     use_taskmanager=False)
+                                                     use_taskmanager=False,
+                                                     only_image_manager=True)
         self._config = new_config
 
     def _uploadImage(self, build_id, upload_id, image_name, images, provider,

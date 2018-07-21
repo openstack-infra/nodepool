@@ -30,7 +30,8 @@ class ProviderManager(object):
     log = logging.getLogger("nodepool.ProviderManager")
 
     @staticmethod
-    def reconfigure(old_config, new_config, zk_conn, use_taskmanager=True):
+    def reconfigure(old_config, new_config, zk_conn, use_taskmanager=True,
+                    only_image_manager=False):
         '''
         Reconfigure the provider managers on any configuration changes.
 
@@ -41,9 +42,13 @@ class ProviderManager(object):
         :param Config new_config: The newly read configuration.
         :param ZooKeeper zk_conn: A ZooKeeper connection object.
         :param bool use_taskmanager: If True, use a task manager.
+        :param bool only_image_manager: If True, skip manager that do not
+                    manage images. This is used by the builder process.
         '''
         stop_managers = []
         for p in new_config.providers.values():
+            if only_image_manager and not p.manage_images:
+                continue
             oldmanager = None
             if old_config:
                 oldmanager = old_config.provider_managers.get(p.name)
