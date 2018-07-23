@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Diskimages env-vars can be set in the secure.conf file.
