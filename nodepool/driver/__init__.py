@@ -698,6 +698,9 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
             # be created again.
             for node in aborted_nodes:
                 self._satisfied_types.removeNode(node.id)
+            self.log.debug(
+                "Pausing request handling after node abort to satisfy "
+                "request %s", self.request.id)
             self.paused = True
             return False
         else:
