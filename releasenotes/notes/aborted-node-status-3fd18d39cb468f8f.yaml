@@ -1,0 +1,8 @@
+---
+upgrade:
+  - |
+    A new node status (ABORTED) is added to the ZooKeeper data model. It
+    is recommended that, during your nodepool upgrade, you shut down all
+    launcher processes before restarting any of them. Running multiple
+    launchers with mixed support of this new node status may cause
+    unexpected errors to be reported in the logs.
