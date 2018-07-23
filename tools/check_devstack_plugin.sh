@@ -59,7 +59,7 @@ function waitforimage {
 
     while ! $NODEPOOL image-list | grep $name | grep $state; do
         $NODEPOOL image-list > ${LOGDIR}/nodepool-image-list.txt
-        $NODEPOOL list > ${LOGDIR}/nodepool-list.txt
+        $NODEPOOL list --detail > ${LOGDIR}/nodepool-list.txt
 
         builds=$(ls -l /var/log/nodepool/builds/ | grep $name | wc -l)
         if [[ ${builds} -ge 4 ]]; then
@@ -76,7 +76,7 @@ function waitfornode {
 
     while ! $NODEPOOL list | grep $name | grep $state | grep "unlocked"; do
         $NODEPOOL image-list > ${LOGDIR}/nodepool-image-list.txt
-        $NODEPOOL list > ${LOGDIR}/nodepool-list.txt
+        $NODEPOOL list --detail > ${LOGDIR}/nodepool-list.txt
         sleep 10
     done
 }
