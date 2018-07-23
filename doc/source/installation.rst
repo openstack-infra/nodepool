@@ -64,10 +64,12 @@ configuration files, the data in the secure file takes precedence.
 The secure file location can be changed with the ``-s`` option and follows
 the same file format as the Nodepool configuration file.
 
-Secrets stored in diskimage env-vars may be leaked by the elements or in
-the image build logs. Before using sensitive information in env-vars, please
-carefully audit the elements that are enabled and ensure they are handling
-the environment safely.
+.. warning::
+
+   Secrets stored in diskimage env-vars may be leaked by the elements
+   or in the image build logs. Before using sensitive information in
+   env-vars, please carefully audit the elements that are enabled and
+   ensure they are handling the environment safely.
 
 There is an optional logging configuration file, specified with the ``-l``
 option. The logging configuration file can accept either:
