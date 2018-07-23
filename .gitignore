@@ -1,6 +1,7 @@
 *.egg
 *.egg-info
 *.pyc
+.coverage
 .stestr
 .test
 .testrepository
@@ -9,6 +10,7 @@ AUTHORS
 build/*
 ChangeLog
 config
+cover
 doc/build/*
 zuul/versioninfo
 dist/
