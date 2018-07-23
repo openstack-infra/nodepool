@@ -350,6 +350,53 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(req.state, zk.FAILED)
         self.assertNotEqual(req.declined_by, [])
 
+    def test_az_change_recover(self):
+        '''
+        Test that nodepool recovers from az change in the cloud.
+        '''
+        configfile = self.setup_config('node_az_change.yaml')
+        self.useBuilder(configfile)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        self.wait_for_config(pool)
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
+        # now change the azs in the cloud
+        cloud = pool.getProviderManager('fake-provider')._getClient()
+        cloud._azs = ['new-az1', 'new-az2']
+
+        # Do a second request. This will fail because the cached azs are not
+        # available anymore.
+        # TODO(tobiash): Ideally we should already be able to already recover
+        # this request.
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req2)
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FAILED)
+
+        # Create a third request to test that nodepool successfully recovers
+        # from a stale az cache.
+        req3 = zk.NodeRequest()
+        req3.state = zk.REQUESTED
+        req3.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req3)
+        req3 = self.waitForNodeRequest(req3)
+        self.assertEqual(req3.state, zk.FULFILLED)
+
+        node = self.zk.getNode(req3.nodes[0])
+        self.assertIn(node.az, ['new-az1', 'new-az2'])
+
     def test_fail_minready_request_at_capacity(self):
         '''
         A min-ready request to a provider that is already at capacity should

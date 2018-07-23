@@ -19,7 +19,7 @@ import threading
 import time
 import uuid
 
-import openstack
+import openstack.exceptions
 
 from nodepool import exceptions
 from nodepool.driver.openstack.provider import OpenStackProvider
@@ -100,6 +100,7 @@ class FakeOpenStackCloud(object):
             Dummy(Dummy.FLAVOR, id='f2', ram=8192, name='Unreal Flavor',
                   vcpus=4),
         ]
+        self._azs = ['az1', 'az2']
         self._server_list = []
         self.max_cores, self.max_instances, self.max_ram = FakeOpenStackCloud.\
             _get_quota()
@@ -155,6 +156,12 @@ class FakeOpenStackCloud(object):
             self.max_instances > -1 and
             len(instance_list) >= self.max_instances):
             over_quota = True
+
+        az = kw.get('availability_zone')
+        if az and az not in self._azs:
+            raise openstack.exceptions.BadRequestException(
+                message='The requested availability zone is not available',
+                http_status=400)
 
         s = Dummy(instance_type,
                   id=uuid.uuid4().hex,
@@ -261,7 +268,7 @@ class FakeOpenStackCloud(object):
         self._delete(name_or_id, self._server_list)
 
     def list_availability_zone_names(self):
-        return ['fake-az1', 'fake-az2']
+        return self._azs.copy()
 
     def get_compute_limits(self):
         return Dummy(
