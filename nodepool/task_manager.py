@@ -26,6 +26,14 @@ from openstack import task_manager as openstack_task_manager
 from nodepool import stats
 
 
+def _transform_task_name(task_name):
+    # openstacksdk sets task.name to something like "compute.DELETE.servers"
+    # We want ComputeDeleteServers
+    return "".join(
+        [part.lower().capitalize() for part in task_name.split('.')]
+    )
+
+
 class ManagerStoppedException(Exception):
     pass
 
@@ -68,7 +76,9 @@ class TaskManager(openstack_task_manager.TaskManager):
                         break
                     time.sleep(self.rate - delta)
                 self.log.debug("Manager %s running task %s (queue %s)" %
-                               (self.name, task.name, self.queue.qsize()))
+                               (self.name,
+                                _transform_task_name(task.name),
+                                self.queue.qsize()))
                 self.run_task(task)
                 self.queue.task_done()
         except Exception:
@@ -76,10 +86,14 @@ class TaskManager(openstack_task_manager.TaskManager):
             raise
 
     def post_run_task(self, elapsed_time, task):
-        super(TaskManager, self).post_run_task(elapsed_time, task)
+        task_name = _transform_task_name(task.name)
+        self.log.debug(
+            "Manager %s ran task %s in %ss" %
+            (self.name, task_name, elapsed_time))
+
         if self.statsd:
             # nodepool.task.PROVIDER.TASK_NAME
-            key = 'nodepool.task.%s.%s' % (self.name, task.name)
+            key = 'nodepool.task.%s.%s' % (self.name, task_name)
             self.statsd.timing(key, int(elapsed_time * 1000))
             self.statsd.incr(key)
 
