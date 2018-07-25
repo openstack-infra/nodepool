@@ -81,7 +81,8 @@ class NodeLauncher(threading.Thread,
             self.zk.storeNode(self.node)
             statsd_key = 'error.quota'
         except Exception as e:
-            self.log.exception("Launch failed for node %s:", self.node.id)
+            self.log.exception(
+                "Launch failed for node %s:", self.node.hostname)
             self.node.state = zk.FAILED
             self.zk.storeNode(self.node)
 
