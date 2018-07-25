@@ -16,6 +16,7 @@
 """Common utilities used in testing"""
 
 import glob
+import itertools
 import logging
 import os
 import random
@@ -235,19 +236,63 @@ class BaseTestCase(testtools.TestCase):
             time.sleep(0.1)
 
     def assertReportedStat(self, key, value=None, kind=None):
+        """Check statsd output
+
+        Check statsd return values.  A ``value`` should specify a
+        ``kind``, however a ``kind`` may be specified without a
+        ``value`` for a generic match.  Leave both empy to just check
+        for key presence.
+
+        :arg str key: The statsd key
+        :arg str value: The expected value of the metric ``key``
+        :arg str kind: The expected type of the metric ``key``  For example
+
+          - ``c`` counter
+          - ``g`` gauge
+          - ``ms`` timing
+          - ``s`` set
+        """
+
+        if value:
+            self.assertNotEqual(kind, None)
+
         start = time.time()
         while time.time() < (start + 5):
-            for stat in self.statsd.stats:
-                k, v = stat.decode('utf8').split(':')
+            # Note our fake statsd just queues up results in a queue.
+            # We just keep going through them until we find one that
+            # matches, or fail out.  If statsd pipelines are used,
+            # large single packets are sent with stats separated by
+            # newlines; thus we first flatten the stats out into
+            # single entries.
+            stats = itertools.chain.from_iterable(
+                [s.decode('utf-8').split('\n') for s in self.statsd.stats])
+            for stat in stats:
+                k, v = stat.split(':')
                 if key == k:
-                    if value is None and kind is None:
-                        return
-                    elif value:
-                        if value == v:
-                            return
-                    elif kind:
-                        if v.endswith('|' + kind):
-                            return
+                    if kind is None:
+                        # key with no qualifiers is found
+                        return True
+
+                    s_value, s_kind = v.split('|')
+
+                    # if no kind match, look for other keys
+                    if kind != s_kind:
+                        continue
+
+                    if value:
+                        # special-case value|ms because statsd can turn
+                        # timing results into float of indeterminate
+                        # length, hence foiling string matching.
+                        if kind == 'ms':
+                            if float(value) == float(s_value):
+                                return True
+                        if value == s_value:
+                            return True
+                        # otherwise keep looking for other matches
+                        continue
+
+                    # this key matches
+                    return True
             time.sleep(0.1)
 
         raise Exception("Key %s not found in reported stats" % key)

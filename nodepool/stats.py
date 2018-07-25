@@ -79,9 +79,11 @@ class StatsReporter(object):
             keys.append('nodepool.launch.requestor.%s.%s' %
                         (requestor, subkey))
 
+        pipeline = self._statsd.pipeline()
         for key in keys:
-            self._statsd.timing(key, dt)
-            self._statsd.incr(key)
+            pipeline.timing(key, dt)
+            pipeline.incr(key)
+        pipeline.send()
 
     def updateNodeStats(self, zk_conn, provider):
         '''
@@ -123,11 +125,13 @@ class StatsReporter(object):
             else:
                 states[key] = 1
 
+        pipeline = self._statsd.pipeline()
         for key, count in states.items():
-            self._statsd.gauge(key, count)
+            pipeline.gauge(key, count)
 
         # nodepool.provider.PROVIDER.max_servers
         key = 'nodepool.provider.%s.max_servers' % provider.name
         max_servers = sum([p.max_servers for p in provider.pools.values()
                            if p.max_servers])
-        self._statsd.gauge(key, max_servers)
+        pipeline.gauge(key, max_servers)
+        pipeline.send()
