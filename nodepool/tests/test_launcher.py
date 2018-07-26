@@ -79,8 +79,8 @@ class TestLauncher(tests.DBTestCase):
         )
         self.zk.deleteNodeRequest(req)
         self.waitForNodeRequestLockDeletion(req.id)
-        self.assertReportedStat('nodepool.nodes.ready', '1|g')
-        self.assertReportedStat('nodepool.nodes.building', '0|g')
+        self.assertReportedStat('nodepool.nodes.ready', value='1', kind='g')
+        self.assertReportedStat('nodepool.nodes.building', value='0', kind='g')
 
     def test_node_assignment_order(self):
         """Test that nodes are assigned in the order requested"""
