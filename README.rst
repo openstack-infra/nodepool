@@ -34,7 +34,7 @@ Contributing
 To browse the latest code, see: https://git.zuul-ci.org/cgit/nodepool/tree/
 To clone the latest code, use `git clone https://git.zuul-ci.org/nodepool`
 
-Bugs are handled at: https://storyboard.openstack.org/#!/project/679
+Bugs are handled at: https://storyboard.openstack.org/#!/project/openstack-infra/nodepool
 
 Code reviews are handled by gerrit at https://review.openstack.org
 
