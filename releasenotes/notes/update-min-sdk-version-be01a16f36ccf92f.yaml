@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    Bump minimum version of openstacksdk library to 0.17.2 to correct an
+    issue causing a crash in OpenStack provider communication threads.
