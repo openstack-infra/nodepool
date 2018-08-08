@@ -232,13 +232,19 @@ class OpenStackNodeLauncher(NodeLauncher):
             except Exception as e:
                 if attempts <= self._retries:
                     self.log.exception(
-                        "Launch attempt %d/%d failed for node %s:",
-                        attempts, self._retries, self.node.id)
+                        "Request %s: Launch attempt %d/%d failed for node %s:",
+                        self.handler.request.id, attempts,
+                        self._retries, self.node.id)
                 # If we created an instance, delete it.
                 if self.node.external_id:
-                    self.handler.manager.cleanupNode(self.node.external_id)
-                    self.handler.manager.waitForNodeCleanup(
-                        self.node.external_id)
+                    deleting_node = zk.Node()
+                    deleting_node.provider = self.node.provider
+                    deleting_node.external_id = self.node.external_id
+                    deleting_node.state = zk.DELETING
+                    self.zk.storeNode(deleting_node)
+                    self.log.info(
+                        "Request %s: Node %s scheduled for cleanup",
+                        self.handler.request.id, deleting_node.external_id)
                     self.node.external_id = None
                     self.node.public_ipv4 = None
                     self.node.public_ipv6 = None

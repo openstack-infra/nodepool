@@ -1497,6 +1497,43 @@ class TestLauncher(tests.DBTestCase):
         while self.zk.countPoolNodes('fake-provider', 'main'):
             time.sleep(0)
 
+    def test_launchNode_delete_error(self):
+        '''
+        Test that the launcher keeps trying to spawn a node in case of a
+         delete error
+        '''
+        fake_client = fakeprovider.FakeLaunchAndDeleteFailCloud(
+            times_to_fail=1)
+
+        def get_fake_client(*args, **kwargs):
+            return fake_client
+
+        self.useFixture(fixtures.MockPatchObject(
+            fakeprovider.FakeProvider, '_getClient',
+            get_fake_client))
+
+        configfile = self.setup_config('node_launch_retry.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = 60
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertTrue(fake_client.launch_success)
+        self.assertTrue(fake_client.delete_success)
+        self.assertEqual(fake_client.times_to_fail_delete,
+                         fake_client.times_failed_delete)
+        self.assertEqual(fake_client.times_to_fail_launch,
+                         fake_client.times_failed_launch)
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(len(req.nodes), 1)
+
     @mock.patch(
         'nodepool.driver.openstack.handler.OpenStackNodeRequestHandler.poll')
     def test_handler_poll_session_expired(self, mock_poll):
