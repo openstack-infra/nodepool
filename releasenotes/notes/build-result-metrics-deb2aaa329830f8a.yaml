@@ -1,0 +1,9 @@
+---
+features:
+  - |
+    Two new metrics are now reported after each run of the diskimage builder:
+    nodepool.builder.dib_image_build.<diskimage_name>.<ext>.rc will be set to
+    the last result code of the diskimage builder. This metric can be used to
+    set up alerting for failed disk image builds.
+    nodepool.builder.dib_image_build.<diskimage_name>.<ext>.duration will
+    receive the time it took to build the disk image.
