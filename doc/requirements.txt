@@ -1,0 +1,4 @@
+sphinx>=1.5.1,<1.6
+sphinxcontrib-programoutput
+sphinxcontrib-httpdomain
+reno>=2.5.0 # Apache-2.0

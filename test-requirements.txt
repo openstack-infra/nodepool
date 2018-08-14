@@ -1,10 +1,6 @@
 # Nodepool uses hacking for its dependencies
 hacking>=0.10.2,<0.11
 coverage
-sphinx>=1.5.1,<1.6
-sphinxcontrib-programoutput
-sphinxcontrib-httpdomain
-reno>=2.5.0 # Apache-2.0
 fixtures>=0.3.12
 mock>=1.0
 python-subunit
