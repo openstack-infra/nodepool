@@ -120,6 +120,8 @@
         NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB: false
 
 - project:
+    templates:
+      - build-tox-docs
     check:
       jobs:
         - tox-cover
@@ -131,9 +133,6 @@
             voting: false
         - nodepool-functional-py35-src:
             voting: false
-        - build-sphinx-docs:
-            vars:
-              sphinx_python: python3
         - pbrx-build-container-images:
             vars:
               pbrx_prefix: zuul
@@ -141,9 +140,6 @@
       jobs:
         - tox-pep8
         - tox-py35
-        - build-sphinx-docs:
-            vars:
-              sphinx_python: python3
         - pbrx-build-container-images:
             vars:
               pbrx_prefix: zuul
