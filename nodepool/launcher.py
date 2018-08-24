@@ -474,6 +474,13 @@ class CleanupWorker(BaseCleanupWorker):
         '''
         zk_conn = self._nodepool.getZK()
 
+        deleting_nodes = {}
+        for node in zk_conn.nodeIterator():
+            if node.state == zk.DELETING:
+                if node.provider not in deleting_nodes:
+                    deleting_nodes[node.provider] = []
+                deleting_nodes[node.provider].append(node.external_id)
+
         for provider in self._nodepool.config.providers.values():
             manager = self._nodepool.getProviderManager(provider.name)
 
@@ -486,6 +493,11 @@ class CleanupWorker(BaseCleanupWorker):
                 if meta['nodepool_provider_name'] != provider.name:
                     # Another launcher, sharing this provider but configured
                     # with a different name, owns this.
+                    continue
+
+                if (provider.name in deleting_nodes and
+                    server.id in deleting_nodes[provider.name]):
+                    # Already deleting this node
                     continue
 
                 if not zk_conn.getNode(meta['nodepool_node_id']):
