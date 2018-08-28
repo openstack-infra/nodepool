@@ -146,6 +146,10 @@
     post:
       jobs:
         - publish-zuul-docs
+        - openstackzuul-pbrx-push-container-images:
+            vars:
+              pbrx_prefix: zuul
+
     experimental:
       jobs:
         - nodepool-functional-py35-debian-src
