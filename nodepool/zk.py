@@ -631,7 +631,19 @@ class Node(BaseModel):
         o.username = d.get('username', 'zuul')
         o.connection_type = d.get('connection_type')
         o.host_keys = d.get('host_keys', [])
-        o.hold_expiration = d.get('hold_expiration')
+        hold_expiration = d.get('hold_expiration')
+        if hold_expiration is not None:
+            try:
+                # We try to force this to an integer value because we do
+                # relative second based age comparisons using this value
+                # and those need to be a number type.
+                o.hold_expiration = int(hold_expiration)
+            except ValueError:
+                # Coercion to int failed, just use default of 0,
+                # which means no expiration
+                o.hold_expiration = 0
+        else:
+            o.hold_expiration = hold_expiration
         return o
 
 

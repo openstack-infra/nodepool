@@ -867,6 +867,55 @@ class TestLauncher(tests.DBTestCase):
         manager = pool.getProviderManager('fake-provider')
         self.waitForInstanceDeletion(manager, node.external_id)
 
+    def test_hold_expiration_str_type(self):
+        """Test a held node is deleted when past its operator-specified TTL,
+        even when the type is bad"""
+        configfile = self.setup_config('node_max_hold_age_no_default.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label')
+        self.log.debug("...done waiting for initial pool.")
+        node = nodes[0]
+        self.log.debug("Holding node %s..." % node.id)
+        # hold the node
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        node.hold_expiration = '1'
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        # Wait for the instance to be cleaned up
+        manager = pool.getProviderManager('fake-provider')
+        self.waitForInstanceDeletion(manager, node.external_id)
+
+    def test_hold_expiration_bad_type_coercion(self):
+        """Test a held node uses default expiration value when type is bad"""
+        configfile = self.setup_config('node_max_hold_age_no_default.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.waitForImage('fake-provider', 'fake-image')
+        self.log.debug("Waiting for initial pool...")
+        nodes = self.waitForNodes('fake-label')
+        self.log.debug("...done waiting for initial pool.")
+        node = nodes[0]
+        self.log.debug("Holding node %s..." % node.id)
+        # hold the node
+        node.state = zk.HOLD
+        node.comment = 'testing'
+        node.hold_expiration = 'notanumber'
+        self.zk.lockNode(node, blocking=False)
+        self.zk.storeNode(node)
+        self.zk.unlockNode(node)
+        znode = self.zk.getNode(node.id)
+        self.log.debug("Node %s in state '%s'" % (znode.id, znode.state))
+        self.assertEqual(znode.hold_expiration, 0)
+
     def test_hold_expiration_lower_than_default(self):
         """Test a held node is deleted when past its operator-specified TTL,
         with max-hold-age set in the configuration"""
