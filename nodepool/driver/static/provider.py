@@ -122,6 +122,52 @@ class StaticNodeProvider(Provider):
             self.zk.storeNode(node)
             self.log.debug("Registered static node %s", node.hostname)
 
+    def updateNodeFromConfig(self, static_node):
+        '''
+        Update a static node in ZooKeeper according to config.
+
+        The node is only updated if one of the relevant config items
+        changed. Name changes of nodes are handled via the
+        register/deregister flow.
+
+        :param dict static_node: The node definition from the config file.
+        '''
+        host_keys = self.checkHost(static_node)
+        nodes = self.getRegisteredReadyNodes(static_node["name"])
+        new_attrs = (
+            static_node["labels"],
+            static_node["username"],
+            static_node["connection-port"],
+            static_node["connection-type"],
+            host_keys,
+        )
+
+        for node in nodes:
+            original_attrs = (node.type, node.username, node.connection_port,
+                              node.connection_type, node.host_keys)
+
+            if original_attrs == new_attrs:
+                continue
+
+            node.type = static_node["labels"]
+            node.username = static_node["username"]
+            node.connection_port = static_node["connection-port"]
+            node.connection_type = static_node["connection-type"]
+            nodeutils.set_node_ip(node)
+            node.host_keys = host_keys
+
+            try:
+                self.zk.lockNode(node, blocking=False)
+            except exceptions.ZKLockException:
+                self.log.warning("Unable to lock node %s for update", node.id)
+                continue
+
+            try:
+                self.zk.storeNode(node)
+                self.log.debug("Updated static node %s", node.hostname)
+            finally:
+                self.zk.unlockNode(node)
+
     def deregisterNode(self, count, node_name):
         '''
         Attempt to delete READY nodes.
@@ -191,6 +237,12 @@ class StaticNodeProvider(Provider):
                     except Exception:
                         self.log.exception("Couldn't deregister static node:")
                         continue
+
+                try:
+                    self.updateNodeFromConfig(node)
+                except Exception:
+                    self.log.exception("Couldn't update static node:")
+                    continue
 
                 self.static_nodes[node["name"]] = node
 
