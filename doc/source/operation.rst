@@ -272,3 +272,106 @@ launchers, all will provide the same information.
    :reqheader Accept: ``application/json`` or ``text/*``
    :resheader Content-Type: ``application/json`` or ``text/plain``
                             depending on the :http:header:`Accept` header
+
+Monitoring
+----------
+
+Nodepool provides monitoring information to statsd. See
+:ref:`statsd_configuration` to learn how to enable statsd support. Currently,
+these metrics are supported:
+
+Nodepool builder
+~~~~~~~~~~~~~~~~
+
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.size
+   :type: gauge
+
+   This stat reports the size of the built image in bytes.
+
+.. zuul:stat:: nodepool.image_update.<image name>.<provider name>
+   :type: counter, timer
+
+   Number of image uploads to a specific provider in the cloud plus the time in
+   seconds spent to upload the image.
+
+Nodepool launcher
+~~~~~~~~~~~~~~~~~
+
+.. zuul:stat:: nodepool.provider.<provider>.max_servers
+   :type: gauge
+
+   Current setting of the max-server configuration parameter for the respective
+   provider.
+
+.. _nodepool_nodes:
+
+.. zuul:stat:: nodepool.nodes.<state>
+  :type: counter
+
+   Number of nodes in a specific state.
+
+   state can be:
+
+   * building
+   * deleting
+   * failed
+   * in-use
+   * ready
+   * used
+
+.. zuul:stat:: nodepool.provider.<provider>.nodes.<state>
+   :type: gauge
+
+   Number of nodes per provider that are in one specific state. See
+   :ref:`nodepool.nodes <nodepool_nodes>` for a list of possible states.
+
+.. zuul:stat:: nodepool.label.<label>.nodes.<state>
+   :type: counter
+
+   Number of nodes with a specific label in a specific state. See
+   :ref:`nodepool.nodes <nodepool_nodes>` for a list of possible states.
+
+.. zuul:stat:: nodepool.task.<provider>.<task>
+   :type: counter, timer
+
+   Number of tasks executed per provider plus the duration of the task
+   execution.
+
+.. _nodepool_launch:
+
+.. zuul:stat:: nodepool.launch.<result>
+   :type: counter, timer
+
+   Number of launches, categorized by the launch result plus the duration
+   of the launch.
+
+   *result* can be:
+
+   * ready: launch was successful
+   * error.zksession: Zookeeper session was lost
+   * error.quota: Quota of the provider was reached
+   * error.unknown: Some other error during launch
+
+.. zuul:stat:: nodepool.launch.provider.<provider>.<az>.<result>
+   :type: counter, timer
+
+   Number of launches per provider per availability zone, categorized
+   by the launch result plus duration of the launch.
+
+   See :ref:`nodepool.launch <nodepool_launch>` for a list of possible results.
+
+.. zuul:stat:: nodepool.launch.image.<image>.<result>
+   :type: counter, timer
+
+   Number of launches per image, categorized by the launch result plus duration
+   of the launch.
+
+   See :ref:`nodepool.launch <nodepool_launch>` for a list of possible results.
+
+.. zuul:stat:: nodepool.launch.requestor.<requestor>.<result>
+   :type: counter, timer
+
+   Number of launches per requestor, categorized by the launch result plus the
+   duration of the launch.
+
+   See :ref:`nodepool.launch <nodepool_launch>` for a list of possible results.

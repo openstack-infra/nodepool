@@ -21,6 +21,8 @@ usually recommended.
 Nodepool only needs to be told how to contact the ZooKeeper cluster;
 it will automatically populate the ZNode structure as needed.
 
+.. _statsd_configuration:
+
 Statsd and Graphite
 ~~~~~~~~~~~~~~~~~~~
 
