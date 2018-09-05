@@ -277,3 +277,19 @@ class TestDriverStatic(tests.DBTestCase):
         new_nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(new_nodes), 1)
         self.assertEqual(nodes[0].hostname, new_nodes[0].hostname)
+
+    def test_missing_static_node(self):
+        """Test that a missing static node is added"""
+        configfile = self.setup_config('static-2-nodes.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        self.log.debug("Waiting for initial nodes")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
+
+        self.zk.deleteNode(nodes[0])
+
+        self.log.debug("Waiting for node to transition to ready again")
+        nodes = self.waitForNodes('fake-label', 2)
+        self.assertEqual(len(nodes), 2)
