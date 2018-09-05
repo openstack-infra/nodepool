@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    The static driver now updates labels and connection related attributes
+    in Zookeeper at startup and on config change. Changing the name of a node
+    will be handled via the registration/deregistration flow as before.

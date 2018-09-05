@@ -1,0 +1,23 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: fake-label
+  - name: fake-label2
+
+providers:
+  - name: static-provider
+    driver: static
+    pools:
+      - name: main
+        nodes:
+          - name: fake-host-1
+            labels:
+              - fake-label
+              - fake-label2
+            timeout: 13
+            connection-type: winrm
+            connection-port: 5986
+            username: admin
