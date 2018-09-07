@@ -197,7 +197,11 @@ class StaticNodeProvider(Provider):
                 # It's already locked so skip it.
                 continue
 
-            if node.state != zk.READY:
+            # Double check the state now that we have a lock since it
+            # may have changed on us. We keep using the original node
+            # since it's holding the lock.
+            _node = self.zk.getNode(node.id)
+            if _node.state != zk.READY:
                 # State changed so skip it.
                 self.zk.unlockNode(node)
                 continue
