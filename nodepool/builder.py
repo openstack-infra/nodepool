@@ -749,6 +749,7 @@ class BuildWorker(BaseWorker):
         self.log.info('Running %s' % (cmd,))
         self.log.info('Logging to %s' % (log_fn,))
 
+        start_time = time.monotonic()
         try:
             p = subprocess.Popen(
                 shlex.split(cmd),
@@ -784,6 +785,8 @@ class BuildWorker(BaseWorker):
         if did_suspend:
             self.log.info("ZooKeeper available. Resuming")
 
+        build_time = time.monotonic() - start_time
+
         build_data = zk.ImageBuild()
         build_data.builder_id = self._builder_id
         build_data.builder = self._hostname
@@ -816,6 +819,15 @@ class BuildWorker(BaseWorker):
                     self.log.debug("%s created image %s.%s (size: %d) " %
                                    (diskimage.name, filename, ext, size))
                     self._statsd.gauge(key, size)
+
+        if self._statsd:
+            # report result to statsd
+            for ext in img_types.split(','):
+                key_base = 'nodepool.dib_image_build.%s.%s' % (
+                    diskimage.name, ext)
+                self._statsd.gauge(key_base + '.rc', rc)
+                self._statsd.timing(key_base + '.duration',
+                                    int(build_time * 1000))
 
         return build_data
 
