@@ -36,17 +36,21 @@ class StaticNodeProvider(Provider):
         self.static_nodes = {}
 
     def checkHost(self, node):
-        # Check node is reachable
-        if node["connection-type"] != "ssh":
-            return
+        '''Check node is reachable'''
+        # only gather host keys if the connection type is ssh
+        gather_hostkeys = node["connection-type"] == 'ssh'
         try:
             keys = nodeutils.nodescan(node["name"],
                                       port=node["connection-port"],
-                                      timeout=node["timeout"])
+                                      timeout=node["timeout"],
+                                      gather_hostkeys=gather_hostkeys)
         except exceptions.ConnectionTimeoutException:
             raise StaticNodeError(
                 "%s:%s: ConnectionTimeoutException" % (
                     node["name"], node["connection-port"]))
+
+        if not gather_hostkeys:
+            return
 
         # Check node host-key
         if set(node["host-key"]).issubset(set(keys)):
