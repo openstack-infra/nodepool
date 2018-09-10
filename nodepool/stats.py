@@ -110,12 +110,15 @@ class StatsReporter(object):
             states[key] += 1
 
             # nodepool.label.LABEL.nodes.STATE
-            key = 'nodepool.label.%s.nodes.%s' % (node.type, node.state)
-            # It's possible we could see node types that aren't in our config
-            if key in states:
-                states[key] += 1
-            else:
-                states[key] = 1
+            # nodes can have several labels
+            for label in node.type:
+                key = 'nodepool.label.%s.nodes.%s' % (label, node.state)
+                # It's possible we could see node types that aren't in our
+                # config
+                if key in states:
+                    states[key] += 1
+                else:
+                    states[key] = 1
 
             # nodepool.provider.PROVIDER.nodes.STATE
             key = 'nodepool.provider.%s.nodes.%s' % (node.provider, node.state)
