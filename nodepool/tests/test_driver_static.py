@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import mock
 import os
 
 from nodepool import config as nodepool_config
@@ -277,6 +278,32 @@ class TestDriverStatic(tests.DBTestCase):
         new_nodes = self.waitForNodes('fake-label')
         self.assertEqual(len(new_nodes), 1)
         self.assertEqual(nodes[0].hostname, new_nodes[0].hostname)
+
+    def test_liveness_check(self):
+        '''
+        Test liveness check during request handling.
+        '''
+        configfile = self.setup_config('static-basic.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(len(nodes), 1)
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+
+        with mock.patch("nodepool.nodeutils.nodescan") as nodescan_mock:
+            nodescan_mock.side_effect = OSError
+            self.zk.storeNodeRequest(req)
+            self.waitForNodeDeletion(nodes[0])
+
+        self.log.debug("Waiting for request %s", req.id)
+        req = self.waitForNodeRequest(req)
+
+        self.assertEqual(req.state, zk.FULFILLED)
+        self.assertEqual(len(req.nodes), 1)
+        self.assertNotEqual(req.nodes[0], nodes[0].id)
 
     def test_missing_static_node(self):
         """Test that a missing static node is added"""

@@ -78,6 +78,27 @@ class StaticNodeProvider(Provider):
             nodes.append(node)
         return nodes
 
+    def checkNodeLiveness(self, node):
+        static_node = self.poolNodes().get(node.hostname)
+        if static_node is None:
+            return False
+
+        try:
+            nodeutils.nodescan(static_node["name"],
+                               port=static_node["connection-port"],
+                               timeout=static_node["timeout"],
+                               gather_hostkeys=False)
+            return True
+        except Exception:
+            self.log.exception("Failed to connect to node %s:",
+                               static_node["name"])
+        try:
+            self.deregisterNode(count=1, node_name=static_node["name"])
+        except Exception:
+            self.log.exception("Couldn't deregister static node:")
+
+        return False
+
     def getRegisteredNodeHostnames(self):
         '''
         Get hostnames for all registered static nodes.

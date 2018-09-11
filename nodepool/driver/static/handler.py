@@ -44,3 +44,6 @@ class StaticNodeRequestHandler(NodeRequestHandler):
     def launchesComplete(self):
         # We don't wait on a launch since we never actually launch.
         return True
+
+    def checkReusableNode(self, node):
+        return self.manager.checkNodeLiveness(node)
