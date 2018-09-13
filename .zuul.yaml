@@ -120,11 +120,10 @@
         NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB: false
 
 - project:
-    templates:
-      - build-tox-docs
     check:
       jobs:
         - tox-cover
+        - tox-docs
         - tox-pep8
         - tox-py35
         - nodepool-zuul-functional:
@@ -138,6 +137,7 @@
               pbrx_prefix: zuul
     gate:
       jobs:
+        - tox-docs
         - tox-pep8
         - tox-py35
         - pbrx-build-container-images:
