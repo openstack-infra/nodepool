@@ -300,6 +300,41 @@ class FakeUploadFailCloud(FakeOpenStackCloud):
             return super(FakeUploadFailCloud, self).create_image(**kwargs)
 
 
+class FakeLaunchAndDeleteFailCloud(FakeOpenStackCloud):
+    log = logging.getLogger("nodepool.FakeLaunchAndDeleteFailCloud")
+
+    def __init__(self, times_to_fail=None):
+        super(FakeLaunchAndDeleteFailCloud, self).__init__()
+        self.times_to_fail_delete = times_to_fail
+        self.times_to_fail_launch = times_to_fail
+        self.times_failed_delete = 0
+        self.times_failed_launch = 0
+        self.launch_success = False
+        self.delete_success = False
+
+    def wait_for_server(self, **kwargs):
+        if self.times_to_fail_launch is None:
+            raise Exception("Test fail server launch.")
+        if self.times_failed_launch < self.times_to_fail_launch:
+            self.times_failed_launch += 1
+            raise exceptions.ServerDeleteException("Test fail server launch.")
+        else:
+            self.launch_success = True
+            return super(FakeLaunchAndDeleteFailCloud,
+                         self).wait_for_server(**kwargs)
+
+    def delete_server(self, *args, **kwargs):
+        if self.times_to_fail_delete is None:
+            raise exceptions.ServerDeleteException("Test fail server delete.")
+        if self.times_failed_delete < self.times_to_fail_delete:
+            self.times_failed_delete += 1
+            raise exceptions.ServerDeleteException("Test fail server delete.")
+        else:
+            self.delete_success = True
+            return super(FakeLaunchAndDeleteFailCloud,
+                         self).delete_server(*args, **kwargs)
+
+
 class FakeProvider(OpenStackProvider):
     fake_cloud = FakeOpenStackCloud
 
