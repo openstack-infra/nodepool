@@ -27,6 +27,7 @@ from nodepool.driver.utils import QuotaInformation
 from nodepool.nodeutils import iterate_timeout
 from nodepool.task_manager import TaskManager
 from nodepool import version
+from nodepool import zk
 
 # Import entire module to avoid partial-loading, circular import
 from nodepool.driver.openstack import handler
@@ -440,6 +441,53 @@ class OpenStackProvider(Provider):
         self.deleteServer(server_id)
 
     def cleanupLeakedResources(self):
+        '''
+        Delete any leaked server instances.
+
+        Remove any servers found in this provider that are not recorded in
+        the ZooKeeper data.
+        '''
+
+        deleting_nodes = {}
+
+        for node in self._zk.nodeIterator():
+            if node.state == zk.DELETING:
+                if node.provider != self.provider.name:
+                    continue
+                if node.provider not in deleting_nodes:
+                    deleting_nodes[node.provider] = []
+                deleting_nodes[node.provider].append(node.external_id)
+
+        for server in self.listNodes():
+            meta = server.get('metadata', {})
+
+            if 'nodepool_provider_name' not in meta:
+                continue
+
+            if meta['nodepool_provider_name'] != self.provider.name:
+                # Another launcher, sharing this provider but configured
+                # with a different name, owns this.
+                continue
+
+            if (self.provider.name in deleting_nodes and
+                server.id in deleting_nodes[self.provider.name]):
+                # Already deleting this node
+                continue
+
+            if not self._zk.getNode(meta['nodepool_node_id']):
+                self.log.warning(
+                    "Marking for delete leaked instance %s (%s) in %s "
+                    "(unknown node id %s)",
+                    server.name, server.id, self.provider.name,
+                    meta['nodepool_node_id']
+                )
+                # Create an artifical node to use for deleting the server.
+                node = zk.Node()
+                node.external_id = server.id
+                node.provider = self.provider.name
+                node.state = zk.DELETING
+                self._zk.storeNode(node)
+
         if self.provider.clean_floating_ips:
             self._client.delete_unattached_floating_ips()
 

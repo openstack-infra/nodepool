@@ -467,53 +467,10 @@ class CleanupWorker(BaseCleanupWorker):
 
     def _cleanupLeakedInstances(self):
         '''
-        Delete any leaked server instances.
-
-        Remove any servers we find in providers we know about that are not
-        recorded in the ZooKeeper data.
+        Allow each provider manager a chance to cleanup resources.
         '''
-        zk_conn = self._nodepool.getZK()
-
-        deleting_nodes = {}
-        for node in zk_conn.nodeIterator():
-            if node.state == zk.DELETING:
-                if node.provider not in deleting_nodes:
-                    deleting_nodes[node.provider] = []
-                deleting_nodes[node.provider].append(node.external_id)
-
         for provider in self._nodepool.config.providers.values():
             manager = self._nodepool.getProviderManager(provider.name)
-
-            for server in manager.listNodes():
-                meta = server.get('metadata', {})
-
-                if 'nodepool_provider_name' not in meta:
-                    continue
-
-                if meta['nodepool_provider_name'] != provider.name:
-                    # Another launcher, sharing this provider but configured
-                    # with a different name, owns this.
-                    continue
-
-                if (provider.name in deleting_nodes and
-                    server.id in deleting_nodes[provider.name]):
-                    # Already deleting this node
-                    continue
-
-                if not zk_conn.getNode(meta['nodepool_node_id']):
-                    self.log.warning(
-                        "Marking for delete leaked instance %s (%s) in %s "
-                        "(unknown node id %s)",
-                        server.name, server.id, provider.name,
-                        meta['nodepool_node_id']
-                    )
-                    # Create an artifical node to use for deleting the server.
-                    node = zk.Node()
-                    node.external_id = server.id
-                    node.provider = provider.name
-                    node.state = zk.DELETING
-                    zk_conn.storeNode(node)
-
             manager.cleanupLeakedResources()
 
     def _cleanupMaxReadyAge(self):
