@@ -48,6 +48,7 @@ class OpenStackProvider(Provider):
         self._use_taskmanager = use_taskmanager
         self._taskmanager = None
         self._current_nodepool_quota = None
+        self._zk = None
 
     def start(self, zk_conn):
         if self._use_taskmanager:
@@ -55,6 +56,7 @@ class OpenStackProvider(Provider):
                                             self.provider.rate)
             self._taskmanager.start()
         self.resetClient()
+        self._zk = zk_conn
 
     def stop(self):
         if self._taskmanager:
@@ -136,18 +138,17 @@ class OpenStackProvider(Provider):
     def invalidateQuotaCache(self):
         self._current_nodepool_quota['timestamp'] = 0
 
-    def estimatedNodepoolQuotaUsed(self, zk, pool=None):
+    def estimatedNodepoolQuotaUsed(self, pool=None):
         '''
         Sums up the quota used (or planned) currently by nodepool. If pool is
         given it is filtered by the pool.
 
-        :param zk: the object to access zookeeper
         :param pool: If given, filtered by the pool.
         :return: Calculated quota in use by nodepool
         '''
         used_quota = QuotaInformation()
 
-        for node in zk.nodeIterator():
+        for node in self._zk.nodeIterator():
             if node.provider == self.provider.name:
                 if pool and not node.pool == pool.name:
                     continue
