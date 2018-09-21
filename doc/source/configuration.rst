@@ -710,6 +710,12 @@ Example configuration::
 
     In gigabytes. Default 50.
 
+  ``instance-properties`` (default: None)
+    A dictionary of key/value properties to set when booting each
+    server.  These properties become available via the ``meta-data``
+    on the active server (e.g. within
+    ``config-drive:openstack/latest/meta_data.json``)
+
 
 Static driver
 ^^^^^^^^^^^^^

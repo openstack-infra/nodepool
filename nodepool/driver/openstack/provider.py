@@ -268,7 +268,8 @@ class OpenStackProvider(Provider):
                      nodepool_node_id=None, nodepool_node_label=None,
                      nodepool_image_name=None,
                      networks=None, security_groups=None,
-                     boot_from_volume=False, volume_size=50):
+                     boot_from_volume=False, volume_size=50,
+                     instance_properties=None):
         if not networks:
             networks = []
         if not isinstance(image, dict):
@@ -313,6 +314,9 @@ class OpenStackProvider(Provider):
             groups=",".join(groups_list),
             nodepool_provider_name=self.provider.name,
         )
+        # merge in any provided properties
+        if instance_properties:
+            meta = {**instance_properties, **meta}
         if nodepool_node_id:
             meta['nodepool_node_id'] = nodepool_node_id
         if nodepool_image_name:

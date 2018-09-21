@@ -136,7 +136,8 @@ class OpenStackNodeLauncher(NodeLauncher):
             networks=self.pool.networks,
             security_groups=self.pool.security_groups,
             boot_from_volume=self.label.boot_from_volume,
-            volume_size=self.label.volume_size)
+            volume_size=self.label.volume_size,
+            instance_properties=self.label.instance_properties)
 
         self.node.external_id = server.id
         self.node.hostname = hostname

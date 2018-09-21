@@ -46,6 +46,9 @@ providers:
             min-ram: 8192
             boot-from-volume: True
             volume-size: 100
+            instance-properties:
+              a_key: a_value
+              b_key: b_value
 
   - name: cloud2
     driver: openstack

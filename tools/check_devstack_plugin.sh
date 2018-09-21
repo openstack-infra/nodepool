@@ -50,6 +50,15 @@ function sshintonode {
         FAILURE_REASON="Root partition of $name does not appear to have grown: $root_size < $expected_root_size"
         RETURN=1
     fi
+
+    # Check we saw metadata deployed to the config-drive
+    /tmp/ssh_wrapper $node \
+        "dd status=none if=/dev/sr0 | tr -cd '[:print:]' | grep -q nodepool_devstack"
+    if [[ $? -ne 0 ]]; then
+        echo "*** Failed to find metadata in config-drive"
+        FAILURE_REASON="Failed to find meta-data in config-drive for $node"
+        RETURN=1
+    fi
 }
 
 function waitforimage {
