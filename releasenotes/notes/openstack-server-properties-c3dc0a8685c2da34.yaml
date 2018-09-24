@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    The OpenStack driver now supports configuring instance properties on boot.
+    These properties end up in the instance metadata and will be visible to the
+    instance after boot. Use the ``instance-properties`` dict on provider pool
+    label to set this per label type booted.
