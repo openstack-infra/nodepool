@@ -1,0 +1,8 @@
+---
+fixes:
+  - |
+    Task names are now consistently normalised to CamelCase without
+    deliminators.  Some statistics sent to statsd with ``-`` or ``_``
+    characters will have changed keys, for example
+    ``ComputePostOs-volumes_boot`` is now
+    ``ComputePostOsVolumesBoot``.

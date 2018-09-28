@@ -18,6 +18,7 @@
 
 import threading
 import logging
+import re
 import queue
 import time
 
@@ -27,10 +28,14 @@ from nodepool import stats
 
 
 def _transform_task_name(task_name):
-    # openstacksdk sets task.name to something like "compute.DELETE.servers"
-    # We want ComputeDeleteServers
+    # Transform openstacksdk internal task name to something more
+    # suitable for sending to statsd for tracking; e.g.
+    #
+    #  compute.DELETE.servers -> ComputeDeleteServers
+    #  compute.POST.os-volumes_boot -> ComputePostOsVolumesBoot
+    parts = re.split('[.\-_]', task_name)
     return "".join(
-        [part.lower().capitalize() for part in task_name.split('.')]
+        [part.lower().capitalize() for part in parts]
     )
 
 

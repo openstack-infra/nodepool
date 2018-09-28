@@ -385,3 +385,18 @@ Nodepool launcher
    duration of the launch.
 
    See :ref:`nodepool.launch <nodepool_launch>` for a list of possible results.
+
+OpenStack API stats
+~~~~~~~~~~~~~~~~~~~
+
+Low level details on the timing of OpenStack API calls will be logged
+by the API task manager.  These calls are logged under
+``nodepool.task.<provider>.<api-call>``.  The API call name is of the
+generic format ``<endpoint><method><operation>`` transformed into a
+CamelCase value with no deliminators; for example the
+``compute.GET.servers`` call becomes ``ComputeGetServers`` and
+``compute.POST.os-volumes_boot`` becomes ``ComputePostOsVolumesBoot``.
+
+Since these calls reflect the internal operations of the
+``openstacksdk``, the exact keys logged may vary across providers and
+releases.

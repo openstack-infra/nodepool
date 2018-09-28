@@ -20,10 +20,23 @@ import yaml
 
 from nodepool import config as nodepool_config
 from nodepool import provider_manager
+from nodepool import task_manager
 from nodepool import tests
 
 
 class TestShadeIntegration(tests.IntegrationTestCase):
+    def test_task_name_transformation(self):
+        t = task_manager._transform_task_name
+        self.assertEqual(
+            t('compute.DELETE.servers'),
+            'ComputeDeleteServers')
+        self.assertEqual(
+            t('compute.POST.os-volumes_boot'),
+            'ComputePostOsVolumesBoot')
+        self.assertEqual(
+            t('compute.GET.os-availability-zone'),
+            'ComputeGetOsAvailabilityZone')
+
     def _cleanup_cloud_config(self):
         os.remove(self.clouds_path)
 
