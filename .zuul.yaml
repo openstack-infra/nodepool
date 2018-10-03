@@ -155,4 +155,5 @@
         - nodepool-functional-py35-debian-src
     release:
       jobs:
+        - release-zuul-python
         - publish-zuul-docs
