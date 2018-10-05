@@ -1527,8 +1527,13 @@ class TestLauncher(tests.DBTestCase):
         self.zk.storeNodeRequest(req)
 
         req = self.waitForNodeRequest(req)
+
+        # The deletion of the node can be delayed so wait for it.
+        while True:
+            if fake_client.delete_success:
+                break
+            time.sleep(0.1)
         self.assertTrue(fake_client.launch_success)
-        self.assertTrue(fake_client.delete_success)
         self.assertEqual(fake_client.times_to_fail_delete,
                          fake_client.times_failed_delete)
         self.assertEqual(fake_client.times_to_fail_launch,
