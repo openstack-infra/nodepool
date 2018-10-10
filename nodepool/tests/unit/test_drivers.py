@@ -21,7 +21,8 @@ from nodepool.driver import Drivers
 class TestDrivers(tests.DBTestCase):
     def setup_config(self, filename):
         test_dir = os.path.dirname(__file__)
-        drivers_dir = os.path.join(os.path.dirname(test_dir), 'driver')
+        drivers_dir = os.path.join(
+            os.path.dirname(os.path.dirname(test_dir)), 'driver')
         Drivers.load([drivers_dir])
         return super().setup_config(filename)
 
