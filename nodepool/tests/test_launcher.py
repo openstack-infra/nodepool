@@ -1751,3 +1751,24 @@ class TestLauncher(tests.DBTestCase):
 
         req3 = self.waitForNodeRequest(req3)
         self.assertEqual(req3.state, zk.FAILED)
+
+    def test_leaked_port_cleanup(self):
+        configfile = self.setup_config('node.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = 1
+        pool.start()
+        self.waitForNodes('fake-label')
+
+        manager = pool.getProviderManager('fake-provider')
+        down_ports = manager.listPorts(status='DOWN')
+        self.assertEqual(2, len(down_ports))
+        self.log.debug("Down ports: %s", down_ports)
+
+        # Change the port cleanup interval to happen quicker
+        manager._port_cleanup_interval_secs = 2
+        while manager.listPorts(status='DOWN'):
+            time.sleep(1)
+
+        self.assertReportedStat('nodepool.provider.fake-provider.downPorts',
+                                value='2', kind='c')
