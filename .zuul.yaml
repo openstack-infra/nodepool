@@ -136,6 +136,7 @@
         - pbrx-build-container-images:
             vars:
               pbrx_prefix: zuul
+        - zuul-quick-start
     gate:
       jobs:
         - tox-docs
@@ -146,6 +147,7 @@
         - pbrx-build-container-images:
             vars:
               pbrx_prefix: zuul
+        - zuul-quick-start
     post:
       jobs:
         - publish-zuul-docs
