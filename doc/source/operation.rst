@@ -222,7 +222,7 @@ is the same.
 Web interface
 -------------
 
-If configured (see :ref:`webapp-conf`), a ``nodepool-launcher``
+If configured (see :attr:`webapp-conf`), a ``nodepool-launcher``
 instance can provide a range of end-points that can provide
 information in text and ``json`` format.  Note if there are multiple
 launchers, all will provide the same information.
