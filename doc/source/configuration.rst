@@ -21,6 +21,12 @@ and ``providers`` sections::
 The following sections are available.  All are required unless
 otherwise indicated.
 
+.. attr-overview::
+   :maxdepth: 1
+
+Options
+-------
+
 .. attr:: webapp
 
    Define the webapp endpoint port and listen address
@@ -343,6 +349,13 @@ otherwise indicated.
 
 OpenStack Driver
 ----------------
+
+Selecting the OpenStack driver adds the following options to the
+:attr:`providers` section of the configuration.
+
+.. attr-overview::
+   :prefix: providers.openstack
+   :maxdepth: 3
 
 .. attr:: providers.openstack
 
@@ -888,6 +901,13 @@ OpenStack Driver
 
 Static Provider
 ---------------
+
+Selecting the static driver adds the following options to the
+:attr:`providers` section of the configuration.
+
+.. attr-overview::
+   :prefix: providers.static
+   :maxdepth: 3
 
 .. attr:: providers.static
    :type: list
