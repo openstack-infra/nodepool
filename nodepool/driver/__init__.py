@@ -413,7 +413,10 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
         diff = requested_types - saved_types
         needed_types = list(diff.elements())
 
-        ready_nodes = self.zk.getReadyNodesOfTypes(needed_types)
+        if self.request.reuse:
+            ready_nodes = self.zk.getReadyNodesOfTypes(needed_types)
+        else:
+            ready_nodes = []
 
         for ntype in needed_types:
             # First try to grab from the list of already available nodes.
@@ -455,6 +458,20 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
                 # If we calculate that we're at capacity, pause until nodes
                 # are released by Zuul and removed by the DeletedNodeWorker.
                 if not self.hasRemainingQuota(ntype):
+
+                    if self.request.requestor == "NodePool:min-ready":
+                        # The point of the min-ready nodes is to have nodes on
+                        # standby for future requests. When at capacity, it
+                        # doesn't make sense to wait for and use resources to
+                        # speculatively create a node. Decline this so someone
+                        # else with capacity can take it.
+                        self.log.debug(
+                            "Declining node request %s because provider cannot"
+                            " satisfy min-ready")
+                        self.decline_request()
+                        self._declinedHandlerCleanup()
+                        return
+
                     self.log.info(
                         "Not enough quota remaining to satisfy request %s",
                         self.request.id)
@@ -530,19 +547,6 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
         # backoff for some seconds if the used quota would be exceeded?
         # This way we could give another (free) provider the chance to take
         # this request earlier.
-
-        # For min-ready requests, which do not re-use READY nodes, let's
-        # decline if this provider is already at capacity. Otherwise, we
-        # could end up wedged until another request frees up a node.
-        if self.pool.max_servers is not None and \
-           self.request.requestor == "NodePool:min-ready":
-            current_count = self.zk.countPoolNodes(self.provider.name,
-                                                   self.pool.name)
-            # Use >= because dynamic config changes to max-servers can leave
-            # us with more than max-servers.
-            # TODO: handle this with the quota code
-            if current_count >= self.pool.max_servers:
-                declined_reasons.append("provider cannot satisfy min-ready")
 
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
