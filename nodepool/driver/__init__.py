@@ -543,11 +543,6 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
         elif not self.hasProviderQuota(self.request.node_types):
             declined_reasons.append('it would exceed quota')
 
-        # TODO(tobiash): Maybe also calculate the quota prediction here and
-        # backoff for some seconds if the used quota would be exceeded?
-        # This way we could give another (free) provider the chance to take
-        # this request earlier.
-
         if declined_reasons:
             self.log.debug("Declining node request %s because %s",
                            self.request.id, ', '.join(declined_reasons))
