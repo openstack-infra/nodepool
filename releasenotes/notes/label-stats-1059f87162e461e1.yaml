@@ -1,0 +1,5 @@
+---
+fixes:
+  - |
+    The nodes by label and state statistic gauges are now correctly reset to
+    zero if no node of a label and state exists.

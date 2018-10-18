@@ -84,6 +84,28 @@ class TestLauncher(tests.DBTestCase):
         self.assertReportedStat('nodepool.label.fake-label.nodes.ready',
                                 value='1', kind='g')
 
+        # Verify that we correctly initialized unused label stats to 0
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.building',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.testing',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.ready',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.in-use',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.used',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.hold',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.deleting',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.failed',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.init',
+                                value='0', kind='g')
+        self.assertReportedStat('nodepool.label.fake-label2.nodes.aborted',
+                                value='0', kind='g')
+
     def test_node_assignment_order(self):
         """Test that nodes are assigned in the order requested"""
         configfile = self.setup_config('node_many_labels.yaml')

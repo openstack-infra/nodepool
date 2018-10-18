@@ -104,6 +104,12 @@ class StatsReporter(object):
             key = 'nodepool.provider.%s.nodes.%s' % (provider.name, state)
             states[key] = 0
 
+        # Initialize label stats to 0
+        for label in provider.getSupportedLabels():
+            for state in zk.Node.VALID_STATES:
+                key = 'nodepool.label.%s.nodes.%s' % (label, state)
+                states[key] = 0
+
         for node in zk_conn.nodeIterator():
             # nodepool.nodes.STATE
             key = 'nodepool.nodes.%s' % node.state
