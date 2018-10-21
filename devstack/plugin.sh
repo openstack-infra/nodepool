@@ -43,6 +43,13 @@ function install_glean {
 }
 
 
+function install_openstacksdk {
+    if use_library_from_git "openstacksdk"; then
+        git_clone_by_name "openstacksdk"
+        $NODEPOOL_INSTALL/bin/pip install $DEST/openstacksdk
+    fi
+}
+
 # Install nodepool code
 function install_nodepool {
     VENV="virtualenv -p python3"
@@ -52,6 +59,11 @@ function install_nodepool {
 
     setup_develop $DEST/nodepool
     $NODEPOOL_INSTALL/bin/pip install $DEST/nodepool
+
+    # TODO(mordred) Install openstacksdk after nodepool so that if we're
+    # in the -src job we don't re-install from the requirement.
+    # We should make this more resilient, probably using install-siblings.
+    install_openstacksdk
     $NODEPOOL_INSTALL/bin/pbr freeze
 }
 

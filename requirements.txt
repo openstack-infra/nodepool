@@ -7,7 +7,7 @@ extras
 statsd>=3.0
 sqlalchemy>=0.8.2,<1.1.0
 PrettyTable>=0.6,<0.8
-openstacksdk>=0.17.2
+openstacksdk>=0.17.2,!=0.18.0
 diskimage-builder>=2.0.0
 voluptuous
 kazoo
