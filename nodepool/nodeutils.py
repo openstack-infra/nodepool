@@ -82,7 +82,7 @@ def nodescan(ip, port=22, timeout=60, gather_hostkeys=True):
         t = None
         try:
             sock = socket.socket(family, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
+            sock.settimeout(10)
             sock.connect(sockaddr)
             if gather_hostkeys:
                 t = paramiko.transport.Transport(sock)
