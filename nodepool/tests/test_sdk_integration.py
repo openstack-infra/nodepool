@@ -60,7 +60,10 @@ class TestShadeIntegration(tests.IntegrationTestCase):
         config = nodepool_config.loadConfig(configfile)
         self.assertIn('real-provider', config.providers)
         pm = provider_manager.get_provider(
-            config.providers['real-provider'], use_taskmanager=False)
+            config.providers['real-provider'], use_taskmanager=True)
+        # We need to cleanup the provider manager so that it doesn't leak a
+        # thread that causes wait_for_threads in subsequent tests to fail.
+        self.addCleanup(pm.stop)
         pm.start(None)
         self.assertEqual(pm._client.auth, auth_data)
 
