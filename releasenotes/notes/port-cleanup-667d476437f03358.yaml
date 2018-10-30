@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Added a new routine to the OpenStack driver cleanup resources phase that
+    will remove any ports reported to be in the DOWN state. Ports will have
+    to be seen as DOWN for at least three minutes before they will be removed.
+    The number of ports removed will be reported to statsd.
