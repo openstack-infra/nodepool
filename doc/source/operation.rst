@@ -329,12 +329,6 @@ Nodepool launcher
    * ready
    * used
 
-.. zuul:stat:: nodepool.provider.<provider>.downPorts
-   :type: counter
-
-   Number of ports in the DOWN state that have been removed automatically
-   in the cleanup resources phase of the OpenStack driver.
-
 .. zuul:stat:: nodepool.provider.<provider>.nodes.<state>
    :type: gauge
 

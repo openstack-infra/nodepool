@@ -26,7 +26,6 @@ from nodepool.driver import Provider
 from nodepool.driver.utils import QuotaInformation
 from nodepool.nodeutils import iterate_timeout
 from nodepool.task_manager import TaskManager
-from nodepool import stats
 from nodepool import version
 from nodepool import zk
 
@@ -51,10 +50,6 @@ class OpenStackProvider(Provider):
         self._taskmanager = None
         self._current_nodepool_quota = None
         self._zk = None
-        self._down_ports = set()
-        self._last_port_cleanup = None
-        self._port_cleanup_interval_secs = 180
-        self._statsd = stats.get_client()
 
     def start(self, zk_conn):
         if self._use_taskmanager:
@@ -422,21 +417,6 @@ class OpenStackProvider(Provider):
             **meta)
         return image.id
 
-    def listPorts(self, status=None):
-        '''
-        List known ports.
-
-        :param str status: A valid port status. E.g., 'ACTIVE' or 'DOWN'.
-        '''
-        if status:
-            ports = self._client.list_ports(filters={'status': status})
-        else:
-            ports = self._client.list_ports()
-        return ports
-
-    def deletePort(self, port_id):
-        self._client.delete_port(port_id)
-
     def listImages(self):
         return self._client.list_images()
 
@@ -464,7 +444,7 @@ class OpenStackProvider(Provider):
         self.log.debug('Deleting server %s' % server_id)
         self.deleteServer(server_id)
 
-    def cleanupLeakedInstances(self):
+    def cleanupLeakedResources(self):
         '''
         Delete any leaked server instances.
 
@@ -512,63 +492,6 @@ class OpenStackProvider(Provider):
                 node.state = zk.DELETING
                 self._zk.storeNode(node)
 
-    def filterComputePorts(self, ports):
-        '''
-        Return a list of compute ports (or no device owner).
-
-        We are not interested in ports for routers or DHCP.
-        '''
-        ret = []
-        for p in ports:
-            if p.device_owner is None or p.device_owner.startswith("compute:"):
-                ret.append(p)
-        return ret
-
-    def cleanupLeakedPorts(self):
-        if not self._last_port_cleanup:
-            self._last_port_cleanup = time.monotonic()
-            ports = self.listPorts(status='DOWN')
-            ports = self.filterComputePorts(ports)
-            self._down_ports = set([p.id for p in ports])
-            return
-
-        # Return if not enough time has passed between cleanup
-        last_check_in_secs = int(time.monotonic() - self._last_port_cleanup)
-        if last_check_in_secs <= self._port_cleanup_interval_secs:
-            return
-
-        ports = self.listPorts(status='DOWN')
-        ports = self.filterComputePorts(ports)
-        current_set = set([p.id for p in ports])
-        remove_set = current_set & self._down_ports
-
-        removed_count = 0
-        for port_id in remove_set:
-            try:
-                self.deletePort(port_id)
-            except Exception:
-                self.log.exception("Exception deleting port %s in %s:",
-                                   port_id, self.provider.name)
-            else:
-                removed_count += 1
-                self.log.debug("Removed DOWN port %s in %s",
-                               port_id, self.provider.name)
-
-        if self._statsd and removed_count:
-            key = 'nodepool.provider.%s.downPorts' % (self.provider.name)
-            self._statsd.incr(key, removed_count)
-
-        self._last_port_cleanup = time.monotonic()
-
-        # Rely on OpenStack to tell us the down ports rather than doing our
-        # own set adjustment.
-        ports = self.listPorts(status='DOWN')
-        ports = self.filterComputePorts(ports)
-        self._down_ports = set([p.id for p in ports])
-
-    def cleanupLeakedResources(self):
-        self.cleanupLeakedInstances()
-        self.cleanupLeakedPorts()
         if self.provider.clean_floating_ips:
             self._client.delete_unattached_floating_ips()
 
