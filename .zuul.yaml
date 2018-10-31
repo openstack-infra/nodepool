@@ -85,7 +85,7 @@
     vars:
       devstack_localrc:
         NODEPOOL_PAUSE_CENTOS_7_DIB: false
-        NODEPOOL_PAUSE_FEDORA_27_DIB: false
+        NODEPOOL_PAUSE_FEDORA_28_DIB: false
 
 - job:
     name: nodepool-functional-py35-suse-src
