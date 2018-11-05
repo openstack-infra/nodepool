@@ -1,0 +1,15 @@
+- hosts: all
+  vars:
+    nodepool_log_dir: '{{ ansible_user_dir }}/work/logs/nodepool'
+    nodepool_etc_dir: '{{ ansible_user_dir }}/work/etc'
+  tasks:
+    - name: 'Copy files from {{ nodepool_log_dir }}'
+      synchronize:
+        src: '{{ nodepool_log_dir }}'
+        dest: '{{ zuul.executor.log_root }}/{{ inventory_hostname }}'
+        mode: pull
+    - name: 'Copy files from {{ nodepool_etc_dir }}'
+      synchronize:
+        src: '{{ nodepool_etc_dir }}'
+        dest: '{{ zuul.executor.log_root }}/{{ inventory_hostname }}'
+        mode: pull

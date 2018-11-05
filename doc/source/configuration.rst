@@ -1004,3 +1004,92 @@ Selecting the static driver adds the following options to the
          :default: 1
 
          The number of jobs that can run in parallel on this node.
+
+
+Kubernetes driver
+^^^^^^^^^^^^^^^^^
+
+A Kubernetes provider's resources are partitioned into groups called "pool"
+(see :ref:`k8s_pools` for details), and within a pool, the node types which
+are to be made available are listed (see :ref:`k8s_labels` for details).
+
+Example::
+
+  providers:
+    - name: kubespray
+      driver: kubernetes
+      context: admin-cluster.local
+      pools:
+        - name: main
+          labels:
+            - name: kubernetes-namespace
+              type: namespace
+            - name: pod-fedora
+              type: pod
+              image: docker.io/fedora:28
+
+**required**
+
+  ``context``
+  Name of the context configured in ``kube/config``.
+
+  Before using the driver, Nodepool services need a ``kube/config`` file
+  manually installed with cluster admin context.
+
+**optional**
+
+  ``launch-retries``
+
+    The number of times to retry launching a node before considering the job
+    failed.
+
+    Default 3.
+
+
+.. _k8s_pools:
+
+Kubernetes pools
+~~~~~~~~~~~~~~~~
+
+A pool defines a group of resources from a Kubernetes provider. Each pool has a
+maximum number of namespace which can be created (Not Implemented yet).
+
+Example::
+
+  pools:
+    - name: main
+      labels: []
+
+
+**required**
+
+  ``name``
+  Namespace name are prefixed with the pool's name.
+
+
+.. _k8s_labels:
+
+Kubernetes labels
+~~~~~~~~~~~~~~~~~
+
+Each entry in a pool`s `labels` section indicates that the
+corresponding label is available for use in this pool.
+
+Example::
+
+  labels:
+    - name: kubernetes-namespace
+      type: namespace
+    - name: pod-fedora
+      type: pod
+      image: docker.io/fedora:28
+
+
+Kubernetes provider support two types of labels:
+
+Namespace labels provide an empty namespace configured with a service account
+that can creates pods, services, configmaps, ...
+
+Pod labels provide a dedicated namespace with a single pod created using the
+``image`` parameter and it is configured with a service account that can
+exec and get the logs of the pod.

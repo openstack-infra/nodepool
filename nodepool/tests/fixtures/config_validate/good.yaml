@@ -19,6 +19,8 @@ labels:
   - name: trusty-external
     min-ready: 1
   - name: trusty-static
+  - name: kubernetes-namespace
+  - name: pod-fedora
 
 providers:
   - name: cloud1
@@ -98,6 +100,18 @@ providers:
             connection-port: 22022
             username: zuul
             max-parallel-jobs: 1
+
+  - name: kubespray
+    driver: kubernetes
+    context: admin-cluster.local
+    pools:
+      - name: main
+        labels:
+          - name: kubernetes-namespace
+            type: namespace
+          - name: pod-fedora
+            type: pod
+            image: docker.io/fedora:28
 
 diskimages:
   - name: trusty
