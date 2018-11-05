@@ -1,0 +1,23 @@
+zookeeper-servers:
+  - host: {zookeeper_host}
+    port: {zookeeper_port}
+    chroot: {zookeeper_chroot}
+
+labels:
+  - name: kubernetes-namespace
+    min-ready: 1
+  - name: pod-fedora
+    min-ready: 1
+
+providers:
+  - name: minikube
+    driver: kubernetes
+    context: minikube
+    pools:
+      - name: main
+        labels:
+          - name: kubernetes-namespace
+            type: namespace
+          - name: pod-fedora
+            type: pod
+            image: docker.io/fedora:28
