@@ -1006,8 +1006,8 @@ Selecting the static driver adds the following options to the
          The number of jobs that can run in parallel on this node.
 
 
-Kubernetes driver
-^^^^^^^^^^^^^^^^^
+Kubernetes Driver
+-----------------
 
 A Kubernetes provider's resources are partitioned into groups called "pool"
 (see :ref:`k8s_pools` for details), and within a pool, the node types which
@@ -1048,8 +1048,8 @@ Example::
 
 .. _k8s_pools:
 
-Kubernetes pools
-~~~~~~~~~~~~~~~~
+Kubernetes Pools
+^^^^^^^^^^^^^^^^
 
 A pool defines a group of resources from a Kubernetes provider. Each pool has a
 maximum number of namespace which can be created (Not Implemented yet).
@@ -1069,8 +1069,8 @@ Example::
 
 .. _k8s_labels:
 
-Kubernetes labels
-~~~~~~~~~~~~~~~~~
+Kubernetes Labels
+^^^^^^^^^^^^^^^^^
 
 Each entry in a pool`s `labels` section indicates that the
 corresponding label is available for use in this pool.
