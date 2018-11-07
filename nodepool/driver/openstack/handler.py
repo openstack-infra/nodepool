@@ -142,6 +142,11 @@ class OpenStackNodeLauncher(NodeLauncher):
         self.node.external_id = server.id
         self.node.hostname = hostname
         self.node.image_id = image_id
+
+        pool = self.handler.provider.pools.get(self.node.pool)
+        resources = self.handler.manager.quotaNeededByNodeType(
+            self.node.type[0], pool)
+        self.node.resources = resources.quota['compute']
         if username:
             self.node.username = username
         self.node.connection_type = connection_type
