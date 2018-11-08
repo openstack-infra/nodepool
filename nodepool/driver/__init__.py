@@ -437,6 +437,11 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
                         # It's already locked so skip it.
                         continue
                     else:
+                        # Add an extra safety check that the node is still
+                        # ready.
+                        if node.state != zk.READY:
+                            self.zk.unlockNode(node)
+                            continue
                         if self.paused:
                             self.log.debug("Unpaused request %s", self.request)
                             self.paused = False
