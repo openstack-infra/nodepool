@@ -39,10 +39,6 @@ def _transform_task_name(task_name):
     )
 
 
-class ManagerStoppedException(Exception):
-    pass
-
-
 class TaskManager(openstack_task_manager.TaskManager):
     log = logging.getLogger("nodepool.TaskManager")
 
@@ -101,10 +97,3 @@ class TaskManager(openstack_task_manager.TaskManager):
             key = 'nodepool.task.%s.%s' % (self.name, task_name)
             self.statsd.timing(key, int(elapsed_time * 1000))
             self.statsd.incr(key)
-
-    def submit_task(self, task, raw=False):
-        if not self._running:
-            raise ManagerStoppedException(
-                "Manager %s is no longer running" % self.name)
-        self.queue.put(task)
-        return task.wait()
