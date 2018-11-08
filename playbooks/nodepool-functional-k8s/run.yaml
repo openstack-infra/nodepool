@@ -1,5 +1,6 @@
 - hosts: all
   roles:
-    - install-kubernetes
+    - role: install-kubernetes
+      docker_version: 18.06.1~ce~3-0~ubuntu
     - role: tox
       tox_envlist: functional_kubernetes
