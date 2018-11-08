@@ -1009,87 +1009,105 @@ Selecting the static driver adds the following options to the
 Kubernetes Driver
 -----------------
 
-A Kubernetes provider's resources are partitioned into groups called "pool"
-(see :ref:`k8s_pools` for details), and within a pool, the node types which
-are to be made available are listed (see :ref:`k8s_labels` for details).
+Selecting the kubernetes driver adds the following options to the
+:attr:`providers` section of the configuration.
 
-Example::
+.. attr-overview::
+   :prefix: providers.kubernetes
+   :maxdepth: 3
 
-  providers:
-    - name: kubespray
-      driver: kubernetes
-      context: admin-cluster.local
-      pools:
-        - name: main
-          labels:
-            - name: kubernetes-namespace
-              type: namespace
-            - name: pod-fedora
-              type: pod
-              image: docker.io/fedora:28
+.. attr:: providers.kubernetes
+   :type: list
 
-**required**
+   A Kubernetes provider's resources are partitioned into groups
+   called `pools` (see :attr:`providers.kubernetes.pools` for
+   details), and within a pool, the node types which are to be made
+   available are listed (see :attr:`providers.kubernetes.labels` for
+   details).
 
-  ``context``
-  Name of the context configured in ``kube/config``.
+   Note for documentation purposes the option names are prefixed
+   ``providers.kubernetes`` to disambiguate from other drivers, but
+   the ``kubernetes`` is not required in the configuration (e.g. below
+   ``providers.kubernetes.pools`` refers to the ``pools`` key in the
+   ``providers`` section when the ``kubernetes`` driver is selected).
 
-  Before using the driver, Nodepool services need a ``kube/config`` file
-  manually installed with cluster admin context.
+   .. code-block:: yaml
 
-**optional**
-
-  ``launch-retries``
-
-    The number of times to retry launching a node before considering the job
-    failed.
-
-    Default 3.
-
-
-.. _k8s_pools:
-
-Kubernetes Pools
-^^^^^^^^^^^^^^^^
-
-A pool defines a group of resources from a Kubernetes provider. Each pool has a
-maximum number of namespace which can be created (Not Implemented yet).
-
-Example::
-
-  pools:
-    - name: main
-      labels: []
+     providers:
+       - name: kubespray
+         driver: kubernetes
+         context: admin-cluster.local
+         pools:
+           - name: main
+             labels:
+               - name: kubernetes-namespace
+                 type: namespace
+               - name: pod-fedora
+                 type: pod
+                 image: docker.io/fedora:28
 
 
-**required**
+   .. attr:: context
+      :required:
 
-  ``name``
-  Namespace name are prefixed with the pool's name.
+      Name of the context configured in ``kube/config``.
 
+      Before using the driver, Nodepool services need a
+      ``kube/config`` file manually installed with cluster admin
+      context.
 
-.. _k8s_labels:
+   .. attr:: launch-retries
+      :default: 3
 
-Kubernetes Labels
-^^^^^^^^^^^^^^^^^
-
-Each entry in a pool`s `labels` section indicates that the
-corresponding label is available for use in this pool.
-
-Example::
-
-  labels:
-    - name: kubernetes-namespace
-      type: namespace
-    - name: pod-fedora
-      type: pod
-      image: docker.io/fedora:28
+      The number of times to retry launching a node before considering
+      the job failed.
 
 
-Kubernetes provider support two types of labels:
+   .. attr:: pools
+      :type: list
 
-Namespace labels provide an empty namespace configured with a service account
-that can creates pods, services, configmaps, ...
+      A pool defines a group of resources from a Kubernetes
+      provider.
 
-Pod labels provide a dedicated namespace with a single pod created using the
-``image`` parameter and it is configured with a service account that can
-exec and get the logs of the pod.
+      .. attr:: name
+         :required:
+
+         Namespaces are prefixed with the pool's name.
+
+   .. attr:: labels
+      :type: list
+
+      Each entry in a pool`s `labels` section indicates that the
+      corresponding label is available for use in this pool.
+
+      Each entry is a dictionary with the following keys
+
+      .. attr:: name
+         :required:
+
+         Identifier for this label; references an entry in the
+         :attr:`labels` section.
+
+      .. attr:: type
+
+         The Kubernetes provider supports two types of labels:
+
+         .. value:: namespace
+
+            Namespace labels provide an empty namespace configured
+            with a service account that can creates pods, services,
+            configmaps, etc.
+
+         .. value:: pod
+
+            Pod labels provide a dedicated namespace with a single pod
+            created using the
+            :attr:`providers.kubernetes.labels.image` parameter and it
+            is configured with a service account that can exec and get
+            the logs of the pod.
+
+      .. attr:: image
+
+         Only used by the
+         :value:`providers.kubernetes.labels.type.pod` label type;
+         specifies the image name used by the pod.
