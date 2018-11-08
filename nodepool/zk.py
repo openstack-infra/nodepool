@@ -613,43 +613,53 @@ class Node(BaseModel):
         '''
         o = Node(o_id)
         super(Node, o).fromDict(d)
-        o.cloud = d.get('cloud')
-        o.provider = d.get('provider')
-        o.pool = d.get('pool')
-        o.type = d.get('type')
-        o.allocated_to = d.get('allocated_to')
-        o.az = d.get('az')
-        o.region = d.get('region')
-        o.public_ipv4 = d.get('public_ipv4')
-        o.private_ipv4 = d.get('private_ipv4')
-        o.public_ipv6 = d.get('public_ipv6')
-        o.interface_ip = d.get('interface_ip')
-        o.connection_port = d.get('connection_port', d.get('ssh_port', 22))
-        o.image_id = d.get('image_id')
-        o.launcher = d.get('launcher')
-        o.created_time = d.get('created_time')
-        o.external_id = d.get('external_id')
-        o.hostname = d.get('hostname')
-        o.comment = d.get('comment')
-        o.hold_job = d.get('hold_job')
-        o.username = d.get('username', 'zuul')
-        o.connection_type = d.get('connection_type')
-        o.host_keys = d.get('host_keys', [])
+
+        o.updateFromDict(d)
+        return o
+
+    def updateFromDict(self, d):
+        '''
+        Updates the Node object from a dictionary
+
+        :param dict d: The dictionary
+        '''
+        super().fromDict(d)
+        self.cloud = d.get('cloud')
+        self.provider = d.get('provider')
+        self.pool = d.get('pool')
+        self.type = d.get('type')
+        self.allocated_to = d.get('allocated_to')
+        self.az = d.get('az')
+        self.region = d.get('region')
+        self.public_ipv4 = d.get('public_ipv4')
+        self.private_ipv4 = d.get('private_ipv4')
+        self.public_ipv6 = d.get('public_ipv6')
+        self.interface_ip = d.get('interface_ip')
+        self.connection_port = d.get('connection_port', d.get('ssh_port', 22))
+        self.image_id = d.get('image_id')
+        self.launcher = d.get('launcher')
+        self.created_time = d.get('created_time')
+        self.external_id = d.get('external_id')
+        self.hostname = d.get('hostname')
+        self.comment = d.get('comment')
+        self.hold_job = d.get('hold_job')
+        self.username = d.get('username', 'zuul')
+        self.connection_type = d.get('connection_type')
+        self.host_keys = d.get('host_keys', [])
         hold_expiration = d.get('hold_expiration')
         if hold_expiration is not None:
             try:
                 # We try to force this to an integer value because we do
                 # relative second based age comparisons using this value
                 # and those need to be a number type.
-                o.hold_expiration = int(hold_expiration)
+                self.hold_expiration = int(hold_expiration)
             except ValueError:
                 # Coercion to int failed, just use default of 0,
                 # which means no expiration
-                o.hold_expiration = 0
+                self.hold_expiration = 0
         else:
-            o.hold_expiration = hold_expiration
-        o.resources = d.get('resources')
-        return o
+            self.hold_expiration = hold_expiration
+        self.resources = d.get('resources')
 
 
 class ZooKeeper(object):
@@ -1650,7 +1660,9 @@ class ZooKeeper(object):
         Lock a node.
 
         This will set the `lock` attribute of the Node object when the
-        lock is successfully acquired.
+        lock is successfully acquired. Also this will update the node with the
+        latest data after acquiring the lock in order to guarantee that it has
+        the latest state if locking was successful.
 
         :param Node node: The node to lock.
         :param bool blocking: Whether or not to block on trying to
@@ -1679,6 +1691,9 @@ class ZooKeeper(object):
             raise npe.ZKLockException("Did not get lock on %s" % path)
 
         node.lock = lock
+
+        # Do an in-place update of the node so we have the latest data.
+        self.updateNode(node)
 
     def unlockNode(self, node):
         '''
@@ -1742,6 +1757,25 @@ class ZooKeeper(object):
         d.id = node
         d.stat = stat
         return d
+
+    def updateNode(self, node):
+        '''
+        Update the data of a node object in-place
+
+        :param node: The node object
+        '''
+
+        path = self._nodePath(node.id)
+        data, stat = self.client.get(path)
+
+        if data:
+            d = self._bytesToDict(data)
+        else:
+            # The node exists but has no data so use empty dict.
+            d = {}
+
+        node.updateFromDict(d)
+        node.stat = stat
 
     def storeNode(self, node):
         '''
@@ -1855,8 +1889,7 @@ class ZooKeeper(object):
                 continue
 
             # Make sure the state didn't change on us
-            n = self.getNode(node.id)
-            if n.state != READY:
+            if node.state != READY:
                 self.unlockNode(node)
                 continue
 

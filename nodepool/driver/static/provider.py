@@ -173,15 +173,14 @@ class StaticNodeProvider(Provider):
             if original_attrs == new_attrs:
                 continue
 
-            node.type = static_node["labels"]
-            node.username = static_node["username"]
-            node.connection_port = static_node["connection-port"]
-            node.connection_type = static_node["connection-type"]
-            nodeutils.set_node_ip(node)
-            node.host_keys = host_keys
-
             try:
                 self.zk.lockNode(node, blocking=False)
+                node.type = static_node["labels"]
+                node.username = static_node["username"]
+                node.connection_port = static_node["connection-port"]
+                node.connection_type = static_node["connection-type"]
+                nodeutils.set_node_ip(node)
+                node.host_keys = host_keys
             except exceptions.ZKLockException:
                 self.log.warning("Unable to lock node %s for update", node.id)
                 continue
