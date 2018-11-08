@@ -182,15 +182,15 @@ Options
 
    This section lists the images to be built using
    diskimage-builder. The name of the diskimage is mapped to the
-   :attr:`providers.openstack.diskimages` section of the provider, to
-   determine which providers should received uploads of each image.
+   :attr:`providers.[openstack].diskimages` section of the provider,
+   to determine which providers should received uploads of each image.
    The diskimage will be built in every format required by the
    providers with which it is associated.  Because Nodepool needs to
    know which formats to build, if the diskimage will only be built if
    it appears in at least one provider.
 
    To remove a diskimage from the system entirely, remove all
-   associated entries in :attr:`providers.openstack.diskimages` and
+   associated entries in :attr:`providers.[openstack].diskimages` and
    remove its entry from `diskimages`.  All uploads will be deleted as
    well as the files on disk.
 
@@ -252,7 +252,7 @@ Options
       :required:
 
       Identifier to reference the disk image in
-      :attr:`providers.openstack.diskimages` and :attr:`labels`.
+      :attr:`providers.[openstack].diskimages` and :attr:`labels`.
 
    .. attr:: formats
       :type: list
@@ -338,14 +338,19 @@ Options
 
          For details on the extra options required and provided by the
          OpenStack driver, see the separate section
-         :attr:`providers.openstack`
+         :attr:`providers.[openstack]`
 
       .. value:: static
 
          For details on the extra options required and provided by the
          static driver, see the separate section
-         :attr:`providers.static`
+         :attr:`providers.[static]`
 
+      .. value:: kubernetes
+
+         For details on the extra options required and provided by the
+         kubernetes driver, see the separate section
+         :attr:`providers.[kubernetes]`
 
 OpenStack Driver
 ----------------
@@ -354,27 +359,29 @@ Selecting the OpenStack driver adds the following options to the
 :attr:`providers` section of the configuration.
 
 .. attr-overview::
-   :prefix: providers.openstack
+   :prefix: providers.[openstack]
    :maxdepth: 3
 
-.. attr:: providers.openstack
+.. attr:: providers.[openstack]
 
    Specifying the ``openstack`` driver for a provider adds the
-   following keys to the :attr:`providers` configuration.  Note for
-   documentation purposes the option names are prefixed
-   ``providers.openstack`` to disambiguate from other drivers, but the
-   ``openstack`` is not required in the configuration (e.g. below
-   ``providers.openstack.cloud`` refers to the ``cloud`` key in the
-   ``providers`` section when the ``openstack`` driver is selected).
+   following keys to the :attr:`providers` configuration.
+
+   .. note:: For documentation purposes the option names are prefixed
+             ``providers.[openstack]`` to disambiguate from other
+             drivers, but ``[openstack]`` is not required in the
+             configuration (e.g. below ``providers.[openstack].cloud``
+             refers to the ``cloud`` key in the ``providers`` section
+             when the ``openstack`` driver is selected).
 
    An OpenStack provider's resources are partitioned into groups
-   called "pools" (see :attr:`providers.openstack.pools` for details),
+   called "pools" (see :attr:`providers.[openstack].pools` for details),
    and within a pool, the node types which are to be made available
-   are listed (see :attr:`providers.openstack.pools.labels` for
+   are listed (see :attr:`providers.[openstack].pools.labels` for
    details).
 
    Within each OpenStack provider the available Nodepool image types
-   are defined (see :attr:`providers.openstack.diskimages`).
+   are defined (see :attr:`providers.[openstack].diskimages`).
 
    .. code-block:: yaml
 
@@ -556,7 +563,7 @@ Selecting the OpenStack driver adds the following options to the
         :required:
 
         Identifier to refer this image from
-        :attr:`providers.openstack.pools.labels` and
+        :attr:`providers.[openstack].pools.labels` and
         :attr:`diskimages` sections.
 
      .. attr:: pause
@@ -641,14 +648,14 @@ Selecting the OpenStack driver adds the following options to the
 
         If this is provided, it is used to select the image from the
         cloud provider by ID, rather than name.  Mutually exclusive
-        with :attr:`providers.openstack.cloud-images.image-name`
+        with :attr:`providers.[openstack].cloud-images.image-name`
 
      .. attr:: image-name
         :type: str
 
         If this is provided, it is used to select the image from the
         cloud provider by this name or ID.  Mutually exclusive with
-        :attr:`providers.openstack.cloud-images.image-id`
+        :attr:`providers.[openstack].cloud-images.image-id`
 
      .. attr:: username
         :type: str
@@ -821,8 +828,8 @@ Selecting the OpenStack driver adds the following options to the
            :required:
 
            Refers to provider's diskimages, see
-           :attr:`providers.openstack.diskimages`.  Mutually exclusive
-           with :attr:`providers.openstack.pools.labels.cloud-image`
+           :attr:`providers.[openstack].diskimages`.  Mutually exclusive
+           with :attr:`providers.[openstack].pools.labels.cloud-image`
 
         .. attr:: cloud-image
            :type: str
@@ -832,23 +839,23 @@ Selecting the OpenStack driver adds the following options to the
            cloud that already exists on the provider. The value of
            ``cloud-image`` should match the ``name`` of a previously
            configured entry from the ``cloud-images`` section of the
-           provider. See :attr:`providers.openstack.cloud-images`.
+           provider. See :attr:`providers.[openstack].cloud-images`.
            Mutually exclusive with
-           :attr:`providers.openstack.pools.labels.diskimage`
+           :attr:`providers.[openstack].pools.labels.diskimage`
 
         .. attr:: flavor-name
            :type: str
 
            Name or id of the flavor to use. If
-           :attr:`providers.openstack.pools.labels.min-ram` is
+           :attr:`providers.[openstack].pools.labels.min-ram` is
            omitted, it must be an exact match. If
-           :attr:`providers.openstack.pools.labels.min-ram` is given,
+           :attr:`providers.[openstack].pools.labels.min-ram` is given,
            ``flavor-name`` will be used to find flavor names that meet
-           :attr:`providers.openstack.pools.labels.min-ram` and also
+           :attr:`providers.[openstack].pools.labels.min-ram` and also
            contain ``flavor-name``.
 
-           One of :attr:`providers.openstack.pools.labels.min-ram` or
-           :attr:`providers.openstack.pools.labels.flavor-name` must
+           One of :attr:`providers.[openstack].pools.labels.min-ram` or
+           :attr:`providers.[openstack].pools.labels.flavor-name` must
            be specified.
 
         .. attr:: min-ram
@@ -858,8 +865,8 @@ Selecting the OpenStack driver adds the following options to the
            ``m1.large``, etc).  The smallest flavor that meets the
            ``min-ram`` requirements will be chosen.
 
-           One of :attr:`providers.openstack.pools.labels.min-ram` or
-           :attr:`providers.openstack.pools.labels.flavor-name` must
+           One of :attr:`providers.[openstack].pools.labels.min-ram` or
+           :attr:`providers.[openstack].pools.labels.flavor-name` must
            be specified.
 
         .. attr:: boot-from-volume
@@ -899,26 +906,29 @@ Selecting the OpenStack driver adds the following options to the
            ``config-drive:openstack/latest/meta_data.json``)
 
 
-Static Provider
----------------
+Static Driver
+-------------
 
 Selecting the static driver adds the following options to the
 :attr:`providers` section of the configuration.
 
 .. attr-overview::
-   :prefix: providers.static
+   :prefix: providers.[static]
    :maxdepth: 3
 
-.. attr:: providers.static
+.. attr:: providers.[static]
    :type: list
 
    The static provider driver is used to define static nodes.
 
-   Note for documentation purposes the option names are prefixed
-   ``providers.static`` to disambiguate from other drivers, but the
-   ``openstack`` is not required in the configuration (e.g. below
-   ``providers.static.pools`` refers to the ``pools`` key in the
-   ``providers`` section when the ``static`` driver is selected).
+   .. note:: For documentation purposes the option names are prefixed
+             ``providers.[static]`` to disambiguate from other
+             drivers, but ``[static]`` is not required in the
+             configuration (e.g. below ``providers.[static].pools``
+             refers to the ``pools`` key in the ``providers`` section
+             when the ``static`` driver is selected).
+
+   Example:
 
    .. code-block:: yaml
 
@@ -1013,23 +1023,27 @@ Selecting the kubernetes driver adds the following options to the
 :attr:`providers` section of the configuration.
 
 .. attr-overview::
-   :prefix: providers.kubernetes
+   :prefix: providers.[kubernetes]
    :maxdepth: 3
 
-.. attr:: providers.kubernetes
+.. attr:: providers.[kubernetes]
    :type: list
 
    A Kubernetes provider's resources are partitioned into groups
-   called `pools` (see :attr:`providers.kubernetes.pools` for
+   called `pools` (see :attr:`providers.[kubernetes].pools` for
    details), and within a pool, the node types which are to be made
-   available are listed (see :attr:`providers.kubernetes.labels` for
+   available are listed (see :attr:`providers.[kubernetes].labels` for
    details).
 
-   Note for documentation purposes the option names are prefixed
-   ``providers.kubernetes`` to disambiguate from other drivers, but
-   the ``kubernetes`` is not required in the configuration (e.g. below
-   ``providers.kubernetes.pools`` refers to the ``pools`` key in the
-   ``providers`` section when the ``kubernetes`` driver is selected).
+   .. note:: For documentation purposes the option names are prefixed
+             ``providers.[kubernetes]`` to disambiguate from other
+             drivers, but ``[kubernetes]`` is not required in the
+             configuration (e.g. below
+             ``providers.[kubernetes].pools`` refers to the ``pools``
+             key in the ``providers`` section when the ``kubernetes``
+             driver is selected).
+
+   Example:
 
    .. code-block:: yaml
 
@@ -1102,12 +1116,12 @@ Selecting the kubernetes driver adds the following options to the
 
             Pod labels provide a dedicated namespace with a single pod
             created using the
-            :attr:`providers.kubernetes.labels.image` parameter and it
+            :attr:`providers.[kubernetes].labels.image` parameter and it
             is configured with a service account that can exec and get
             the logs of the pod.
 
       .. attr:: image
 
          Only used by the
-         :value:`providers.kubernetes.labels.type.pod` label type;
+         :value:`providers.[kubernetes].labels.type.pod` label type;
          specifies the image name used by the pod.
