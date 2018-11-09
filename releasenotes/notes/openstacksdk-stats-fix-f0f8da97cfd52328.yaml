@@ -1,0 +1,4 @@
+---
+fixes:
+  - Fixes a regression of missing task statistics with OpenstackSDK
+    versions greater than 0.19.0.
