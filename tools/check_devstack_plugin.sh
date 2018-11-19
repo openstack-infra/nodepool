@@ -21,7 +21,7 @@ else
 fi
 NODEPOOL_PAUSE_CENTOS_7_DIB=${NODEPOOL_PAUSE_CENTOS_7_DIB:-True}
 NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB=${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB:-True}
-NODEPOOL_PAUSE_FEDORA_28_DIB=${NODEPOOL_PAUSE_FEDORA_28_DIB:-True}
+NODEPOOL_PAUSE_FEDORA_29_DIB=${NODEPOOL_PAUSE_FEDORA_29_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB=${NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB=${NODEPOOL_PAUSE_UBUNTU_TRUSTY_DIB:-True}
 NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB=${NODEPOOL_PAUSE_UBUNTU_XENIAL_DIB:-True}
@@ -57,6 +57,23 @@ function sshintonode {
     if [[ $? -ne 0 ]]; then
         echo "*** Failed to find metadata in config-drive"
         FAILURE_REASON="Failed to find meta-data in config-drive for $node"
+        RETURN=1
+    fi
+}
+
+function checknm {
+    name=$1
+    state='ready'
+
+    node=`$NODEPOOL list | grep $name | grep $state | cut -d '|' -f6 | tr -d ' '`
+    nm_output=$(/tmp/ssh_wrapper $node -- nmcli c)
+
+    # virtio device is eth0 on older, ens3 on newer
+    if [[ ! ${nm_output} =~ (eth0|ens3) ]]; then
+        echo "*** Failed to find interface in NetworkManager connections"
+        /tmp/ssh_wrapper $node -- nmcli c
+        /tmp/ssh_wrapper $node -- nmcli device
+        FAILURE_REASON="Failed to find interface in NetworkManager connections"
         RETURN=1
     fi
 }
@@ -97,6 +114,8 @@ if [ ${NODEPOOL_PAUSE_CENTOS_7_DIB,,} = 'false' ]; then
     waitfornode centos-7
     # check ssh for root user
     sshintonode centos-7
+    # networkmanager check
+    checknm centos-7
 fi
 
 if [ ${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB,,} = 'false' ]; then
@@ -108,13 +127,15 @@ if [ ${NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB,,} = 'false' ]; then
     sshintonode debian-stretch
 fi
 
-if [ ${NODEPOOL_PAUSE_FEDORA_28_DIB,,} = 'false' ]; then
+if [ ${NODEPOOL_PAUSE_FEDORA_29_DIB,,} = 'false' ]; then
     # check that image built
-    waitforimage fedora-28
+    waitforimage fedora-29
     # check image was bootable
-    waitfornode fedora-28
+    waitfornode fedora-29
     # check ssh for root user
-    sshintonode fedora-28
+    sshintonode fedora-29
+    # networkmanager check
+    checknm fedora-29
 fi
 
 if [ ${NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB,,} = 'false' ]; then
