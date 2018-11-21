@@ -86,7 +86,7 @@ EOF
 function nodepool_write_elements {
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d
     sudo mkdir -p $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/root.d
-    cat > /tmp/01-nodepool-setup <<EOF
+    cat > /tmp/40-nodepool-setup <<EOF
 sudo mkdir -p /etc/nodepool
 # Make it world writeable so nodepool can write here later.
 sudo chmod 777 /etc/nodepool
@@ -97,10 +97,10 @@ if [ -d "\$TARGET_ROOT/etc/apt/apt.conf.d" ]; then
     echo "Acquire::AllowInsecureRepositories \"true\";" | sudo tee -a \$TARGET_ROOT/etc/apt/apt.conf.d/95allow-unauthenticated
 fi
 EOF
-    sudo mv /tmp/01-nodepool-setup \
-        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
+    sudo mv /tmp/40-nodepool-setup \
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/40-nodepool-setup
     sudo chmod a+x \
-        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/01-nodepool-setup
+        $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/install.d/40-nodepool-setup
     sudo mv /tmp/50-apt-allow-unauthenticated \
         $(dirname $NODEPOOL_CONFIG)/elements/nodepool-setup/root.d/50-apt-allow-unauthenticated
     sudo chmod a+x \
