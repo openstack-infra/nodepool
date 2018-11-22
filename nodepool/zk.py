@@ -23,6 +23,7 @@ from kazoo import exceptions as kze
 from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.recipe.lock import Lock
 from kazoo.recipe.cache import TreeCache, TreeEvent
+from kazoo.recipe.election import Election
 
 from nodepool import exceptions as npe
 
@@ -164,6 +165,7 @@ class Launcher(Serializable):
 
     def __init__(self):
         self.id = None
+        self.provider_name = None
         self._supported_labels = set()
 
     def __eq__(self, other):
@@ -186,6 +188,7 @@ class Launcher(Serializable):
     def toDict(self):
         d = {}
         d['id'] = self.id
+        d['provider_name'] = self.provider_name
         # sets are not JSON serializable, so use a sorted list
         d['supported_labels'] = sorted(self.supported_labels)
         return d
@@ -194,6 +197,10 @@ class Launcher(Serializable):
     def fromDict(d):
         obj = Launcher()
         obj.id = d.get('id')
+        # TODO(tobiash): The fallback to 'unknown' is only needed to avoid
+        #                having a full nodepool shutdown on upgrade. It can be
+        #                removed later.
+        obj.provider_name = d.get('provider_name', 'unknown')
         obj.supported_labels = set(d.get('supported_labels', []))
         return obj
 
@@ -689,6 +696,7 @@ class ZooKeeper(object):
     NODE_ROOT = "/nodepool/nodes"
     REQUEST_ROOT = "/nodepool/requests"
     REQUEST_LOCK_ROOT = "/nodepool/requests-lock"
+    ELECTION_ROOT = "/nodepool/elections"
 
     # Log zookeeper retry every 10 seconds
     retry_log_rate = 10
@@ -706,9 +714,14 @@ class ZooKeeper(object):
         self._cached_node_requests = {}
         self.enable_cache = enable_cache
 
+        self.node_stats_event = None
+
     # =======================================================================
     # Private Methods
     # =======================================================================
+
+    def _electionPath(self, election):
+        return "%s/%s" % (self.ELECTION_ROOT, election)
 
     def _imagePath(self, image):
         return "%s/%s" % (self.IMAGE_ROOT, image)
@@ -2102,12 +2115,23 @@ class ZooKeeper(object):
                 node = Node.fromDict(d, node_id)
                 node.stat = event.event_data.stat
                 self._cached_nodes[node_id] = node
+
+            # set the stats event so the stats reporting thread can act upon it
+            if self.node_stats_event is not None:
+                self.node_stats_event.set()
         elif event.event_type == TreeEvent.NODE_REMOVED:
             try:
                 del self._cached_nodes[node_id]
             except KeyError:
                 # If it's already gone, don't care
                 pass
+
+            # set the stats event so the stats reporting thread can act upon it
+            if self.node_stats_event is not None:
+                self.node_stats_event.set()
+
+    def setNodeStatsEvent(self, event):
+        self.node_stats_event = event
 
     def requestCacheListener(self, event):
 
@@ -2154,3 +2178,7 @@ class ZooKeeper(object):
             except KeyError:
                 # If it's already gone, don't care
                 pass
+
+    def getStatsElection(self, identifier):
+        path = self._electionPath('stats')
+        return Election(self.client, path, identifier)

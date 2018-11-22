@@ -46,13 +46,12 @@ LOCK_CLEANUP = 8 * HOURS
 SUSPEND_WAIT_TIME = 30
 
 
-class NodeDeleter(threading.Thread, stats.StatsReporter):
+class NodeDeleter(threading.Thread):
     log = logging.getLogger("nodepool.NodeDeleter")
 
     def __init__(self, zk, provider_manager, node):
         threading.Thread.__init__(self, name='NodeDeleter for %s %s' %
                                   (node.provider, node.external_id))
-        stats.StatsReporter.__init__(self)
         self._zk = zk
         self._provider_manager = provider_manager
         self._node = node
@@ -109,13 +108,8 @@ class NodeDeleter(threading.Thread, stats.StatsReporter):
 
         self.delete(self._zk, self._provider_manager, self._node, node_exists)
 
-        try:
-            self.updateNodeStats(self._zk, self._provider_manager.provider)
-        except Exception:
-            self.log.exception("Exception while reporting stats:")
 
-
-class PoolWorker(threading.Thread):
+class PoolWorker(threading.Thread, stats.StatsReporter):
     '''
     Class that manages node requests for a single provider pool.
 
@@ -143,6 +137,7 @@ class PoolWorker(threading.Thread):
         self.launcher_id = "%s-%s-%s" % (socket.gethostname(),
                                          os.getpid(),
                                          self.name)
+        stats.StatsReporter.__init__(self)
 
     # ---------------------------------------------------------------
     # Private methods
@@ -294,7 +289,11 @@ class PoolWorker(threading.Thread):
             launcher.id = self.launcher_id
             for prov_cfg in self.nodepool.config.providers.values():
                 launcher.supported_labels.update(prov_cfg.getSupportedLabels())
+            launcher.provider_name = self.provider_name
             self.zk.registerLauncher(launcher)
+
+            self.updateProviderLimits(
+                self.nodepool.config.providers.get(self.provider_name))
 
             try:
                 if not self.paused_handler:
@@ -699,6 +698,70 @@ class DeletedNodeWorker(BaseCleanupWorker):
             self.log.exception("Exception in DeletedNodeWorker:")
 
 
+class StatsWorker(BaseCleanupWorker, stats.StatsReporter):
+
+    def __init__(self, nodepool, interval):
+        super().__init__(nodepool, interval, name='StatsWorker')
+        self.log = logging.getLogger('nodepool.StatsWorker')
+        self.stats_event = threading.Event()
+        self.election = None
+
+    def stop(self):
+        self._running = False
+        if self.election is not None:
+            self.log.debug('Cancel leader election')
+            self.election.cancel()
+        self.stats_event.set()
+        super().stop()
+
+    def _run(self):
+        try:
+            stats.StatsReporter.__init__(self)
+
+            if not self._statsd:
+                return
+
+            if self.election is None:
+                zk = self._nodepool.getZK()
+                identifier = "%s-%s" % (socket.gethostname(), os.getpid())
+                self.election = zk.getStatsElection(identifier)
+
+            if not self._running:
+                return
+
+            self.election.run(self._run_stats)
+
+        except Exception:
+            self.log.exception('Exception in StatsWorker:')
+
+    def _run_stats(self):
+        self.log.info('Won stats reporter election')
+
+        # enable us getting events
+        zk = self._nodepool.getZK()
+        zk.setNodeStatsEvent(self.stats_event)
+
+        while self._running:
+            signaled = self.stats_event.wait()
+
+            if not self._running:
+                break
+
+            if not signaled:
+                continue
+
+            self.log.debug('Updating stats')
+            self.stats_event.clear()
+            try:
+                self.updateNodeStats(zk)
+            except Exception:
+                self.log.exception("Exception while reporting stats:")
+            time.sleep(1)
+
+        # Unregister from node stats events
+        zk.setNodeStatsEvent(None)
+
+
 class NodePool(threading.Thread):
     log = logging.getLogger("nodepool.NodePool")
 
@@ -710,6 +773,7 @@ class NodePool(threading.Thread):
         self.watermark_sleep = watermark_sleep
         self.cleanup_interval = 60
         self.delete_interval = 5
+        self.stats_interval = 5
         self._stopped = False
         self._stop_event = threading.Event()
         self.config = None
@@ -718,6 +782,7 @@ class NodePool(threading.Thread):
         self._pool_threads = {}
         self._cleanup_thread = None
         self._delete_thread = None
+        self._stats_thread = None
         self._submittedRequests = {}
 
     def stop(self):
@@ -737,6 +802,10 @@ class NodePool(threading.Thread):
         if self._delete_thread:
             self._delete_thread.stop()
             self._delete_thread.join()
+
+        if self._stats_thread:
+            self._stats_thread.stop()
+            self._stats_thread.join()
 
         # Don't let stop() return until all pool threads have been
         # terminated.
@@ -949,6 +1018,10 @@ class NodePool(threading.Thread):
                     self._delete_thread = DeletedNodeWorker(
                         self, self.delete_interval)
                     self._delete_thread.start()
+
+                if not self._stats_thread:
+                    self._stats_thread = StatsWorker(self, self.stats_interval)
+                    self._stats_thread.start()
 
                 # Stop any PoolWorker threads if the pool was removed
                 # from the config.
