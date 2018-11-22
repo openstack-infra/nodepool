@@ -693,7 +693,7 @@ class ZooKeeper(object):
     # Log zookeeper retry every 10 seconds
     retry_log_rate = 10
 
-    def __init__(self):
+    def __init__(self, enable_cache=True):
         '''
         Initialize the ZooKeeper object.
         '''
@@ -704,6 +704,7 @@ class ZooKeeper(object):
         self._request_cache = None
         self._cached_nodes = {}
         self._cached_node_requests = {}
+        self.enable_cache = enable_cache
 
     # =======================================================================
     # Private Methods
@@ -894,15 +895,16 @@ class ZooKeeper(object):
                 except KazooTimeoutError:
                     self.logConnectionRetryEvent()
 
-            self._node_cache = TreeCache(self.client, self.NODE_ROOT)
-            self._node_cache.listen_fault(self.cacheFaultListener)
-            self._node_cache.listen(self.nodeCacheListener)
-            self._node_cache.start()
+            if self.enable_cache:
+                self._node_cache = TreeCache(self.client, self.NODE_ROOT)
+                self._node_cache.listen_fault(self.cacheFaultListener)
+                self._node_cache.listen(self.nodeCacheListener)
+                self._node_cache.start()
 
-            self._request_cache = TreeCache(self.client, self.REQUEST_ROOT)
-            self._request_cache.listen_fault(self.cacheFaultListener)
-            self._request_cache.listen(self.requestCacheListener)
-            self._request_cache.start()
+                self._request_cache = TreeCache(self.client, self.REQUEST_ROOT)
+                self._request_cache.listen_fault(self.cacheFaultListener)
+                self._request_cache.listen(self.requestCacheListener)
+                self._request_cache.start()
 
     def disconnect(self):
         '''

@@ -373,7 +373,7 @@ class NodePoolCmd(NodepoolApp):
                                  'image-delete', 'alien-image-list',
                                  'list', 'delete',
                                  'request-list', 'info', 'erase'):
-            self.zk = zk.ZooKeeper()
+            self.zk = zk.ZooKeeper(enable_cache=False)
             self.zk.connect(list(config.zookeeper_servers.values()))
 
         self.pool.setConfig(config)

@@ -539,7 +539,7 @@ class DBTestCase(BaseTestCase):
             self.zookeeper_host,
             self.zookeeper_port))
         self.zookeeper_chroot = kz_fxtr.zookeeper_chroot
-        self.zk = zk.ZooKeeper()
+        self.zk = zk.ZooKeeper(enable_cache=False)
         host = zk.ZooKeeperConnectionConfig(
             self.zookeeper_host, self.zookeeper_port, self.zookeeper_chroot
         )
