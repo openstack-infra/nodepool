@@ -515,6 +515,7 @@ class Node(BaseModel):
         self.connection_type = None
         self.host_keys = []
         self.hold_expiration = None
+        self.resources = None
 
     def __repr__(self):
         d = self.toDict()
@@ -549,7 +550,8 @@ class Node(BaseModel):
                     self.connection_type == other.connection_type and
                     self.connection_port == other.connection_port and
                     self.host_keys == other.host_keys and
-                    self.hold_expiration == other.hold_expiration)
+                    self.hold_expiration == other.hold_expiration and
+                    self.resources == other.resources)
         else:
             return False
 
@@ -595,6 +597,7 @@ class Node(BaseModel):
         d['connection_type'] = self.connection_type
         d['connection_port'] = self.connection_port
         d['hold_expiration'] = self.hold_expiration
+        d['resources'] = self.resources
         return d
 
     @staticmethod
@@ -644,6 +647,7 @@ class Node(BaseModel):
                 o.hold_expiration = 0
         else:
             o.hold_expiration = hold_expiration
+        o.resources = d.get('resources')
         return o
 
 

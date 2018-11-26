@@ -70,6 +70,12 @@ class TestLauncher(tests.DBTestCase):
                                               image.provider_name),
                 id=image.id)
             self.assertEqual(node.image_id, p)
+            resources = {
+                'cores': 4,
+                'instances': 1,
+                'ram': 8192,
+            }
+            self.assertEqual(node.resources, resources)
             self.zk.lockNode(node, blocking=False)
             self.zk.unlockNode(node)
 
