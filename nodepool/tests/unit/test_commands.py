@@ -24,6 +24,7 @@ import testtools
 from nodepool.cmd import nodepoolcmd
 from nodepool import tests
 from nodepool import zk
+from nodepool.nodeutils import iterate_timeout
 
 
 class TestNodepoolCMD(tests.DBTestCase):
@@ -124,8 +125,15 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes('fake-label')
-        self.assert_nodes_listed(configfile, 1, detail=False,
-                                 validate_col_count=True)
+
+        for _ in iterate_timeout(10, Exception, "assert nodes are listed"):
+            try:
+                self.assert_nodes_listed(configfile, 1, detail=False,
+                                         validate_col_count=True)
+                break
+            except AssertionError:
+                # node is not listed yet, retry later
+                pass
 
     def test_list_nodes_detail(self):
         configfile = self.setup_config('node.yaml')
@@ -134,8 +142,14 @@ class TestNodepoolCMD(tests.DBTestCase):
         pool.start()
         self.waitForImage('fake-provider', 'fake-image')
         self.waitForNodes('fake-label')
-        self.assert_nodes_listed(configfile, 1, detail=True,
-                                 validate_col_count=True)
+        for _ in iterate_timeout(10, Exception, "assert nodes are listed"):
+            try:
+                self.assert_nodes_listed(configfile, 1, detail=True,
+                                         validate_col_count=True)
+                break
+            except AssertionError:
+                # node is not listed yet, retry later
+                pass
 
     def test_config_validate(self):
         config = os.path.join(os.path.dirname(tests.__file__),

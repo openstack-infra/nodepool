@@ -22,6 +22,7 @@ from kazoo.client import KazooClient, KazooState
 from kazoo import exceptions as kze
 from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.recipe.lock import Lock
+from kazoo.recipe.cache import TreeCache
 
 from nodepool import exceptions as npe
 
@@ -685,6 +686,7 @@ class ZooKeeper(object):
         self.client = None
         self._became_lost = False
         self._last_retry_log = 0
+        self._node_cache = None
 
     # =======================================================================
     # Private Methods
@@ -875,6 +877,9 @@ class ZooKeeper(object):
                 except KazooTimeoutError:
                     self.logConnectionRetryEvent()
 
+            self._node_cache = TreeCache(self.client, self.NODE_ROOT)
+            self._node_cache.start()
+
     def disconnect(self):
         '''
         Close the ZooKeeper cluster connection.
@@ -882,6 +887,11 @@ class ZooKeeper(object):
         You should call this method if you used connect() to establish a
         cluster connection.
         '''
+
+        if self._node_cache is not None:
+            self._node_cache.close()
+            self._node_cache = None
+
         if self.client is not None and self.client.connected:
             self.client.stop()
             self.client.close()
@@ -1696,19 +1706,35 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             return []
 
-    def getNode(self, node):
+    def getNode(self, node, cached=False):
         '''
         Get the data for a specific node.
 
         :param str node: The node ID.
+        :param bool cached: True if the data should be taken from the cache.
 
         :returns: The node data, or None if the node was not found.
         '''
         path = self._nodePath(node)
-        try:
-            data, stat = self.client.get(path)
-        except kze.NoNodeError:
-            return None
+        data = None
+        stat = None
+        if cached:
+            cached_data = self._node_cache.get_data(path)
+            if cached_data:
+                data = cached_data.data
+                stat = cached_data.stat
+
+        # If data is empty we either didn't use the cache or the cache didn't
+        # have the node (yet). Note that even if we use caching we need to
+        # do a real query if the cached data is empty because the node data
+        # might not be in the cache yet when it's listed by the get_children
+        # call.
+        if not data:
+            try:
+                data, stat = self.client.get(path)
+            except kze.NoNodeError:
+                return None
+
         if not data:
             return None
 
@@ -1763,7 +1789,7 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             pass
 
-    def getReadyNodesOfTypes(self, labels):
+    def getReadyNodesOfTypes(self, labels, cached=True):
         '''
         Query ZooKeeper for unused/ready nodes.
 
@@ -1775,7 +1801,7 @@ class ZooKeeper(object):
             those labels.
         '''
         ret = {}
-        for node in self.nodeIterator():
+        for node in self.nodeIterator(cached=cached):
             if node.state != READY or node.allocated_to:
                 continue
             for label in labels:
@@ -1852,12 +1878,14 @@ class ZooKeeper(object):
 
         return False
 
-    def nodeIterator(self):
+    def nodeIterator(self, cached=True):
         '''
         Utility generator method for iterating through all nodes.
+
+        :param bool cached: True if the data should be taken from the cache.
         '''
         for node_id in self.getNodes():
-            node = self.getNode(node_id)
+            node = self.getNode(node_id, cached=cached)
             if node:
                 yield node
 

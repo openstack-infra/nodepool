@@ -17,6 +17,7 @@ import time
 from nodepool import exceptions as npe
 from nodepool import tests
 from nodepool import zk
+from nodepool.nodeutils import iterate_timeout
 
 
 class TestZooKeeper(tests.DBTestCase):
@@ -583,7 +584,7 @@ class TestZooKeeper(tests.DBTestCase):
         n3.type = 'label2'
         self.zk.storeNode(n3)
 
-        r = self.zk.getReadyNodesOfTypes(['label1'])
+        r = self.zk.getReadyNodesOfTypes(['label1'], cached=False)
         self.assertIn('label1', r)
         self.assertEqual(2, len(r['label1']))
         self.assertIn(n1, r['label1'])
@@ -603,7 +604,7 @@ class TestZooKeeper(tests.DBTestCase):
         n3.type = 'label2'
         self.zk.storeNode(n3)
 
-        r = self.zk.getReadyNodesOfTypes(['label1', 'label3'])
+        r = self.zk.getReadyNodesOfTypes(['label1', 'label3'], cached=False)
         self.assertIn('label1', r)
         self.assertIn('label3', r)
         self.assertEqual(2, len(r['label1']))
@@ -614,7 +615,7 @@ class TestZooKeeper(tests.DBTestCase):
 
     def test_nodeIterator(self):
         n1 = self._create_node()
-        i = self.zk.nodeIterator()
+        i = self.zk.nodeIterator(cached=False)
         self.assertEqual(n1, next(i))
         with testtools.ExpectedException(StopIteration):
             next(i)
@@ -669,6 +670,40 @@ class TestZooKeeper(tests.DBTestCase):
         self.assertEqual(req.id, lock_ids[0])
         self.zk.deleteNodeRequestLock(lock_ids[0])
         self.assertEqual([], self.zk.getNodeRequestLockIDs())
+
+    def test_node_caching(self):
+        '''
+        Test that node iteration using both cached and uncached calls
+        produces identical results.
+        '''
+        # Test new node in node set
+        n1 = self._create_node()
+
+        # uncached
+        a1 = self.zk.nodeIterator(cached=False)
+        self.assertEqual(n1, next(a1))
+
+        # cached
+        a2 = self.zk.nodeIterator(cached=True)
+        self.assertEqual(n1, next(a2))
+        with testtools.ExpectedException(StopIteration):
+            next(a2)
+
+        # Test modification of existing node set
+        n1.state = zk.HOLD
+        n1.label = "oompaloompa"
+        self.zk.storeNode(n1)
+
+        # uncached
+        b1 = self.zk.nodeIterator(cached=False)
+        self.assertEqual(n1, next(b1))
+
+        # cached
+        for _ in iterate_timeout(10, Exception,
+                                 "cached node equals original node"):
+            b2 = self.zk.nodeIterator(cached=True)
+            if n1 == next(b2):
+                break
 
 
 class TestZKModel(tests.BaseTestCase):
