@@ -697,6 +697,7 @@ class ZooKeeper(object):
         self._became_lost = False
         self._last_retry_log = 0
         self._node_cache = None
+        self._request_cache = None
 
     # =======================================================================
     # Private Methods
@@ -890,6 +891,9 @@ class ZooKeeper(object):
             self._node_cache = TreeCache(self.client, self.NODE_ROOT)
             self._node_cache.start()
 
+            self._request_cache = TreeCache(self.client, self.REQUEST_ROOT)
+            self._request_cache.start()
+
     def disconnect(self):
         '''
         Close the ZooKeeper cluster connection.
@@ -901,6 +905,10 @@ class ZooKeeper(object):
         if self._node_cache is not None:
             self._node_cache.close()
             self._node_cache = None
+
+        if self._request_cache is not None:
+            self._request_cache.close()
+            self._request_cache = None
 
         if self.client is not None and self.client.connected:
             self.client.stop()
@@ -1545,19 +1553,34 @@ class ZooKeeper(object):
         except kze.NoNodeError:
             pass
 
-    def getNodeRequest(self, request):
+    def getNodeRequest(self, request, cached=False):
         '''
         Get the data for a specific node request.
 
         :param str request: The request ID.
+        :param cached: True if cached node requests should be returned.
 
         :returns: The request data, or None if the request was not found.
         '''
         path = self._requestPath(request)
-        try:
-            data, stat = self.client.get(path)
-        except kze.NoNodeError:
-            return None
+        data = None
+        stat = None
+        if cached:
+            cached_data = self._request_cache.get_data(path)
+            if cached_data:
+                data = cached_data.data
+                stat = cached_data.stat
+
+        # If data is empty we either didn't use the cache or the cache didn't
+        # have the request (yet). Note that even if we use caching we need to
+        # do a real query if the cached data is empty because the request data
+        # might not be in the cache yet when it's listed by the get_children
+        # call.
+        if not data:
+            try:
+                data, stat = self.client.get(path)
+            except kze.NoNodeError:
+                return None
 
         d = NodeRequest.fromDict(self._bytesToDict(data), request)
         d.stat = stat
@@ -1931,12 +1954,12 @@ class ZooKeeper(object):
             if lock_stats:
                 yield lock_stats
 
-    def nodeRequestIterator(self):
+    def nodeRequestIterator(self, cached=True):
         '''
         Utility generator method for iterating through all nodes requests.
         '''
         for req_id in self.getNodeRequests():
-            req = self.getNodeRequest(req_id)
+            req = self.getNodeRequest(req_id, cached=cached)
             if req:
                 yield req
 
