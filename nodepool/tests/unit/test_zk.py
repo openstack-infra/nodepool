@@ -862,6 +862,7 @@ class TestZKModel(tests.BaseTestCase):
         o.comment = 'comment'
         o.hold_job = 'hold job'
         o.host_keys = ['key1', 'key2']
+        o.attributes = {'executor-zone': 'vpn'}
 
         d = o.toDict()
         self.assertNotIn('id', d)
@@ -883,6 +884,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['comment'], o.comment)
         self.assertEqual(d['hold_job'], o.hold_job)
         self.assertEqual(d['host_keys'], o.host_keys)
+        self.assertEqual(d['attributes'], o.attributes)
 
     def test_Node_fromDict(self):
         now = int(time.time())
@@ -907,6 +909,7 @@ class TestZKModel(tests.BaseTestCase):
             'hold_job': 'hold job',
             'host_keys': ['key1', 'key2'],
             'connection_port': 22022,
+            'attributes': {'executor-zone': 'vpn'},
         }
 
         o = zk.Node.fromDict(d, node_id)
@@ -930,6 +933,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.hold_job, d['hold_job'])
         self.assertEqual(o.host_keys, d['host_keys'])
         self.assertEqual(o.connection_port, d['connection_port'])
+        self.assertEqual(o.attributes, d['attributes'])
 
     def test_custom_connection_port(self):
         n = zk.Node('0001')
