@@ -22,6 +22,7 @@ import mock
 from nodepool import tests
 from nodepool import zk
 from nodepool.driver.fake import provider as fakeprovider
+from nodepool.nodeutils import iterate_timeout
 import nodepool.launcher
 
 from kazoo import exceptions as kze
@@ -1003,8 +1004,8 @@ class TestLauncher(tests.DBTestCase):
         nodes = self.waitForNodes('fake-label', 2)
         self.log.debug("...done waiting for initial pool.")
         node_custom = nodes[0]
-        # TODO make it a multiple of fixture's max-hold-age
-        hold_expiration = 20
+        # Make hold expiration much larger than max hold age.
+        hold_expiration = 180
         node = nodes[1]
         self.log.debug("Holding node %s... (default)" % node.id)
         self.log.debug("Holding node %s...(%s seconds)" % (node_custom.id,
@@ -1029,9 +1030,21 @@ class TestLauncher(tests.DBTestCase):
         # Wait for the instance to be cleaned up
         manager = pool.getProviderManager('fake-provider')
         self.waitForInstanceDeletion(manager, node.external_id)
-        # custom node should be deleted as well
-        held_nodes = [n for n in self.zk.nodeIterator() if n.state == zk.HOLD]
-        self.assertEqual(0, len(held_nodes), held_nodes)
+
+        # The custom node should be deleted as well but it may be slightly
+        # delayed after the other node. Because of that we have defined a much
+        # higher hold time than the max hold age. So we can give nodepool a few
+        # extra seconds to clean it up and still validate that the max hold
+        # age is not violated.
+        for _ in iterate_timeout(10, Exception, 'assert custom_node is gone'):
+            try:
+                held_nodes = [n for n in self.zk.nodeIterator(cached=False)
+                              if n.state == zk.HOLD]
+                self.assertEqual(0, len(held_nodes), held_nodes)
+                break
+            except AssertionError:
+                # node still listed, retry
+                pass
 
     def test_label_provider(self):
         """Test that only providers listed in the label satisfy the request"""
