@@ -182,15 +182,21 @@ class OpenStackProvider(Provider):
         flavors = self.listFlavorsById()
         used_quota = QuotaInformation()
 
+        node_ids = set([n.id for n in self._zk.nodeIterator()])
+
         for server in self.listNodes():
             meta = server.get('metadata', {})
 
             nodepool_provider_name = meta.get('nodepool_provider_name')
-            if nodepool_provider_name and \
-                    nodepool_provider_name == self.provider.name:
-                # This provider (regardless of the launcher) owns this server
-                # so it must not be accounted for unmanaged quota.
-                continue
+            if (nodepool_provider_name and
+                nodepool_provider_name == self.provider.name):
+                # This provider (regardless of the launcher) owns this
+                # server so it must not be accounted for unmanaged
+                # quota; unless it has leaked.
+                nodepool_node_id = meta.get('nodepool_node_id')
+                if not (nodepool_node_id and nodepool_node_id in node_ids):
+                    # It has not leaked.
+                    continue
 
             flavor = flavors.get(server.flavor.id)
             used_quota.add(QuotaInformation.construct_from_flavor(flavor))
