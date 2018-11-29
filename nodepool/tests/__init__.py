@@ -207,6 +207,7 @@ class BaseTestCase(testtools.TestCase):
                      'fake-provider3',
                      'CleanupWorker',
                      'DeletedNodeWorker',
+                     'StatsWorker',
                      'pydevd.CommandThread',
                      'pydevd.Reader',
                      'pydevd.Writer',

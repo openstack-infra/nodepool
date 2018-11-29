@@ -85,39 +85,40 @@ class StatsReporter(object):
             pipeline.incr(key)
         pipeline.send()
 
-    def updateNodeStats(self, zk_conn, provider):
+    def updateNodeStats(self, zk_conn):
         '''
         Refresh statistics for all known nodes.
 
         :param ZooKeeper zk_conn: A ZooKeeper connection object.
-        :param Provider provider: A config Provider object.
         '''
         if not self._statsd:
             return
 
         states = {}
 
+        launchers = zk_conn.getRegisteredLaunchers()
+        labels = set()
+        for launcher in launchers:
+            labels.update(launcher.supported_labels)
+        providers = set()
+        for launcher in launchers:
+            providers.add(launcher.provider_name)
+
         # Initialize things we know about to zero
         for state in zk.Node.VALID_STATES:
             key = 'nodepool.nodes.%s' % state
             states[key] = 0
-            key = 'nodepool.provider.%s.nodes.%s' % (provider.name, state)
-            states[key] = 0
+            for provider in providers:
+                key = 'nodepool.provider.%s.nodes.%s' % (provider, state)
+                states[key] = 0
 
         # Initialize label stats to 0
-        for label in provider.getSupportedLabels():
+        for label in labels:
             for state in zk.Node.VALID_STATES:
                 key = 'nodepool.label.%s.nodes.%s' % (label, state)
                 states[key] = 0
 
-        # Note that we intentionally don't use caching here because we don't
-        # know when the next update will happen and thus need to report the
-        # correct most recent state. Otherwise we can end up in reporting
-        # a gauge with a node in state deleting = 1 and never update this for
-        # a long time.
-        # TODO(tobiash): Changing updateNodeStats to just run periodically will
-        # resolve this and we can operate on cached data.
-        for node in zk_conn.nodeIterator(cached=False):
+        for node in zk_conn.nodeIterator():
             # nodepool.nodes.STATE
             key = 'nodepool.nodes.%s' % node.state
             states[key] += 1
@@ -145,9 +146,18 @@ class StatsReporter(object):
         for key, count in states.items():
             pipeline.gauge(key, count)
 
+        pipeline.send()
+
+    def updateProviderLimits(self, provider):
+        if not self._statsd:
+            return
+
+        pipeline = self._statsd.pipeline()
+
         # nodepool.provider.PROVIDER.max_servers
         key = 'nodepool.provider.%s.max_servers' % provider.name
         max_servers = sum([p.max_servers for p in provider.pools.values()
                            if p.max_servers])
         pipeline.gauge(key, max_servers)
+
         pipeline.send()

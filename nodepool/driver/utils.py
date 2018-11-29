@@ -94,7 +94,6 @@ class NodeLauncher(threading.Thread,
         try:
             dt = int((time.monotonic() - start_time) * 1000)
             self.recordLaunchStats(statsd_key, dt)
-            self.updateNodeStats(self.zk, self.provider_config)
         except Exception:
             self.log.exception("Exception while reporting stats:")
 
