@@ -521,6 +521,7 @@ class Node(BaseModel):
         self.host_keys = []
         self.hold_expiration = None
         self.resources = None
+        self.attributes = None
 
     def __repr__(self):
         d = self.toDict()
@@ -556,7 +557,8 @@ class Node(BaseModel):
                     self.connection_port == other.connection_port and
                     self.host_keys == other.host_keys and
                     self.hold_expiration == other.hold_expiration and
-                    self.resources == other.resources)
+                    self.resources == other.resources and
+                    self.attributes == other.attributes)
         else:
             return False
 
@@ -603,6 +605,7 @@ class Node(BaseModel):
         d['connection_port'] = self.connection_port
         d['hold_expiration'] = self.hold_expiration
         d['resources'] = self.resources
+        d['attributes'] = self.attributes
         return d
 
     @staticmethod
@@ -664,6 +667,7 @@ class Node(BaseModel):
         else:
             self.hold_expiration = hold_expiration
         self.resources = d.get('resources')
+        self.attributes = d.get('attributes')
 
 
 class ZooKeeper(object):

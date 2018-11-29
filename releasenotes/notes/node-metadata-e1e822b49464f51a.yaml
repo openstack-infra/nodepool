@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    A new configuration option is available under the 'pools' attribute
+    of an OpenStack provider. This config value, 'node-attributes', can contain
+    a dictionary of arbitrary key-value pairs and will be stored with the
+    node data within ZooKeeper.

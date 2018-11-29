@@ -26,6 +26,9 @@ providers:
     pools:
       - name: main
         max-servers: 96
+        node-attributes:
+          key1: value1
+          key2: value2
         availability-zones:
           - az1
         networks:

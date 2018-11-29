@@ -489,6 +489,8 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[0].type, ['fake-label'])
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
+        self.assertEqual(nodes[0].attributes,
+                         {'key1': 'value1', 'key2': 'value2'})
 
     def test_node_host_key_checking_false(self):
         """Test that an image and node are created"""

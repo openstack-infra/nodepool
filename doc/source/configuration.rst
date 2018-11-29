@@ -700,6 +700,9 @@ Selecting the OpenStack driver adds the following options to the
               - zuul-security-group
             auto-floating-ip: False
             host-key-checking: True
+            node-attributes:
+              key1: value1
+              key2: value2
             labels:
               - name: trusty
                 min-ram: 8192
@@ -719,6 +722,12 @@ Selecting the OpenStack driver adds the following options to the
         :required:
 
         Pool name
+
+     .. attr:: node-attributes
+        :type: dict
+
+        A dictionary of key-value pairs that will be stored with the node data
+        in ZooKeeper. The keys and values can be any arbitrary string.
 
      .. attr:: max-cores
         :type: int

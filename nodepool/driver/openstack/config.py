@@ -275,6 +275,7 @@ class OpenStackProviderConfig(ProviderConfig):
             pp.security_groups = pool.get('security-groups', [])
             pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
             pp.host_key_checking = bool(pool.get('host-key-checking', True))
+            pp.node_attributes = pool.get('node-attributes')
 
             for label in pool.get('labels', []):
                 pl = ProviderLabel()
@@ -367,6 +368,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'max-servers': int,
             'max-ram': int,
             'labels': [pool_label],
+            'node-attributes': dict,
             'availability-zones': [str],
             'security-groups': [str]
         }
