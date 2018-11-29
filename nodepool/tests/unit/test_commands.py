@@ -39,18 +39,25 @@ class TestNodepoolCMD(tests.DBTestCase):
     def assert_listed(self, configfile, cmd, col, val, count, col_count=0):
         log = logging.getLogger("tests.PrettyTableMock")
         self.patch_argv("-c", configfile, *cmd)
-        with mock.patch('prettytable.PrettyTable.add_row') as m_add_row:
-            nodepoolcmd.main()
-            rows_with_val = 0
-            # Find add_rows with the status were looking for
-            for args, kwargs in m_add_row.call_args_list:
-                row = args[0]
-                if col_count:
-                    self.assertEquals(len(row), col_count)
-                log.debug(row)
-                if row[col] == val:
-                    rows_with_val += 1
-            self.assertEquals(rows_with_val, count)
+        for _ in iterate_timeout(10, AssertionError, 'assert listed'):
+            try:
+                with mock.patch('prettytable.PrettyTable.add_row') as \
+                        m_add_row:
+                    nodepoolcmd.main()
+                    rows_with_val = 0
+                    # Find add_rows with the status were looking for
+                    for args, kwargs in m_add_row.call_args_list:
+                        row = args[0]
+                        if col_count:
+                            self.assertEquals(len(row), col_count)
+                        log.debug(row)
+                        if row[col] == val:
+                            rows_with_val += 1
+                    self.assertEquals(rows_with_val, count)
+                break
+            except AssertionError:
+                # retry
+                pass
 
     def assert_alien_images_listed(self, configfile, image_cnt, image_id):
         self.assert_listed(configfile, ['alien-image-list'], 2, image_id,
