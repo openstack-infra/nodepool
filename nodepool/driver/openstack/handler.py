@@ -18,6 +18,7 @@ import pprint
 import random
 
 from kazoo import exceptions as kze
+import openstack
 
 from nodepool import exceptions
 from nodepool import nodeutils as utils
@@ -122,22 +123,29 @@ class OpenStackNodeLauncher(NodeLauncher):
         # because that isn't available in ZooKeeper until after the server is
         # active, which could cause a race in leak detection.
 
-        server = self.handler.manager.createServer(
-            hostname,
-            image=image_external,
-            min_ram=self.label.min_ram,
-            flavor_name=self.label.flavor_name,
-            key_name=self.label.key_name,
-            az=self.node.az,
-            config_drive=config_drive,
-            nodepool_node_id=self.node.id,
-            nodepool_node_label=self.node.type[0],
-            nodepool_image_name=image_name,
-            networks=self.pool.networks,
-            security_groups=self.pool.security_groups,
-            boot_from_volume=self.label.boot_from_volume,
-            volume_size=self.label.volume_size,
-            instance_properties=self.label.instance_properties)
+        try:
+            server = self.handler.manager.createServer(
+                hostname,
+                image=image_external,
+                min_ram=self.label.min_ram,
+                flavor_name=self.label.flavor_name,
+                key_name=self.label.key_name,
+                az=self.node.az,
+                config_drive=config_drive,
+                nodepool_node_id=self.node.id,
+                nodepool_node_label=self.node.type[0],
+                nodepool_image_name=image_name,
+                networks=self.pool.networks,
+                security_groups=self.pool.security_groups,
+                boot_from_volume=self.label.boot_from_volume,
+                volume_size=self.label.volume_size,
+                instance_properties=self.label.instance_properties)
+        except openstack.cloud.exc.OpenStackCloudCreateException as e:
+            if e.resource_id:
+                self.node.external_id = e.resource_id
+                # The outer exception handler will handle storing the
+                # node immediately after this.
+            raise
 
         self.node.external_id = server.id
         self.node.hostname = hostname
