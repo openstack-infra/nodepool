@@ -2086,7 +2086,13 @@ class ZooKeeper(object):
         self.log.exception(e)
 
     def nodeCacheListener(self, event):
+        try:
+            self._nodeCacheListener(event)
+        except Exception:
+            self.log.exception("Exception in node cache update for event: %s",
+                               event)
 
+    def _nodeCacheListener(self, event):
         if hasattr(event.event_data, 'path'):
             # Ignore root node
             path = event.event_data.path
@@ -2142,7 +2148,14 @@ class ZooKeeper(object):
         self.node_stats_event = event
 
     def requestCacheListener(self, event):
+        try:
+            self._requestCacheListener(event)
+        except Exception:
+            self.log.exception(
+                "Exception in request cache update for event: %s",
+                event)
 
+    def _requestCacheListener(self, event):
         if hasattr(event.event_data, 'path'):
             # Ignore root node
             path = event.event_data.path
