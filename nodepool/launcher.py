@@ -758,7 +758,6 @@ class StatsWorker(BaseCleanupWorker, stats.StatsReporter):
             if not signaled:
                 continue
 
-            self.log.debug('Updating stats')
             self.stats_event.clear()
             try:
                 self.updateNodeStats(zk)
