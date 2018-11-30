@@ -194,7 +194,8 @@ class OpenStackProvider(Provider):
                 # server so it must not be accounted for unmanaged
                 # quota; unless it has leaked.
                 nodepool_node_id = meta.get('nodepool_node_id')
-                if not (nodepool_node_id and nodepool_node_id in node_ids):
+                # FIXME(tobiash): Add a test case for this
+                if nodepool_node_id and nodepool_node_id in node_ids:
                     # It has not leaked.
                     continue
 
