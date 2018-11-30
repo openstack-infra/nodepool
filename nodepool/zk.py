@@ -440,6 +440,7 @@ class NodeRequest(BaseModel):
         self.nodes = []
         self.reuse = True
         self.requestor = None
+        self.relative_priority = 0
 
     def __repr__(self):
         d = self.toDict()
@@ -454,7 +455,8 @@ class NodeRequest(BaseModel):
                     self.node_types == other.node_types and
                     self.nodes == other.nodes and
                     self.reuse == other.reuse and
-                    self.requestor == other.requestor)
+                    self.requestor == other.requestor and
+                    self.relative_priority == other.relative_priority)
         else:
             return False
 
@@ -468,6 +470,7 @@ class NodeRequest(BaseModel):
         d['nodes'] = self.nodes
         d['reuse'] = self.reuse
         d['requestor'] = self.requestor
+        d['relative_priority'] = self.relative_priority
         return d
 
     @staticmethod
@@ -492,6 +495,7 @@ class NodeRequest(BaseModel):
         self.nodes = d.get('nodes', [])
         self.reuse = d.get('reuse', True)
         self.requestor = d.get('requestor')
+        self.relative_priority = d.get('relative_priority', 0)
 
 
 class Node(BaseModel):

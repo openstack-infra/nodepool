@@ -159,7 +159,15 @@ class PoolWorker(threading.Thread, stats.StatsReporter):
         if provider.max_concurrency == 0:
             return
 
-        for req_id in self.zk.getNodeRequests():
+        # Sort requests by queue priority, then, for all requests at
+        # the same priority, use the relative_priority field to
+        # further sort, then finally, the submission order.
+        requests = list(self.zk.nodeRequestIterator())
+        requests.sort(key=lambda r: (r.id.split('-')[0],
+                                     r.relative_priority,
+                                     r.id.split('-')[1]))
+
+        for req in requests:
             if self.paused_handler:
                 return
 
@@ -177,7 +185,7 @@ class PoolWorker(threading.Thread, stats.StatsReporter):
                                active_threads, provider.max_concurrency)
                 return
 
-            req = self.zk.getNodeRequest(req_id)
+            req = self.zk.getNodeRequest(req.id)
             if not req:
                 continue
 

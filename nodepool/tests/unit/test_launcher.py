@@ -1794,3 +1794,33 @@ class TestLauncher(tests.DBTestCase):
 
         req3 = self.waitForNodeRequest(req3)
         self.assertEqual(req3.state, zk.FAILED)
+
+    def test_request_order(self):
+        """Test that requests are handled in sorted order"""
+        configfile = self.setup_config('node_no_min_ready.yaml')
+        self.useBuilder(configfile)
+        image = self.waitForImage('fake-provider', 'fake-image')
+        self.assertEqual(image.username, 'zuul')
+
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.node_types.append('fake-label')
+        req1.relative_priority = 2
+        self.zk.storeNodeRequest(req1)
+
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.node_types.append('fake-label')
+        req2.relative_priority = 1
+        self.zk.storeNodeRequest(req2)
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FULFILLED)
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+
+        self.assertTrue(req2.id > req1.id)
+        self.assertTrue(req2.state_time < req1.state_time)
