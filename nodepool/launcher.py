@@ -106,7 +106,11 @@ class NodeDeleter(threading.Thread):
         else:
             node_exists = True
 
-        self.delete(self._zk, self._provider_manager, self._node, node_exists)
+        try:
+            self.delete(self._zk, self._provider_manager,
+                        self._node, node_exists)
+        except Exception:
+            self.log.exception("Error deleting node %s:", self._node)
 
 
 class PoolWorker(threading.Thread, stats.StatsReporter):
