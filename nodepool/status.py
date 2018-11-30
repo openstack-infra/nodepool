@@ -232,6 +232,7 @@ def image_list(zk):
 def request_list(zk):
     headers_table = OrderedDict([
         ("id", "Request ID"),
+        ("relative_priority", "Priority"),
         ("state", "State"),
         ("requestor", "Requestor"),
         ("node_types", "Node Types"),
@@ -239,7 +240,8 @@ def request_list(zk):
         ("declined_by", "Declined By")])
     objs = []
     for req in zk.nodeRequestIterator():
-        values = [req.id, req.state, req.requestor,
+        values = [req.id, req.relative_priority,
+                  req.state, req.requestor,
                   req.node_types,
                   req.nodes,
                   req.declined_by]
