@@ -180,7 +180,9 @@ class PoolWorker(threading.Thread, stats.StatsReporter):
             if not self.running:
                 return True
 
+            self.log.debug("Considering request %s", req.id)
             if self.paused_handler:
+                self.log.debug("Handler is now paused")
                 return True
 
             # Get active threads for all pools for this provider
@@ -199,24 +201,29 @@ class PoolWorker(threading.Thread, stats.StatsReporter):
 
             req = self.zk.getNodeRequest(req.id)
             if not req:
+                self.log.debug("Request %s no longer exists", req.id)
                 continue
 
             # Only interested in unhandled requests
             if req.state != zk.REQUESTED:
+                self.log.debug("Request %s is in state %s", req.id, req.state)
                 continue
 
             # Skip it if we've already declined
             if self.launcher_id in req.declined_by:
+                self.log.debug("Request %s was already declined", req.id)
                 continue
 
             try:
                 self.zk.lockNodeRequest(req, blocking=False)
             except exceptions.ZKLockException:
+                self.log.debug("Request %s is locked by someone else", req.id)
                 continue
 
             # Make sure the state didn't change on us after getting the lock
             if req.state != zk.REQUESTED:
                 self.zk.unlockNodeRequest(req)
+                self.log.debug("Request %s is in state %s", req.id, req.state)
                 continue
 
             # Got a lock, so assign it
