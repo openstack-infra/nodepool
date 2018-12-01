@@ -40,12 +40,12 @@ def join(a, b):
 
 def print_tree(node):
     data, stat = zk.client.get(node)
-    print "Node: %s %s" % (node, stat)
+    print("Node: %s %s" % (node, stat))
     if data:
-        print data
+        print(data)
 
     for child in zk.client.get_children(node):
-        print
+        print()
         print_tree(join(node, child))
 
 print_tree('/')
