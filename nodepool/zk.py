@@ -2113,6 +2113,10 @@ class ZooKeeper(object):
         node_id = path.rsplit('/', 1)[1]
 
         if event.event_type in (TreeEvent.NODE_ADDED, TreeEvent.NODE_UPDATED):
+            # Nodes with empty data are invalid so skip add or update these.
+            if not event.event_data.data:
+                return
+
             # Perform an in-place update of the already cached node if possible
             d = self._bytesToDict(event.event_data.data)
             old_node = self._cached_nodes.get(node_id)
@@ -2176,6 +2180,10 @@ class ZooKeeper(object):
         request_id = path.rsplit('/', 1)[1]
 
         if event.event_type in (TreeEvent.NODE_ADDED, TreeEvent.NODE_UPDATED):
+            # Requests with empty data are invalid so skip add or update these.
+            if not event.event_data.data:
+                return
+
             # Perform an in-place update of the cached request if possible
             d = self._bytesToDict(event.event_data.data)
             old_request = self._cached_node_requests.get(request_id)
