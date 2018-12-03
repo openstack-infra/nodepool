@@ -45,6 +45,20 @@ class KubernetesPool(ConfigPool):
     def __repr__(self):
         return "<KubernetesPool %s>" % self.name
 
+    def load(self, pool_config, full_config):
+        super().load(pool_config)
+        self.name = pool_config['name']
+        self.labels = {}
+        for label in pool_config.get('labels', []):
+            pl = KubernetesLabel()
+            pl.name = label['name']
+            pl.type = label['type']
+            pl.image = label.get('image')
+            pl.image_pull = label.get('image-pull', 'IfNotPresent')
+            pl.pool = self
+            self.labels[pl.name] = pl
+            full_config.labels[label['name']].pools.append(self)
+
 
 class KubernetesProviderConfig(ProviderConfig):
     def __init__(self, driver, provider):
@@ -72,19 +86,9 @@ class KubernetesProviderConfig(ProviderConfig):
         self.context = self.provider['context']
         for pool in self.provider.get('pools', []):
             pp = KubernetesPool()
-            pp.name = pool['name']
+            pp.load(pool, config)
             pp.provider = self
             self.pools[pp.name] = pp
-            pp.labels = {}
-            for label in pool.get('labels', []):
-                pl = KubernetesLabel()
-                pl.name = label['name']
-                pl.type = label['type']
-                pl.image = label.get('image')
-                pl.image_pull = label.get('image-pull', 'IfNotPresent')
-                pl.pool = pp
-                pp.labels[pl.name] = pl
-                config.labels[label['name']].pools.append(pp)
 
     def getSchema(self):
         k8s_label = {
@@ -94,10 +98,11 @@ class KubernetesProviderConfig(ProviderConfig):
             'image-pull': str,
         }
 
-        pool = {
+        pool = ConfigPool.getCommonSchemaDict()
+        pool.update({
             v.Required('name'): str,
             v.Required('labels'): [k8s_label],
-        }
+        })
 
         provider = {
             v.Required('pools'): [pool],

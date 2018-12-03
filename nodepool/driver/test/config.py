@@ -12,7 +12,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import math
 import voluptuous as v
 
 from nodepool.driver import ConfigPool
@@ -20,7 +19,10 @@ from nodepool.driver import ProviderConfig
 
 
 class TestPool(ConfigPool):
-    pass
+    def load(self, pool_config):
+        super().load(pool_config)
+        self.name = pool_config['name']
+        self.labels = pool_config['labels']
 
 
 class TestConfig(ProviderConfig):
@@ -43,18 +45,19 @@ class TestConfig(ProviderConfig):
         self.labels = set()
         for pool in self.provider.get('pools', []):
             testpool = TestPool()
-            testpool.name = pool['name']
+            testpool.load(pool)
             testpool.provider = self
-            testpool.max_servers = pool.get('max-servers', math.inf)
-            testpool.labels = pool['labels']
             for label in pool['labels']:
                 self.labels.add(label)
                 newconfig.labels[label].pools.append(testpool)
             self.pools[pool['name']] = testpool
 
     def getSchema(self):
-        pool = {'name': str,
-                'labels': [str]}
+        pool = ConfigPool.getCommonSchemaDict()
+        pool.update({
+            'name': str,
+            'labels': [str]
+        })
         return v.Schema({'pools': [pool]})
 
     def getSupportedLabels(self, pool_name=None):

@@ -41,6 +41,33 @@ class StaticPool(ConfigPool):
     def __repr__(self):
         return "<StaticPool %s>" % self.name
 
+    def load(self, pool_config, full_config):
+        super().load(pool_config)
+        self.name = pool_config['name']
+        # WARNING: This intentionally changes the type!
+        self.labels = set()
+        for node in pool_config.get('nodes', []):
+            self.nodes.append({
+                'name': node['name'],
+                'labels': as_list(node['labels']),
+                'host-key': as_list(node.get('host-key', [])),
+                'timeout': int(node.get('timeout', 5)),
+                # Read ssh-port values for backward compat, but prefer port
+                'connection-port': int(
+                    node.get('connection-port', node.get('ssh-port', 22))),
+                'connection-type': node.get('connection-type', 'ssh'),
+                'username': node.get('username', 'zuul'),
+                'max-parallel-jobs': int(node.get('max-parallel-jobs', 1)),
+            })
+            if isinstance(node['labels'], str):
+                for label in node['labels'].split():
+                    self.labels.add(label)
+                    full_config.labels[label].pools.append(self)
+            elif isinstance(node['labels'], list):
+                for label in node['labels']:
+                    self.labels.add(label)
+                    full_config.labels[label].pools.append(self)
+
 
 class StaticProviderConfig(ProviderConfig):
     def __init__(self, *args, **kwargs):
@@ -65,32 +92,9 @@ class StaticProviderConfig(ProviderConfig):
     def load(self, config):
         for pool in self.provider.get('pools', []):
             pp = StaticPool()
-            pp.name = pool['name']
+            pp.load(pool, config)
             pp.provider = self
             self.pools[pp.name] = pp
-            # WARNING: This intentionally changes the type!
-            pp.labels = set()
-            for node in pool.get('nodes', []):
-                pp.nodes.append({
-                    'name': node['name'],
-                    'labels': as_list(node['labels']),
-                    'host-key': as_list(node.get('host-key', [])),
-                    'timeout': int(node.get('timeout', 5)),
-                    # Read ssh-port values for backward compat, but prefer port
-                    'connection-port': int(
-                        node.get('connection-port', node.get('ssh-port', 22))),
-                    'connection-type': node.get('connection-type', 'ssh'),
-                    'username': node.get('username', 'zuul'),
-                    'max-parallel-jobs': int(node.get('max-parallel-jobs', 1)),
-                })
-                if isinstance(node['labels'], str):
-                    for label in node['labels'].split():
-                        pp.labels.add(label)
-                        config.labels[label].pools.append(pp)
-                elif isinstance(node['labels'], list):
-                    for label in node['labels']:
-                        pp.labels.add(label)
-                        config.labels[label].pools.append(pp)
 
     def getSchema(self):
         pool_node = {
@@ -103,10 +107,11 @@ class StaticProviderConfig(ProviderConfig):
             'connection-type': str,
             'max-parallel-jobs': int,
         }
-        pool = {
+        pool = ConfigPool.getCommonSchemaDict()
+        pool.update({
             'name': str,
             'nodes': [pool_node],
-        }
+        })
         return v.Schema({'pools': [pool]})
 
     def getSupportedLabels(self, pool_name=None):
