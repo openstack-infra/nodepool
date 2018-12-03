@@ -253,6 +253,7 @@ class OpenStackNodeLauncher(NodeLauncher):
                 if self.node.external_id:
                     deleting_node = zk.Node()
                     deleting_node.provider = self.node.provider
+                    deleting_node.pool = self.node.pool
                     deleting_node.external_id = self.node.external_id
                     deleting_node.state = zk.DELETING
                     self.zk.storeNode(deleting_node)
