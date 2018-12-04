@@ -1882,6 +1882,20 @@ class ZooKeeper(object):
             path = self._nodePath(node.id)
             self.client.set(path, node.serialize())
 
+    def deleteRawNode(self, node_id):
+        '''
+        Delete a znode for a Node.
+
+        This is used to forcefully delete a Node znode that has somehow
+        ended up without any actual data. In most cases, you should be using
+        deleteNode() instead.
+        '''
+        path = self._nodePath(node_id)
+        try:
+            self.client.delete(path, recursive=True)
+        except kze.NoNodeError:
+            pass
+
     def deleteNode(self, node):
         '''
         Delete a node.
@@ -1898,11 +1912,7 @@ class ZooKeeper(object):
         # lock is removed before the node deletion occurs.
         node.state = DELETED
         self.client.set(path, node.serialize())
-
-        try:
-            self.client.delete(path, recursive=True)
-        except kze.NoNodeError:
-            pass
+        self.deleteRawNode(node.id)
 
     def getReadyNodesOfTypes(self, labels, cached=True):
         '''

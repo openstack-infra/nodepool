@@ -410,6 +410,7 @@ class CleanupWorker(BaseCleanupWorker):
             (self._cleanupLostRequests, 'lost request cleanup'),
             (self._cleanupMaxReadyAge, 'max ready age cleanup'),
             (self._cleanupMaxHoldAge, 'max hold age cleanup'),
+            (self._cleanupEmptyNodes, 'empty node cleanup'),
         ]
 
     def _resetLostRequest(self, zk_conn, req):
@@ -615,6 +616,21 @@ class CleanupWorker(BaseCleanupWorker):
                     "Failure marking aged node %s for delete:", node.id)
             finally:
                 zk_conn.unlockNode(node)
+
+    def _cleanupEmptyNodes(self):
+        '''
+        Remove any Node znodes that may be totally empty.
+        '''
+        self.log.debug('Cleaning up empty nodes...')
+        zk_conn = self._nodepool.getZK()
+
+        # We cannot use nodeIterator() here since that does not yield us
+        # empty nodes.
+        for node_id in zk_conn.getNodes():
+            node = zk_conn.getNode(node_id)
+            if node is None:
+                self.log.debug("Removing empty node %s", node_id)
+                zk_conn.deleteRawNode(node_id)
 
     def _run(self):
         '''

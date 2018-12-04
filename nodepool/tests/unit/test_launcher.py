@@ -1824,3 +1824,20 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertTrue(req2.id > req1.id)
         self.assertTrue(req2.state_time < req1.state_time)
+
+    def test_empty_node_deleted(self):
+        """Test that empty nodes are deleted by the cleanup thread"""
+        configfile = self.setup_config('node.yaml')
+
+        # Create empty node
+        path = "%s" % self.zk._nodePath("12345")
+        self.log.debug("node path %s", path)
+        self.zk.client.create(path, makepath=True)
+        self.assertTrue(self.zk.client.exists(path))
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = .1
+        pool.start()
+
+        while self.zk.client.exists(path):
+            time.sleep(.1)
