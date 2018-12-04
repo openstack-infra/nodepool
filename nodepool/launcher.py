@@ -704,6 +704,27 @@ class DeletedNodeWorker(BaseCleanupWorker):
                 except exceptions.ZKLockException:
                     continue
 
+                if (node.state == zk.DELETED or
+                    node.provider is None):
+                    # The node has been deleted out from under us --
+                    # we only obtained the lock because in the
+                    # recursive delete, the lock is deleted first and
+                    # we locked the node between the time of the lock
+                    # delete and the node delete.  We need to clean up
+                    # the mess.
+                    try:
+                        # This should delete the lock as well
+                        zk_conn.deleteNode(node)
+                    except Exception:
+                        self.log.exception(
+                            "Error deleting already deleted znode:")
+                        try:
+                            zk_conn.unlockNode(node)
+                        except Exception:
+                            self.log.exception(
+                                "Error unlocking already deleted znode:")
+                    continue
+
                 # Double check the state now that we have a lock since it
                 # may have changed on us.
                 if node.state not in cleanup_states:
