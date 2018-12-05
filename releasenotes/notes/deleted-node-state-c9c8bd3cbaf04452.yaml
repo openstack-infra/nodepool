@@ -1,0 +1,6 @@
+---
+upgrade:
+  - |
+    A change to the ZooKeeper schema to support a new DELETED node state will
+    require a total shutdown of all Nodepool launchers before restarting any of
+    them with this version.
