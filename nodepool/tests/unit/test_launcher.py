@@ -729,6 +729,39 @@ class TestLauncher(tests.DBTestCase):
         # retries in config is set to 2, so 2 attempts to create a server
         self.assertEqual(0, manager.createServer_fails)
 
+    def test_node_launch_with_broken_znodes(self):
+        """Test that node launch still works if there are broken znodes"""
+        # Create a znode without type
+        znode = zk.Node()
+        znode.provider = 'fake-provider'
+        znode.pool = 'main'
+        znode.external_id = 'fakeid'
+        znode.state = zk.READY
+
+        # Create znode without pool
+        self.zk.storeNode(znode)
+        znode = zk.Node()
+        znode.provider = 'fake-provider'
+        znode.type = ['fake-label']
+        znode.external_id = 'fakeid'
+        znode.state = zk.READY
+        self.zk.storeNode(znode)
+
+        configfile = self.setup_config('node_launch_retry.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.wait_for_config(pool)
+        self.waitForImage('fake-provider', 'fake-image')
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
     def test_node_launch_retries_with_external_id(self):
         configfile = self.setup_config('node_launch_retry.yaml')
         pool = self.useNodepool(configfile, watermark_sleep=1)

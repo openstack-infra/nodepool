@@ -151,26 +151,30 @@ class OpenStackProvider(Provider):
 
         for node in self._zk.nodeIterator():
             if node.provider == self.provider.name:
-                if pool and not node.pool == pool.name:
-                    continue
-                provider_pool = self.provider.pools.get(node.pool)
-                if not provider_pool:
-                    self.log.warning(
-                        "Cannot find provider pool for node %s" % node)
-                    # This node is in a funny state we log it for debugging
-                    # but move on and don't account it as we can't properly
-                    # calculate its cost without pool info.
-                    continue
-                if node.type[0] not in provider_pool.labels:
-                    self.log.warning(
-                        "Node type is not in provider pool for node %s" % node)
-                    # This node is also in a funny state; the config
-                    # may have changed under it.  It should settle out
-                    # eventually when it's deleted.
-                    continue
-                node_resources = self.quotaNeededByNodeType(
-                    node.type[0], provider_pool)
-                used_quota.add(node_resources)
+                try:
+                    if pool and not node.pool == pool.name:
+                        continue
+                    provider_pool = self.provider.pools.get(node.pool)
+                    if not provider_pool:
+                        self.log.warning(
+                            "Cannot find provider pool for node %s" % node)
+                        # This node is in a funny state we log it for debugging
+                        # but move on and don't account it as we can't properly
+                        # calculate its cost without pool info.
+                        continue
+                    if node.type[0] not in provider_pool.labels:
+                        self.log.warning("Node type is not in provider pool "
+                                         "for node %s" % node)
+                        # This node is also in a funny state; the config
+                        # may have changed under it.  It should settle out
+                        # eventually when it's deleted.
+                        continue
+                    node_resources = self.quotaNeededByNodeType(
+                        node.type[0], provider_pool)
+                    used_quota.add(node_resources)
+                except Exception:
+                    self.log.exception("Couldn't consider invalid node %s "
+                                       "for quota:" % node)
         return used_quota
 
     def unmanagedQuotaUsed(self):
