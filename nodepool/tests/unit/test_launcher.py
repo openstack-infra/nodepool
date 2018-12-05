@@ -729,6 +729,42 @@ class TestLauncher(tests.DBTestCase):
         # retries in config is set to 2, so 2 attempts to create a server
         self.assertEqual(0, manager.createServer_fails)
 
+    def test_node_launch_retries_with_external_id(self):
+        configfile = self.setup_config('node_launch_retry.yaml')
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        self.useBuilder(configfile)
+        pool.start()
+        self.wait_for_config(pool)
+        manager = pool.getProviderManager('fake-provider')
+        manager.createServer_fails_with_external_id = 2
+        self.waitForImage('fake-provider', 'fake-image')
+
+        # Stop the DeletedNodeWorker so we can make sure the fake znode that
+        # is used to delete the failed servers is still around when requesting.
+        # the second node.
+        pool._delete_thread.stop()
+        time.sleep(1)
+
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FAILED)
+
+        # retries in config is set to 2, so 2 attempts to create a server
+        self.assertEqual(0, manager.createServer_fails_with_external_id)
+
+        # Request another node to check if nothing is wedged
+        req = zk.NodeRequest()
+        req.state = zk.REQUESTED
+        req.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req)
+
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(req.state, zk.FULFILLED)
+
     def test_node_delete_failure(self):
         def fail_delete(self, name):
             raise RuntimeError('Fake Error')

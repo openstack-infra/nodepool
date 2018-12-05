@@ -24,6 +24,7 @@ import openstack.exceptions
 from nodepool import exceptions
 from nodepool.driver.openstack.provider import OpenStackProvider
 from nodepool.driver.fake.handler import FakeNodeRequestHandler
+from openstack.cloud.exc import OpenStackCloudCreateException
 
 
 class Dummy(object):
@@ -340,6 +341,7 @@ class FakeProvider(OpenStackProvider):
 
     def __init__(self, provider, use_taskmanager):
         self.createServer_fails = 0
+        self.createServer_fails_with_external_id = 0
         self.__client = FakeProvider.fake_cloud()
         super(FakeProvider, self).__init__(provider, use_taskmanager)
 
@@ -350,6 +352,9 @@ class FakeProvider(OpenStackProvider):
         while self.createServer_fails:
             self.createServer_fails -= 1
             raise Exception("Expected createServer exception")
+        while self.createServer_fails_with_external_id:
+            self.createServer_fails_with_external_id -= 1
+            raise OpenStackCloudCreateException('server', 'fakeid')
         return super(FakeProvider, self).createServer(*args, **kwargs)
 
     def getRequestHandler(self, poolworker, request):
