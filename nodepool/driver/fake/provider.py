@@ -141,6 +141,7 @@ class FakeOpenStackCloud(object):
             public_v6 = 'fake_v6'
             public_v4 = 'fake'
             private_v4 = 'fake'
+            host_id = 'fake_host_id'
             interface_ip = 'fake_v6'
             break
         if not addresses:
@@ -151,6 +152,7 @@ class FakeOpenStackCloud(object):
             public_v6 = ''
             public_v4 = 'fake'
             private_v4 = 'fake'
+            host_id = 'fake'
             interface_ip = 'fake'
         over_quota = False
         if (instance_type == Dummy.INSTANCE and
@@ -173,6 +175,7 @@ class FakeOpenStackCloud(object):
                   public_v4=public_v4,
                   public_v6=public_v6,
                   private_v4=private_v4,
+                  host_id=host_id,
                   interface_ip=interface_ip,
                   security_groups=security_groups,
                   location=Dummy(Dummy.LOCATION, zone=kw.get('az')),
@@ -238,6 +241,7 @@ class FakeOpenStackCloud(object):
         server.public_v4 = 'fake'
         server.public_v6 = 'fake'
         server.private_v4 = 'fake'
+        server.host_id = 'fake'
         server.interface_ip = 'fake'
         return server
 

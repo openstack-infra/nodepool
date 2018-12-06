@@ -678,12 +678,14 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(label1_nodes[0].public_ipv4, 'fake')
         self.assertEqual(label1_nodes[0].public_ipv6, 'fake_v6')
         self.assertEqual(label1_nodes[0].interface_ip, 'fake_v6')
+        self.assertEqual(label1_nodes[0].host_id, 'fake_host_id')
 
         # ipv6 address unavailable
         self.assertEqual(label2_nodes[0].provider, 'fake-provider2')
         self.assertEqual(label2_nodes[0].public_ipv4, 'fake')
         self.assertEqual(label2_nodes[0].public_ipv6, '')
         self.assertEqual(label2_nodes[0].interface_ip, 'fake')
+        self.assertEqual(label2_nodes[0].host_id, 'fake')
 
     def test_node_delete_success(self):
         configfile = self.setup_config('node.yaml')

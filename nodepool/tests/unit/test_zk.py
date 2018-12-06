@@ -855,6 +855,7 @@ class TestZKModel(tests.BaseTestCase):
         o.public_ipv4 = '<ipv4>'
         o.private_ipv4 = '<pvt-ipv4>'
         o.public_ipv6 = '<ipv6>'
+        o.host_id = 'fake-host-id'
         o.image_id = 'image-id'
         o.launcher = 'launcher-id'
         o.external_id = 'ABCD'
@@ -877,6 +878,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(d['public_ipv4'], o.public_ipv4)
         self.assertEqual(d['private_ipv4'], o.private_ipv4)
         self.assertEqual(d['public_ipv6'], o.public_ipv6)
+        self.assertEqual(d['host_id'], o.host_id)
         self.assertEqual(d['image_id'], o.image_id)
         self.assertEqual(d['launcher'], o.launcher)
         self.assertEqual(d['external_id'], o.external_id)
@@ -901,6 +903,7 @@ class TestZKModel(tests.BaseTestCase):
             'public_ipv4': '<ipv4>',
             'private_ipv4': '<pvt-ipv4>',
             'public_ipv6': '<ipv6>',
+            'host_id': 'fake-host-id',
             'image_id': 'image-id',
             'launcher': 'launcher-id',
             'external_id': 'ABCD',
@@ -925,6 +928,7 @@ class TestZKModel(tests.BaseTestCase):
         self.assertEqual(o.public_ipv4, d['public_ipv4'])
         self.assertEqual(o.private_ipv4, d['private_ipv4'])
         self.assertEqual(o.public_ipv6, d['public_ipv6'])
+        self.assertEqual(o.host_id, d['host_id'])
         self.assertEqual(o.image_id, d['image_id'])
         self.assertEqual(o.launcher, d['launcher'])
         self.assertEqual(o.external_id, d['external_id'])

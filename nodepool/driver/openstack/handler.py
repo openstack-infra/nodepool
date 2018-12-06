@@ -189,6 +189,7 @@ class OpenStackNodeLauncher(NodeLauncher):
             raise exceptions.LaunchNetworkException(
                 "Unable to find public IP of server")
 
+        self.node.host_id = server.host_id
         self.node.interface_ip = interface_ip
         self.node.public_ipv4 = server.public_v4
         self.node.public_ipv6 = server.public_v6
@@ -204,10 +205,10 @@ class OpenStackNodeLauncher(NodeLauncher):
 
         self.log.debug(
             "Node %s is running [region: %s, az: %s, ip: %s ipv4: %s, "
-            "ipv6: %s]" %
+            "ipv6: %s, hostid: %s]" %
             (self.node.id, self.node.region, self.node.az,
              self.node.interface_ip, self.node.public_ipv4,
-             self.node.public_ipv6))
+             self.node.public_ipv6, self.node.host_id))
 
         # wait and scan the new node and record in ZooKeeper
         host_keys = []

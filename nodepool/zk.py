@@ -521,6 +521,7 @@ class Node(BaseModel):
         self.public_ipv4 = None
         self.private_ipv4 = None
         self.public_ipv6 = None
+        self.host_id = None
         self.interface_ip = None
         self.connection_port = 22
         self.image_id = None
@@ -558,6 +559,7 @@ class Node(BaseModel):
                     self.public_ipv4 == other.public_ipv4 and
                     self.private_ipv4 == other.private_ipv4 and
                     self.public_ipv6 == other.public_ipv6 and
+                    self.host_id == other.host_id and
                     self.interface_ip == other.interface_ip and
                     self.image_id == other.image_id and
                     self.launcher == other.launcher and
@@ -601,6 +603,7 @@ class Node(BaseModel):
         d['public_ipv4'] = self.public_ipv4
         d['private_ipv4'] = self.private_ipv4
         d['public_ipv6'] = self.public_ipv6
+        d['host_id'] = self.host_id
         d['interface_ip'] = self.interface_ip
         d['connection_port'] = self.connection_port
         # TODO(tobiash): ssh_port is kept for backwards compatibility reasons
@@ -655,6 +658,7 @@ class Node(BaseModel):
         self.public_ipv4 = d.get('public_ipv4')
         self.private_ipv4 = d.get('private_ipv4')
         self.public_ipv6 = d.get('public_ipv6')
+        self.host_id = d.get('host_id')
         self.interface_ip = d.get('interface_ip')
         self.connection_port = d.get('connection_port', d.get('ssh_port', 22))
         self.image_id = d.get('image_id')
