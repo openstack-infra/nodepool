@@ -1653,31 +1653,54 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(req.state, zk.FULFILLED)
         self.assertEqual(len(req.nodes), 1)
 
-    @mock.patch(
-        'nodepool.driver.openstack.handler.OpenStackNodeRequestHandler.poll')
+    @mock.patch('nodepool.driver.NodeRequestHandler.poll')
     def test_handler_poll_session_expired(self, mock_poll):
         '''
-        Test ZK session lost during handler poll().
+        Test ZK session lost during handler poll() removes handler.
         '''
-        mock_poll.side_effect = kze.SessionExpiredError()
-
-        # use a config with min-ready of 0
-        configfile = self.setup_config('node_launch_retry.yaml')
-        self.useBuilder(configfile)
-        pool = self.useNodepool(configfile, watermark_sleep=1)
-        pool.cleanup_interval = 60
-        pool.start()
-        self.waitForImage('fake-provider', 'fake-image')
-
         req = zk.NodeRequest()
         req.state = zk.REQUESTED
         req.node_types.append('fake-label')
         self.zk.storeNodeRequest(req)
 
+        # We need to stop processing of this request so that it does not
+        # re-enter request handling, so we can then verify that it was
+        # actually removed from request_handlers in the final assert of
+        # this test.
+        def side_effect():
+            req.state = zk.FAILED
+            # Intentionally ignore that it is already locked.
+            self.zk.storeNodeRequest(req)
+            raise kze.SessionExpiredError()
+
+        mock_poll.side_effect = side_effect
+
+        # use a config with min-ready of 0
+        configfile = self.setup_config('node_launch_retry.yaml')
+        self.useBuilder(configfile)
+
+        # Wait for the image to exist before starting the launcher, else
+        # we'll decline the request.
+        self.waitForImage('fake-provider', 'fake-image')
+
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.cleanup_interval = 60
+        pool.start()
+
+        # Wait for request handling to occur
+        while not mock_poll.call_count:
+            time.sleep(.1)
+
+        # Note: The launcher is not setting FAILED state here, but our mock
+        # side effect should be doing so. Just verify that.
+        req = self.waitForNodeRequest(req)
+        self.assertEqual(zk.FAILED, req.state)
+
         # A session loss during handler poll should at least remove the
-        # request from active handlers
-        req = self.waitForNodeRequest(req, states=(zk.PENDING,))
-        self.assertEqual(1, mock_poll.call_count)
+        # request from active handlers. The session exception from our first
+        # time through poll() should handle removing the request handler.
+        # And our mock side effect should ensure it does not re-enter
+        # request handling before we check it.
         self.assertEqual(0, len(
             pool._pool_threads["fake-provider-main"].request_handlers))
 
