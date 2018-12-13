@@ -19,6 +19,10 @@
 - job:
     name: nodepool-functional-base
     parent: devstack
+    # NOTE(ianw): for now, keep these jobs as Xenial only.  We will
+    # add bionic variants, but we want to keep Xenial testing around
+    # whilst we still run Xenial for upstream nodepool-builders too
+    nodeset: openstack-single-node-xenial
     pre-run: playbooks/nodepool-functional-base/pre.yaml
     post-run: playbooks/nodepool-functional-base/post.yaml
     timeout: 5400
