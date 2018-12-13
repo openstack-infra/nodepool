@@ -22,6 +22,7 @@ import importlib
 import logging
 import math
 import os
+import voluptuous as v
 
 from nodepool import zk
 from nodepool import exceptions
@@ -909,6 +910,14 @@ class ProviderConfig(ConfigValue, metaclass=abc.ABCMeta):
 
     def __repr__(self):
         return "<Provider %s>" % self.name
+
+    @classmethod
+    def getCommonSchemaDict(self):
+        return {
+            v.Required('name'): str,
+            'driver': str,
+            'max-concurrency': int
+        }
 
     @property
     @abc.abstractmethod

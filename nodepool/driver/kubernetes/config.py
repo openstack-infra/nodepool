@@ -109,7 +109,10 @@ class KubernetesProviderConfig(ProviderConfig):
             v.Required('context'): str,
             'launch-retries': int,
         }
-        return v.Schema(provider)
+
+        schema = ProviderConfig.getCommonSchemaDict()
+        schema.update(provider)
+        return v.Schema(schema)
 
     def getSupportedLabels(self, pool_name=None):
         labels = set()

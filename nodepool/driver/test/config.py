@@ -58,7 +58,9 @@ class TestConfig(ProviderConfig):
             'name': str,
             'labels': [str]
         })
-        return v.Schema({'pools': [pool]})
+        schema = ProviderConfig.getCommonSchemaDict()
+        schema.update({'pools': [pool]})
+        return v.Schema(schema)
 
     def getSupportedLabels(self, pool_name=None):
         return self.labels
