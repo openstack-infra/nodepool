@@ -42,13 +42,25 @@ function install_glean {
     fi
 }
 
-
 function install_openstacksdk {
     if use_library_from_git "openstacksdk"; then
         git_clone_by_name "openstacksdk"
         $NODEPOOL_INSTALL/bin/pip install $DEST/openstacksdk
     fi
 }
+
+function install_dogpile_cache {
+    if use_library_from_git "dogpile.cache"; then
+        GITREPO["dogpile.cache"]=$DOGPILE_CACHE_REPO_URL
+        GITDIR["dogpile.cache"]=$DEST/dogpile.cache
+        GITBRANCH["dogpile.cache"]=$DOGPILE_CACHE_REPO_REF
+
+
+        git_clone_by_name "dogpile.cache"
+        $NODEPOOL_INSTALL/bin/pip install $DEST/dogpile.cache
+    fi
+}
+
 
 # Install nodepool code
 function install_nodepool {
@@ -64,6 +76,7 @@ function install_nodepool {
     # in the -src job we don't re-install from the requirement.
     # We should make this more resilient, probably using install-siblings.
     install_openstacksdk
+    install_dogpile_cache
     $NODEPOOL_INSTALL/bin/pbr freeze
 }
 
