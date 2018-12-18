@@ -651,6 +651,14 @@ EOF
     mkdir -p $HOME/.cache/openstack/
 }
 
+function nodepool_zk_on_tmpfs {
+    local datadir
+    datadir=$(sed -n -e 's/^dataDir=//p' /etc/zookeeper/conf/zoo.cfg)
+    sudo service zookeeper stop
+    sudo mount -t tmpfs -o nodev,nosuid,size=500M none $datadir
+    sudo service zookeeper start
+}
+
 # Create configs
 # Setup custom flavor
 function configure_nodepool {
@@ -693,6 +701,9 @@ function start_nodepool {
     export STATSD_HOST=localhost
     export STATSD_PORT=8125
     run_process statsd "/usr/bin/socat -u udp-recv:$STATSD_PORT -"
+
+    # Restart nodepool's zk on a tmpfs
+    nodepool_zk_on_tmpfs
 
     # Ensure our configuration is valid.
     $NODEPOOL_INSTALL/bin/nodepool -c $NODEPOOL_CONFIG config-validate
