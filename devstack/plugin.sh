@@ -691,6 +691,10 @@ function start_nodepool {
         openstack --os-project-name demo --os-username demo security group rule create --ingress --protocol udp --dst-port 1:65535 --remote-ip 0.0.0.0/0 default
     fi
 
+    # start an unmanaged vm that should be ignored by nodepool
+    local cirros_image=$(openstack --os-project-name demo --os-username demo image list | grep cirros | awk '{print $4}' | head -n1)
+    openstack --os-project-name demo --os-username demo server create --flavor cirros256 --image $cirros_image unmanaged-vm
+
     # create root keypair to use with glean for devstack cloud.
     nova --os-project-name demo --os-username demo \
         keypair-add --pub-key $NODEPOOL_PUBKEY $NODEPOOL_KEY_NAME
@@ -715,6 +719,9 @@ function start_nodepool {
 
 function shutdown_nodepool {
     stop_process nodepool
+
+    # Verify that the unmanaged vm still exists
+    openstack --os-project-name demo --os-username demo server show unmanaged-vm
     :
 }
 
