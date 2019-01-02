@@ -504,7 +504,8 @@ class CleanupWorker(BaseCleanupWorker):
         '''
         for provider in self._nodepool.config.providers.values():
             manager = self._nodepool.getProviderManager(provider.name)
-            manager.cleanupLeakedResources()
+            if manager:
+                manager.cleanupLeakedResources()
 
     def _cleanupMaxReadyAge(self):
         '''
@@ -921,7 +922,7 @@ class NodePool(threading.Thread):
         return self.zk
 
     def getProviderManager(self, provider_name):
-        return self.config.provider_managers[provider_name]
+        return self.config.provider_managers.get(provider_name)
 
     def getPoolWorkers(self, provider_name):
         return [t for t in self._pool_threads.values() if
