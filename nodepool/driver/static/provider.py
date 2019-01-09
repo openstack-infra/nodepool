@@ -49,7 +49,7 @@ class StaticNodeProvider(Provider):
                     node["name"], node["connection-port"]))
 
         if not gather_hostkeys:
-            return
+            return []
 
         # Check node host-key
         if set(node["host-key"]).issubset(set(keys)):

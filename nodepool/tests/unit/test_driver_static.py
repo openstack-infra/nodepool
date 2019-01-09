@@ -177,7 +177,7 @@ class TestDriverStatic(tests.DBTestCase):
         self.assertEqual(nodes[0].username, 'admin')
         self.assertEqual(nodes[0].connection_port, 5986)
         self.assertEqual(nodes[0].connection_type, 'winrm')
-        self.assertEqual(nodes[0].host_keys, None)
+        self.assertEqual(nodes[0].host_keys, [])
 
     def test_static_multilabel(self):
         configfile = self.setup_config('static-multilabel.yaml')
