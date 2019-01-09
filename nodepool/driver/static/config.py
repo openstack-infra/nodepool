@@ -112,7 +112,9 @@ class StaticProviderConfig(ProviderConfig):
             'name': str,
             'nodes': [pool_node],
         })
-        return v.Schema({'pools': [pool]})
+        schema = ProviderConfig.getCommonSchemaDict()
+        schema.update({'pools': [pool]})
+        return v.Schema(schema)
 
     def getSupportedLabels(self, pool_name=None):
         labels = set()

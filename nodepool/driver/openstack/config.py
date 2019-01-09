@@ -385,7 +385,8 @@ class OpenStackProviderConfig(ProviderConfig):
             'security-groups': [str]
         })
 
-        return v.Schema({
+        schema = ProviderConfig.getCommonSchemaDict()
+        schema.update({
             'region-name': str,
             v.Required('cloud'): str,
             'boot-timeout': int,
@@ -400,6 +401,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'diskimages': [provider_diskimage],
             'cloud-images': [provider_cloud_images],
         })
+        return v.Schema(schema)
 
     def getSupportedLabels(self, pool_name=None):
         labels = set()

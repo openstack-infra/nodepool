@@ -14,6 +14,7 @@ import logging
 import voluptuous as v
 import yaml
 
+from nodepool.driver import ProviderConfig
 from nodepool.config import get_provider_config
 
 log = logging.getLogger(__name__)
@@ -26,11 +27,7 @@ class ConfigValidator:
         self.config_file = config_file
 
     def validate(self):
-        provider = {
-            'name': v.Required(str),
-            'driver': str,
-            'max-concurrency': int,
-        }
+        provider = ProviderConfig.getCommonSchemaDict()
 
         label = {
             'name': str,
