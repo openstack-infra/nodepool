@@ -149,6 +149,64 @@ class ProviderPool(ConfigPool):
     def __repr__(self):
         return "<ProviderPool %s>" % self.name
 
+    def load(self, pool_config, full_config, provider):
+        '''
+        Load pool configuration options.
+
+        :param dict pool_config: A single pool config section from which we
+            will load the values.
+        :param dict full_config: The full nodepool config.
+        :param OpenStackProviderConfig: The calling provider object.
+        '''
+        super().load(pool_config)
+
+        self.provider = provider
+        self.name = pool_config['name']
+        self.max_cores = pool_config.get('max-cores', math.inf)
+        self.max_ram = pool_config.get('max-ram', math.inf)
+        self.ignore_provider_quota = pool_config.get('ignore-provider-quota',
+                                                     False)
+        self.azs = pool_config.get('availability-zones')
+        self.networks = pool_config.get('networks', [])
+        self.security_groups = pool_config.get('security-groups', [])
+        self.auto_floating_ip = bool(pool_config.get('auto-floating-ip', True))
+        self.host_key_checking = bool(pool_config.get('host-key-checking',
+                                                      True))
+
+        for label in pool_config.get('labels', []):
+            pl = ProviderLabel()
+            pl.name = label['name']
+            pl.pool = self
+            self.labels[pl.name] = pl
+            diskimage = label.get('diskimage', None)
+            if diskimage:
+                pl.diskimage = full_config.diskimages[diskimage]
+            else:
+                pl.diskimage = None
+            cloud_image_name = label.get('cloud-image', None)
+            if cloud_image_name:
+                cloud_image = provider.cloud_images.get(cloud_image_name, None)
+                if not cloud_image:
+                    raise ValueError(
+                        "cloud-image %s does not exist in provider %s"
+                        " but is referenced in label %s" %
+                        (cloud_image_name, self.name, pl.name))
+            else:
+                cloud_image = None
+            pl.cloud_image = cloud_image
+            pl.min_ram = label.get('min-ram', 0)
+            pl.flavor_name = label.get('flavor-name', None)
+            pl.key_name = label.get('key-name')
+            pl.console_log = label.get('console-log', False)
+            pl.boot_from_volume = bool(label.get('boot-from-volume',
+                                                 False))
+            pl.volume_size = label.get('volume-size', 50)
+            pl.instance_properties = label.get('instance-properties',
+                                               None)
+
+            top_label = full_config.labels[pl.name]
+            top_label.pools.append(self)
+
 
 class OpenStackProviderConfig(ProviderConfig):
     def __init__(self, driver, provider):
@@ -263,53 +321,8 @@ class OpenStackProviderConfig(ProviderConfig):
 
         for pool in self.provider.get('pools', []):
             pp = ProviderPool()
-            pp.name = pool['name']
-            pp.provider = self
+            pp.load(pool, config, self)
             self.pools[pp.name] = pp
-            pp.max_cores = pool.get('max-cores', math.inf)
-            pp.max_servers = pool.get('max-servers', math.inf)
-            pp.max_ram = pool.get('max-ram', math.inf)
-            pp.ignore_provider_quota = pool.get('ignore-provider-quota', False)
-            pp.azs = pool.get('availability-zones')
-            pp.networks = pool.get('networks', [])
-            pp.security_groups = pool.get('security-groups', [])
-            pp.auto_floating_ip = bool(pool.get('auto-floating-ip', True))
-            pp.host_key_checking = bool(pool.get('host-key-checking', True))
-            pp.node_attributes = pool.get('node-attributes')
-
-            for label in pool.get('labels', []):
-                pl = ProviderLabel()
-                pl.name = label['name']
-                pl.pool = pp
-                pp.labels[pl.name] = pl
-                diskimage = label.get('diskimage', None)
-                if diskimage:
-                    pl.diskimage = config.diskimages[diskimage]
-                else:
-                    pl.diskimage = None
-                cloud_image_name = label.get('cloud-image', None)
-                if cloud_image_name:
-                    cloud_image = self.cloud_images.get(cloud_image_name, None)
-                    if not cloud_image:
-                        raise ValueError(
-                            "cloud-image %s does not exist in provider %s"
-                            " but is referenced in label %s" %
-                            (cloud_image_name, self.name, pl.name))
-                else:
-                    cloud_image = None
-                pl.cloud_image = cloud_image
-                pl.min_ram = label.get('min-ram', 0)
-                pl.flavor_name = label.get('flavor-name', None)
-                pl.key_name = label.get('key-name')
-                pl.console_log = label.get('console-log', False)
-                pl.boot_from_volume = bool(label.get('boot-from-volume',
-                                                     False))
-                pl.volume_size = label.get('volume-size', 50)
-                pl.instance_properties = label.get('instance-properties',
-                                                   None)
-
-                top_label = config.labels[pl.name]
-                top_label.pools.append(pp)
 
     def getSchema(self):
         provider_diskimage = {
@@ -358,20 +371,19 @@ class OpenStackProviderConfig(ProviderConfig):
                            v.Any(label_min_ram, label_flavor_name),
                            v.Any(label_diskimage, label_cloud_image))
 
-        pool = {
+        pool = ConfigPool.getCommonSchemaDict()
+        pool.update({
             'name': str,
             'networks': [str],
             'auto-floating-ip': bool,
             'host-key-checking': bool,
             'ignore-provider-quota': bool,
             'max-cores': int,
-            'max-servers': int,
             'max-ram': int,
             'labels': [pool_label],
-            'node-attributes': dict,
             'availability-zones': [str],
             'security-groups': [str]
-        }
+        })
 
         return v.Schema({
             'region-name': str,

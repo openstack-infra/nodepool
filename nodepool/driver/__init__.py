@@ -824,7 +824,11 @@ class ConfigValue(object, metaclass=abc.ABCMeta):
         return not self.__eq__(other)
 
 
-class ConfigPool(ConfigValue):
+class ConfigPool(ConfigValue, metaclass=abc.ABCMeta):
+    '''
+    Base class for a single pool as defined in the configuration file.
+    '''
+
     def __init__(self):
         self.labels = {}
         self.max_servers = math.inf
@@ -836,6 +840,40 @@ class ConfigPool(ConfigValue):
                     self.max_servers == other.max_servers and
                     self.node_attributes == other.node_attributes)
         return False
+
+    @classmethod
+    def getCommonSchemaDict(self):
+        '''
+        Return the schema dict for common pool attributes.
+
+        When a driver validates its own configuration schema, it should call
+        this class method to get and include the common pool attributes in
+        the schema.
+
+        The `labels` attribute, though common, can vary its type across
+        drivers so it is not returned in the schema.
+        '''
+        return {
+            'max-servers': int,
+            'node-attributes': dict,
+        }
+
+    @abc.abstractmethod
+    def load(self, pool_config):
+        '''
+        Load pool config options from the parsed configuration file.
+
+        Subclasses are expected to call the parent method so that common
+        configuration values are loaded properly.
+
+        Although `labels` is a common attribute, each driver may
+        define it differently, so we cannot parse that attribute here.
+
+        :param dict pool_config: A single pool config section from which we
+            will load the values.
+        '''
+        self.max_servers = pool_config.get('max-servers', math.inf)
+        self.node_attributes = pool_config.get('node-attributes')
 
 
 class DriverConfig(ConfigValue):

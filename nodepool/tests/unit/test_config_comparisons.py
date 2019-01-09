@@ -28,11 +28,17 @@ from nodepool.driver.static.config import StaticPool
 from nodepool.driver.static.config import StaticProviderConfig
 
 
+class TempConfigPool(ConfigPool):
+    def load(self):
+        pass
+
+
 class TestConfigComparisons(tests.BaseTestCase):
 
     def test_ConfigPool(self):
-        a = ConfigPool()
-        b = ConfigPool()
+
+        a = TempConfigPool()
+        b = TempConfigPool()
         self.assertEqual(a, b)
         a.max_servers = 5
         self.assertNotEqual(a, b)
@@ -94,9 +100,9 @@ class TestConfigComparisons(tests.BaseTestCase):
         a.max_servers = 5
         self.assertNotEqual(a, b)
 
-        c = ConfigPool()
+        c = TempConfigPool()
         d = ProviderPool()
-        self.assertNotEqual(c, d)
+        self.assertNotEqual(d, c)
 
     def test_OpenStackProviderConfig(self):
         provider = {'name': 'foo'}
@@ -114,7 +120,7 @@ class TestConfigComparisons(tests.BaseTestCase):
         # intentionally change an attribute of the base class
         a.max_servers = 5
         self.assertNotEqual(a, b)
-        c = ConfigPool()
+        c = TempConfigPool()
         self.assertNotEqual(b, c)
 
     def test_StaticProviderConfig(self):
