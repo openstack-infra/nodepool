@@ -201,7 +201,7 @@ EOF
 
     NODEPOOL_CENTOS_7_MIN_READY=1
     NODEPOOL_DEBIAN_STRETCH_MIN_READY=1
-    NODEPOOL_FEDORA_28_MIN_READY=1
+    NODEPOOL_FEDORA_29_MIN_READY=1
     NODEPOOL_UBUNTU_BIONIC_MIN_READY=1
     NODEPOOL_UBUNTU_TRUSTY_MIN_READY=1
     NODEPOOL_UBUNTU_XENIAL_MIN_READY=1
@@ -216,8 +216,8 @@ EOF
     if $NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB ; then
        NODEPOOL_DEBIAN_STRETCH_MIN_READY=0
     fi
-    if $NODEPOOL_PAUSE_FEDORA_28_DIB ; then
-       NODEPOOL_FEDORA_28_MIN_READY=0
+    if $NODEPOOL_PAUSE_FEDORA_29_DIB ; then
+       NODEPOOL_FEDORA_29_MIN_READY=0
     fi
     if $NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB ; then
        NODEPOOL_UBUNTU_BIONIC_MIN_READY=0
@@ -257,8 +257,8 @@ labels:
     min-ready: $NODEPOOL_CENTOS_7_MIN_READY
   - name: debian-stretch
     min-ready: $NODEPOOL_DEBIAN_STRETCH_MIN_READY
-  - name: fedora-28
-    min-ready: $NODEPOOL_FEDORA_28_MIN_READY
+  - name: fedora-29
+    min-ready: $NODEPOOL_FEDORA_29_MIN_READY
   - name: ubuntu-bionic
     min-ready: $NODEPOOL_UBUNTU_BIONIC_MIN_READY
   - name: ubuntu-trusty
@@ -287,7 +287,7 @@ providers:
         config-drive: true
       - name: debian-stretch
         config-drive: true
-      - name: fedora-28
+      - name: fedora-29
         config-drive: true
       - name: ubuntu-bionic
         config-drive: true
@@ -323,8 +323,8 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
-          - name: fedora-28
-            diskimage: fedora-28
+          - name: fedora-29
+            diskimage: fedora-29
             min-ram: 1024
             flavor-name: 'nodepool'
             console-log: True
@@ -411,6 +411,7 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
+      DIB_SIMPLE_INIT_NETWORKMANAGER: '1'
   - name: debian-stretch
     pause: $NODEPOOL_PAUSE_DEBIAN_STRETCH_DIB
     rebuild-age: 86400
@@ -438,8 +439,8 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
-  - name: fedora-28
-    pause: $NODEPOOL_PAUSE_FEDORA_28_DIB
+  - name: fedora-29
+    pause: $NODEPOOL_PAUSE_FEDORA_29_DIB
     rebuild-age: 86400
     elements:
       - fedora-minimal
@@ -449,7 +450,7 @@ diskimages:
       - devuser
       - openssh-server
       - nodepool-setup
-    release: 28
+    release: 29
     env-vars:
       TMPDIR: $NODEPOOL_DIB_BASE_PATH/tmp
       DIB_CHECKSUM: '1'
@@ -460,6 +461,7 @@ diskimages:
       $DIB_GLEAN_INSTALLTYPE
       $DIB_GLEAN_REPOLOCATION
       $DIB_GLEAN_REPOREF
+      DIB_SIMPLE_INIT_NETWORKMANAGER: '1'
   - name: ubuntu-bionic
     pause: $NODEPOOL_PAUSE_UBUNTU_BIONIC_DIB
     rebuild-age: 86400
