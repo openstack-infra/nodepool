@@ -16,6 +16,8 @@
 import os
 import uuid
 import fixtures
+import mock
+import subprocess
 
 from nodepool import builder, exceptions, tests
 from nodepool.driver.fake import provider as fakeprovider
@@ -335,3 +337,10 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
         self.assertEqual(build_default._formats, ['qcow2'])
         self.assertEqual(build_vhd._formats, ['vhd'])
+
+    @mock.patch.object(subprocess.Popen, 'wait')
+    def test_diskimage_build_timeout(self, mock_wait):
+        mock_wait.side_effect = subprocess.TimeoutExpired('dib_cmd', 1)
+        configfile = self.setup_config('diskimage_build_timeout.yaml')
+        self.useBuilder(configfile, cleanup_interval=0)
+        self.waitForBuild('fake-image', '0000000001', states=(zk.FAILED,))

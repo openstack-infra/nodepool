@@ -277,6 +277,12 @@ Options
       Specifies the distro to be used as a base image to build the image using
       diskimage-builder.
 
+   .. attr:: build-timeout
+      :type: int
+
+      How long (in seconds) to wait for the diskimage build before giving up.
+      The default is 8 hours.
+
    .. attr:: elements
       :type: list
 
