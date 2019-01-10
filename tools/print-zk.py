@@ -31,7 +31,7 @@ args = parser.parse_args()
 config = nodepool.config.loadConfig(args.config)
 
 zk = nodepool.zk.ZooKeeper(enable_cache=False)
-zk.connect(config.zookeeper_servers.values())
+zk.connect(list(config.zookeeper_servers.values()))
 
 def join(a, b):
     if a.endswith('/'):
