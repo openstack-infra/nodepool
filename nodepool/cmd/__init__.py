@@ -91,7 +91,9 @@ class NodepoolApp(object):
         return os.path.abspath(os.path.expanduser(path))
 
     def create_parser(self):
-        parser = argparse.ArgumentParser(description=self.app_description)
+        parser = argparse.ArgumentParser(
+            description=self.app_description,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         parser.add_argument('-l',
                             dest='logconfig',
