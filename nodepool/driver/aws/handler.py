@@ -49,8 +49,6 @@ class AwsInstanceLauncher(NodeLauncher):
                 attempts += 1
             time.sleep(1)
 
-        instance.create_tags(Tags=[{'Key': 'nodepool_id',
-                                    'Value': str(self.node.id)}])
         instance_id = instance.id
         self.node.external_id = instance_id
         self.zk.storeNode(self.node)
@@ -60,6 +58,8 @@ class AwsInstanceLauncher(NodeLauncher):
             state = instance.state.get('Name')
             self.log.debug("Instance %s is %s" % (instance_id, state))
             if state == 'running':
+                instance.create_tags(Tags=[{'Key': 'nodepool_id',
+                                            'Value': str(self.node.id)}])
                 break
             time.sleep(0.5)
             instance.reload()
