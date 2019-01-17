@@ -1,0 +1,32 @@
+- name: Configure a multi node environment
+  hosts: all
+  tasks:
+    - name: Set up multi-node firewall
+      include_role:
+        name: multi-node-firewall
+
+    - name: Set up multi-node firewall
+      include_role:
+        name: multi-node-hosts-file
+
+- hosts: launcher
+  roles:
+    - role: bindep
+  tasks:
+    - name: Ensure nodepool services directories
+      file:
+        path: '{{ ansible_user_dir }}/{{ item }}'
+        state: directory
+      with_items:
+        - work/logs/nodepool
+        - work/etc
+        - work/images
+
+    - name: Ensure oc client is installed
+      package:
+        name: origin-clients
+      become: yes
+
+- hosts: cluster
+  roles:
+    - install-openshift

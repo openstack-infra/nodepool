@@ -139,6 +139,21 @@
     required-projects:
       - openstack-infra/nodepool
 
+- job:
+    description: |
+      Test that nodepool works with openshift.
+    name: nodepool-functional-openshift
+    pre-run: playbooks/nodepool-functional-openshift/pre.yaml
+    run: playbooks/nodepool-functional-openshift/run.yaml
+    nodeset:
+      nodes:
+        - name: cluster
+          label: centos-7
+        - name: launcher
+          label: fedora-28
+    required-projects:
+      - openstack-infra/nodepool
+
 - project:
     check:
       jobs:
@@ -154,6 +169,7 @@
         - nodepool-functional-py35-src:
             voting: false
         - nodepool-functional-k8s
+        - nodepool-functional-openshift
         - pbrx-build-container-images:
             vars:
               pbrx_prefix: zuul
