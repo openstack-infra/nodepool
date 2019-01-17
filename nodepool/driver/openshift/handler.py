@@ -118,7 +118,7 @@ class OpenshiftNodeRequestHandler(NodeRequestHandler):
 
         node_states = [node.state for node in self.nodeset]
 
-        # NOTE: It very important that NodeLauncher always sets one of
+        # NOTE: It's very important that NodeLauncher always sets one of
         # these states, no matter what.
         if not all(s in (zk.READY, zk.FAILED, zk.ABORTED)
                    for s in node_states):

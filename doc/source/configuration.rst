@@ -1125,7 +1125,7 @@ Selecting the kubernetes driver adds the following options to the
          .. value:: namespace
 
             Namespace labels provide an empty namespace configured
-            with a service account that can creates pods, services,
+            with a service account that can create pods, services,
             configmaps, etc.
 
          .. value:: pod
@@ -1193,7 +1193,7 @@ Selecting the openshift driver adds the following options to the
 
       Before using the driver, Nodepool services need a ``kube/config`` file
       manually installed with self-provisioner (the service account needs to
-      be able to create project) context.
+      be able to create projects) context.
       Make sure the context is present in ``oc config get-contexts`` command
       output.
 
@@ -1240,13 +1240,13 @@ Selecting the openshift driver adds the following options to the
          .. value:: project
 
             Project labels provide an empty project configured
-            with a service account that can creates pods, services,
+            with a service account that can create pods, services,
             configmaps, etc.
 
          .. value:: pod
 
-            Pod labels provide a dedicated project with a single pod
-            created using the
+            Pod labels provide a new dedicated project with a single
+            pod created using the
             :attr:`providers.[openshift].labels.image` parameter and it
             is configured with a service account that can exec and get
             the logs of the pod.
@@ -1257,12 +1257,18 @@ Selecting the openshift driver adds the following options to the
          :value:`providers.[openshift].labels.type.pod` label type;
          specifies the image name used by the pod.
 
+      .. attr:: image-pull
+         :default: IfNotPresent
+         :type: str
+
+         The ImagePullPolicy, can be IfNotPresent, Always or Never.
+
       .. attr:: cpu
          :type: int
 
          Only used by the
          :value:`providers.[openshift].labels.type.pod` label type;
-         specifies the amount of cpu to request for the pod.
+         specifies the number of cpu to request for the pod.
 
       .. attr:: memory
          :type: int
