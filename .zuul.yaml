@@ -178,9 +178,6 @@
     vars: &nodepool_image_vars
       docker_images:
         - context: .
-          repository: zuul/nodepool-base
-          target: nodepool-base
-        - context: .
           repository: zuul/nodepool
           target: nodepool
         - context: .
