@@ -74,10 +74,11 @@
     parent: nodepool-functional-base
     run: playbooks/nodepool-functional-py35-src/run.yaml
     required-projects:
-      - openstack-infra/glean
-      - openstack-infra/nodepool
-      - openstack/diskimage-builder
-      - openstack/openstacksdk
+      - name: github.com/sqlalchemy/dogpile.cache
+      - name: openstack-infra/glean
+      - name: openstack-infra/nodepool
+      - name: openstack/diskimage-builder
+      - name: openstack/openstacksdk
 
 - job:
     name: nodepool-functional-py35-src

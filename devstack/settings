@@ -23,6 +23,9 @@ DISKIMAGE_BUILDER_REPO_REF=${DISKIMAGE_BUILDER_REPO_REF:-master}
 GLEAN_REPO_URL=${GLEAN_REPO_URL:-https://git.openstack.org/openstack/glean}
 GLEAN_REPO_REF=${GLEAN_REPO_REF:-master}
 
+DOGPILE_CACHE_REPO_URL=${DOGPILE_CACHE_REPO_URL:-https://github.com/sqlalchemy/dogpile.git}
+DOGPILE_CACHE_REPO_REF=${DOGPILE_CACHE_REPO_REF:-master}
+
 enable_service geard
 enable_service statsd
 enable_service nodepool-launcher
