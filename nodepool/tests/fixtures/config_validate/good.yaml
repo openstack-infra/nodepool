@@ -56,6 +56,12 @@ providers:
             instance-properties:
               a_key: a_value
               b_key: b_value
+            userdata: |
+              #cloud-config
+              password: password
+              chpasswd: { expire: False }
+              ssh_pwauth: True
+              hostname: test
 
   - name: cloud2
     driver: openstack

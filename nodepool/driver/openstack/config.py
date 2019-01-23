@@ -87,6 +87,7 @@ class ProviderLabel(ConfigValue):
         self.boot_from_volume = False
         self.volume_size = None
         self.instance_properties = None
+        self.userdata = None
         # The ProviderPool object that owns this label.
         self.pool = None
 
@@ -103,7 +104,8 @@ class ProviderLabel(ConfigValue):
                     other.console_log == self.console_log and
                     other.boot_from_volume == self.boot_from_volume and
                     other.volume_size == self.volume_size and
-                    other.instance_properties == self.instance_properties)
+                    other.instance_properties == self.instance_properties and
+                    other.userdata == self.userdata)
         return False
 
     def __repr__(self):
@@ -203,6 +205,7 @@ class ProviderPool(ConfigPool):
             pl.volume_size = label.get('volume-size', 50)
             pl.instance_properties = label.get('instance-properties',
                                                None)
+            pl.userdata = label.get('userdata', None)
 
             top_label = full_config.labels[pl.name]
             top_label.pools.append(self)
@@ -355,6 +358,7 @@ class OpenStackProviderConfig(ProviderConfig):
             'boot-from-volume': bool,
             'volume-size': int,
             'instance-properties': dict,
+            'userdata': str,
         }
 
         label_min_ram = v.Schema({v.Required('min-ram'): int}, extra=True)

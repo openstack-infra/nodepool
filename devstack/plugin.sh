@@ -328,6 +328,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: debian-stretch
             diskimage: debian-stretch
             min-ram: 512
@@ -336,6 +342,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: fedora-29
             diskimage: fedora-29
             min-ram: 1024
@@ -344,6 +356,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: ubuntu-bionic
             diskimage: ubuntu-bionic
             min-ram: 512
@@ -352,6 +370,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: ubuntu-trusty
             diskimage: ubuntu-trusty
             min-ram: 512
@@ -360,6 +384,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: ubuntu-xenial
             diskimage: ubuntu-xenial
             min-ram: 512
@@ -368,6 +398,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: opensuse-423
             diskimage: opensuse-423
             min-ram: 512
@@ -376,6 +412,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: opensuse-150
             diskimage: opensuse-150
             min-ram: 512
@@ -384,6 +426,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: opensuse-tumbleweed
             diskimage: opensuse-tumbleweed
             min-ram: 512
@@ -392,6 +440,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
           - name: gentoo-17-0-systemd
             diskimage: gentoo-17-0-systemd
             min-ram: 512
@@ -400,6 +454,12 @@ providers:
             key-name: $NODEPOOL_KEY_NAME
             instance-properties:
               nodepool_devstack: testing
+            userdata: |
+              #cloud-config
+              write_files:
+              - content: |
+                  testpassed
+                path: /etc/testfile_nodepool_userdata
 
 diskimages:
   - name: centos-7
