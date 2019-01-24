@@ -6,9 +6,8 @@ python-daemon>=2.0.4,<2.1.0
 extras
 statsd>=3.0
 PrettyTable>=0.6,<0.8
-# openstacksdk 0.20.0 exposes a bug in keystoneauth. The pin can be removed
-# once keystoneauth1 has made a release
-openstacksdk>=0.17.2,!=0.18.0,!=0.20.0
+# openstacksdk before 0.21.0 has issues with dogpile.cache
+openstacksdk>=0.21.0
 diskimage-builder>=2.0.0
 voluptuous
 kazoo

@@ -32,6 +32,7 @@ class Dummy(object):
     INSTANCE = 'Instance'
     FLAVOR = 'Flavor'
     LOCATION = 'Server.Location'
+    PORT = 'Port'
 
     def __init__(self, kind, **kw):
         self.__kind = kind
@@ -105,6 +106,12 @@ class FakeOpenStackCloud(object):
         self._server_list = []
         self.max_cores, self.max_instances, self.max_ram = FakeOpenStackCloud.\
             _get_quota()
+        self._down_ports = [
+            Dummy(Dummy.PORT, id='1a', status='DOWN',
+                  device_owner="compute:nova"),
+            Dummy(Dummy.PORT, id='2b', status='DOWN',
+                  device_owner=None),
+        ]
 
     def _get(self, name_or_id, instance_list):
         self.log.debug("Get %s in %s" % (name_or_id, repr(instance_list)))
@@ -285,6 +292,20 @@ class FakeOpenStackCloud(object):
             total_instances_used=len(self._server_list),
             total_ram_used=8192 * len(self._server_list)
         )
+
+    def list_ports(self, filters=None):
+        if filters and filters.get('status') == 'DOWN':
+            return self._down_ports
+        return []
+
+    def delete_port(self, port_id):
+        tmp_ports = []
+        for port in self._down_ports:
+            if port.id != port_id:
+                tmp_ports.append(port)
+            else:
+                self.log.debug("Deleted port ID: %s", port_id)
+        self._down_ports = tmp_ports
 
 
 class FakeUploadFailCloud(FakeOpenStackCloud):
