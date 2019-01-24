@@ -155,6 +155,61 @@
     required-projects:
       - openstack-infra/nodepool
 
+- secret:
+    name: nodepool-dockerhub
+    data:
+      username: zuulzuul
+      password: !encrypted/pkcs1-oaep
+        - VV5m4XbsYvAz0/7T+WoIypvD3ijRsPYrGo4O5JuOHt6TX14s9B1KddeMwnabEEKapPdbb
+          cwqbzFKoHRMi8DdXiDKxrgbTSC1jb3BvKq7XE0/xF4Bq2dM+r3yDnXS6a7BuijSqFSiMG
+          /9bf0jqEAWXWCvbYUAxKOklJIRLjcKywCP5CulmW6EV8f1Iya8Y7UGpjGyL34FVQuc52Y
+          5MLp+Dra95pvBJMgikbu7LtMPCXOMctUFBpwNArCjWKGhz00UZwyAmsbPPHwQWb+884ZP
+          v9zi2FuRAL+rn4DRVwyIw28ZdCEr5F5EkZon3lSIhikhdQIyHPtW8VwMJTL4RxBdmgcEt
+          +zZBbLlOU+0AHPGLlO/yQNvHeSzwY9pe2oIGuqSu3h6zp6Y0NIE/Q0VpiIXWpOAnLOmno
+          uOd3j9tZ1beol2mg4Yk7rOaXu1Fvtfhd1K3LpLzEbiGzCMIEZuFHU2ZInAbUmtm0BtbDa
+          /bYvI9dB/uqA2xgse5rVMa++v3AfWJTJhFY/wBU4fHOWlFBUZKFuSoijUcWMfnfMMyU2B
+          A5CQKhv4Wmtzbvo/oneYkwFOTYaPNj2DS0BcFJFkR8FZDYmTBPnKoBH5wpwwnrzPOpCMa
+          L21z+Vp1Vce1XCsaOduMrmZDvuQcK1YOKIIUeElAQw8GuwTfcXqekoPvp54SeE=
+
+- job:
+    name: nodepool-build-image
+    parent: build-docker-image
+    description: Build Docker images.
+    vars: &nodepool_image_vars
+      docker_images:
+        - context: .
+          repository: zuul/nodepool-base
+          target: nodepool-base
+        - context: .
+          repository: zuul/nodepool
+          target: nodepool
+        - context: .
+          repository: zuul/nodepool-launcher
+          target: nodepool-launcher
+        - context: .
+          repository: zuul/nodepool-builder
+          target: nodepool-builder
+
+- job:
+    name: nodepool-upload-image
+    parent: upload-docker-image
+    description: Build Docker images and upload to Docker Hub.
+    vars: *nodepool_image_vars
+    secrets:
+      - name: docker_credentials
+        secret: nodepool-dockerhub
+        pass-to-parent: true
+
+- job:
+    name: nodepool-promote-image
+    parent: promote-docker-image
+    description: Promote previously uploaded Docker images.
+    vars: *nodepool_image_vars
+    secrets:
+      - name: docker_credentials
+        secret: nodepool-dockerhub
+        pass-to-parent: true
+
 - project:
     check:
       jobs:
@@ -171,9 +226,7 @@
             voting: false
         - nodepool-functional-k8s
         - nodepool-functional-openshift
-        - pbrx-build-container-images:
-            vars:
-              pbrx_prefix: zuul
+        - nodepool-build-image
         - zuul-quick-start
     gate:
       jobs:
@@ -182,17 +235,14 @@
         - tox-py35
         - tox-py36:
             nodeset: ubuntu-bionic
-        - pbrx-build-container-images:
-            vars:
-              pbrx_prefix: zuul
         - zuul-quick-start
+        - nodepool-upload-image
     post:
       jobs:
         - publish-zuul-docs
-        - openstackzuul-pbrx-push-container-images:
-            vars:
-              pbrx_prefix: zuul
-
+    promote:
+      jobs:
+        - nodepool-promote-image
     experimental:
       jobs:
         - nodepool-functional-py35-debian-src
