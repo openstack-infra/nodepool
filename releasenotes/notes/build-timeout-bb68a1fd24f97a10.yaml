@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    A new option (build-timeout) has been added to the builder diskimage
+    configuration to control how long the builder should wait for image
+    builds before giving up. The default is 8 hours.
