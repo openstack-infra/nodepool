@@ -410,25 +410,20 @@ class DBTestCase(BaseTestCase):
             time.sleep(1)
         self.wait_for_threads()
 
-    def waitForBuild(self, image_name, build_id, states=None):
-        if states is None:
-            states = (zk.READY,)
-
+    def waitForBuild(self, image_name, build_id):
         base = "-".join([image_name, build_id])
-
         while True:
-            self.wait_for_threads()
-            build = self.zk.getBuild(image_name, build_id)
-            if build and build.state in states:
-                break
-            time.sleep(1)
-
-        # We should only expect a dib manifest with a successful build.
-        while build.state == zk.READY:
             self.wait_for_threads()
             files = builder.DibImageFile.from_image_id(
                 self._config_images_dir.path, base)
             if files:
+                break
+            time.sleep(1)
+
+        while True:
+            self.wait_for_threads()
+            build = self.zk.getBuild(image_name, build_id)
+            if build and build.state == zk.READY:
                 break
             time.sleep(1)
 
