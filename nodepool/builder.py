@@ -739,28 +739,21 @@ class BuildWorker(BaseWorker):
         if 'qcow2' in img_types:
             qemu_img_options = DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS
 
-        log_fn = self._getBuildLog(diskimage.name, build_id)
-
-        cmd = ('%s -x -t %s --checksum --no-tmpfs %s -o %s --logfile %s %s' %
+        cmd = ('%s -x -t %s --checksum --no-tmpfs %s -o %s %s' %
                (self.dib_cmd, img_types, qemu_img_options, filename,
-                log_fn, img_elements))
+                img_elements))
 
         self._pruneBuildLogs(diskimage.name)
+        log_fn = self._getBuildLog(diskimage.name, build_id)
 
         self.log.info('Running %s' % (cmd,))
         self.log.info('Logging to %s' % (log_fn,))
 
         start_time = time.monotonic()
-
-        # We used to use readline() on stdout to output the lines to the
-        # build log. Unfortunately, this would block as long as the process
-        # ran (with no easy way to timeout the read) and wedge the builder.
-        # Now we use --logfile option to the dib command and set a timeout
-        # on the wait() call to prevent the wedge.
-        did_timeout = False
         try:
             p = subprocess.Popen(
                 shlex.split(cmd),
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 env=env)
         except OSError as e:
@@ -768,20 +761,17 @@ class BuildWorker(BaseWorker):
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
 
-        try:
-            rc = p.wait(timeout=diskimage.build_timeout)
-        except subprocess.TimeoutExpired:
-            p.kill()
-            did_timeout = True
-            rc = 1
-            self.log.error(
-                "Build timeout for image %s, build %s (log: %s)",
-                diskimage.name, build_id, log_fn)
-        else:
-            # Append return code to dib's log file
-            with open(log_fn, 'ab') as log:
-                m = "Exit code: %s\n" % rc
-                log.write(m.encode('utf8'))
+        with open(log_fn, 'wb') as log:
+            while True:
+                ln = p.stdout.readline()
+                log.write(ln)
+                log.flush()
+                if not ln:
+                    break
+
+            rc = p.wait()
+            m = "Exit code: %s\n" % rc
+            log.write(m.encode('utf8'))
 
         # It's possible the connection to the ZK cluster could have been
         # interrupted during the build. If so, wait for it to return.
@@ -806,10 +796,9 @@ class BuildWorker(BaseWorker):
             self.log.info("ZooKeeper lost while building %s" % diskimage.name)
             self._zk.resetLostFlag()
             build_data.state = zk.FAILED
-        elif p.returncode or did_timeout:
+        elif p.returncode:
             self.log.info(
-                "DIB failed creating %s (%s) (timeout=%s)" % (
-                    diskimage.name, p.returncode, did_timeout))
+                "DIB failed creating %s (%s)" % (diskimage.name, p.returncode))
             build_data.state = zk.FAILED
         else:
             self.log.info("DIB image %s is built" % diskimage.name)

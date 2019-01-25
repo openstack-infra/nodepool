@@ -1,49 +1,10 @@
 #!/bin/bash
 
-outfile=
-outtypes=("qcow2")
-
-all_args=$*
-logfile=
-checksum=
-no_tmpfs=
-qemu_img_options=
-x=
-
-TEMP=$(getopt -o xo:t: --long qemu-img-options:,no-tmpfs,checksum,logfile: -- "$@")
-if [ $? -ne 0 ]; then
-    echo "Invalid option"
-    exit 1
-fi
-eval set -- "$TEMP"
-while true ; do
-    case "$1" in
-        --checksum)
-            checksum=1; shift 1;;
-        --no-tmpfs)
-            no_tmpfs=1; shift 1;;
-        --qemu-img-options)
-            qemu_img_options=$2; shift 2;;
-        --logfile)
-            logfile=$2; shift 2;;
-        -o) outfile=$2; shift 2;;
-        -t) IFS="," read -a outtypes <<< "$2"; shift 2;;
-        -x) x=1; shift;;
-        --) shift ; break ;;
-        *) echo "Unknown option : $1"; exit 1;;
-    esac
-done
-
-# If --logfile was given, direct stdout to it, as well
-if [ ! -z "$logfile" ]; then
-    exec > >(tee -a ${logfile})
-fi
-
 echo "*** fake-image-create: start"
 
 echo "arguments:"
 echo "----"
-echo "$all_args"
+echo $*
 echo "----"
 
 if [[ "${SHOULD_FAIL}" == 'true' ]]; then
@@ -77,21 +38,30 @@ if [[ "${BASE_IMAGE_FILE}" != "Fedora-Cloud-Base-20141029-21_Beta.x86_64.qcow2" 
     exit 1
 fi
 
-if [ ! -z "$logfile" ]; then
-    echo " -> logfile: $logfile"
+outfile=
+outtypes=("qcow2")
+
+TEMP=$(getopt -o xo:t: --long qemu-img-options:,no-tmpfs,checksum -- "$@")
+if [ $? -ne 0 ]; then
+    echo "Invalid option"
+    exit 1
 fi
-if [ ! -z "$checksum" ]; then
-    echo " -> set --checksum"
-fi
-if [ ! -z "$no_tmpfs" ]; then
-    echo " -> set --no-tmpfs"
-fi
-if [ ! -z "$qemu_img_options" ]; then
-    echo " -> qemu-img-options: $qemu_img_options"
-fi
-if [ ! -z "$x" ]; then
-    echo " -> debugging enabled"
-fi
+eval set -- "$TEMP"
+while true ; do
+    case "$1" in
+        --checksum)
+            echo " -> set --checksum"; shift 1;;
+        --no-tmpfs)
+            echo " -> set --no-tmpfs"; shift 1;;
+        --qemu-img-options)
+            echo " -> qemu-img-options: $2"; shift 2;;
+        -o) outfile=$2; shift 2;;
+        -t) IFS="," read -a outtypes <<< "$2"; shift 2;;
+        -x) echo " -> debugging enabled"; shift;;
+        --) shift ; break ;;
+        *) echo "Unknown option : $1"; exit 1;;
+    esac
+done
 
 if [ -z "$outfile" ]; then
     echo "No output file specified."
