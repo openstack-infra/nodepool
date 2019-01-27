@@ -18,16 +18,14 @@ FROM opendevorg/python-builder as builder
 COPY . /tmp/src
 RUN assemble
 
-FROM opendevorg/python-base as nodepool-base
+FROM opendevorg/python-base as nodepool
 
 COPY --from=builder /output/ /output
 RUN /output/install-from-bindep
-
-FROM nodepool-base as nodepool
 CMD ["/usr/local/bin/nodepool"]
 
-FROM nodepool-base as nodepool-launcher
+FROM nodepool as nodepool-launcher
 CMD ["/usr/local/bin/nodepool-launcher"]
 
-FROM nodepool-base as nodepool-builder
+FROM nodepool as nodepool-builder
 CMD ["/usr/local/bin/nodepool-builder"]
