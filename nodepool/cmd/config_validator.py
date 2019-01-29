@@ -44,6 +44,7 @@ class ConfigValidator:
             'rebuild-age': int,
             'env-vars': {str: str},
             'username': str,
+            'build-timeout': int,
         }
 
         webapp = {

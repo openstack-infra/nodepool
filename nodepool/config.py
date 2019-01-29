@@ -118,6 +118,7 @@ class Config(ConfigValue):
             d.image_types = set(diskimage.get('formats', []))
             d.pause = bool(diskimage.get('pause', False))
             d.username = diskimage.get('username', 'zuul')
+            d.build_timeout = diskimage.get('build-timeout', (8 * 60 * 60))
             self.diskimages[d.name] = d
 
     def setSecureDiskimageEnv(self, diskimages, secure_config_path):
@@ -179,6 +180,7 @@ class DiskImage(ConfigValue):
         self.image_types = None
         self.pause = False
         self.username = None
+        self.build_timeout = None
 
     def __eq__(self, other):
         if isinstance(other, DiskImage):
@@ -189,7 +191,8 @@ class DiskImage(ConfigValue):
                     other.env_vars == self.env_vars and
                     other.image_types == self.image_types and
                     other.pause == self.pause and
-                    other.username == self.username)
+                    other.username == self.username and
+                    other.build_timeout == self.build_timeout)
         return False
 
     def __repr__(self):
