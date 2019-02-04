@@ -77,7 +77,7 @@ def nodescan(ip, port=22, timeout=60, gather_hostkeys=True):
     key = None
     for count in iterate_timeout(
             timeout, exceptions.ConnectionTimeoutException,
-            "connection on port %s" % port):
+            "connection to %s on port %s" % (ip, port)):
         sock = None
         t = None
         try:
