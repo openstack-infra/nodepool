@@ -364,6 +364,12 @@ Options
          openshift driver, see the separate section
          :attr:`providers.[openshift]`
 
+      .. value:: aws
+
+         For details on the extra options required and provided by the
+         AWS driver, see the separate section
+         :attr:`providers.[aws]`
+
 
 OpenStack Driver
 ----------------
@@ -1291,3 +1297,237 @@ Selecting the openshift driver adds the following options to the
          Only used by the
          :value:`providers.[openshift].labels.type.pod` label type;
          specifies the amount of memory in MB to request for the pod.
+
+AWS EC2 Driver
+--------------
+
+Selecting the aws driver adds the following options to the :attr:`providers`
+section of the configuration.
+
+.. attr-overview::
+   :prefix: providers.[aws]
+   :maxdepth: 3
+
+.. attr:: providers.[aws]
+   :type: list
+
+   An AWS provider's resources are partitioned into groups called `pool`
+   (see :attr:`providers.[aws].pools` for details), and within a pool,
+   the node types which are to be made available are listed
+   (see :attr:`providers.[aws].pools.labels` for details).
+
+   See `Boto Configuration`_ for information on how to configure credentials
+   and other settings for AWS access in Nodepool's runtime environment.
+
+   .. note:: For documentation purposes the option names are prefixed
+             ``providers.[aws]`` to disambiguate from other
+             drivers, but ``[aws]`` is not required in the
+             configuration (e.g. below
+             ``providers.[aws].pools`` refers to the ``pools``
+             key in the ``providers`` section when the ``aws``
+             driver is selected).
+
+   Example:
+
+   .. code-block:: yaml
+
+     providers:
+       - name: ec2-us-west-2
+         driver: aws
+         region-name: us-west-2
+         cloud-images:
+           - name: debian9
+             image-id: ami-09c308526d9534717
+             username: admin
+         pools:
+           - name: main
+             max-servers: 5
+             subnet-id: subnet-0123456789abcdef0
+             security-group-id: sg-01234567890abcdef
+             labels:
+               - name: debian9
+                 cloud-image: debian9
+                 flavor-name: t3.medium
+                 key-name: zuul
+               - name: debian9-large
+                 cloud-image: debian9
+                 flavor-name: t3.large
+                 key-name: zuul
+
+   .. attr:: name
+      :required:
+
+      A unique name for this provider configuration.
+
+   .. attr:: region
+      :required:
+
+      Name of the `AWS region`_ to interact with.
+
+   .. attr:: profile-name
+
+      The AWS credentials profile to load for this provider. If unspecified the
+      `boto3` library will select a profile.
+
+      See `Boto Configuration`_ for more information.
+
+   .. attr:: boot-timeout
+      :type: int seconds
+      :default: 60
+
+      Once an instance is active, how long to try connecting to the
+      image via SSH.  If the timeout is exceeded, the node launch is
+      aborted and the instance deleted.
+
+   .. attr:: launch-retries
+      :default: 3
+
+      The number of times to retry launching a node before considering
+      the job failed.
+
+   .. attr:: cloud-images
+      :type: list
+
+      Each entry in this section must refer to an entry in the
+      :attr:`providers.[aws].cloud-images` section.
+
+      .. code-block:: yaml
+
+         cloud-images:
+           - name: ubuntu1804
+             image-id: ami-082fd9a18128c9e8c
+             username: ubuntu
+           - name: my-custom-win2k3
+             connection-type: winrm
+             username: admin
+
+      Each entry is a dictionary with the following keys
+
+      .. attr:: name
+         :type: string
+         :required:
+
+         Identifier to refer this cloud-image from :attr:`labels` section.
+         Since this name appears elsewhere in the nodepool configuration file,
+         you may want to use your own descriptive name here and use
+         ``image-id`` to specify the cloud image so that if
+         the image id changes on the cloud, the impact to your Nodepool
+         configuration will be minimal. However, if ``image-id`` is not
+         provided, this is assumed to be the image id in the cloud.
+
+      .. attr:: image-id
+         :type: str
+
+         If this is provided, it is used to select the image from the cloud
+         provider by ID.
+
+      .. attr:: username
+         :type: str
+
+         The username that a consumer should use when connecting to the node.
+
+      .. attr:: connection-type
+         :type: str
+
+         The connection type that a consumer should use when connecting to the
+         node. For most images this is not necessary. However when creating
+         Windows images this could be 'winrm' to enable access via ansible.
+
+      .. attr:: connection-port
+         :type: int
+         :default: 22/ 5986
+
+         The port that a consumer should use when connecting to the node. For
+         most diskimages this is not necessary. This defaults to 22 for ssh and
+         5986 for winrm.
+
+   .. attr:: pools
+      :type: list
+
+      A pool defines a group of resources from an AWS provider. Each pool has a
+      maximum number of nodes which can be launched from it, along with a number
+      of cloud-related attributes used when launching nodes.
+
+      .. attr:: name
+         :required:
+
+         A unique name within the provider for this pool of resources.
+
+      .. attr:: subnet-id
+
+         If provided, specifies the subnet to assign to the primary network
+         interface of nodes.
+
+      .. attr:: security-group-id
+
+         If provided, specifies the security group ID to assign to the primary
+         network interface of nodes.
+
+      .. attr:: host-key-checking
+         :type: bool
+         :default: True
+
+         Specify custom behavior of validation of SSH host keys.  When set to
+         False, nodepool-launcher will not ssh-keyscan nodes after they are
+         booted. This might be needed if nodepool-launcher and the nodes it
+         launches are on different networks.  The default value is True.
+
+      .. attr:: labels
+         :type: list
+
+         Each entry in a pool's `labels` section indicates that the
+         corresponding label is available for use in this pool.  When creating
+         nodes for a label, the flavor-related attributes in that label's
+         section will be used.
+
+         .. code-block:: yaml
+
+            labels:
+              - name: bionic
+                flavor-name: m5a.large
+                console-log: True
+
+         Each entry is a dictionary with the following keys
+
+           .. attr:: name
+              :type: str
+              :required:
+
+              Identifier to refer this label.
+
+           .. attr:: cloud-image
+              :type: str
+              :required:
+
+              Refers to the name of an externally managed image in the
+              cloud that already exists on the provider. The value of
+              ``cloud-image`` should match the ``name`` of a previously
+              configured entry from the ``cloud-images`` section of the
+              provider. See :attr:`providers.[aws].cloud-images`.
+
+           .. attr:: flavor-name
+              :type: str
+              :required:
+
+              Name of the flavor to use.
+
+           .. attr:: key-name
+              :type: string
+
+              If given, the name of a keypair that will be used when
+              booting each server.
+
+           .. attr:: volume-type
+              :type: string
+
+              If given, the root `EBS volume type`_
+
+           .. attr:: volume-size
+              :type: int
+
+              If given, the size of the root EBS volume, in GiB.
+
+
+.. _`EBS volume type`: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html
+.. _`AWS region`: https://docs.aws.amazon.com/general/latest/gr/rande.html
+.. _`Boto configuration`: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html
