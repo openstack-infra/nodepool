@@ -1,0 +1,26 @@
+zookeeper-servers:
+  - host: null
+    port: null
+    chroot: null
+
+labels:
+  - name: ubuntu1404
+
+providers:
+  - name: ec2-us-west-2
+    driver: aws
+    region-name: us-west-2
+    cloud-images:
+      - name: ubuntu1404
+        image-id: ami-1e749f67
+        username: ubuntu
+    pools:
+      - name: main
+        max-servers: 5
+        subnet-id: null
+        security-group-id: null
+        labels:
+          - name: ubuntu1404
+            cloud-image: ubuntu1404
+            flavor-name: t3.medium
+            key-name: zuul

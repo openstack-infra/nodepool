@@ -7,3 +7,4 @@ python-subunit
 stestr>=1.0.0 # Apache-2.0
 testscenarios
 testtools>=0.9.27
+moto
