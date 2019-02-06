@@ -13,8 +13,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import fcntl
 import logging
 import os
+import select
 import shutil
 import socket
 import subprocess
@@ -41,6 +43,9 @@ SUSPEND_WAIT_TIME = 30
 # HP Cloud requires qemu compat with 0.10. That version works elsewhere,
 # so just hardcode it for all qcow2 building
 DEFAULT_QEMU_IMAGE_COMPAT_OPTIONS = "--qemu-img-options 'compat=0.10'"
+
+# DIB process polling timeout, in milliseconds
+BUILD_PROCESS_POLL_TIMEOUT = 30 * 1000
 
 
 class DibImageFile(object):
@@ -750,6 +755,7 @@ class BuildWorker(BaseWorker):
         self.log.info('Logging to %s' % (log_fn,))
 
         start_time = time.monotonic()
+
         try:
             p = subprocess.Popen(
                 shlex.split(cmd),
@@ -761,17 +767,73 @@ class BuildWorker(BaseWorker):
                 "Failed to exec '%s'. Error: '%s'" % (cmd, e.strerror)
             )
 
-        with open(log_fn, 'wb') as log:
-            while True:
-                ln = p.stdout.readline()
-                log.write(ln)
-                log.flush()
-                if not ln:
-                    break
+        # Make subprocess stdout non-blocking
+        fd = p.stdout.fileno()
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
-            rc = p.wait()
-            m = "Exit code: %s\n" % rc
-            log.write(m.encode('utf8'))
+        # Poll subprocess stdout for readability
+        r, w, e = select.select([fd], [], [], 0)
+        bitmask = (select.POLLIN | select.POLLHUP)
+        poll = select.poll()
+        poll.register(fd, bitmask)
+
+        rc = None
+        did_timeout = False
+        subprocess_done = False
+
+        def buildDidTimeout():
+            build_time = time.monotonic() - start_time
+            if build_time > diskimage.build_timeout:
+                return True
+            return False
+
+        with open(log_fn, 'wb') as log:
+
+            # While the subprocess is running, we will loop through stdout
+            # events. If we can read data, write that out to the log file.
+            # If the subprocess completes, set the flag so we can exit and
+            # write the return code.
+            #
+            # We check for build timeouts in two places: after we have read
+            # all available data in the buffer (which will cause an early exit
+            # of the poll loop), and after a poll timeout. If we did not have
+            # a check after the reads, we would have to have a poll timeout
+            # to occur to check for a build timeout, which may not happen if
+            # there is constantly data available for reading.
+
+            while not subprocess_done:
+                for fd, event in poll.poll(BUILD_PROCESS_POLL_TIMEOUT):
+
+                    # Data available for reading
+                    if event & select.POLLIN:
+                        data = p.stdout.read(1024)
+                        while data:
+                            log.write(data)
+                            log.flush()
+                            data = p.stdout.read(1024)
+                        if buildDidTimeout():
+                            break
+
+                    # Subprocess complete
+                    elif event & select.POLLHUP:
+                        subprocess_done = True
+                        rc = p.wait()
+
+                if not subprocess_done:
+                    if buildDidTimeout():
+                        did_timeout = True
+                        rc = 1
+                        self.log.error(
+                            "Build timeout for image %s, build %s (log: %s)",
+                            diskimage.name, build_id, log_fn)
+                        p.kill()
+                        break
+
+            # Subprocess finished, write return code
+            if not did_timeout:
+                m = "Exit code: %s\n" % rc
+                log.write(m.encode('utf8'))
 
         # It's possible the connection to the ZK cluster could have been
         # interrupted during the build. If so, wait for it to return.
@@ -796,9 +858,10 @@ class BuildWorker(BaseWorker):
             self.log.info("ZooKeeper lost while building %s" % diskimage.name)
             self._zk.resetLostFlag()
             build_data.state = zk.FAILED
-        elif p.returncode:
+        elif p.returncode or did_timeout:
             self.log.info(
-                "DIB failed creating %s (%s)" % (diskimage.name, p.returncode))
+                "DIB failed creating %s (%s) (timeout=%s)" % (
+                    diskimage.name, p.returncode, did_timeout))
             build_data.state = zk.FAILED
         else:
             self.log.info("DIB image %s is built" % diskimage.name)
