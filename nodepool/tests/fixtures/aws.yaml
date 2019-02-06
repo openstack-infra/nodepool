@@ -22,5 +22,5 @@ providers:
         labels:
           - name: ubuntu1404
             cloud-image: ubuntu1404
-            flavor-name: t3.medium
+            instance-type: t3.medium
             key-name: zuul

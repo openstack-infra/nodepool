@@ -1347,11 +1347,11 @@ section of the configuration.
              labels:
                - name: debian9
                  cloud-image: debian9
-                 flavor-name: t3.medium
+                 instance-type: t3.medium
                  key-name: zuul
                - name: debian9-large
                  cloud-image: debian9
-                 flavor-name: t3.large
+                 instance-type: t3.large
                  key-name: zuul
 
    .. attr:: name
@@ -1484,7 +1484,7 @@ section of the configuration.
 
             labels:
               - name: bionic
-                flavor-name: m5a.large
+                instance-type: m5a.large
                 console-log: True
 
          Each entry is a dictionary with the following keys
@@ -1505,7 +1505,7 @@ section of the configuration.
               configured entry from the ``cloud-images`` section of the
               provider. See :attr:`providers.[aws].cloud-images`.
 
-           .. attr:: flavor-name
+           .. attr:: instance-type
               :type: str
               :required:
 
