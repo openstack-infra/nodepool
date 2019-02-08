@@ -12,5 +12,6 @@ make [compile test platform:apk]
 musl-dev [compile test platform:apk]
 python3-dev [compile test platform:dpkg]
 python3-devel [compile test platform:rpm]
+sudo
 zookeeperd [platform:dpkg test]
 zookeeper [platform:rpm test]
