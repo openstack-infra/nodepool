@@ -107,13 +107,13 @@ class AwsProvider(Provider):
         return True
 
     def createInstance(self, label):
-        image_name = label.cloud_image.external_name
+        image_id = label.cloud_image.external_name
         args = dict(
-            ImageId=image_name,
+            ImageId=image_id,
             MinCount=1,
             MaxCount=1,
             KeyName=label.key_name,
-            InstanceType=label.flavor_name,
+            InstanceType=label.instance_type,
             NetworkInterfaces=[{
                 'AssociatePublicIpAddress': True,
                 'DeviceIndex': 0}])
@@ -129,7 +129,7 @@ class AwsProvider(Provider):
         # We might need to supply our own mapping before lauching the instance.
         # We basically want to make sure DeleteOnTermination is true and be
         # able to set the volume type and size.
-        image = self.getImage(image_name)
+        image = self.getImage(image_id)
         # TODO: Flavors can also influence whether or not the VM spawns with a
         # volume -- we basically need to ensure DeleteOnTermination is true
         if hasattr(image, 'block_device_mappings'):

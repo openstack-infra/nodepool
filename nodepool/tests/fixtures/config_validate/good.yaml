@@ -155,7 +155,7 @@ providers:
         labels:
           - name: centos-ami
             cloud-image: centos-ami
-            flavor-name: t2.micro
+            instance-type: t2.micro
             key-name: zuul
             volume-type: gp2
             volume-size: 80
