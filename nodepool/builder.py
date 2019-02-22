@@ -888,12 +888,13 @@ class BuildWorker(BaseWorker):
 
         if self._statsd:
             # report result to statsd
-            for ext in img_types.split(','):
-                key_base = 'nodepool.dib_image_build.%s.%s' % (
-                    diskimage.name, ext)
-                pipeline.gauge(key_base + '.rc', rc)
-                pipeline.timing(key_base + '.duration',
-                                int(build_time * 1000))
+            key_base = 'nodepool.dib_image_build.%s.status' % (
+                diskimage.name)
+            pipeline.timing(key_base + '.duration',
+                            int(build_time * 1000))
+            pipeline.gauge(key_base + '.rc', rc)
+            pipeline.gauge(key_base + '.last_build',
+                           int(time.time()))
             pipeline.send()
 
         return build_data

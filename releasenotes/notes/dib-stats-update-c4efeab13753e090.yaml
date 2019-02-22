@@ -1,0 +1,12 @@
+---
+upgrade:
+  - The diskimage-builder stats have been reworked to be more useful.
+    The return code and duration is now stored in
+    ``nodepool.dib_image-build.<diskimage_name>.status.<rc|duration>``;
+    previously this was split for each image format.  This is
+    unnecessary and confusing since the results will always be the
+    same, since all formats are generated from the same
+    diskimage-builder run.  An additional gauge
+    ``nodepool.dib_image_build.<diskimage_name>.status.last_build`` is
+    added to make it easy to show relative time of builds in
+    dashboards.
