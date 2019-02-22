@@ -854,6 +854,9 @@ class BuildWorker(BaseWorker):
         build_data.builder = self._hostname
         build_data.username = diskimage.username
 
+        if self._statsd:
+            pipeline = self._statsd.pipeline()
+
         if self._zk.didLoseConnection:
             self.log.info("ZooKeeper lost while building %s" % diskimage.name)
             self._zk.resetLostFlag()
@@ -881,16 +884,17 @@ class BuildWorker(BaseWorker):
                     size = os.stat("%s.%s" % (filename, ext)).st_blocks * 512
                     self.log.debug("%s created image %s.%s (size: %d) " %
                                    (diskimage.name, filename, ext, size))
-                    self._statsd.gauge(key, size)
+                    pipeline.gauge(key, size)
 
         if self._statsd:
             # report result to statsd
             for ext in img_types.split(','):
                 key_base = 'nodepool.dib_image_build.%s.%s' % (
                     diskimage.name, ext)
-                self._statsd.gauge(key_base + '.rc', rc)
-                self._statsd.timing(key_base + '.duration',
-                                    int(build_time * 1000))
+                pipeline.gauge(key_base + '.rc', rc)
+                pipeline.timing(key_base + '.duration',
+                                int(build_time * 1000))
+            pipeline.send()
 
         return build_data
 

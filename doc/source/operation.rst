@@ -294,15 +294,15 @@ Nodepool builder
    Number of image uploads to a specific provider in the cloud plus the time in
    seconds spent to upload the image.
 
-.. zuul:stat:: nodepool.builder.dib_image_build.<diskimage_name>.<ext>.rc
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.rc
    :type: gauge
 
    Return code of the DIB.
 
-.. zuul:stat:: nodepool.builder.dib_image_build.<diskimage_name>.<ext>.duration
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.duration
    :type: timer
 
-   Time the DIB run took.
+   Time the DIB run took in ms
 
 Nodepool launcher
 ~~~~~~~~~~~~~~~~~

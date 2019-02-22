@@ -326,6 +326,8 @@ class TestNodePoolBuilder(tests.DBTestCase):
                                 '0', 'g')
         self.assertReportedStat('nodepool.dib_image_build.'
                                 'fake-image.tar.duration', None, 'ms')
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image.tar.size', '4096', 'g')
 
     def test_diskimage_build_formats(self):
         configfile = self.setup_config('node_diskimage_formats.yaml')
@@ -336,6 +338,11 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
         self.assertEqual(build_default._formats, ['qcow2'])
         self.assertEqual(build_vhd._formats, ['vhd'])
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image-default-format.qcow2.size',
+                                '4096', 'g')
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image-vhd.vhd.size', '4096', 'g')
 
     @mock.patch('select.poll')
     def test_diskimage_build_timeout(self, mock_poll):
