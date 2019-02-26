@@ -536,6 +536,63 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(nodes[0].username, 'zuul')
         self.assertNotEqual(nodes[0].host_keys, [])
 
+    def test_node_request_provider(self):
+        """Test that a node request for a specific provider is honored"""
+        configfile = self.setup_config('node_two_provider.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        # Validate we have images in both providers
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        self.waitForNodes('fake-label', 1)
+
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.provider = 'fake-provider'
+        req1.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req1)
+
+        req2 = zk.NodeRequest()
+        req2.state = zk.REQUESTED
+        req2.provider = 'fake-provider2'
+        req2.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req2)
+
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+        self.assertEqual(len(req1.nodes), 1)
+        node = self.zk.getNode(req1.nodes[0])
+        self.assertEqual(node.provider, 'fake-provider')
+
+        req2 = self.waitForNodeRequest(req2)
+        self.assertEqual(req2.state, zk.FULFILLED)
+        self.assertEqual(len(req2.nodes), 1)
+        node = self.zk.getNode(req2.nodes[0])
+        self.assertEqual(node.provider, 'fake-provider2')
+
+    def test_node_request_invalid_provider(self):
+        """Test that a node request for a missing provider is handled"""
+        configfile = self.setup_config('node_two_provider.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+        # Validate we have images in both providers
+        self.waitForImage('fake-provider', 'fake-image')
+        self.waitForImage('fake-provider2', 'fake-image')
+        self.waitForNodes('fake-label', 1)
+
+        req1 = zk.NodeRequest()
+        req1.state = zk.REQUESTED
+        req1.provider = 'missing-provider'
+        req1.node_types.append('fake-label')
+        self.zk.storeNodeRequest(req1)
+
+        req1 = self.waitForNodeRequest(req1)
+        self.assertEqual(req1.state, zk.FULFILLED)
+        self.assertEqual(len(req1.nodes), 1)
+        self.zk.getNode(req1.nodes[0])
+
     def test_node_boot_from_volume(self):
         """Test that an image and node are created from a volume"""
         configfile = self.setup_config('node_boot_from_volume.yaml')

@@ -442,6 +442,7 @@ class NodeRequest(BaseModel):
         self.nodes = []
         self.reuse = True
         self.requestor = None
+        self.provider = None
         self.relative_priority = 0
 
     def __repr__(self):
@@ -458,6 +459,7 @@ class NodeRequest(BaseModel):
                     self.nodes == other.nodes and
                     self.reuse == other.reuse and
                     self.requestor == other.requestor and
+                    self.provider == other.provider and
                     self.relative_priority == other.relative_priority)
         else:
             return False
@@ -472,6 +474,7 @@ class NodeRequest(BaseModel):
         d['nodes'] = self.nodes
         d['reuse'] = self.reuse
         d['requestor'] = self.requestor
+        d['provider'] = self.provider
         d['relative_priority'] = self.relative_priority
         return d
 
@@ -497,6 +500,7 @@ class NodeRequest(BaseModel):
         self.nodes = d.get('nodes', [])
         self.reuse = d.get('reuse', True)
         self.requestor = d.get('requestor')
+        self.provider = d.get('provider')
         self.relative_priority = d.get('relative_priority', 0)
 
 
