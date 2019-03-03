@@ -1,0 +1,15 @@
+---
+upgrade:
+  - |
+    The ``TaskManager`` used by the OpenStack provider has been removed.
+    The ``keystoneauth1`` library underneath ``openstacksdk`` has grown
+    support for rate limiting using a ``FairSemaphore`` instead of a pool
+    of worker threads. This should reduce the overall thread count.
+  - |
+    statsd key names have changed. Because of the removal of ``TaskManager``
+    statsd calls are being deferred to openstacksdk. Instead of keys of the
+    form ``ComputeGetServers``, the openstacksdk keys are of the form
+    ``compute.GET.servers``. They will always start with the normalized
+    ``service-type``, followed by the HTTP verb, followed by a ``.`` separated
+    list of url segments. Any service version, project-id entries in the url
+    or ``.json`` suffixes will be removed.

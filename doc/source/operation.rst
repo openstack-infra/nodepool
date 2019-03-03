@@ -517,12 +517,11 @@ OpenStack API stats
 ~~~~~~~~~~~~~~~~~~~
 
 Low level details on the timing of OpenStack API calls will be logged
-by the API task manager.  These calls are logged under
+by ``openstacksdk``. These calls are logged under
 ``nodepool.task.<provider>.<api-call>``.  The API call name is of the
-generic format ``<endpoint><method><operation>`` transformed into a
-CamelCase value with no deliminators; for example the
-``compute.GET.servers`` call becomes ``ComputeGetServers`` and
-``compute.POST.os-volumes_boot`` becomes ``ComputePostOsVolumesBoot``.
+generic format ``<service-type>.<method>.<operation>``. For example, the
+``GET /servers`` call to the ``compute`` service becomes
+``compute.GET.servers``.
 
 Since these calls reflect the internal operations of the
 ``openstacksdk``, the exact keys logged may vary across providers and
