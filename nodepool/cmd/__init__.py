@@ -106,9 +106,16 @@ class NodepoolApp(object):
         return parser
 
     def parse_args(self):
-        args = self.parser.parse_args()
-        self.logconfig = self.get_path(args.logconfig)
-        return args
+        self.args = self.parser.parse_args()
+        self.logconfig = self.get_path(self.args.logconfig)
+
+        # The arguments debug and foreground both lead to nodaemon mode so
+        # set nodaemon if one of them is set.
+        if ((hasattr(self.args, 'debug') and self.args.debug) or
+                (hasattr(self.args, 'foreground') and self.args.foreground)):
+            self.args.nodaemon = True
+        else:
+            self.args.nodaemon = False
 
     def setup_logging(self):
         if self.logconfig:
@@ -118,7 +125,8 @@ class NodepoolApp(object):
             # config, leave the config set to emit to stdout.
             if hasattr(self.args, 'nodaemon') and self.args.nodaemon:
                 logging_config = logconfig.ServerLoggingConfig()
-                logging_config.setDebug()
+                if hasattr(self.args, 'debug') and self.args.debug:
+                    logging_config.setDebug()
             else:
                 # Setting a server value updates the defaults to use
                 # WatchedFileHandler on /var/log/nodepool/{server}-debug.log
@@ -132,7 +140,7 @@ class NodepoolApp(object):
             argv = sys.argv[1:]
 
         self.parser = self.create_parser()
-        self.args = self.parse_args()
+        self.parse_args()
         return self._do_run()
 
     def _do_run(self):
@@ -161,16 +169,19 @@ class NodepoolDaemonApp(NodepoolApp):
                             default='/var/run/nodepool/%s.pid' % self.app_name)
 
         parser.add_argument('-d',
-                            dest='nodaemon',
+                            dest='debug',
+                            action='store_true',
+                            help='do not run as a daemon with debug logging')
+        parser.add_argument('-f',
+                            dest='foreground',
                             action='store_true',
                             help='do not run as a daemon')
 
         return parser
 
     def parse_args(self):
-        args = super(NodepoolDaemonApp, self).parse_args()
-        self.pidfile = self.get_path(args.pidfile)
-        return args
+        super().parse_args()
+        self.pidfile = self.get_path(self.args.pidfile)
 
     def _do_run(self):
         if self.args.nodaemon:
