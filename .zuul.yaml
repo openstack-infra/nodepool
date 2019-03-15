@@ -212,9 +212,9 @@
       jobs:
         - tox-docs
         - tox-pep8
-        - tox-py35
-        - tox-py36:
-            nodeset: ubuntu-bionic
+        - tox-py35:
+            nodeset: ubuntu-xenial
+        - tox-py36
         - nodepool-zuul-functional:
             voting: false
         - nodepool-functional-py35:
@@ -229,9 +229,9 @@
       jobs:
         - tox-docs
         - tox-pep8
-        - tox-py35
-        - tox-py36:
-            nodeset: ubuntu-bionic
+        - tox-py35:
+            nodeset: ubuntu-xenial
+        - tox-py36
         - zuul-quick-start
         - nodepool-upload-image
     post:
