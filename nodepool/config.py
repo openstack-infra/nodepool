@@ -225,7 +225,7 @@ def openConfig(path):
     # attempt to reload it.
     while True:
         try:
-            config = yaml.load(open(path))
+            config = yaml.safe_load(open(path))
             break
         except IOError as e:
             if e.errno == 2:
