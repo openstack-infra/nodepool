@@ -205,19 +205,140 @@ alien-image-list
 Removing a Provider
 -------------------
 
-To remove a provider, remove all of the images from that provider`s
-configuration (and remove all instances of that provider from any
-labels) and set that provider's max-servers to -1.  This will instruct
-Nodepool to delete any images uploaded to that provider, not upload
-any new ones, and stop booting new nodes on the provider.  You can
-then let the nodes go through their normal lifecycle.  Once all nodes
-have been deleted you remove the config from nodepool for that
-provider entirely (though leaving it in this state is effectively the
-same and makes it easy to turn the provider back on).
+Removing a provider from nodepool involves two separate steps: removing from
+the builder process, and removing from the launcher process.
 
-If urgency is required you can delete the nodes directly instead of
-waiting for them to go through their normal lifecycle but the effect
-is the same.
+.. warning::
+
+  Since the launcher process depends on images being present in the provider,
+  you should follow the process for removing a provider from the launcher
+  before doing the steps to remove it from the builder.
+
+Removing from the Launcher
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To remove a provider from the launcher, set that provider's ``max-servers``
+value to 0 (or any value less than 0). This disables the provider and will
+instruct the launcher to stop booting new nodes on the provider. You can then
+let the nodes go through their normal lifecycle. Once all nodes have been
+deleted, you may remove the provider from launcher configuration file entirely,
+although leaving it in this state is effectively the same and makes it easy
+to turn the provider back on.
+
+.. note::
+
+  There is currently no way to force the launcher to immediately begin
+  deleting any unused instances from a disabled provider. If urgency is
+  required, you can delete the nodes directly instead of waiting for them
+  to go through their normal lifecycle, but the effect is the same.
+
+For example, if you want to remove ProviderA from a launcher with a
+configuration file defined as::
+
+  providers:
+    - name: ProviderA
+      region-name: region1
+      cloud: ProviderA
+      boot-timeout: 120
+      diskimages:
+        - name: centos
+        - name: fedora
+      pools:
+        - name: main
+          max-servers: 100
+          labels:
+            - name: centos
+              min-ram: 8192
+              flavor-name: Performance
+              diskimage: centos
+              key-name: root-key
+
+Then you would need to alter the configuration to::
+
+  providers:
+    - name: ProviderA
+      region-name: region1
+      cloud: ProviderA
+      boot-timeout: 120
+      diskimages:
+        - name: centos
+        - name: fedora
+      pools:
+        - name: main
+          max-servers: 0
+          labels:
+            - name: centos
+              min-ram: 8192
+              flavor-name: Performance
+              diskimage: centos
+              key-name: root-key
+
+.. note::
+
+  The launcher process will automatically notice any changes in its
+  configuration file, so there is no need to restart the service to
+  pick up the change.
+
+Removing from the Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The builder controls image building, uploading, and on-disk cleanup.
+The builder needs a chance to properly manage these resources for a removed
+a provider. To do this, you need to first set the ``diskimage`` configuration
+section for the provider you want to remove to an empty list.
+
+.. warning::
+
+  Make sure the provider is disabled in the launcher before disabling in
+  the builder.
+
+For example, if you want to remove ProviderA from a builder with a
+configuration file defined as::
+
+  providers:
+    - name: ProviderA
+      region-name: region1
+      diskimages:
+        - name: centos
+        - name: fedora
+
+  diskimages:
+    - name: centos
+      pause: false
+      elements:
+        - centos-minimal
+        ...
+      env-vars:
+        ...
+
+Then you would need to alter the configuration to::
+
+  providers:
+    - name: ProviderA
+      region-name: region1
+      diskimages: []
+
+  diskimages:
+    - name: centos
+      pause: false
+      elements:
+        - centos-minimal
+        ...
+      env-vars:
+        ...
+
+By keeping the provider defined in the configuration file, but changing
+the ``diskimages`` to an empty list, you signal the builder to cleanup
+resources for that provider, including any images already uploaded, any
+on-disk images, and any image data stored in ZooKeeper. After those
+resources have been cleaned up, it is safe to remove the provider from the
+configuration file entirely, if you wish to do so.
+
+.. note::
+
+  The builder process will automatically notice any changes in its
+  configuration file, so there is no need to restart the service to
+  pick up the change.
 
 Web interface
 -------------
