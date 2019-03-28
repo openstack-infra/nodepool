@@ -70,7 +70,7 @@ class ConfigValidator:
         }
 
         log.info("validating %s" % self.config_file)
-        config = yaml.load(open(self.config_file))
+        config = yaml.safe_load(open(self.config_file))
 
         # validate the overall schema
         schema = v.Schema(top_level)
