@@ -228,61 +228,55 @@ class CleanupWorker(BaseWorker):
             return True
         return False
 
-    def _removeDibItem(self, filename):
-        if filename is None:
+    @staticmethod
+    def deleteLocalBuild(images_dir, image, build, log):
+        '''
+        Remove expired image build from local disk.
+
+        It is safe to call this multiple times, or if no local files exist.
+
+        :param str images_dir: Path to the DIB images directory.
+        :param str image: Name of the image whose build we are deleting.
+        :param ImageBuild build: The build we want to delete.
+        :param Logger log: A logging object for log output.
+        '''
+        def removeDibItem(filename):
+            if filename is None:
+                return
+            try:
+                os.remove(filename)
+                log.info("Removed DIB file %s" % filename)
+            except OSError as e:
+                if e.errno != 2:    # No such file or directory
+                    raise e
+
+        base = "-".join([image, build.id])
+        files = DibImageFile.from_image_id(images_dir, base)
+        if not files:
             return
+
+        log.info("Doing cleanup for %s:%s" % (image, build.id))
+
+        manifest_dir = None
+
+        for f in files:
+            filename = f.to_path(images_dir, True)
+            if not manifest_dir:
+                path, ext = filename.rsplit('.', 1)
+                manifest_dir = path + ".d"
+            items = [filename, f.md5_file, f.sha256_file]
+            list(map(removeDibItem, items))
+
         try:
-            os.remove(filename)
-            self.log.info("Removed DIB file %s" % filename)
+            shutil.rmtree(manifest_dir)
+            log.info("Removed DIB manifest %s" % manifest_dir)
         except OSError as e:
             if e.errno != 2:    # No such file or directory
                 raise e
 
     def _deleteLocalBuild(self, image, build):
-        '''
-        Remove expired image build from local disk.
-
-        :param str image: Name of the image whose build we are deleting.
-        :param ImageBuild build: The build we want to delete.
-
-        :returns: True if files were deleted, False if none were found.
-        '''
-        base = "-".join([image, build.id])
-        files = DibImageFile.from_image_id(self._config.imagesdir, base)
-        if not files:
-            # NOTE(pabelanger): It is possible we don't have any files because
-            # diskimage-builder failed. So, check to see if we have the correct
-            # builder so we can removed the data from zookeeper.
-
-            # To maintain backward compatibility with builders that didn't
-            # use unique builder IDs before, but do now, always compare to
-            # hostname as well since some ZK data may still reference that.
-            if (build.builder_id == self._builder_id or
-                build.builder == self._hostname
-            ):
-                return True
-            return False
-
-        self.log.info("Doing cleanup for %s:%s" % (image, build.id))
-
-        manifest_dir = None
-
-        for f in files:
-            filename = f.to_path(self._config.imagesdir, True)
-            if not manifest_dir:
-                path, ext = filename.rsplit('.', 1)
-                manifest_dir = path + ".d"
-            items = [filename, f.md5_file, f.sha256_file]
-            list(map(self._removeDibItem, items))
-
-        try:
-            shutil.rmtree(manifest_dir)
-            self.log.info("Removed DIB manifest %s" % manifest_dir)
-        except OSError as e:
-            if e.errno != 2:    # No such file or directory
-                raise e
-
-        return True
+        CleanupWorker.deleteLocalBuild(
+            self._config.imagesdir, image, build, self.log)
 
     def _cleanupProvider(self, provider, image, build_id):
         all_uploads = self._zk.getUploads(image, build_id, provider.name)
@@ -497,9 +491,16 @@ class CleanupWorker(BaseWorker):
                     ):
                         build.state = zk.DELETING
                         self._zk.storeBuild(image, build, build.id)
+                    # Release the lock here so we can delete the build znode
 
-                # Release the lock here so we can delete the build znode
-                if self._deleteLocalBuild(image, build):
+                # If we own this build, delete the local DIB files.
+                # To maintain backward compatibility with builders that didn't
+                # use unique builder IDs before, but do now, always compare to
+                # hostname as well since some ZK data may still reference that.
+                if (build.builder_id == self._builder_id or
+                    build.builder == self._hostname
+                ):
+                    self._deleteLocalBuild(image, build)
                     if not self._zk.deleteBuild(image, build.id):
                         self.log.error("Unable to delete build %s because"
                                        " uploads still remain.", build)
