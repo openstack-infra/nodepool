@@ -210,6 +210,7 @@
 - project:
     check:
       jobs:
+        - nodepool-build-image
         - tox-docs
         - tox-pep8
         - tox-py35:
@@ -223,17 +224,18 @@
             voting: false
         - nodepool-functional-k8s
         - nodepool-functional-openshift
-        - nodepool-build-image
-        - zuul-quick-start
+        - zuul-quick-start:
+            dependencies: nodepool-build-image
     gate:
       jobs:
+        - nodepool-upload-image
         - tox-docs
         - tox-pep8
         - tox-py35:
             nodeset: ubuntu-xenial
         - tox-py36
-        - zuul-quick-start
-        - nodepool-upload-image
+        - zuul-quick-start:
+            dependencies: nodepool-upload-image
     post:
       jobs:
         - publish-zuul-docs
