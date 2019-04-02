@@ -173,7 +173,7 @@
 
 - job:
     name: nodepool-build-image
-    parent: build-docker-image
+    parent: opendev-build-docker-image
     description: Build Docker images.
     vars: &nodepool_image_vars
       docker_images:
@@ -189,7 +189,7 @@
 
 - job:
     name: nodepool-upload-image
-    parent: upload-docker-image
+    parent: opendev-upload-docker-image
     description: Build Docker images and upload to Docker Hub.
     vars: *nodepool_image_vars
     secrets:
@@ -199,7 +199,7 @@
 
 - job:
     name: nodepool-promote-image
-    parent: promote-docker-image
+    parent: opendev-promote-docker-image
     description: Promote previously uploaded Docker images.
     vars: *nodepool_image_vars
     secrets:
