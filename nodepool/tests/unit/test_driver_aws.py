@@ -17,6 +17,7 @@ import fixtures
 import logging
 import os
 import tempfile
+import time
 from unittest.mock import patch
 
 import boto3
@@ -78,18 +79,44 @@ class TestDriverAws(tests.DBTestCase):
 
                 self.log.debug("Waiting for request %s", req.id)
                 req = self.waitForNodeRequest(req)
-            self.assertEqual(req.state, zk.FULFILLED)
 
-            self.assertNotEqual(req.nodes, [])
-            node = self.zk.getNode(req.nodes[0])
-            self.assertEqual(node.allocated_to, req.id)
-            self.assertEqual(node.state, zk.READY)
-            self.assertIsNotNone(node.launcher)
-            self.assertEqual(node.connection_type, 'ssh')
-            nodescan.assert_called_with(
-                node.interface_ip, port=22, timeout=180, gather_hostkeys=True)
+                self.assertEqual(req.state, zk.FULFILLED)
 
-            node.state = zk.DELETING
-            self.zk.storeNode(node)
+                self.assertNotEqual(req.nodes, [])
+                node = self.zk.getNode(req.nodes[0])
+                self.assertEqual(node.allocated_to, req.id)
+                self.assertEqual(node.state, zk.READY)
+                self.assertIsNotNone(node.launcher)
+                self.assertEqual(node.connection_type, 'ssh')
+                nodescan.assert_called_with(
+                    node.interface_ip,
+                    port=22,
+                    timeout=180,
+                    gather_hostkeys=True)
+                # A new request will be paused and for lack of quota until this
+                # one is deleted
+                req2 = zk.NodeRequest()
+                req2.state = zk.REQUESTED
+                req2.node_types.append('ubuntu1404')
+                self.zk.storeNodeRequest(req2)
+                req2 = self.waitForNodeRequest(
+                    req2, (zk.PENDING, zk.FAILED, zk.FULFILLED))
+                self.assertEqual(req2.state, zk.PENDING)
+                # It could flip from PENDING to one of the others, so sleep a
+                # bit and be sure
+                time.sleep(1)
+                req2 = self.waitForNodeRequest(
+                    req2, (zk.PENDING, zk.FAILED, zk.FULFILLED))
+                self.assertEqual(req2.state, zk.PENDING)
 
-            self.waitForNodeDeletion(node)
+                node.state = zk.DELETING
+                self.zk.storeNode(node)
+
+                self.waitForNodeDeletion(node)
+
+                req2 = self.waitForNodeRequest(req2, (zk.FAILED, zk.FULFILLED))
+                self.assertEqual(req2.state, zk.FULFILLED)
+                node = self.zk.getNode(req2.nodes[0])
+                node.state = zk.DELETING
+                self.zk.storeNode(node)
+                self.waitForNodeDeletion(node)
