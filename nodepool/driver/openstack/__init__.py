@@ -30,5 +30,5 @@ class OpenStackDriver(Driver):
     def getProviderConfig(self, provider):
         return OpenStackProviderConfig(self, provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return OpenStackProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return OpenStackProvider(provider_config)

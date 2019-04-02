@@ -41,7 +41,7 @@ MAX_QUOTA_AGE = 5 * 60  # How long to keep the quota information cached
 class OpenStackProvider(Provider):
     log = logging.getLogger("nodepool.driver.openstack.OpenStackProvider")
 
-    def __init__(self, provider, use_taskmanager):
+    def __init__(self, provider):
         self.provider = provider
         self._images = {}
         self._networks = {}

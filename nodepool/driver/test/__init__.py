@@ -21,5 +21,5 @@ class TestDriver(Driver):
     def getProviderConfig(self, provider):
         return config.TestConfig(provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
+    def getProvider(self, provider_config):
         return provider.TestProvider(provider_config)

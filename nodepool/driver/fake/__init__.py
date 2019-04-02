@@ -30,5 +30,5 @@ class FakeDriver(Driver):
     def getProviderConfig(self, provider):
         return FakeProviderConfig(self, provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return FakeProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return FakeProvider(provider_config)

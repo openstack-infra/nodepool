@@ -21,5 +21,5 @@ class StaticDriver(Driver):
     def getProviderConfig(self, provider):
         return config.StaticProviderConfig(provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return provider.StaticNodeProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return provider.StaticNodeProvider(provider_config)
