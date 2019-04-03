@@ -535,9 +535,10 @@ class DBTestCase(BaseTestCase):
         return app
 
     def useBuilder(self, configfile, securefile=None, cleanup_interval=.5):
-        self.useFixture(
+        builder_fixture = self.useFixture(
             BuilderFixture(configfile, cleanup_interval, securefile)
         )
+        return builder_fixture.builder
 
     def setupZK(self):
         f = ZookeeperServerFixture()

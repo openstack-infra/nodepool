@@ -17,6 +17,7 @@ import os
 import uuid
 import fixtures
 import mock
+import time
 
 from nodepool import builder, exceptions, tests
 from nodepool.driver.fake import provider as fakeprovider
@@ -350,3 +351,46 @@ class TestNodePoolBuilder(tests.DBTestCase):
         builder.BUILD_PROCESS_POLL_TIMEOUT = 500
         self.useBuilder(configfile, cleanup_interval=0)
         self.waitForBuild('fake-image', '0000000001', states=(zk.FAILED,))
+
+    def test_session_loss_during_build(self):
+        configfile = self.setup_config('node.yaml')
+
+        # We need to make the image build process pause so we can introduce
+        # a simulated ZK session loss. The fake dib process will sleep while
+        # the pause file is present in the images directory supplied to it.
+        pause_file = os.path.join(self._config_images_dir.path,
+                                  "fake-image-create.pause")
+        open(pause_file, 'w')
+
+        # Disable cleanup thread to verify builder cleans up after itself
+        bldr = self.useBuilder(configfile, cleanup_interval=0)
+        self.waitForBuild('fake-image', '0000000001', states=(zk.BUILDING,))
+
+        # The build should now be paused just before writing out any DIB files.
+        # Mock the next call to storeBuild() which is supposed to be the update
+        # of the current build in ZooKeeper. This failure simulates losing the
+        # ZK session and not being able to update the record.
+        bldr.zk.storeBuild = mock.Mock(side_effect=Exception('oops'))
+
+        # Allow the fake-image-create to continue by removing the pause file
+        os.remove(pause_file)
+
+        # The fake dib process writes out a .done file at the end. We need
+        # this so we do not continue in this test until *after* all files are
+        # written by that dib process.
+        done_file = os.path.join(self._config_images_dir.path,
+                                 "fake-image-create.done")
+        while not os.path.exists(done_file):
+            time.sleep(.1)
+
+        # There shouldn't be any DIB files even though cleanup thread is
+        # disabled because the builder should clean up after itself.
+        images_dir = bldr._config.imagesdir
+
+        # Wait for builder to remove the leaked files
+        image_files = builder.DibImageFile.from_image_id(
+            images_dir, 'fake-image-0000000001')
+        while image_files:
+            time.sleep(.1)
+            image_files = builder.DibImageFile.from_image_id(
+                images_dir, 'fake-image-0000000001')
