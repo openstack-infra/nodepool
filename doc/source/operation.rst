@@ -407,23 +407,33 @@ Nodepool builder
 .. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.size
    :type: gauge
 
-   This stat reports the size of the built image in bytes.
+   This stat reports the size of the built image in bytes.  ``ext`` is
+   based on the formats of the images created for the build, for
+   example ``qcow2``, ``raw``, ``vhd``, etc.
+
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.status.rc
+   :type: gauge
+
+   Return code of the last DIB run.  Zero is successful, non-zero is
+   unsuccessful.
+
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.status.duration
+   :type: timer
+
+   Time the last DIB run for this image build took, in ms
+
+.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.status.last_build
+   :type: gauge
+
+   The UNIX timestamp of the last time a build for this image
+   returned.  This can be useful for presenting a relative time ("X
+   hours ago") in a dashboard.
 
 .. zuul:stat:: nodepool.image_update.<image name>.<provider name>
    :type: counter, timer
 
    Number of image uploads to a specific provider in the cloud plus the time in
    seconds spent to upload the image.
-
-.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.rc
-   :type: gauge
-
-   Return code of the DIB.
-
-.. zuul:stat:: nodepool.dib_image_build.<diskimage_name>.<ext>.duration
-   :type: timer
-
-   Time the DIB run took in ms
 
 Nodepool launcher
 ~~~~~~~~~~~~~~~~~

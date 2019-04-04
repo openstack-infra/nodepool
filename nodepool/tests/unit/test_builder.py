@@ -309,10 +309,11 @@ class TestNodePoolBuilder(tests.DBTestCase):
         self.waitForImage('fake-provider', 'fake-image')
         # Make sure our cleanup worker properly removes the first build.
         self.waitForBuildDeletion('fake-image', '0000000001')
-        self.assertReportedStat('nodepool.dib_image_build.fake-image.qcow2.rc',
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image.status.rc',
                                 '127', 'g')
         self.assertReportedStat('nodepool.dib_image_build.'
-                                'fake-image.qcow2.duration', None, 'ms')
+                                'fake-image.status.duration', None, 'ms')
 
     def test_diskimage_build_only(self):
         configfile = self.setup_config('node_diskimage_only.yaml')
@@ -323,12 +324,15 @@ class TestNodePoolBuilder(tests.DBTestCase):
 
         self.assertEqual(build_tar._formats, ['tar'])
         self.assertEqual(build_default._formats, ['qcow2'])
-        self.assertReportedStat('nodepool.dib_image_build.fake-image.tar.rc',
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image.status.rc',
                                 '0', 'g')
         self.assertReportedStat('nodepool.dib_image_build.'
-                                'fake-image.tar.duration', None, 'ms')
+                                'fake-image.status.duration', None, 'ms')
         self.assertReportedStat('nodepool.dib_image_build.'
                                 'fake-image.tar.size', '4096', 'g')
+        self.assertReportedStat('nodepool.dib_image_build.'
+                                'fake-image.status.last_build', None, 'g')
 
     def test_diskimage_build_formats(self):
         configfile = self.setup_config('node_diskimage_formats.yaml')
