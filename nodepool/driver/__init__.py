@@ -473,7 +473,7 @@ class NodeRequestHandler(NodeRequestHandlerNotifications,
                         # else with capacity can take it.
                         self.log.debug(
                             "Declining node request %s because provider cannot"
-                            " satisfy min-ready")
+                            " satisfy min-ready", self.request.id)
                         self.decline_request()
                         self._declinedHandlerCleanup()
                         return
