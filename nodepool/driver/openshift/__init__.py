@@ -33,5 +33,5 @@ class OpenshiftDriver(Driver):
     def getProviderConfig(self, provider):
         return OpenshiftProviderConfig(self, provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return OpenshiftProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return OpenshiftProvider(provider_config)

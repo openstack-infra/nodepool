@@ -23,5 +23,5 @@ class AwsDriver(Driver):
     def getProviderConfig(self, provider):
         return AwsProviderConfig(self, provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return AwsProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return AwsProvider(provider_config)

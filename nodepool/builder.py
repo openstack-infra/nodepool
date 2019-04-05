@@ -543,7 +543,6 @@ class CleanupWorker(BaseWorker):
         self._checkForZooKeeperChanges(new_config)
         provider_manager.ProviderManager.reconfigure(self._config, new_config,
                                                      self._zk,
-                                                     use_taskmanager=False,
                                                      only_image_manager=True)
         self._config = new_config
 
@@ -988,7 +987,6 @@ class UploadWorker(BaseWorker):
         self._checkForZooKeeperChanges(new_config)
         provider_manager.ProviderManager.reconfigure(self._config, new_config,
                                                      self._zk,
-                                                     use_taskmanager=False,
                                                      only_image_manager=True)
         self._config = new_config
 

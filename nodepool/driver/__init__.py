@@ -120,14 +120,10 @@ class Driver(object, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def getProvider(self, provider_config, use_taskmanager):
+    def getProvider(self, provider_config):
         """Return a Provider instance
 
         :arg dict provider_config: A ProviderConfig instance
-
-        :arg bool use_taskmanager: Whether this provider should use a
-           task manager (i.e., perform synchronous or asynchronous
-           operations).
         """
         pass
 

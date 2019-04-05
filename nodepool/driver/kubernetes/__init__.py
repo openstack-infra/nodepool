@@ -30,5 +30,5 @@ class KubernetesDriver(Driver):
     def getProviderConfig(self, provider):
         return KubernetesProviderConfig(self, provider)
 
-    def getProvider(self, provider_config, use_taskmanager):
-        return KubernetesProvider(provider_config, use_taskmanager)
+    def getProvider(self, provider_config):
+        return KubernetesProvider(provider_config)
