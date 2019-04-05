@@ -241,10 +241,6 @@ class OpenStackNodeLauncher(NodeLauncher):
             try:
                 self._launchNode()
                 break
-            except openstack.exceptions.TaskManagerStopped:
-                # If we lost our TaskManager session, we won't be able to
-                # launch an instance, so there's no need to continue.
-                raise
             except kze.SessionExpiredError:
                 # If we lost our ZooKeeper session, we've lost our node lock
                 # so there's no need to continue.
