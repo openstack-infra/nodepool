@@ -1438,9 +1438,15 @@ class TestLauncher(tests.DBTestCase):
         self.assertEqual(2, len(pool._pool_threads))
 
         self.replace_config(configfile, 'launcher_two_provider_remove.yaml')
-        # wait longer than our watermark_sleep time for the config to change
-        time.sleep(1)
-        self.assertEqual(1, len(pool._pool_threads))
+
+        # Our provider pool thread count should eventually be reduced to 1
+        for _ in iterate_timeout(10, Exception,
+                                 'provider pool threads to reduce to 1'):
+            try:
+                self.assertEqual(1, len(pool._pool_threads))
+                break
+            except AssertionError:
+                pass
 
     def test_failed_provider(self):
         """Test that broken provider doesn't fail node requests."""
