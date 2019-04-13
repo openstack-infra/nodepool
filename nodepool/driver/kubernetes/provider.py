@@ -114,7 +114,7 @@ class KubernetesProvider(Provider):
             "propagationPolicy": "Background"
         }
         try:
-            self.k8s_client.delete_namespace(server_id, delete_body)
+            self.k8s_client.delete_namespace(server_id, body=delete_body)
             self.log.info("%s: namespace removed" % server_id)
         except Exception:
             # TODO: implement better exception handling
