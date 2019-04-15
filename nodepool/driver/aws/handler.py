@@ -13,11 +13,12 @@
 # under the License.
 
 import logging
+import math
 import time
 
 from nodepool import exceptions
 from nodepool import zk
-from nodepool.driver.utils import NodeLauncher
+from nodepool.driver.utils import NodeLauncher, QuotaInformation
 from nodepool.driver import NodeRequestHandler
 from nodepool.nodeutils import nodescan
 
@@ -25,6 +26,7 @@ from nodepool.nodeutils import nodescan
 class AwsInstanceLauncher(NodeLauncher):
     def __init__(self, handler, node, provider_config, provider_label):
         super().__init__(handler.zk, node, provider_config)
+        self.provider_name = provider_config.name
         self.retries = provider_config.launch_retries
         self.pool = provider_config.pools[provider_label.pool.name]
         self.handler = handler
@@ -60,6 +62,10 @@ class AwsInstanceLauncher(NodeLauncher):
             if state == 'running':
                 instance.create_tags(Tags=[{'Key': 'nodepool_id',
                                             'Value': str(self.node.id)}])
+                instance.create_tags(Tags=[{'Key': 'nodepool_pool',
+                                            'Value': str(self.pool.name)}])
+                instance.create_tags(Tags=[{'Key': 'nodepool_provider',
+                                            'Value': str(self.provider_name)}])
                 break
             time.sleep(0.5)
             instance.reload()
@@ -126,6 +132,45 @@ class AwsNodeRequestHandler(NodeRequestHandler):
                     if not self.manager.labelReady(self.pool.labels[label]):
                         return False
         return True
+
+    def hasRemainingQuota(self, ntype):
+        '''
+        Apply max_servers check, ignoring other quotas.
+
+        :returns: True if we have room, False otherwise.
+        '''
+        needed_quota = QuotaInformation(cores=1, instances=1, ram=1, default=1)
+        n_running = self.manager.countNodes(self.pool.name)
+        pool_quota = QuotaInformation(
+            cores=math.inf,
+            instances=self.pool.max_servers - n_running,
+            ram=math.inf,
+            default=math.inf)
+        pool_quota.subtract(needed_quota)
+        self.log.debug("hasRemainingQuota({},{}) = {}".format(
+            self.pool, ntype, pool_quota))
+        return pool_quota.non_negative()
+
+    def hasProviderQuota(self, node_types):
+        '''
+        Apply max_servers check to a whole request
+
+        :returns: True if we have room, False otherwise.
+        '''
+        needed_quota = QuotaInformation(
+            cores=1,
+            instances=len(node_types),
+            ram=1,
+            default=1)
+        pool_quota = QuotaInformation(
+            cores=math.inf,
+            instances=self.pool.max_servers,
+            ram=math.inf,
+            default=math.inf)
+        pool_quota.subtract(needed_quota)
+        self.log.debug("hasProviderQuota({},{}) = {}".format(
+            self.pool, node_types, pool_quota))
+        return pool_quota.non_negative()
 
     def launchesComplete(self):
         '''

@@ -16,7 +16,7 @@ providers:
         username: ubuntu
     pools:
       - name: main
-        max-servers: 5
+        max-servers: 1
         subnet-id: null
         security-group-id: null
         labels:

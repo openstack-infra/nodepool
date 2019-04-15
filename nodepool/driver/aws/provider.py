@@ -27,11 +27,14 @@ class AwsInstance:
         if metadatas:
             for metadata in metadatas:
                 if metadata["Key"] == "nodepool_id":
-                    self.metadata = {
-                        'nodepool_provider_name': provider.name,
-                        'nodepool_node_id': metadata["Value"],
-                    }
-                    break
+                    self.metadata['nodepool_node_id'] = metadata["Value"]
+                    continue
+                if metadata["Key"] == "nodepool_pool":
+                    self.metadata['nodepool_pool_name'] = metadata["Value"]
+                    continue
+                if metadata["Key"] == "nodepool_provider":
+                    self.metadata['nodepool_provider_name'] = metadata["Value"]
+                    continue
 
     def get(self, name, default=None):
         return getattr(self, name, default)
@@ -65,9 +68,29 @@ class AwsProvider(Provider):
         for instance in self.ec2.instances.all():
             if instance.state["Name"].lower() == "terminated":
                 continue
+            ours = False
+            if instance.tags:
+                for tag in instance.tags:
+                    if (tag["Key"] == 'nodepool_provider'
+                        and tag["Value"] == self.provider.name):
+                        ours = True
+                        break
+            if not ours:
+                continue
             servers.append(AwsInstance(
                 instance.id, instance.tags, self.provider))
         return servers
+
+    def countNodes(self, pool=None):
+        n = 0
+        for instance in self.listNodes():
+            if pool is not None:
+                if 'nodepool_pool_name' not in instance.metadata:
+                    continue
+                if pool != instance.metadata['nodepool_pool_name']:
+                    continue
+            n += 1
+        return n
 
     def getImage(self, image_id):
         return self.ec2.Image(image_id)
