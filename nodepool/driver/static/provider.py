@@ -36,8 +36,10 @@ class StaticNodeProvider(Provider):
 
     def checkHost(self, node):
         '''Check node is reachable'''
-        # only gather host keys if the connection type is ssh
-        gather_hostkeys = node["connection-type"] == 'ssh'
+        # only gather host keys if the connection type is ssh or network_cli
+        gather_hostkeys = (
+            node["connection-type"] == 'ssh' or
+            node["connection-type"] == 'network_cli')
         try:
             keys = nodeutils.nodescan(node["name"],
                                       port=node["connection-port"],
