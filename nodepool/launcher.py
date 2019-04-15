@@ -704,7 +704,7 @@ class DeletedNodeWorker(BaseCleanupWorker):
         Delete instances from providers and nodes entries from ZooKeeper.
         '''
         cleanup_states = (zk.USED, zk.IN_USE, zk.BUILDING, zk.FAILED,
-                          zk.DELETING, zk.ABORTED)
+                          zk.DELETING, zk.DELETED, zk.ABORTED)
 
         zk_conn = self._nodepool.getZK()
         for node in zk_conn.nodeIterator():
