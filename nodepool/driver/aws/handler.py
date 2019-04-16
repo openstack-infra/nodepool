@@ -82,7 +82,8 @@ class AwsInstanceLauncher(NodeLauncher):
         self.node.connection_type = self.label.cloud_image.connection_type
         if self.pool.host_key_checking:
             try:
-                if self.node.connection_type == 'ssh':
+                if (self.node.connection_type == 'ssh' or
+                        self.node.connection_type == 'network_cli'):
                     gather_hostkeys = True
                 else:
                     gather_hostkeys = False

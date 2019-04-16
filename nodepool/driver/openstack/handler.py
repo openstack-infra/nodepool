@@ -217,8 +217,11 @@ class OpenStackNodeLauncher(NodeLauncher):
             try:
                 self.log.debug(
                     "Gathering host keys for node %s", self.node.id)
-                # only gather host keys if the connection type is ssh
-                gather_host_keys = connection_type == 'ssh'
+                # only gather host keys if the connection type is ssh or
+                # network_cli
+                gather_host_keys = (
+                    connection_type == 'ssh' or
+                    connection_type == 'network_cli')
                 host_keys = utils.nodescan(
                     interface_ip,
                     timeout=self.provider_config.boot_timeout,
