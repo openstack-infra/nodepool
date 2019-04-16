@@ -18,6 +18,7 @@ import math
 import time
 import fixtures
 import mock
+import testtools
 
 from nodepool import tests
 from nodepool import zk
@@ -2025,3 +2026,30 @@ class TestLauncher(tests.DBTestCase):
 
         self.assertReportedStat('nodepool.provider.fake-provider.downPorts',
                                 value='2', kind='c')
+
+    def test_deleteRawNode_exception(self):
+        configfile = self.setup_config('node.yaml')
+        self.useBuilder(configfile)
+        pool = self.useNodepool(configfile, watermark_sleep=1)
+        pool.start()
+
+        nodes = self.waitForNodes('fake-label')
+        self.assertEqual(1, len(nodes))
+
+        # We want the first call to deleteRawNode() to fail, but subsequent
+        # ones to succeed, so we store a pointer to the actual method so we
+        # can reset it at the point we want to really delete.
+        real_method = nodepool.zk.ZooKeeper.deleteRawNode
+        nodepool.zk.ZooKeeper.deleteRawNode = mock.Mock(
+            side_effect=Exception('mock exception'))
+
+        # This call should leave the node in the DELETED state
+        with testtools.ExpectedException(Exception):
+            self.zk.deleteNode(nodes[0])
+
+        node = self.zk.getNode(nodes[0].id, cached=False)
+        self.assertEqual(zk.DELETED, node.state)
+
+        # Ready for the real delete now
+        nodepool.zk.ZooKeeper.deleteRawNode = real_method
+        self.waitForNodeDeletion(node)
