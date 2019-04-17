@@ -18,6 +18,7 @@ import argparse
 import daemon
 import errno
 import extras
+import io
 import logging
 import logging.config
 import os
@@ -28,6 +29,9 @@ import traceback
 
 from nodepool.version import version_info as npd_version_info
 from nodepool import logconfig
+
+yappi = extras.try_import('yappi')
+objgraph = extras.try_import('objgraph')
 
 # as of python-daemon 1.6 it doesn't bundle pidlockfile anymore
 # instead it depends on lockfile-0.9.1 which uses pidfile.
@@ -58,21 +62,57 @@ def is_pidfile_stale(pidfile):
 
 def stack_dump_handler(signum, frame):
     signal.signal(signal.SIGUSR2, signal.SIG_IGN)
-    log_str = ""
-    threads = {}
-    for t in threading.enumerate():
-        threads[t.ident] = t
-    for thread_id, stack_frame in sys._current_frames().items():
-        thread = threads.get(thread_id)
-        if thread:
-            thread_name = thread.name
-        else:
-            thread_name = 'Unknown'
-        label = '%s (%s)' % (thread_name, thread_id)
-        log_str += "Thread: %s\n" % label
-        log_str += "".join(traceback.format_stack(stack_frame))
     log = logging.getLogger("nodepool.stack_dump")
-    log.debug(log_str)
+    log.debug("Beginning debug handler")
+
+    try:
+        threads = {}
+        for t in threading.enumerate():
+            threads[t.ident] = t
+        log_str = ""
+        for thread_id, stack_frame in sys._current_frames().items():
+            thread = threads.get(thread_id)
+            if thread:
+                thread_name = thread.name
+                thread_is_daemon = str(thread.daemon)
+            else:
+                thread_name = '(Unknown)'
+                thread_is_daemon = '(Unknown)'
+            log_str += "Thread: %s %s d: %s\n"\
+                       % (thread_id, thread_name, thread_is_daemon)
+            log_str += "".join(traceback.format_stack(stack_frame))
+        log.debug(log_str)
+    except Exception:
+        log.exception("Thread dump error:")
+
+    try:
+        if yappi:
+            if not yappi.is_running():
+                log.debug("Starting Yappi")
+                yappi.start()
+            else:
+                log.debug("Stopping Yappi")
+                yappi.stop()
+                yappi_out = io.StringIO()
+                yappi.get_func_stats().print_all(out=yappi_out)
+                yappi.get_thread_stats().print_all(out=yappi_out)
+                log.debug(yappi_out.getvalue())
+                yappi_out.close()
+                yappi.clear_stats()
+    except Exception:
+        log.exception("Yappi error:")
+
+    try:
+        if objgraph:
+            log.debug("Most common types:")
+            objgraph_out = io.StringIO()
+            objgraph.show_growth(limit=100, file=objgraph_out)
+            log.debug(objgraph_out.getvalue())
+            objgraph_out.close()
+    except Exception:
+        log.exception("Objgraph error:")
+    log.debug("End debug handler")
+
     signal.signal(signal.SIGUSR2, stack_dump_handler)
 
 
