@@ -1,6 +1,0 @@
----
-features:
-  - |
-    The static driver now pre-registers its nodes with ZooKeeper at startup
-    and on configuration changes. A single node may be registered multiple
-    times, based on the value of max-parallel-jobs.

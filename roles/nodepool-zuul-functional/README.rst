@@ -1,1 +1,0 @@
-Prepare nodepool installation.

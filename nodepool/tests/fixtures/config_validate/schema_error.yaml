@@ -1,4 +1,0 @@
-elements-dir: /etc/nodepool/elements
-images-dir: /opt/nodepool_dib
-
-nothandled: element

@@ -1,7 +1,0 @@
-clouds:
-  fake:
-    auth:
-      usernmae: 'fake'
-      password: 'fake'
-      project_id: 'fake'
-      auth_url: 'fake'

@@ -1,7 +1,0 @@
-qemu-utils
-kpartx
-debootstrap
-yum-utils
-zookeeperd
-zypper
-gnupg2

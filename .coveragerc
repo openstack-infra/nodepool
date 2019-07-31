@@ -1,7 +1,0 @@
-[run]
-branch = True
-source = nodepool
-omit = nodepool/tests/*
-
-[report]
-ignore_errors = True

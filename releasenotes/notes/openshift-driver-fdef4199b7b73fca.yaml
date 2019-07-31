@@ -1,5 +1,0 @@
----
-features:
-  - |
-    A new driver is available to support Openshift cluster as a resources provider
-    to enable project and pod request.

@@ -1,5 +1,0 @@
-providers:
-  - name: static-rack
-    driver: static
-    cloud: no-cloud
-
